@@ -1,0 +1,49 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  font-family: Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.container {
+  width: 100%;
+  min-height: 100vh;
+  background: #f7f7f7;
+}
+
+.header {
+  padding: 20px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: #666;
+}
+
+.content {
+  padding: 20px;
+}
+
+.content h2 {
+  margin-top: 0;
+}
+
+.content button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
