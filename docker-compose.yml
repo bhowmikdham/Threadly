@@ -1,0 +1,69 @@
+# Threadly prod-shaped stack. See docs/architecture.md for the topology.
+# Named volumes survive re-deploys: pgdata, chromadata, caddy_data.
+name: threadly
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "443:443"          # security group opens 443 + 22 only; ACME via TLS-ALPN on 443
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data           # certs — losing this triggers rate-limited re-issuance
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks: [threadly_net]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8000"             # reachable only inside threadly_net (caddy proxies to it)
+    volumes:
+      - ./ml:/ml:ro        # AI-team artifacts: classifier, adapter, prompts (read-only)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+    networks: [threadly_net]
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-threadly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-threadly}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-threadly} -d $${POSTGRES_DB:-threadly}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [threadly_net]
+
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chromadata:/data   # capped usage in practice — t3 memory budget, see architecture doc
+    networks: [threadly_net]
+
+networks:
+  threadly_net:
+
+volumes:
+  pgdata:
+  chromadata:
+  caddy_data:
+  caddy_config:

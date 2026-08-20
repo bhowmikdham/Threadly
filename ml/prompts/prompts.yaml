@@ -1,0 +1,22 @@
+# Versioned prompt templates. Loaded by the api container from /ml/prompts/prompts.yaml.
+# Bump `version` on ANY change — ablation runs pin this.
+version: 0.1.0
+
+summarise_thread:
+  description: Collapse a cleaned thread into decisions, action items, deadlines.
+  variables: [thread_text, participant_names]
+  template: |
+    TODO(AI team): authored in W1. Keep outputs grounded in thread_text only;
+    no outside knowledge; mark uncertainty explicitly.
+
+draft_reply:
+  description: Draft a reply in the user's voice using RAG examples.
+  variables: [thread_text, instruction, voice_examples, tone]
+  template: |
+    TODO(AI team): authored in W3 alongside RAG.
+
+plan_intent:
+  description: Map a user utterance to an intent JSON (2b fallback when rules miss).
+  variables: [utterance, intent_schema]
+  template: |
+    TODO(AI team): must return ONLY JSON matching intent_schema.
