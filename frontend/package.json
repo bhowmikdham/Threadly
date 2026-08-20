@@ -24,9 +24,11 @@
     "typescript": "5.3.3"
   },
   "manifest": {
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6dZFvQRDRsU3uS3+5wIR38W5nMdy02p9HNqe7/o9z7L2hNUcpkIMTXsAhSFItfgvyBI6XRN9fPuwDjFpyghAB+qVO0CXkNkLXTSiL8qNkJZ7P3QT63tO5wKx6xEPGyz+/ZwCSEDmDiQezWRVIQTuG6Tj5KxOa40S/190y63AGkcvR7hVp4ZRDRHHP39V8eXI26Bu9kYNasMb8/i71iZuTrRkgqgtc0uZXUvHv0DXXM9cv4YNs2/3oChGhX65L2/LQ5gUpIMYle4NXDTuFy+Zt7fu+6xKBnvYzl9UOzoK/uix7UXBbiqeynwII/qCeFDcpHBU6wXMndjK38d2bBvsDwIDAQAB",
     "permissions": [
-      "sidePanel"
+      "sidePanel", "identity"
     ],
+    "oauth2": { "client_id": "1054567044769-6dk3mi16v6k1m5omlc5g8akdd94kgv1j.apps.googleusercontent.com", "scopes": [ "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/gmail.readonly" ] },
     "host_permissions": [
       "https://*/*"
     ],
