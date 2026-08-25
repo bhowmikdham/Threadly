@@ -4,8 +4,9 @@ The seam between `frontend/` and `backend/`. **Contract-first**: any change to a
 path, field, or event shape happens by PR to this file, reviewed by both sides,
 before the code changes. The pydantic models in `backend/app/schemas/` mirror this.
 
-Status: v0 — endpoint shapes are proposals until the frontend and backend owners
-sign off. Nothing here is implemented yet except `/healthz` (skeleton returns 501).
+Status: v0.1 — W1 endpoints are LIVE: `/auth/google/exchange`, `/auth/refresh`,
+`/healthz`, `/readyz`, `/sync`, `/threads`, `/threads/{id}`, `/threads/{id}/summary` (SSE).
+Still stubbed (501): `/draft*`, `/entities`, `/commitments`, `/voice/*`.
 
 ## Conventions
 
@@ -40,7 +41,7 @@ event: error        data: {"error": {envelope}}     # terminal on failure
 ### Auth
 | Method | Path                    | Body                    | Returns |
 |--------|-------------------------|-------------------------|---------|
-| POST   | `/auth/google/exchange` | `{"code": "..."}` (OAuth auth code from extension flow) | `{"jwt": "...", "user": {"id", "email", "name"}}` |
+| POST   | `/auth/google/exchange` | `{"code": "...", "redirect_uri": "..."}` — auth code from `chrome.identity.launchWebAuthFlow`, plus the redirect URI used | `{"jwt": "...", "user": {"id", "email", "name"}}` |
 | POST   | `/auth/refresh`         | — (valid JWT)           | `{"jwt": "..."}` |
 
 ### Health
@@ -48,6 +49,13 @@ event: error        data: {"error": {envelope}}     # terminal on failure
 |--------|------------|---------|
 | GET    | `/healthz` | `{"status": "ok", "version": "..."}` — liveness, no auth, no DB touch |
 | GET    | `/readyz`  | `{"status": "ok", "postgres": true, "chroma": true}` — 503 + envelope if a dependency is down |
+
+### Sync
+| Method | Path    | Body | Returns |
+|--------|---------|------|---------|
+| POST   | `/sync` | —    | `{"mode": "backfill|incremental", "messages_upserted": n, "threads_touched": n}` — first call walks the whole mailbox (ALL pages), later calls use the Gmail history cursor; expired cursor transparently re-backfills |
+
+Call it right after login, then on side-panel open. Runs inline in W1 (a few seconds for test inboxes).
 
 ### Threads
 | Method | Path                      | Query                                   | Returns |
@@ -79,7 +87,7 @@ masks PII before any cloud egress.
 
 ## Open questions (settle before W2)
 
-- [ ] Pagination style for `/threads` (page number vs cursor) — frontend preference?
+- [x] Pagination for `/threads`: page numbers, `page_size` 25 (decided W1 — shout if the panel wants cursors)
 - [ ] Does the side panel want thread list deltas pushed (SSE) or is poll-on-open fine?
 - [ ] Draft approval flow: does `send` live in backend (`/draft/{id}/send`) or does the
       extension compose via Gmail UI with the draft text? Changes module 3 scope.

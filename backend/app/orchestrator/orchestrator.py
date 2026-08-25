@@ -1,24 +1,80 @@
-"""Module 5 — ORCHESTRATOR (build: W2+).
+"""Module 5 — ORCHESTRATOR (W1: SUMMARISE pipeline implemented).
 
-Single dispatch point for user requests. The rule that shapes everything here
-(ADR 002): structured data goes AROUND the LLM, never through it.
+The rule that shapes everything here (ADR 002): structured data goes AROUND
+the LLM, never through it.
 
-Dispatch table (from the architecture doc):
-- FETCH_ENTITY / FETCH_COMMITMENTS -> entity store (postgres). No model call.
-- SUMMARISE -> summaries cache hit on (thread_id, last_msg_id)? return it.
-               miss -> clean thread -> prompt (from /ml/prompts) -> model_client -> cache.
-- DRAFT     -> RAG retrieve (7, user's sent-mail voice examples) -> 4b via
-               model_client -> stream tokens -> persist drafts row.
+SUMMARISE:
+    cache hit on (thread_pk, last_msg_id)  -> yield cached text, done (no model)
+    miss -> build thread text from postgres -> prompt -> model_client stream
+         -> persist to summaries -> done
+Emits SummaryEvent items the SSE route maps 1:1 onto the wire contract.
 """
-from app.orchestrator.intents import Intent
-from app.planner.planner import Plan
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.errors import ApiError
+from app.db import repositories as repo
+from app.model_client.client import get_model_client
+from app.orchestrator.prompts import get_prompt, prompts_version
+
+_THREAD_CHAR_BUDGET = 12_000  # keep 4b prompts inside local context; W2: openrouter for longer
 
 
-async def dispatch(user_id: int, p: Plan):
-    match p.intent:
-        case Intent.FETCH_ENTITY | Intent.FETCH_COMMITMENTS:
-            raise NotImplementedError("W2: entity store query")
-        case Intent.SUMMARISE:
-            raise NotImplementedError("W1/W2: cache -> summary pipeline")
-        case Intent.DRAFT:
-            raise NotImplementedError("W3: RAG + 4b")
+@dataclass
+class SummaryEvent:
+    kind: str  # "token" | "done" | "cached"
+    text: str = ""
+    provider: str | None = None
+
+
+def _render_thread(messages, char_budget: int = _THREAD_CHAR_BUDGET) -> str:
+    """Newest-last transcript, trimmed oldest-first to fit the budget."""
+    blocks: list[str] = []
+    for m in messages:
+        who = "ME" if m.is_from_user else (m.from_addr or "unknown")
+        when = m.sent_at.isoformat() if m.sent_at else "?"
+        blocks.append(f"[{when}] {who}:\n{m.body_clean or ''}")
+    text = "\n\n---\n\n".join(blocks)
+    return text[-char_budget:] if len(text) > char_budget else text
+
+
+async def summarise_thread(
+    session: AsyncSession, user_id: int, gmail_thread_id: str
+) -> AsyncIterator[SummaryEvent]:
+    thread = await repo.get_thread_for_user(session, user_id, gmail_thread_id)
+    if thread is None:
+        raise ApiError(404, "not_found", "Unknown thread — run /sync first?")
+    if not thread.last_msg_id:
+        raise ApiError(409, "thread_empty", "Thread has no synced messages yet.")
+
+    cached = await repo.get_cached_summary(session, thread.id, thread.last_msg_id)
+    if cached is not None:
+        yield SummaryEvent("cached", cached.body, provider="cache")
+        yield SummaryEvent("done", provider="cache")
+        return
+
+    messages = await repo.thread_messages(session, thread.id)
+    if not messages:
+        raise ApiError(409, "thread_empty", "Thread has no synced messages yet.")
+
+    prompt = get_prompt("summarise_thread", thread_text=_render_thread(messages))
+    stream, info = await get_model_client().stream(prompt, max_tokens=500)
+
+    parts: list[str] = []
+    async for token in stream:
+        parts.append(token)
+        yield SummaryEvent("token", token, provider=info.provider)
+
+    body = "".join(parts).strip()
+    await repo.store_summary(
+        session,
+        user_id=user_id,
+        thread_pk=thread.id,
+        last_msg_id=thread.last_msg_id,
+        body=body,
+        model_used=f"{info.provider}:{info.model}@prompts-{prompts_version()}",
+    )
+    await session.commit()
+    yield SummaryEvent("done", provider=info.provider)

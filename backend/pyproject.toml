@@ -15,10 +15,9 @@ dependencies = [
     "pyjwt>=2.9",
     "cryptography>=43",
     "pyyaml>=6.0",
-    # Heavy SDKs — imported lazily inside functions, so tests/CI run without them installed:
-    "google-auth>=2.34",
-    "google-auth-oauthlib>=1.2",
-    "google-api-python-client>=2.140",
+    # Google OAuth + Gmail are called over plain REST with httpx (app/auth/google.py,
+    # app/sync/gmail.py) — no google SDKs in the image, fully mockable in tests.
+    # chromadb is imported lazily (W3), so tests/CI run without it installed:
     "chromadb>=0.5",
 ]
 

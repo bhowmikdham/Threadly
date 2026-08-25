@@ -38,6 +38,8 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320))
     display_name: Mapped[str | None] = mapped_column(String(200))
     refresh_token_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # Fernet (auth/crypto)
+    access_token_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # Fernet; short-lived
+    access_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     gmail_history_id: Mapped[str | None] = mapped_column(String(32))  # incremental sync cursor
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

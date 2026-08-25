@@ -2,13 +2,14 @@
 
 Owner: backend. SQLAlchemy models live in `backend/app/db/models.py`; schema
 changes go through alembic (`make db-revision m="..."` then `make db-upgrade`)
-and update this file in the same PR.
+and update this file in the same PR. Baseline migration: `26902c33da74_w1_initial_schema`
+(all 7 tables + the drafts GIN index), validated against a clean postgres 16.
 
 Column lists below are the v0 starting point — expected to evolve.
 
 | Table         | Purpose                          | Keys & rules |
 |---------------|----------------------------------|--------------|
-| `users`       | account + oauth + sync cursor    | `google_sub` UNIQUE; refresh token stored Fernet-encrypted (`auth/crypto.py`); `gmail_history_id` = incremental sync cursor |
+| `users`       | account + oauth + sync cursor    | `google_sub` UNIQUE; refresh + access tokens stored Fernet-encrypted (`auth/crypto.py`) with `access_token_expires_at`; `gmail_history_id` = incremental sync cursor |
 | `threads`     | conversation index               | UNIQUE `(user_id, gmail_thread_id)`; caches `last_msg_id`, `last_msg_at` for ordering + summary cache key |
 | `messages`    | cleaned message bodies           | UNIQUE `(user_id, gmail_msg_id)`; `body_clean` = quotes/signatures stripped by sync worker; raw bodies are NOT stored |
 | `summaries`   | thread summary cache             | **cache key = UNIQUE `(thread_id, last_msg_id)`** — new message ⇒ new key ⇒ regeneration; old rows are cheap history |

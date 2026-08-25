@@ -26,7 +26,7 @@ def test_stub_endpoints_are_enveloped_501_when_authed(client):
 
     settings = get_settings()
     token = jwt.encode({"sub": "1"}, settings.secret_key, algorithm=settings.jwt_algorithm)
-    r = client.get("/threads", headers={"Authorization": f"Bearer {token}"})
+    r = client.post("/draft", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 501
     _assert_envelope(r.json())
     assert r.json()["error"]["code"] == "not_implemented"
