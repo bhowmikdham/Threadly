@@ -109,4 +109,9 @@ Findings sent back as round-2 instructions:
   from the desktop app), and the user may need to reopen it — or hand the
   round-2/3 work list to another session.
 
-Awaiting: worker wake-up / round-2+3 deliverables. Next review ~60 min out.
+Probe result: trigger fires do NOT wake the disconnected worker session
+(updated_at unchanged through two fires). Rounds 2–3 are queued and will
+deliver when the user next opens that session in the desktop app. Coordination
+is blocked on that user action; check-ins continue meanwhile.
+
+Awaiting: worker session reopen → round-2+3 deliverables. Reviews continue hourly.
