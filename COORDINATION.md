@@ -59,4 +59,37 @@ Sent to worker:
    milestones M1 doc → M2 skeleton+tests → M3 chat wired to Claude API →
    M4 real classifier.
 
-Awaiting: worker's branch push + STATUS.md. Next review scheduled ~45 min out.
+### Round 2 — 2026-08-27 (~13:35 UTC)
+
+GitHub write access is fixed (this branch is now on origin). Worker pushed
+`claude/threadly-llm-bert-architecture-btzyux` at 29878da: a docker-compose
+microservice backend (Caddy → gateway → orchestrator → inference/gmail,
+postgres + chroma), `contracts/CONTRACTS.md` boundary spec, CI, and unit tests.
+
+Coordinator verification of 29878da:
+- `python -m compileall` clean; **27/27 unit tests pass** (run locally, same as CI).
+- Internal `X-Threadly-Internal` token enforced by all three internal services.
+- Draft lifecycle FSM server-side, send user-gated + idempotent.
+- Google tokens Fernet-encrypted at rest; only Caddy publishes ports.
+- All `/v1` routes JWT-gated (incl. voice/sync/chat).
+
+Findings sent back as round-2 instructions:
+1. `STATUS.md` (round-1 ask) still missing — required as the reporting channel.
+2. The architecture doc README references is not committed → `docs/ARCHITECTURE.md`.
+3. LLM provider: worker built Ollama-primary + OpenRouter-fallback (inherited
+   design) instead of the Claude API suggestion — accepted, but must be
+   recorded as an explicit decision in the architecture doc.
+4. **Frontend/backend auth mismatch (top priority):** the extension uses
+   `chrome.identity.getAuthToken` (raw access token, `gmail.readonly` only) but
+   the backend expects an OAuth *code* via `/v1/auth/google/url` + `exchange`
+   with `gmail.send` in scope. Worker to write `docs/FRONTEND_INTEGRATION.md`
+   (launchWebAuthFlow + `<ext-id>.chromiumapp.org` redirect, JWT storage +
+   refresh, manifest changes, SSE consumption example) and add gateway
+   CORSMiddleware for the extension origin.
+5. Prod safety guard: fail fast when `DEV_MODE=false` with change-me
+   secrets/empty Fernet key.
+6. Refresh tokens are stateless (no rotation/revocation) — document as accepted
+   MVP risk. Nit: `google_exchange` assumes JSON error bodies.
+7. Verify the CI Actions run goes green on the worker branch.
+
+Awaiting: round-2 deliverables on the worker branch. Next review ~60 min out.
