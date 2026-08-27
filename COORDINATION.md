@@ -92,4 +92,21 @@ Findings sent back as round-2 instructions:
    MVP risk. Nit: `google_exchange` assumes JSON error bodies.
 7. Verify the CI Actions run goes green on the worker branch.
 
-Awaiting: round-2 deliverables on the worker branch. Next review ~60 min out.
+### Round 3 — 2026-08-27 (~14:45 UTC)
+
+- No new commits on the worker branch since 29878da; the worker session has
+  been idle/disconnected since 13:17 UTC and does not appear to have processed
+  the round-2 message (fired 13:38).
+- Coordinator confirmed **GitHub Actions CI is green** on the worker branch
+  (run #1, success, head 29878da).
+- Re-fired the channel with a consolidated round-3 message (same work list as
+  round 2: STATUS.md, docs/ARCHITECTURE.md + provider ADR + refresh-token risk
+  note, docs/FRONTEND_INTEGRATION.md as top priority, gateway CORS, prod
+  fail-fast guard, google_exchange JSON guard), marked safe against duplicate
+  delivery.
+- Probing whether the fire wakes the disconnected session; if not, the trigger
+  channel only delivers when the worker session is reopened (it originates
+  from the desktop app), and the user may need to reopen it — or hand the
+  round-2/3 work list to another session.
+
+Awaiting: worker wake-up / round-2+3 deliverables. Next review ~60 min out.
