@@ -1,0 +1,8 @@
+{$THREADLY_DOMAIN:localhost} {
+	encode gzip
+
+	# SSE passthrough: disable response buffering so token streams flush immediately.
+	reverse_proxy gateway:8000 {
+		flush_interval -1
+	}
+}

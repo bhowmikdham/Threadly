@@ -1,0 +1,90 @@
+name: threadly
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  env_file: .env
+  networks: [threadly_net]
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      THREADLY_DOMAIN: ${THREADLY_DOMAIN:-localhost}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    networks: [threadly_net]
+    depends_on: [gateway]
+
+  gateway:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    healthcheck: &http-healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request,os;urllib.request.urlopen('http://localhost:'+os.environ.get('PORT','8000')+'/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      PORT: "8000"
+
+  orchestrator:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/orchestrator/Dockerfile }
+    healthcheck: *http-healthcheck
+    environment:
+      PORT: "8010"
+    volumes:
+      - ./models:/models:ro
+
+  inference:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/inference/Dockerfile }
+    healthcheck: *http-healthcheck
+    environment:
+      PORT: "8020"
+    volumes:
+      - ./models:/models:ro
+
+  gmail:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/gmail/Dockerfile }
+    healthcheck: *http-healthcheck
+    environment:
+      PORT: "8030"
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks: [threadly_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    volumes:
+      - chromadata:/data
+    networks: [threadly_net]
+
+networks:
+  threadly_net:
+
+volumes:
+  pgdata:
+  chromadata:
+  caddy_data:

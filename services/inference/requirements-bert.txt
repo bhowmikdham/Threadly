@@ -1,0 +1,5 @@
+# Optional: only needed to serve the AI team's BERT classifier from models/bert.
+# Install with: docker compose build inference --build-arg WITH_BERT=1
+torch>=2.2
+transformers>=4.40
+safetensors>=0.4
