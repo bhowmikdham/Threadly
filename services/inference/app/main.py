@@ -48,7 +48,7 @@ async def generate(body: GenerateRequest):
 
 @app.post("/v1/classify", dependencies=[Depends(internal_only)])
 async def classify(body: ClassifyRequest):
-    return classify_mod.classify(body.text, body.labels)
+    return await classify_mod.classify(body.text, body.labels)
 
 
 @app.post("/v1/embed", dependencies=[Depends(internal_only)])

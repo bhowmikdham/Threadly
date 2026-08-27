@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from threadly_common.errors import install_error_handlers
 
 from . import clients, db
-from .routes import auth, chat, drafts, entities, sync, system, threads
+from .routes import auth, chat, commitments, drafts, entities, sync, system, threads, voice
 
 
 @asynccontextmanager
@@ -25,3 +25,5 @@ app.include_router(threads.router, prefix="/v1", tags=["threads"])
 app.include_router(drafts.router, prefix="/v1", tags=["drafts"])
 app.include_router(entities.router, prefix="/v1", tags=["entities"])
 app.include_router(sync.router, prefix="/v1", tags=["sync"])
+app.include_router(commitments.router, prefix="/v1", tags=["commitments"])
+app.include_router(voice.router, prefix="/v1", tags=["voice"])

@@ -70,6 +70,10 @@ async def handle(user_id: int, message: str, thread_id: int | None) -> AsyncIter
 async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIterator[str]:
     """Pure SQL — no LLM tokens spent. Progressive disclosure via cursor."""
     params = the_plan.params
+    if params.get("type") == "commitment":
+        async for chunk in _fetch_commitments(user_id):
+            yield chunk
+        return
     window_days = params.get("window_days") or config.DEFAULT_ENTITY_WINDOW_DAYS
     limit = config.ENTITY_PAGE_SIZE
 
@@ -138,6 +142,34 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         if has_more:
             text += " There are older ones too — want me to keep looking further back?"
     yield sse_event(EVENT_TOKEN, {"text": text})
+
+
+async def _fetch_commitments(user_id: int) -> AsyncIterator[str]:
+    """Open commitments, soonest deadline first. Small result set — no cursor."""
+    async with db.pool().acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, description, direction, due_at, source_msg_id, status
+            FROM commitments WHERE user_id = $1 AND status = 'open'
+            ORDER BY due_at ASC NULLS LAST, id ASC
+            LIMIT 50
+            """,
+            user_id,
+        )
+    items = [dict(r) for r in rows]
+    yield sse_event(EVENT_ENTITIES, {"items": items, "has_more": False, "cursor": None, "entity_type": "commitment"})
+
+    if not items:
+        yield sse_event(EVENT_TOKEN, {"text": "You're all clear — no open commitments found in your mail."})
+        return
+    promises = sum(1 for i in items if i["direction"] == "outbound")
+    asks = len(items) - promises
+    parts = []
+    if promises:
+        parts.append(f"{promises} thing{'s' if promises != 1 else ''} you promised")
+    if asks:
+        parts.append(f"{asks} thing{'s' if asks != 1 else ''} people asked of you")
+    yield sse_event(EVENT_TOKEN, {"text": f"You have {' and '.join(parts)}, sorted by deadline."})
 
 
 async def _summarise(user_id: int, thread_id: int | None) -> AsyncIterator[str]:

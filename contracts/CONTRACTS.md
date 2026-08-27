@@ -24,20 +24,28 @@ All `/v1/*` endpoints (except `/v1/auth/*`) require `Authorization: Bearer <acce
 
 ```
 POST /v1/auth/dev              {email}            # DEV_MODE only
+GET  /v1/auth/google/url?state=                    -> {url} consent URL to open
 POST /v1/auth/google/exchange  {code}
 POST /v1/auth/refresh          {refresh_token}
 POST /v1/chat                  {message, thread_id?}    -> SSE stream (§3)
 GET  /v1/threads?limit&offset
 GET  /v1/threads/{id}                                   -> thread + messages
 GET  /v1/entities?type&merchant&window_days&cursor&limit -> §4
+GET  /v1/commitments?status&direction&limit             -> asks + promises, by deadline
+POST /v1/commitments/{id}/done
 GET  /v1/drafts                / GET /v1/drafts/{id}
 PATCH /v1/drafts/{id}          {subject?, body?, to_addrs?}
 POST /v1/drafts/{id}/approve
 POST /v1/drafts/{id}/send      header: Idempotency-Key (recommended)
 POST /v1/drafts/{id}/discard
+POST /v1/voice/stt             multipart audio     -> {text, stub}
+POST /v1/voice/tts             {text, voice_id?}   -> audio stream (wav stub in dev)
 POST /v1/sync                                           # manual sync trigger
 GET  /healthz
 ```
+
+`FETCH_ENTITY` with `type: commitment` reads the commitments table instead of
+entities (asks vs promises, `direction: inbound|outbound`, ordered by `due_at`).
 
 Errors (any non-2xx, "R18 envelope"):
 
@@ -108,7 +116,7 @@ Every internal call carries `X-Threadly-Internal: <token>`.
 orchestrator POST /v1/orchestrate       {user_id, message, thread_id?} -> SSE
 orchestrator POST /internal/rag/index   {user_id, docs: [{id, text}]}
 inference    POST /v1/generate          {prompt, system?, max_tokens?, small_model?} -> SSE
-inference    POST /v1/classify          {text, labels?} -> {label, confidence, source}
+inference    POST /v1/classify          {text, labels?} -> {label, confidence, source: bert|llm|rules}
 inference    POST /v1/embed             {texts[]} -> {embeddings[][], backend, dim}
 gmail        POST /internal/oauth/exchange {code} -> {user_id, email}
 gmail        POST /internal/send        {draft_id, user_id} -> {gmail_msg_id}

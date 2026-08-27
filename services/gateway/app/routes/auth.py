@@ -36,6 +36,35 @@ async def dev_login(body: DevLogin):
     return {"user_id": user_id, **security.create_session(user_id)}
 
 
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_SCOPES = " ".join([
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/userinfo.email",
+])
+
+
+@router.get("/google/url")
+async def google_url(state: str | None = None):
+    """Build the consent URL for the extension to open. The frontend never
+    needs the client id — it just follows this URL and posts back the code."""
+    if not config.GOOGLE_CLIENT_ID or not config.GOOGLE_REDIRECT_URI:
+        raise APIError("google_not_configured", "Google OAuth is not configured on this deployment.", status=501)
+    from urllib.parse import urlencode
+
+    params = {
+        "client_id": config.GOOGLE_CLIENT_ID,
+        "redirect_uri": config.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": GOOGLE_SCOPES,
+        "access_type": "offline",   # we need a refresh token
+        "prompt": "consent",
+    }
+    if state:
+        params["state"] = state
+    return {"url": f"{GOOGLE_AUTH_URL}?{urlencode(params)}"}
+
+
 @router.post("/google/exchange")
 async def google_exchange(body: GoogleExchange):
     """OAuth code exchange. The gmail service owns Google credentials and token

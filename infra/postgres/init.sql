@@ -78,16 +78,21 @@ CREATE TABLE entities (
 CREATE INDEX entities_browse_idx ON entities (user_id, type, occurred_at DESC, id DESC);
 CREATE INDEX entities_merchant_idx ON entities (user_id, merchant);
 
+-- Promises and asks with a deadline, extracted at sync time.
+-- direction: 'outbound' = something the user promised; 'inbound' = something
+-- someone asked of the user.
 CREATE TABLE commitments (
     id             BIGSERIAL PRIMARY KEY,
     user_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     description    TEXT NOT NULL,
+    direction      TEXT NOT NULL DEFAULT 'inbound',
     due_at         TIMESTAMPTZ,
     source_msg_id  TEXT NOT NULL,
     status         TEXT NOT NULL DEFAULT 'open',
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (user_id, source_msg_id, description)
 );
+CREATE INDEX commitments_due_idx ON commitments (user_id, status, due_at);
 
 -- Draft lifecycle: generated -> edited -> approved -> sending -> sent | failed.
 -- The LLM writes rows here; only POST /v1/drafts/{id}/send (user-gated) can

@@ -31,6 +31,12 @@ def test_draft_is_imperative():
     assert plan("what did he write in that email?").intent == Intent.SEARCH
 
 
+def test_commitments_lookup():
+    assert plan("what did I promise people this week?").params.get("type") == "commitment"
+    assert plan("show me my deadlines").intent == Intent.FETCH_ENTITY
+    assert plan("what's due soon?").params.get("type") == "commitment"
+
+
 def test_question_is_search():
     assert plan("when is my dentist appointment?").intent == Intent.SEARCH
 

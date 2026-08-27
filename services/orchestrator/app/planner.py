@@ -15,6 +15,7 @@ ENTITY_TYPE_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("order", re.compile(r"\border(s)?\b|\bpurchase(s)?\b", re.I)),
     ("tracking", re.compile(r"\btracking\b|\bshipment\b|\bwhere('s| is) my (package|parcel|delivery|order)\b", re.I)),
     ("amount", re.compile(r"\breceipt(s)?\b|\binvoice(s)?\b|\bcharged?\b|\bhow much did i (pay|spend)\b", re.I)),
+    ("commitment", re.compile(r"\bcommitments?\b|\bpromised?\b|\bdeadlines?\b|\bwhat('s| is) due\b|\bfollow[- ]?ups?\b|\bowe\b", re.I)),
 ]
 
 MERCHANT_RE = re.compile(r"\b(?:for|from|with|at)\s+([A-Z][A-Za-z0-9&._-]{1,29})")

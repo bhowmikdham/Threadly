@@ -56,6 +56,17 @@ async def sync_user(user_id: int) -> dict:
                 "UPDATE threads SET msg_count = (SELECT count(*) FROM messages WHERE thread_id = $1) WHERE id = $1",
                 thread_id,
             )
+            # Commitments come from both directions: inbound asks, outbound promises.
+            for commitment in extractor.extract_commitments(msg):
+                await conn.execute(
+                    """
+                    INSERT INTO commitments (user_id, description, direction, due_at, source_msg_id)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (user_id, source_msg_id, description) DO NOTHING
+                    """,
+                    user_id, commitment["description"], commitment["direction"],
+                    commitment["due_at"], commitment["source_msg_id"],
+                )
             if msg.get("is_sent"):
                 rag_docs.append({"id": msg["gmail_msg_id"], "text": msg.get("body_text") or ""})
             else:

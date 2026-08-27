@@ -1,7 +1,8 @@
-"""Tier-1 extraction: regexes catch 90%+ of order numbers, tracking codes and
-amounts at sync time, so chat-time lookups are pure SQL. Tier-2 (LLM residue)
-is a hook for later — rows it would add use the same UNIQUE(user,type,key)
-constraint, so both tiers dedupe against each other for free."""
+"""Tier-1 extraction: regexes catch 90%+ of order numbers, tracking codes,
+amounts and dated commitments at sync time, so chat-time lookups are pure SQL.
+Tier-2 (LLM residue) is a hook for later — rows it would add use the same
+UNIQUE constraints, so both tiers dedupe against each other for free."""
+import datetime as dt
 import re
 
 ORDER_RE = re.compile(
@@ -18,6 +19,50 @@ AMOUNT_RE = re.compile(
 )
 
 STOPWORD_KEYS = {"number", "confirmation", "details", "status", "update", "history"}
+
+# A sentence containing a deadline phrase is a commitment candidate.
+COMMITMENT_RE = re.compile(
+    r"([^.!?\n]*\b(?:by|before|due)\s+"
+    r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|end of (?:the )?(?:day|week))"
+    r"\b[^.!?\n]*)",
+    re.I,
+)
+WEEKDAYS = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+
+
+def parse_due(phrase: str, base: dt.datetime) -> dt.datetime | None:
+    """'by thursday' relative to when the email was sent -> a concrete
+    end-of-day UTC timestamp. Same-day names mean today, not next week."""
+    phrase = phrase.lower()
+    eod = base.replace(hour=23, minute=59, second=0, microsecond=0)
+    if phrase == "today" or phrase.startswith("end of") and "day" in phrase:
+        return eod
+    if phrase == "tomorrow":
+        return eod + dt.timedelta(days=1)
+    if phrase.startswith("end of") and "week" in phrase:
+        return eod + dt.timedelta(days=(4 - base.weekday()) % 7)
+    if phrase in WEEKDAYS:
+        return eod + dt.timedelta(days=(WEEKDAYS[phrase] - base.weekday()) % 7)
+    return None
+
+
+def extract_commitments(message: dict) -> list[dict]:
+    """message: {gmail_msg_id, sent_at, is_sent, body_text}. is_sent decides
+    direction: the user's own mail carries promises, inbound mail carries asks."""
+    text = message.get("body_text") or ""
+    out, seen = [], set()
+    for m in COMMITMENT_RE.finditer(text):
+        description = " ".join(m.group(1).split()).strip(" -–—")[:200]
+        if not description or description.lower() in seen:
+            continue
+        seen.add(description.lower())
+        out.append({
+            "description": description,
+            "direction": "outbound" if message.get("is_sent") else "inbound",
+            "due_at": parse_due(m.group(2), message["sent_at"]),
+            "source_msg_id": message["gmail_msg_id"],
+        })
+    return out
 
 
 def merchant_from_addr(from_addr: str | None) -> str | None:
