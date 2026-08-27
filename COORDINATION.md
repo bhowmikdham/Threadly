@@ -114,4 +114,12 @@ Probe result: trigger fires do NOT wake the disconnected worker session
 deliver when the user next opens that session in the desktop app. Coordination
 is blocked on that user action; check-ins continue meanwhile.
 
-Awaiting: worker session reopen → round-2+3 deliverables. Reviews continue hourly.
+### Round 4 — 2026-08-27 (~16:05 UTC)
+
+No change: no new commits on the worker branch, worker session still idle and
+disconnected since 13:17 UTC (second consecutive unreachable check-in). Rounds
+2–3 remain queued for delivery when the session is reopened. No re-fire (would
+only duplicate the queue). Loop parked at a ~3-hour cadence until the worker
+session is reopened or the user redirects the work.
+
+Awaiting: worker session reopen → round-2+3 deliverables.
