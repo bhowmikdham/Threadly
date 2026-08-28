@@ -41,12 +41,21 @@ CREATE TABLE messages (
     subject       TEXT,
     snippet       TEXT,
     body_text     TEXT,
+    -- Per-message classifier labels (AI team's BERTs: priority is their
+    -- strongest; action set agreed as approve/review/edit/complete_submit/
+    -- attend/reply/no_action). Written by the sync worker at label time;
+    -- `labels` keeps the full {task: {label, confidence, source}} detail.
+    priority      TEXT,
+    action        TEXT,
+    category      TEXT,
+    labels        JSONB NOT NULL DEFAULT '{}',
     tsv           tsvector GENERATED ALWAYS AS
                   (to_tsvector('english', coalesce(subject, '') || ' ' || coalesce(snippet, '') || ' ' || coalesce(body_text, ''))) STORED,
     UNIQUE (user_id, gmail_msg_id)
 );
 CREATE INDEX messages_fts_idx ON messages USING GIN (tsv);
 CREATE INDEX messages_thread_idx ON messages (thread_id, sent_at);
+CREATE INDEX messages_triage_idx ON messages (user_id, priority, sent_at DESC) WHERE is_sent = FALSE;
 
 -- Summary cache. Cache key: (thread_id, last_msg_id) — a new message in the
 -- thread changes last_msg_id, which invalidates by simply missing the cache.

@@ -14,6 +14,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.getenv("THREADLY_OPENROUTER_MODEL", "qwen/qwen3.5-9b")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-BERT_DIR = os.getenv("THREADLY_BERT_DIR", "/models/bert")
+BERT_DIR = os.getenv("THREADLY_BERT_DIR", "/models/bert")  # legacy single-dir location (intent)
+CLASSIFIERS_DIR = os.getenv("THREADLY_CLASSIFIERS_DIR", "/models/classifiers")
 EMBED_DIM = int(os.getenv("THREADLY_STUB_EMBED_DIM", "384"))
 MAX_TOKENS_CAP = int(os.getenv("THREADLY_MAX_TOKENS_CAP", "1024"))

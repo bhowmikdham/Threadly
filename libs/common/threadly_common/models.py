@@ -31,6 +31,7 @@ class OrchestrateRequest(ChatRequest):
 class ClassifyRequest(BaseModel):
     text: str
     labels: list[str] | None = None
+    task: str = "intent"  # intent | priority | action | category
 
 
 class GenerateRequest(BaseModel):

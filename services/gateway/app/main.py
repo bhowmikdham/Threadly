@@ -5,7 +5,7 @@ from threadly_common.errors import install_error_handlers
 from threadly_common.requestid import install_request_id
 
 from . import clients, db
-from .routes import auth, chat, commitments, drafts, entities, sync, system, threads, voice
+from .routes import auth, chat, commitments, drafts, entities, messages, sync, system, threads, voice
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ app.include_router(system.router)
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/v1", tags=["chat"])
 app.include_router(threads.router, prefix="/v1", tags=["threads"])
+app.include_router(messages.router, prefix="/v1", tags=["messages"])
 app.include_router(drafts.router, prefix="/v1", tags=["drafts"])
 app.include_router(entities.router, prefix="/v1", tags=["entities"])
 app.include_router(sync.router, prefix="/v1", tags=["sync"])

@@ -55,6 +55,36 @@ async def _tier2_extract(user_id: int, candidates: list[dict]) -> int:
     return extracted
 
 
+LABEL_TASKS = ("priority", "action", "category")
+
+
+async def _label_messages(batch: list[tuple[int, str]]) -> int:
+    """Run the AI team's per-email classifiers (or their fallbacks) on newly
+    synced inbound mail and store the labels. Best-effort per message."""
+    labeled = 0
+    for msg_db_id, text in batch:
+        try:
+            labels = {}
+            for task in LABEL_TASKS:
+                resp = await http.post(
+                    f"{config.INFERENCE_URL}/v1/classify",
+                    json={"text": text[:2000], "task": task},
+                    headers={"X-Threadly-Internal": config.INTERNAL_TOKEN},
+                )
+                resp.raise_for_status()
+                labels[task] = resp.json()
+            async with db.pool().acquire() as conn:
+                await conn.execute(
+                    "UPDATE messages SET priority = $1, action = $2, category = $3, labels = $4 WHERE id = $5",
+                    labels["priority"]["label"], labels["action"]["label"], labels["category"]["label"],
+                    json.dumps(labels), msg_db_id,
+                )
+            labeled += 1
+        except Exception:
+            log.exception("labeling failed for message %s (will stay unlabeled)", msg_db_id)
+    return labeled
+
+
 async def sync_user(user_id: int) -> dict:
     async with db.pool().acquire() as conn:
         has_tokens = bool(await conn.fetchval(
@@ -66,7 +96,7 @@ async def sync_user(user_id: int) -> dict:
     client = gmail_client.client_for(user_id, has_tokens)
     messages = await client.list_messages(after=last_seen)
 
-    new_msgs, new_entities, rag_docs, tier2_candidates = 0, 0, [], []
+    new_msgs, new_entities, rag_docs, tier2_candidates, label_batch = 0, 0, [], [], []
     async with db.pool().acquire() as conn:
         for msg in messages:
             thread_id = await conn.fetchval(
@@ -115,9 +145,13 @@ async def sync_user(user_id: int) -> dict:
                 new_entities += await _upsert_entities(conn, user_id, tier1)
                 if config.TIER2_EXTRACTION and extractor.needs_tier2(msg, tier1):
                     tier2_candidates.append(msg)
+                if config.MESSAGE_LABELING:
+                    label_batch.append((inserted, f"{msg.get('subject', '')}\n{msg.get('body_text') or msg.get('snippet') or ''}"))
 
     if tier2_candidates:
         new_entities += await _tier2_extract(user_id, tier2_candidates)
+
+    labeled = await _label_messages(label_batch) if label_batch else 0
 
     if rag_docs:
         try:
@@ -129,7 +163,7 @@ async def sync_user(user_id: int) -> dict:
         except Exception:
             log.exception("RAG indexing failed for user %s (will retry next sync)", user_id)
 
-    result = {"user_id": user_id, "messages": new_msgs, "entities": new_entities, "rag_docs": len(rag_docs)}
+    result = {"user_id": user_id, "messages": new_msgs, "entities": new_entities, "labeled": labeled, "rag_docs": len(rag_docs)}
     log.info("sync done: %s", result)
     return result
 

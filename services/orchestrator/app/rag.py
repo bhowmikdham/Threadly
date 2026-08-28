@@ -2,10 +2,12 @@
 the inference service, retrieval capped by characters (t3 memory budget)."""
 import asyncio
 import logging
+import time
 
 import chromadb
 
 from . import config, inference_client
+from .rag_evict import select_evictions
 
 log = logging.getLogger(__name__)
 
@@ -32,11 +34,24 @@ async def index_documents(user_id: int, docs: list[dict]) -> int:
 
     def _upsert():
         col = _chroma().get_or_create_collection(_collection_name(user_id))
+        now = time.time()
         col.upsert(
             ids=[str(d["id"]) for d in docs],
             embeddings=embeddings,
             documents=[d["text"][:2000] for d in docs],
+            metadatas=[{"indexed_at": now} for _ in docs],
         )
+        # Per-user cap (t3 memory budget): evict the oldest-indexed docs.
+        if col.count() > config.RAG_MAX_DOCS_PER_USER:
+            got = col.get(include=["metadatas"])
+            stamped = [
+                (doc_id, (meta or {}).get("indexed_at", 0.0))
+                for doc_id, meta in zip(got["ids"], got["metadatas"])
+            ]
+            evict = select_evictions(stamped, config.RAG_MAX_DOCS_PER_USER)
+            if evict:
+                col.delete(ids=evict)
+                log.info("RAG cap: evicted %d docs for user %s", len(evict), user_id)
 
     await asyncio.to_thread(_upsert)
     return len(docs)

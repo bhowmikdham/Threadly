@@ -29,7 +29,8 @@ POST /v1/auth/google/exchange  {code}
 POST /v1/auth/refresh          {refresh_token}
 POST /v1/chat                  {message, thread_id?}    -> SSE stream (§3)
 GET  /v1/threads?limit&offset
-GET  /v1/threads/{id}                                   -> thread + messages
+GET  /v1/threads/{id}                                   -> thread + messages (incl. labels)
+GET  /v1/messages?priority&action&category&limit&offset -> triage / priority inbox
 GET  /v1/entities?type&merchant&window_days&cursor&limit -> §4
 GET  /v1/commitments?status&direction&limit             -> asks + promises, by deadline
 POST /v1/commitments/{id}/done
@@ -94,8 +95,22 @@ generated -> edited -> approved -> sending -> sent
 
 Mounted at `/models` (see `models/README.md`):
 
-- `bert/` — HF sequence-classification dir; served by inference `/v1/classify`.
-  Labels **must** be intent names from §1.
+- `classifiers/<task>/` — one HF sequence-classification dir per classifier:
+  `priority/` (most important), `action/`, `category/`. Served by inference
+  `/v1/classify {task}` and applied to **every inbound email at sync time**;
+  results are stored on `messages` (`priority`, `action`, `category`, full
+  detail in `labels` jsonb) and queryable via `GET /v1/messages?priority=high`.
+  - **action labels (agreed)**: `approve, review, edit, complete_submit,
+    attend, reply, no_action` — multiclass, exactly one per email. Label names
+    come from the model's `config.json` id2label and are stored verbatim.
+  - **priority / category labels**: whatever the model config declares; the
+    backend treats them as opaque strings. Until models land, keyword-rule
+    fallbacks emit `high|normal` and `purchases|scheduling|newsletters|work|other`.
+  - **deadline stays out of the classifiers** (per AI team decision): the
+    backend's commitments extractor owns deadlines (§ /v1/commitments).
+- `bert/` — legacy single-dir location, still checked for the chat **intent**
+  classifier (labels = intent names from §1); optional, the planner degrades
+  to small-model JSON then rules without it.
 - `prompts.yaml` — overrides the orchestrator's default templates. Slot names
   are the contract; the AI team owns the wording, the backend owns the slots:
 
@@ -116,7 +131,8 @@ Every internal call carries `X-Threadly-Internal: <token>`.
 orchestrator POST /v1/orchestrate       {user_id, message, thread_id?} -> SSE
 orchestrator POST /internal/rag/index   {user_id, docs: [{id, text}]}
 inference    POST /v1/generate          {prompt, system?, max_tokens?, small_model?} -> SSE
-inference    POST /v1/classify          {text, labels?} -> {label, confidence, source: bert|llm|rules}
+inference    POST /v1/classify          {text, task?, labels?} -> {label, confidence, source: bert|llm|rules}
+                                        task: intent (default) | priority | action | category
 inference    POST /v1/embed             {texts[]} -> {embeddings[][], backend, dim}
 gmail        POST /internal/oauth/exchange {code} -> {user_id, email}
 gmail        POST /internal/send        {draft_id, user_id} -> {gmail_msg_id}

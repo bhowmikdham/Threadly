@@ -6,6 +6,7 @@ INTERNAL_TOKEN = os.getenv("THREADLY_INTERNAL_TOKEN", "dev-internal")
 ORCHESTRATOR_URL = os.getenv("THREADLY_ORCHESTRATOR_URL", "http://orchestrator:8010")
 INFERENCE_URL = os.getenv("THREADLY_INFERENCE_URL", "http://inference:8020")
 TIER2_EXTRACTION = os.getenv("THREADLY_TIER2_EXTRACTION", "true").lower() == "true"
+MESSAGE_LABELING = os.getenv("THREADLY_MESSAGE_LABELING", "true").lower() == "true"
 FERNET_KEY = os.getenv("THREADLY_FERNET_KEY", "")
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")

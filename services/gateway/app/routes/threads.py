@@ -36,7 +36,8 @@ async def get_thread(thread_id: int, user_id: int = Depends(security.current_use
             raise APIError("not_found", "Thread not found.", status=404)
         messages = await conn.fetch(
             """
-            SELECT id, gmail_msg_id, from_addr, to_addrs, is_sent, sent_at, subject, snippet, body_text
+            SELECT id, gmail_msg_id, from_addr, to_addrs, is_sent, sent_at, subject, snippet, body_text,
+                   priority, action, category
             FROM messages WHERE thread_id = $1 AND user_id = $2
             ORDER BY sent_at ASC
             """,

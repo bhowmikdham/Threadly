@@ -30,6 +30,7 @@ async def healthz():
             "openrouter": "configured" if router.openrouter.available() else "unconfigured",
             "stub": "enabled" if config.DEV_MODE else "disabled",
         },
+        "classifiers": classify_mod.loaded_classifiers(),
     }
 
 
@@ -60,7 +61,7 @@ async def generate(body: GenerateRequest):
 
 @app.post("/v1/classify", dependencies=[Depends(internal_only)])
 async def classify(body: ClassifyRequest):
-    return await classify_mod.classify(body.text, body.labels)
+    return await classify_mod.classify(body.text, body.labels, body.task)
 
 
 @app.post("/v1/embed", dependencies=[Depends(internal_only)])

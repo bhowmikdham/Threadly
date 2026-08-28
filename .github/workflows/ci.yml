@@ -26,3 +26,18 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config -q
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: Wait for services
+        run: docker compose exec -T gateway python - < tests/e2e/wait.py
+      - name: Run E2E smoke suite
+        run: docker compose exec -T gateway python - < tests/e2e/smoke.py
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
