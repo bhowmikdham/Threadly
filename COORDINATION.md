@@ -158,3 +158,28 @@ desktop-app-bound session. Coordination now relays through the user.
 > change-me defaults or the Fernet key is empty. (6) Guard google_exchange
 > resp.json() on non-JSON 5xx. FYI: coordinator verified 99116c5 — 34/34
 > tests, CI green.
+
+### Round 6 — 2026-08-29 (~00:00 UTC)
+
+Worker pushed b6ff2f1 (22:35 UTC): per-email action/category/priority
+labeling pipeline aligned with the AI team's classifiers, GET /v1/messages
+triage endpoint, per-user Chroma RAG cap with eviction, committed E2E suite
+wired into CI as a compose-stack job.
+
+Coordinator verification: compile clean, **41/41 unit tests pass** locally —
+but **CI run #3 is RED**: the new e2e job failed.
+
+**Root cause (from job logs):** `.env.example` carries inline comments after
+values (`THREADLY_DEV_MODE=true   # ...`, `OPENROUTER_API_KEY=   # ...`). The
+e2e job does `cp .env.example .env` and services load it via `env_file:
+.env`; in the CI compose parser the comment text leaks into the values.
+Evidence: inference logged "ollama unhealthy; falling back" and a real
+OpenRouter call returning **401 Unauthorized**, though both vars should be
+empty; `THREADLY_DEV_MODE` equally fails its `== "true"` check, so dev auth
+404s and the smoke suite dies at login. **Fix:** move every inline comment to
+its own line (optionally also strip values in config parsing), push, confirm
+run #4 green.
+
+Diagnosis sent through the channel (round 6) and relayed here for the user.
+Round-2/3 integration deliverables remain outstanding (still no STATUS.md or
+docs/ on the worker branch).
