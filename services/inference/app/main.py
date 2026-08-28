@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, Header
 from fastapi.responses import StreamingResponse
 from threadly_common.errors import APIError, install_error_handlers
 from threadly_common.models import ClassifyRequest, EmbedRequest, GenerateRequest
+from threadly_common.requestid import install_request_id
 from threadly_common.sse import EVENT_DONE, EVENT_TOKEN, SSE_HEADERS, sse_event
 
 from . import classify as classify_mod
@@ -10,6 +11,7 @@ from .backends import router
 
 app = FastAPI(title="Threadly Inference")
 install_error_handlers(app)
+install_request_id(app)
 
 
 async def internal_only(x_threadly_internal: str | None = Header(default=None)):
@@ -33,6 +35,16 @@ async def healthz():
 
 @app.post("/v1/generate", dependencies=[Depends(internal_only)])
 async def generate(body: GenerateRequest):
+    if not body.stream:
+        # Collected mode for machine callers (tier-2 extraction, batch jobs).
+        chunks, meta = [], {}
+        async for kind, payload in router.generate(body.prompt, body.system, body.max_tokens, body.small_model):
+            if kind == "token":
+                chunks.append(payload)
+            else:
+                meta = payload
+        return {"text": "".join(chunks), **meta}
+
     async def stream():
         try:
             async for kind, payload in router.generate(body.prompt, body.system, body.max_tokens, body.small_model):

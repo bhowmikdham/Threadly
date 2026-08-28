@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header
 from pydantic import BaseModel
 from threadly_common.errors import APIError, install_error_handlers
+from threadly_common.requestid import install_request_id
 
 from . import config, crypto, db, gmail_client, sync
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Threadly Gmail Service", lifespan=lifespan)
 install_error_handlers(app)
+install_request_id(app)
 
 
 async def internal_only(x_threadly_internal: str | None = Header(default=None)):

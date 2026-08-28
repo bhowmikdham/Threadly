@@ -4,6 +4,8 @@ DEV_MODE = os.getenv("THREADLY_DEV_MODE", "false").lower() == "true"
 DATABASE_URL = os.getenv("THREADLY_DATABASE_URL", "postgresql://threadly:threadly@postgres:5432/threadly")
 INTERNAL_TOKEN = os.getenv("THREADLY_INTERNAL_TOKEN", "dev-internal")
 ORCHESTRATOR_URL = os.getenv("THREADLY_ORCHESTRATOR_URL", "http://orchestrator:8010")
+INFERENCE_URL = os.getenv("THREADLY_INFERENCE_URL", "http://inference:8020")
+TIER2_EXTRACTION = os.getenv("THREADLY_TIER2_EXTRACTION", "true").lower() == "true"
 FERNET_KEY = os.getenv("THREADLY_FERNET_KEY", "")
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from threadly_common.errors import install_error_handlers
+from threadly_common.requestid import install_request_id
 
 from . import clients, db
 from .routes import auth, chat, commitments, drafts, entities, sync, system, threads, voice
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Threadly Gateway", lifespan=lifespan)
 install_error_handlers(app)
+install_request_id(app)
 
 app.include_router(system.router)
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])

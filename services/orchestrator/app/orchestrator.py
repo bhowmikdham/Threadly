@@ -19,8 +19,8 @@ from . import config, db, inference_client, planner, prompts, rag
 log = logging.getLogger(__name__)
 
 
-async def handle(user_id: int, message: str, thread_id: int | None) -> AsyncIterator[str]:
-    request_id = str(uuid.uuid4())
+async def handle(user_id: int, message: str, thread_id: int | None, request_id: str | None = None) -> AsyncIterator[str]:
+    request_id = request_id or str(uuid.uuid4())
     the_plan = planner.plan(message)
 
     if the_plan.intent == Intent.UNKNOWN:

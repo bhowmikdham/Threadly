@@ -14,6 +14,47 @@ log = logging.getLogger(__name__)
 http = httpx.AsyncClient(timeout=60.0)
 
 
+async def _upsert_entities(conn, user_id: int, entities: list[dict]) -> int:
+    inserted = 0
+    for entity in entities:
+        done = await conn.execute(
+            """
+            INSERT INTO entities (user_id, type, key, value, merchant, source_msg_id, occurred_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (user_id, type, key) DO NOTHING
+            """,
+            user_id, entity["type"], entity["key"], json.dumps(entity["value"]),
+            entity["merchant"], entity["source_msg_id"], entity["occurred_at"],
+        )
+        if done.endswith("1"):
+            inserted += 1
+    return inserted
+
+
+async def _tier2_extract(user_id: int, candidates: list[dict]) -> int:
+    """LLM extraction for the residue tier-1 missed. Best-effort: any failure
+    just leaves the message for a future improvement, never blocks sync."""
+    extracted = 0
+    for msg in candidates:
+        try:
+            resp = await http.post(
+                f"{config.INFERENCE_URL}/v1/generate",
+                json={"prompt": extractor.tier2_prompt(msg), "max_tokens": 200, "small_model": True, "stream": False},
+                headers={"X-Threadly-Internal": config.INTERNAL_TOKEN},
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("backend") == "stub":
+                continue  # dev stub output is not real extraction
+            entities = extractor.parse_tier2_response(payload.get("text", ""), msg)
+            if entities:
+                async with db.pool().acquire() as conn:
+                    extracted += await _upsert_entities(conn, user_id, entities)
+        except Exception:
+            log.exception("tier-2 extraction failed for message %s", msg.get("gmail_msg_id"))
+    return extracted
+
+
 async def sync_user(user_id: int) -> dict:
     async with db.pool().acquire() as conn:
         has_tokens = bool(await conn.fetchval(
@@ -25,7 +66,7 @@ async def sync_user(user_id: int) -> dict:
     client = gmail_client.client_for(user_id, has_tokens)
     messages = await client.list_messages(after=last_seen)
 
-    new_msgs, new_entities, rag_docs = 0, 0, []
+    new_msgs, new_entities, rag_docs, tier2_candidates = 0, 0, [], []
     async with db.pool().acquire() as conn:
         for msg in messages:
             thread_id = await conn.fetchval(
@@ -70,18 +111,13 @@ async def sync_user(user_id: int) -> dict:
             if msg.get("is_sent"):
                 rag_docs.append({"id": msg["gmail_msg_id"], "text": msg.get("body_text") or ""})
             else:
-                for entity in extractor.extract(msg):
-                    done = await conn.execute(
-                        """
-                        INSERT INTO entities (user_id, type, key, value, merchant, source_msg_id, occurred_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        ON CONFLICT (user_id, type, key) DO NOTHING
-                        """,
-                        user_id, entity["type"], entity["key"], json.dumps(entity["value"]),
-                        entity["merchant"], entity["source_msg_id"], entity["occurred_at"],
-                    )
-                    if done.endswith("1"):
-                        new_entities += 1
+                tier1 = extractor.extract(msg)
+                new_entities += await _upsert_entities(conn, user_id, tier1)
+                if config.TIER2_EXTRACTION and extractor.needs_tier2(msg, tier1):
+                    tier2_candidates.append(msg)
+
+    if tier2_candidates:
+        new_entities += await _tier2_extract(user_id, tier2_candidates)
 
     if rag_docs:
         try:

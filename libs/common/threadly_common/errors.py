@@ -30,14 +30,17 @@ def install_error_handlers(app) -> None:
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
 
+    def _rid(request: Request) -> str | None:
+        return getattr(getattr(request, "state", None), "request_id", None)
+
     @app.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError):
-        return JSONResponse(status_code=exc.status, content=error_envelope(exc.code, exc.message, details=exc.details))
+        return JSONResponse(status_code=exc.status, content=error_envelope(exc.code, exc.message, _rid(request), details=exc.details))
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):
-        return JSONResponse(status_code=422, content=error_envelope("validation_error", "Invalid request.", details={"errors": exc.errors()}))
+        return JSONResponse(status_code=422, content=error_envelope("validation_error", "Invalid request.", _rid(request), details={"errors": exc.errors()}))
 
     @app.exception_handler(Exception)
     async def unhandled_handler(request: Request, exc: Exception):
-        return JSONResponse(status_code=500, content=error_envelope("internal_error", "Something went wrong."))
+        return JSONResponse(status_code=500, content=error_envelope("internal_error", "Something went wrong.", _rid(request)))

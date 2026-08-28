@@ -21,3 +21,4 @@ def _load(name: str, path: Path) -> None:
 _load("orch_planner", ROOT / "services" / "orchestrator" / "app" / "planner.py")
 _load("gmail_extractor", ROOT / "services" / "gmail" / "app" / "extractor.py")
 _load("inference_pii", ROOT / "services" / "inference" / "app" / "pii.py")
+_load("gateway_ratelimit", ROOT / "services" / "gateway" / "app" / "ratelimit.py")

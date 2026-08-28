@@ -38,6 +38,7 @@ class GenerateRequest(BaseModel):
     system: str | None = None
     max_tokens: int = 512
     small_model: bool = False  # route to the 2b (planner/JSON) tier
+    stream: bool = True        # False = collect and return {"text", ...} JSON
 
 
 class EmbedRequest(BaseModel):

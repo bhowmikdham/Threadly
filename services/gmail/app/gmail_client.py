@@ -214,6 +214,18 @@ class MockGmail:
                 "is_sent": False,
             },
             {
+                # Transactional but regex-missed: exercises the tier-2 residue path.
+                "gmail_msg_id": _mock_id(u, "flight-1"),
+                "gmail_thread_id": _mock_id(u, "thread-flight-1"),
+                "from_addr": "noreply@jetstar.com",
+                "to_addrs": ["me@example.com"],
+                "subject": "Your Jetstar booking is confirmed",
+                "sent_at": now - dt.timedelta(days=12),
+                "snippet": "See you on board!",
+                "body_text": "Your reservation is all set. Quote JQ7X9P at check-in. See you on board!",
+                "is_sent": False,
+            },
+            {
                 "gmail_msg_id": _mock_id(u, "boss-1"),
                 "gmail_thread_id": _mock_id(u, "thread-boss"),
                 "from_addr": "priya@acme-corp.com",

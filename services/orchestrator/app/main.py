@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header
+from fastapi import Depends, FastAPI, Header, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from threadly_common.errors import APIError, install_error_handlers
 from threadly_common.models import OrchestrateRequest
+from threadly_common.requestid import install_request_id
 from threadly_common.sse import SSE_HEADERS
 
 from . import config, db, inference_client, orchestrator, rag
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Threadly Orchestrator", lifespan=lifespan)
 install_error_handlers(app)
+install_request_id(app)
 
 
 async def internal_only(x_threadly_internal: str | None = Header(default=None)):
@@ -35,9 +37,9 @@ async def healthz():
 
 
 @app.post("/v1/orchestrate", dependencies=[Depends(internal_only)])
-async def orchestrate(body: OrchestrateRequest):
+async def orchestrate(body: OrchestrateRequest, request: Request):
     return StreamingResponse(
-        orchestrator.handle(body.user_id, body.message, body.thread_id),
+        orchestrator.handle(body.user_id, body.message, body.thread_id, request.state.request_id),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
