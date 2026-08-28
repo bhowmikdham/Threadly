@@ -123,3 +123,38 @@ only duplicate the queue). Loop parked at a ~3-hour cadence until the worker
 session is reopened or the user redirects the work.
 
 Awaiting: worker session reopen → round-2+3 deliverables.
+
+### Round 5 — 2026-08-28 (~04:20 UTC)
+
+Worker woke at 03:08 UTC (user typed into its session) and pushed 99116c5:
+tier-2 LLM entity extraction with hallucination guards, per-user rate limit on
+/v1/chat, X-Request-ID tracing across services, DEPLOY.md runbook, 7 new tests.
+
+Coordinator verification of 99116c5: compile clean, **34/34 tests pass**
+locally, **CI green** (run #2). Quality remains high.
+
+**Channel finding:** none of the round-2/3 items appear (no STATUS.md, no
+docs/, no CORS, no fail-fast, google_exchange still unguarded) — the worker is
+following its own build order and has evidently never received any coordinator
+message. The trigger channel queues but does not deliver into this
+desktop-app-bound session. Coordination now relays through the user.
+
+**Relay text (user: paste into the worker session):**
+
+> Coordinator instructions (relayed). Before further backend modules, ship the
+> integration items: (1) STATUS.md at branch root (Done/In progress/Blocked/
+> Questions), updated every push. (2) docs/FRONTEND_INTEGRATION.md — the
+> extension on origin/frontend uses chrome.identity.getAuthToken
+> (gmail.readonly only) and cannot produce the {code} that
+> POST /v1/auth/google/exchange expects; spec the switch to
+> chrome.identity.launchWebAuthFlow via GET /v1/auth/google/url with redirect
+> https://<EXT_ID>.chromiumapp.org/, code exchange, JWT storage in
+> chrome.storage.local + silent refresh, manifest changes (drop the oauth2
+> block, narrow host_permissions), and a fetch+ReadableStream SSE example for
+> POST /v1/chat. (3) Add gateway CORSMiddleware for the extension origin.
+> (4) Commit the architecture doc as docs/ARCHITECTURE.md with an ADR for
+> Ollama+OpenRouter vs Claude API and the stateless-refresh-JWT accepted risk.
+> (5) Fail fast at startup when THREADLY_DEV_MODE=false and secrets are
+> change-me defaults or the Fernet key is empty. (6) Guard google_exchange
+> resp.json() on non-JSON 5xx. FYI: coordinator verified 99116c5 — 34/34
+> tests, CI green.
