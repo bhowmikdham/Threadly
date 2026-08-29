@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import "./style.css"
+
+const ELEVENLABS_API_KEY="sk_476386bd65baf349698531a300fdbf63503a2a3d5fbea555"
 
 function SidePanel() {
   const [signedIn, setSignedIn] = useState(false)
@@ -8,6 +10,13 @@ function SidePanel() {
 
   // State for the bottom chat input
   const [message, setMessage] = useState("")
+
+  // State for voice recording
+
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   const signIn = () => {
     setLoading(true)
@@ -37,7 +46,61 @@ function SidePanel() {
     setMessage("")
   }
 
+  const transcribeAudio = async (audioBlob : Blob) => {
+    setTranscribing(true)
+    const formData = new FormData()
+    formData.append("file", audioBlob, "recording.webm")
+    formData.append("model_id", "scribe_v2")
+    try{
+      const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+        method:"POST",
+        headers: {"xi-api-key" : ELEVENLABS_API_KEY},
+        body : formData
+      })
+      const data = await res.json()
+      if (data.text){
+        setMessage((prev) =>  (prev ? prev + " " + data.text : data.text))
+      }
+    } catch (err) {
+      console.error("Transcription failed: ", err)
+    } finally {
+      setTranscribing(false)
+    }
+  }
 
+  const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" })
+    chunksRef.current = []
+    recorder.ondataavailable = (e) => chunksRef.current.push(e.data)
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop())
+      const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType })
+      console.log("Recorded blob size:", audioBlob.size, "type:", audioBlob.type)
+      await transcribeAudio(audioBlob)
+    }
+    recorder.start()
+    mediaRecorderRef.current = recorder
+    setRecording(true)
+  } catch (err) {
+    console.error("Mic permission error:", err)
+    alert("Microphone access was blocked or dismissed. Please try again and click Allow when prompted.")
+  }
+}
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    setRecording(false)
+  }
+
+  const toggleMic = () => {
+    if (recording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
   return (
     <div className="container">
       <header className="header">
@@ -80,12 +143,31 @@ function SidePanel() {
       </main>
       {/* Bottom Chat Input Section */}
       {signedIn && (
-        <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "8px", marginTop: "auto", paddingTop: "12px" }}>
+        <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "8px", marginTop: "auto", paddingTop: "12px", alignItems: "center" }}>
+          <button 
+            type="button"
+            onClick={toggleMic}
+            title={recording ? "Stop Recording" : "Record voice message"}
+            style={{
+              flexShrink: 0,
+               width: 40,
+               height: 40,
+               borderRadius: "50%",
+               border: "none",
+               backgroundColor: recording ? "#ea4335" : "#f1f3f4",
+               cursor: "pointer",
+               fontSize: 16
+            }}
+          >
+            {recording ? "⏹" : "🎤"}
+          </button>
+
           <input
             type="text"
-            placeholder="Type a message..."
+            placeholder={transcribing ? "Transcribing..." : "Type a message..."}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            disabled={transcribing}
             style={{
               flex: 1,
               padding: "10px 14px",
