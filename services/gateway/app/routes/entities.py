@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Depends, Query
 from threadly_common.cursor import decode_cursor, encode_cursor
 from threadly_common.errors import APIError
+from threadly_common.merchant import merchant_candidates
 
 from .. import config, db, security
 
@@ -31,8 +32,10 @@ async def list_entities(
         args.append(type)
         base_conditions.append(f"type = ${len(args)}")
     if merchant:
-        args.append(merchant)
-        base_conditions.append(f"merchant ILIKE ${len(args)}")
+        # Fuzzy phrase match against the derived merchant AND the raw sender
+        # kept in value.from — "guzman y gomez" hits merchant GYG via initialism.
+        args.append(merchant_candidates(merchant))
+        base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
     base_arg_count = len(args)
 
     conditions = list(base_conditions)

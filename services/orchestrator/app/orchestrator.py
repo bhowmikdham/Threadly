@@ -8,6 +8,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 from threadly_common.cursor import encode_cursor
+from threadly_common.merchant import merchant_candidates
 from threadly_common.models import Intent, Plan
 from threadly_common.sse import (
     EVENT_DONE, EVENT_DRAFT, EVENT_ENTITIES, EVENT_ERROR, EVENT_META,
@@ -84,8 +85,9 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         args.append(params["type"])
         base_conditions.append(f"type = ${len(args)}")
     if params.get("merchant"):
-        args.append(params["merchant"])
-        base_conditions.append(f"merchant ILIKE ${len(args)}")
+        # Fuzzy phrase match: derived merchant OR raw sender in value.from.
+        args.append(merchant_candidates(params["merchant"]))
+        base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
     base_args = list(args)
 
     args.append(window_start)

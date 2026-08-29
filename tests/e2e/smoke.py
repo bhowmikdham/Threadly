@@ -53,8 +53,14 @@ evs = chat("give me the order number of all the orders that i did for GYG")
 meta, ent = dict(evs)["meta"], dict(evs).get("entities", {})
 check("GYG intent", meta["intent"] == "FETCH_ENTITY" and meta["params"].get("merchant") == "GYG", meta)
 keys = [i["key"] for i in ent.get("items", [])]
-check("GYG orders (60d window)", len(keys) == 3 and all(k.startswith("GYG-") for k in keys), keys)
+check("GYG orders (60d window)", len(keys) == 4 and all(k.startswith("GYG-") for k in keys), keys)
+check("HTML-only order extracted", "GYG-84990" in keys, keys)
 check("has_more + cursor", ent.get("has_more") is True and ent.get("cursor"))
+
+# merchant vocabulary: full brand name must hit the domain-derived merchant
+evs2 = chat("show me all my orders from guzman y gomez")
+alias_keys = [i["key"] for i in dict(evs2).get("entities", {}).get("items", [])]
+check("merchant alias guzman y gomez -> GYG", sorted(alias_keys) == sorted(keys), alias_keys)
 r = c.get(f"{BASE}/v1/entities", params={"type": "order", "merchant": "GYG", "cursor": ent["cursor"]}, headers=H)
 check("cursor pages older", len(r.json()["items"]) == 2 and r.json()["has_more"] is False, r.text)
 

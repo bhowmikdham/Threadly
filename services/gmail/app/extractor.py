@@ -66,13 +66,26 @@ def extract_commitments(message: dict) -> list[dict]:
     return out
 
 
+# TLD/public-suffix labels stripped from the right; the rightmost remaining
+# label is the brand. Handles subdomain senders: em.gyg.com.au -> GYG.
+_SUFFIX_LABELS = {
+    "com", "net", "org", "co", "io", "ai", "app", "dev", "shop", "store",
+    "gov", "edu", "mil", "info", "biz",
+    "au", "uk", "nz", "us", "ca", "de", "fr", "jp", "in", "sg", "br", "mx",
+    "es", "it", "nl", "se", "ie", "ch",
+}
+
+
 def merchant_from_addr(from_addr: str | None) -> str | None:
-    """orders@gyg.com.au -> GYG. Best-effort; entity rows keep the raw sender too."""
+    """no-reply@em.gyg.com.au -> GYG. Best-effort; entity rows keep the raw
+    sender in value.from, and merchant queries match against both."""
     if not from_addr or "@" not in from_addr:
         return None
-    domain = from_addr.rsplit("@", 1)[1].lower()
-    label = domain.split(".")[0]
-    return label.upper() if label else None
+    domain = from_addr.rsplit("@", 1)[1].strip().lower().rstrip(">")
+    labels = [label for label in domain.split(".") if label]
+    while labels and labels[-1] in _SUFFIX_LABELS:
+        labels.pop()
+    return labels[-1].upper() if labels else None
 
 
 def extract(message: dict) -> list[dict]:

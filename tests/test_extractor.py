@@ -38,3 +38,10 @@ def test_merchant_from_addr():
     assert merchant_from_addr("noreply@auspost.com.au") == "AUSPOST"
     assert merchant_from_addr(None) is None
     assert merchant_from_addr("not-an-email") is None
+
+
+def test_merchant_from_subdomain_senders():
+    # real merchants send from mail-infrastructure subdomains
+    assert merchant_from_addr("no-reply@em.gyg.com.au") == "GYG"
+    assert merchant_from_addr("track@orders.uber.com") == "UBER"
+    assert merchant_from_addr("auto-confirm@amazon.com.au") == "AMAZON"

@@ -18,7 +18,21 @@ ENTITY_TYPE_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("commitment", re.compile(r"\bcommitments?\b|\bpromised?\b|\bdeadlines?\b|\bwhat('s| is) due\b|\bfollow[- ]?ups?\b|\bowe\b", re.I)),
 ]
 
-MERCHANT_RE = re.compile(r"\b(?:for|from|with|at)\s+([A-Z][A-Za-z0-9&._-]{1,29})")
+# Merchant phrases: up to 4 words after for/from/with/at, any case, with
+# time/filler words trimmed out ("from the last 2 months" -> no merchant,
+# "for guzman y gomez" -> "guzman y gomez").
+MERCHANT_PHRASE_RE = re.compile(
+    r"\b(?:for|from|with|at)\s+([A-Za-z0-9][\w&'.-]*(?:\s+[A-Za-z0-9][\w&'.-]*){0,3})", re.I
+)
+MERCHANT_STOPWORDS = {
+    "the", "a", "an", "my", "me", "all", "any", "this", "that", "these", "those",
+    "last", "past", "previous", "recent", "latest", "first", "ever", "so", "far",
+    "week", "weeks", "month", "months", "year", "years", "day", "days",
+    "today", "yesterday", "tomorrow", "ago", "now",
+    "order", "orders", "purchase", "purchases", "email", "emails", "mail",
+    "inbox", "gmail", "account", "i", "did", "do", "have", "had", "please",
+    "again", "and", "in", "on", "of", "it", "them",
+}
 WINDOW_RE = re.compile(r"\blast\s+(\d+)\s*(day|week|month)s?\b", re.I)
 QUESTION_START_RE = re.compile(r"^\s*(who|what|when|where|which|why|how|show|find|search|list|do i|did i|have i|is there|are there)\b", re.I)
 
@@ -31,8 +45,15 @@ def parse_window_days(message: str) -> int | None:
 
 
 def parse_merchant(message: str) -> str | None:
-    m = MERCHANT_RE.search(message)
-    return m.group(1).strip(".,!?") if m else None
+    for m in MERCHANT_PHRASE_RE.finditer(message):
+        words = []
+        for word in m.group(1).split():
+            word = word.strip(".,!?")
+            if word and not word.isdigit() and word.lower() not in MERCHANT_STOPWORDS:
+                words.append(word)
+        if words:
+            return " ".join(words[:4])
+    return None
 
 
 def plan(message: str) -> Plan:

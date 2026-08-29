@@ -71,6 +71,20 @@ types (forward compatibility).
 | `error` | R18 envelope | terminal |
 | `done` | `{request_id}` | terminal |
 
+### Ingestion normalization
+
+Every synced message is normalized once, before storage: HTML-only bodies are
+rendered to text (most order confirmations are HTML-only), and scraping
+artifacts (forwarded-by banners, original-message markers, signatures) are
+stripped. Everything downstream — extraction, FTS search, the classifiers,
+RAG, summaries — consumes the cleaned text, which also keeps runtime input
+shaped like the AI team's cleaned training data.
+
+`merchant` (in chat and `GET /v1/entities`) is a fuzzy phrase, not an exact
+value: each word, the initialism, and the collapsed phrase are matched against
+the domain-derived merchant and the raw sender — "guzman y gomez", "gyg" and
+"GYG" all find orders from `no-reply@em.gyg.com.au`.
+
 ## 4. Progressive disclosure (the "want more?" pattern)
 
 First call returns the default window (60 days) plus `has_more` and an opaque

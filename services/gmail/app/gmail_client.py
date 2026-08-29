@@ -8,7 +8,7 @@ from email.message import EmailMessage
 
 import httpx
 
-from . import config, crypto, db
+from . import config, crypto, db, normalize
 
 http = httpx.AsyncClient(timeout=30.0)
 
@@ -76,16 +76,6 @@ async def _access_token(user_id: int) -> str:
     return tokens["access_token"]
 
 
-def _walk_for_text(payload: dict) -> str:
-    """Depth-first hunt for the text/plain part of a MIME payload."""
-    if payload.get("mimeType") == "text/plain" and payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"] + "==").decode(errors="replace")
-    for part in payload.get("parts", []) or []:
-        if text := _walk_for_text(part):
-            return text
-    return ""
-
-
 class RealGmail:
     def __init__(self, user_id: int):
         self.user_id = user_id
@@ -127,7 +117,7 @@ class RealGmail:
                 "subject": hdrs.get("subject", ""),
                 "sent_at": dt.datetime.fromtimestamp(int(msg["internalDate"]) / 1000, dt.timezone.utc),
                 "snippet": msg.get("snippet", ""),
-                "body_text": _walk_for_text(msg["payload"]),
+                "body_text": normalize.extract_body(msg["payload"]),
                 "is_sent": "SENT" in (msg.get("labelIds") or []),
             })
         return out
@@ -211,6 +201,32 @@ class MockGmail:
                 "sent_at": now - dt.timedelta(days=10),
                 "snippet": "Invoice INV-2043, total $29.00",
                 "body_text": "Invoice number: INV-2043\nAmount charged: $29.00\nDue on the 30th.",
+                "is_sent": False,
+            },
+            {
+                # HTML-only order confirmation from a subdomain sender:
+                # exercises extract_body's HTML fallback and merchant
+                # resolution (em.gyg.com.au -> GYG) through the real pipeline.
+                "gmail_msg_id": _mock_id(u, "gyg-html"),
+                "gmail_thread_id": _mock_id(u, "thread-gyg-html"),
+                "from_addr": "no-reply@em.gyg.com.au",
+                "to_addrs": ["me@example.com"],
+                "subject": "Thanks for your GYG order!",
+                "sent_at": now - dt.timedelta(days=5),
+                "snippet": "Thanks for your order!",
+                "body_text": normalize.extract_body({
+                    "mimeType": "multipart/alternative",
+                    "parts": [{
+                        "mimeType": "text/html",
+                        "body": {"data": base64.urlsafe_b64encode(
+                            b"<html><head><style>.x{color:red}</style></head><body>"
+                            b"<div>Thanks for your order!</div>"
+                            b"<table><tr><td>Order number:</td><td>GYG-84990</td></tr>"
+                            b"<tr><td>Total charged:</td><td>$21.00</td></tr></table>"
+                            b"<p>See you soon &mdash; Guzman y Gomez</p></body></html>"
+                        ).decode()},
+                    }],
+                }),
                 "is_sent": False,
             },
             {

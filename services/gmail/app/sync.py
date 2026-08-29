@@ -7,7 +7,7 @@ import logging
 
 import httpx
 
-from . import config, db, extractor, gmail_client
+from . import config, db, extractor, gmail_client, normalize
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +99,9 @@ async def sync_user(user_id: int) -> dict:
     new_msgs, new_entities, rag_docs, tier2_candidates, label_batch = 0, 0, [], [], []
     async with db.pool().acquire() as conn:
         for msg in messages:
+            # One normalization pass; extraction, FTS, labeling, RAG and
+            # summaries all consume the cleaned text from here on.
+            msg["body_text"] = normalize.clean_email_text(msg.get("body_text") or "")
             thread_id = await conn.fetchval(
                 """
                 INSERT INTO threads (user_id, gmail_thread_id, subject, last_msg_at, msg_count)

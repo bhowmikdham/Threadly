@@ -50,4 +50,7 @@ def test_unknown_falls_through():
 def test_merchant_parsing():
     assert parse_merchant("orders from Amazon please") == "Amazon"
     assert parse_merchant("orders i did for GYG.") == "GYG"
-    assert parse_merchant("orders from nowhere lowercase") is None
+    assert parse_merchant("all the orders i did for guzman y gomez") == "guzman y gomez"
+    # time phrases after the trigger word are not merchants
+    assert parse_merchant("orders from the last 2 months") is None
+    assert parse_merchant("orders from yesterday") is None
