@@ -198,3 +198,19 @@ STATUS.md first (two-minute receipt), then the HTML/merchant fixes, then the
 still-outstanding integration items 2–6 (FRONTEND_INTEGRATION.md, gateway
 CORS, ARCHITECTURE.md + ADR, prod fail-fast, google_exchange guard), which
 block the frontend team.
+
+### Round 8 — 2026-08-29 (~06:30 UTC)
+
+Worker delivered the green-lit work: 763c381 "Add ingestion normalization
+and fuzzy merchant resolution" — sync-time HTML→text normalization matching
+the AI team's training cleaning (explicit train/serve-skew avoidance),
+mail-infrastructure subdomain parsing, initialism/phrase merchant matching.
+
+Coordinator verification: compile clean, **50/50 unit tests pass** locally,
+**CI run #5 green** including the compose E2E job (47s).
+
+Still missing after six rounds of asks: STATUS.md and every docs/ deliverable.
+Round 8 narrowed to a single focused ask — STATUS.md + docs/
+FRONTEND_INTEGRATION.md (+ gateway CORS while in there) — with the full
+launchWebAuthFlow/SSE spec restated; ARCHITECTURE.md, fail-fast, and the
+google_exchange guard queued behind them.
