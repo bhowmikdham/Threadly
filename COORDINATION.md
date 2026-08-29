@@ -183,3 +183,18 @@ run #4 green.
 Diagnosis sent through the channel (round 6) and relayed here for the user.
 Round-2/3 integration deliverables remain outstanding (still no STATUS.md or
 docs/ on the worker branch).
+
+### Round 7 — 2026-08-29 (~01:55 UTC)
+
+The worker applied the coordinator's exact diagnosis: 983c8da moves all
+.env.example inline comments onto their own lines (single-file, disciplined
+commit citing the 401 evidence) — **CI run #4 is green**. The channel/relay
+reached the worker this time. Worker session is connected and active, now
+asking its user for a go-ahead on "HTML extraction & merchant matching
+fixes" for GYG-order search quality.
+
+Round 7 sent: go-ahead granted for the HTML/merchant work, with ordering —
+STATUS.md first (two-minute receipt), then the HTML/merchant fixes, then the
+still-outstanding integration items 2–6 (FRONTEND_INTEGRATION.md, gateway
+CORS, ARCHITECTURE.md + ADR, prod fail-fast, google_exchange guard), which
+block the frontend team.
