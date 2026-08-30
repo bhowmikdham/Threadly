@@ -64,7 +64,7 @@ types (forward compatibility).
 |---|---|---|
 | `meta` | `{request_id, intent, params, planner_source}` | always first |
 | `token` | `{text}` | streamed prose (summary/draft/answer/status lines) |
-| `entities` | `{items[], has_more, cursor, window_days}` | FETCH_ENTITY |
+| `entities` | `{items[], has_more, cursor, window_days, fuzzy}` | FETCH_ENTITY |
 | `results` | `{items[], count}` | SEARCH hits (subject, from, snippet) |
 | `summary` | `{thread_id, text, model, cached}` | SUMMARISE |
 | `draft` | `{draft_id, status, to_addrs, subject, body, model}` | DRAFT — hand the user this draft card |
@@ -81,9 +81,11 @@ RAG, summaries — consumes the cleaned text, which also keeps runtime input
 shaped like the AI team's cleaned training data.
 
 `merchant` (in chat and `GET /v1/entities`) is a fuzzy phrase, not an exact
-value: each word, the initialism, and the collapsed phrase are matched against
-the domain-derived merchant and the raw sender — "guzman y gomez", "gyg" and
-"GYG" all find orders from `no-reply@em.gyg.com.au`.
+value, matched in two tiers: substring/initialism first — "guzman y gomez",
+"gyg" and "GYG" all find orders from `no-reply@em.gyg.com.au` — then, only
+when that finds nothing, an edit-distance fallback for typos ("GIG" → GYG).
+Responses set `fuzzy: true` when the fallback tier answered, so the UI can
+show "closest match" phrasing.
 
 ## 4. Progressive disclosure (the "want more?" pattern)
 

@@ -61,6 +61,16 @@ check("has_more + cursor", ent.get("has_more") is True and ent.get("cursor"))
 evs2 = chat("show me all my orders from guzman y gomez")
 alias_keys = [i["key"] for i in dict(evs2).get("entities", {}).get("items", [])]
 check("merchant alias guzman y gomez -> GYG", sorted(alias_keys) == sorted(keys), alias_keys)
+
+# typo tolerance: GIG is one edit from GYG; strict match finds nothing, the
+# edit-distance tier kicks in and the response says so via fuzzy=true
+evs3 = chat("get me the invoice for GIG")
+ent3 = dict(evs3).get("entities", {})
+check("typo GIG -> GYG via fuzzy tier",
+      ent3.get("fuzzy") is True and len(ent3.get("items", [])) >= 1
+      and all(i["merchant"] == "GYG" for i in ent3["items"]), ent3)
+r = c.get(f"{BASE}/v1/entities", params={"type": "amount", "merchant": "GIG"}, headers=H)
+check("REST fuzzy flag", r.json().get("fuzzy") is True and len(r.json()["items"]) >= 1, r.text)
 r = c.get(f"{BASE}/v1/entities", params={"type": "order", "merchant": "GYG", "cursor": ent["cursor"]}, headers=H)
 check("cursor pages older", len(r.json()["items"]) == 2 and r.json()["has_more"] is False, r.text)
 

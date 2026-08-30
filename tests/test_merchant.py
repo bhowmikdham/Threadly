@@ -1,4 +1,4 @@
-from threadly_common.merchant import merchant_candidates
+from threadly_common.merchant import fuzzy_terms, merchant_candidates, merchant_terms
 
 
 def test_single_word():
@@ -15,3 +15,13 @@ def test_multiword_gets_initialism_and_collapsed():
 
 def test_empty_phrase():
     assert merchant_candidates("   ") == []
+
+
+def test_terms_back_candidates():
+    assert merchant_terms("Guzman y Gomez")[:2] == ["guzman", "gomez"]
+    assert "gyg" in merchant_terms("Guzman y Gomez")
+
+
+def test_fuzzy_terms_drop_too_short():
+    assert fuzzy_terms("GIG") == ["gig"]
+    assert fuzzy_terms("go") == []  # 2-char terms are too noisy for edit distance

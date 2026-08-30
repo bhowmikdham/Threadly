@@ -1,6 +1,9 @@
 -- Threadly schema. One postgres instance; logical ownership per service is
 -- documented in contracts/CONTRACTS.md (§ data ownership).
 
+-- Edit-distance matching for the merchant typo fallback (GIG -> GYG).
+CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
+
 CREATE TABLE users (
     id          BIGSERIAL PRIMARY KEY,
     email       TEXT NOT NULL UNIQUE,

@@ -8,7 +8,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 from threadly_common.cursor import encode_cursor
-from threadly_common.merchant import merchant_candidates
+from threadly_common.merchant import FUZZY_MERCHANT_SQL, fuzzy_terms, merchant_candidates
 from threadly_common.models import Intent, Plan
 from threadly_common.sse import (
     EVENT_DONE, EVENT_DRAFT, EVENT_ENTITIES, EVENT_ERROR, EVENT_META,
@@ -77,24 +77,28 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         return
     window_days = params.get("window_days") or config.DEFAULT_ENTITY_WINDOW_DAYS
     limit = config.ENTITY_PAGE_SIZE
-
     window_start = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=window_days)
-    base_conditions = ["user_id = $1"]
-    args: list = [user_id]
-    if params.get("type"):
-        args.append(params["type"])
-        base_conditions.append(f"type = ${len(args)}")
-    if params.get("merchant"):
-        # Fuzzy phrase match: derived merchant OR raw sender in value.from.
-        args.append(merchant_candidates(params["merchant"]))
-        base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
-    base_args = list(args)
 
-    args.append(window_start)
-    conditions = base_conditions + [f"occurred_at >= ${len(args)}"]
-    args.append(limit + 1)
+    async def run_query(conn, fuzzy: bool):
+        base_conditions = ["user_id = $1"]
+        args: list = [user_id]
+        if params.get("type"):
+            args.append(params["type"])
+            base_conditions.append(f"type = ${len(args)}")
+        if params.get("merchant"):
+            if fuzzy:
+                # Edit-distance fallback: GIG finds GYG.
+                args.append(fuzzy_terms(params["merchant"]))
+                base_conditions.append(FUZZY_MERCHANT_SQL.format(param=f"${len(args)}"))
+            else:
+                # Substring/initialism match: derived merchant OR raw sender.
+                args.append(merchant_candidates(params["merchant"]))
+                base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
+        base_args = list(args)
 
-    async with db.pool().acquire() as conn:
+        args.append(window_start)
+        conditions = base_conditions + [f"occurred_at >= ${len(args)}"]
+        args.append(limit + 1)
         rows = await conn.fetch(
             f"""
             SELECT id, type, key, value, merchant, source_msg_id, occurred_at
@@ -113,6 +117,14 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
                 f"SELECT 1 FROM entities WHERE {' AND '.join(base_conditions)} AND occurred_at < ${len(older_args)} LIMIT 1",
                 *older_args,
             ))
+        return rows, has_more
+
+    fuzzy = False
+    async with db.pool().acquire() as conn:
+        rows, has_more = await run_query(conn, fuzzy=False)
+        if not rows and not has_more and params.get("merchant") and fuzzy_terms(params["merchant"]):
+            rows, has_more = await run_query(conn, fuzzy=True)
+            fuzzy = bool(rows) or has_more
 
     items = [dict(r) for r in rows[:limit]]
     for item in items:  # asyncpg returns jsonb as a string
@@ -130,6 +142,7 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         "has_more": has_more,
         "cursor": cursor,
         "window_days": window_days,
+        "fuzzy": fuzzy,
     })
 
     # Human-readable line the frontend can drop straight into the chat.
@@ -139,6 +152,15 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         text = f"I couldn't find any{merchant} {label}s in the last {window_days} days."
         if has_more:
             text += " There are older ones though — want me to look further back?"
+    elif fuzzy:
+        matched = sorted({i["merchant"] for i in items if i.get("merchant")})
+        closest = " / ".join(matched) if matched else "a close match"
+        text = (
+            f"Nothing under '{params['merchant']}', but {closest} looks like what you meant — "
+            f"found {len(items)} {label}{'s' if len(items) != 1 else ''} from the last {window_days} days."
+        )
+        if has_more:
+            text += " There are older ones too — want me to keep looking further back?"
     else:
         text = f"Found {len(items)}{merchant} {label}{'s' if len(items) != 1 else ''} from the last {window_days} days."
         if has_more:
