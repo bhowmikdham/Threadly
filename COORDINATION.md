@@ -214,3 +214,17 @@ Round 8 narrowed to a single focused ask — STATUS.md + docs/
 FRONTEND_INTEGRATION.md (+ gateway CORS while in there) — with the full
 launchWebAuthFlow/SSE spec restated; ARCHITECTURE.md, fail-fast, and the
 google_exchange guard queued behind them.
+
+### Round 9 — 2026-08-31 (~00:50 UTC)
+
+Worker pushed be952b0 "edit-distance merchant fallback" (typo-tolerant
+merchant lookups, fuzzy:true marking). Coordinator verification: 52/52 unit
+tests, compile clean, **CI run #6 green**.
+
+Worker then went blocked on a question: it found **2 real bugs — a
+cross-merchant leak and a duplicate-amount block — plus 5 gaps**, wrote an
+HLD, and asked "land the fix batch or just report?". Coordinator sent GO:
+land E1+E2 with regression tests first, then the gaps, push incrementally;
+commit the HLD under docs/. Bug fixes outrank all feature work. Standing
+asks unchanged after the batch: STATUS.md, docs/FRONTEND_INTEGRATION.md,
+gateway CORS.
