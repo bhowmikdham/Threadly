@@ -132,3 +132,12 @@ CREATE TABLE drafts (
 CREATE UNIQUE INDEX drafts_idempotency_idx
     ON drafts (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX drafts_list_idx ON drafts (user_id, created_at DESC);
+
+-- Migration ledger: files in this directory apply automatically on a FRESH
+-- database (postgres initdb runs them in name order); scripts/migrate.sh
+-- applies pending ones to an EXISTING database. Number new files 01-, 02-, ...
+CREATE TABLE schema_migrations (
+    name        TEXT PRIMARY KEY,
+    applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO schema_migrations (name) VALUES ('00-baseline.sql');

@@ -1,5 +1,6 @@
 import os
 
+DEV_MODE = os.getenv("THREADLY_DEV_MODE", "false").lower() == "true"
 DATABASE_URL = os.getenv("THREADLY_DATABASE_URL", "postgresql://threadly:threadly@postgres:5432/threadly")
 INTERNAL_TOKEN = os.getenv("THREADLY_INTERNAL_TOKEN", "dev-internal")
 INFERENCE_URL = os.getenv("THREADLY_INFERENCE_URL", "http://inference:8020")

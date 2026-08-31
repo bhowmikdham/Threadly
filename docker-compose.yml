@@ -1,9 +1,16 @@
 name: threadly
 
+# Bounded logs everywhere: the t3's disk must survive months of chatter.
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
 x-service-defaults: &service-defaults
   restart: unless-stopped
   env_file: .env
   networks: [threadly_net]
+  logging: *default-logging
+  mem_limit: 256m
   depends_on:
     postgres:
       condition: service_healthy
@@ -12,6 +19,8 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 128m
     ports:
       - "80:80"
       - "443:443"
@@ -64,9 +73,13 @@ services:
     image: postgres:16
     restart: unless-stopped
     env_file: .env
+    logging: *default-logging
+    mem_limit: 512m
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Whole directory: fresh databases apply every migration in name order;
+      # existing databases use scripts/migrate.sh for the newer files.
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     networks: [threadly_net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -75,8 +88,12 @@ services:
       retries: 10
 
   chroma:
+    # NOTE: intentionally unpinned until first prod pull — after deploy, read
+    # the resolved version with `docker inspect` on the box and pin it here.
     image: chromadb/chroma:latest
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 320m
     volumes:
       - chromadata:/data
     networks: [threadly_net]

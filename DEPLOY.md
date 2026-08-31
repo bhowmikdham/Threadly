@@ -1,83 +1,79 @@
-# Threadly — EC2 Deploy Runbook
+# Threadly — Deploy
 
-Target topology from the architecture doc: one EC2 box running the compose
-stack, inference on the Mac over Tailscale, TLS by Caddy.
+One script provisions AWS; one script updates a running box. No console
+click-ops. Topology per the architecture doc: a single EC2 instance runs the
+compose stack, inference lives on the Mac over Tailscale, TLS by Caddy.
 
-## 1. Provision (once)
+## Day 0 — provision everything
 
-- **EC2**: t3.small or larger, Ubuntu 24.04, 30GB gp3.
-- **Security group**: inbound 443 and 22 only (80 optional for ACME HTTP-01;
-  Caddy prefers TLS-ALPN on 443, so 80 can stay closed).
-- **Elastic IP**: allocate + associate; point your DNS A record at it.
-- **Billing alarm**: CloudWatch billing alarm at $20.
+On your laptop (needs aws CLI v2 with credentials, an existing EC2 key pair):
 
 ```bash
-# on the box
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker ubuntu && newgrp docker
-git clone https://github.com/bhowmikdham/Threadly.git && cd Threadly
+KEY_NAME=my-keypair DOMAIN=api.threadly.example ./deploy/provision.sh
 ```
 
-## 2. Configure
+That single command, idempotently (safe to re-run):
+- creates the security group — inbound **443 + 22 only**
+- launches a **t3.small** (Ubuntu 24.04, 30GB gp3), tagged `threadly`
+- allocates + associates an **Elastic IP**
+- injects `deploy/bootstrap.sh` as user-data, which on first boot installs
+  docker, clones the repo, **generates a production `.env`** (random JWT
+  secret, internal token, Fernet key, postgres password — dev mode OFF),
+  builds and starts the stack, and installs the nightly-backup + weekly
+  image-prune cron jobs.
+
+Fail-fast guard: every service refuses to boot in production with missing or
+placeholder secrets, so a botched `.env` is a loud crash at start, not a
+quietly forgeable JWT.
+
+Watch first boot: `ssh ubuntu@<ip> 'sudo tail -f /var/log/cloud-init-output.log'`
+
+### The four things a script can't do for you
+
+1. **DNS**: point your A record at the printed Elastic IP (Caddy then
+   self-provisions the TLS cert on 443 — port 80 stays closed).
+2. **Third-party keys**: edit `/opt/threadly/.env` — `GOOGLE_CLIENT_ID/SECRET/
+   REDIRECT_URI`, `ELEVENLABS_API_KEY`, `OPENROUTER_API_KEY`,
+   `THREADLY_OLLAMA_BASE_URL` — then `sudo docker compose up -d`.
+3. **The Mac**: `brew install ollama tailscale`, join the same tailnet,
+   `OLLAMA_HOST=0.0.0.0 ollama serve`, pull `qwen3.5:4b`, `qwen3.5:2b`,
+   `nomic-embed-text`. QLoRA adapter: `ollama create threadly-4b` from a
+   Modelfile with `ADAPTER`, then set `THREADLY_OLLAMA_MODEL=threadly-4b`.
+   The EC2 box joins the tailnet too (`tailscale up`); verify with
+   `curl http://<mac-ip>:11434/api/tags`.
+4. **Billing alarm** ($20) in CloudWatch — billing metrics live in us-east-1.
+
+## Day N — ship an update
 
 ```bash
-cp .env.example .env
+./deploy/update.sh ubuntu@<elastic-ip>
 ```
 
-Production values that must change:
+Pulls, rebuilds, **applies pending schema migrations** (`scripts/migrate.sh`,
+tracked in the `schema_migrations` table — new migration files go in
+`infra/postgres/init/` with a `01-`, `02-`… prefix), restarts, and health-checks.
 
-| var | value |
-|---|---|
-| `THREADLY_DEV_MODE` | `false` |
-| `THREADLY_DOMAIN` | your DNS name (Caddy auto-provisions the cert) |
-| `THREADLY_JWT_SECRET` / `THREADLY_INTERNAL_TOKEN` | long random strings (`openssl rand -hex 32`) |
-| `THREADLY_FERNET_KEY` | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `POSTGRES_PASSWORD` + same in `THREADLY_DATABASE_URL` | random |
-| `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI` | from the GCP OAuth client (test mode, 100 users) |
-| `THREADLY_OLLAMA_BASE_URL` | `http://<mac-tailscale-ip>:11434` |
-| `OPENROUTER_API_KEY` | fallback when the Mac is down |
-| `ELEVENLABS_API_KEY` | voice |
+## Operate
 
-## 3. Mac inference host
+- **Logs**: `docker compose logs -f --tail=100` — rotated (10MB × 3 per
+  service); one chat turn is greppable across services by its `X-Request-ID`.
+- **Backups**: nightly cron via `scripts/backup.sh` (7 kept, `/opt/threadly/backups`)
+  — copy off-box periodically. Chroma is derived data; pgdata is what matters.
+  Restore: `gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U threadly threadly`
+- **Memory**: services carry `mem_limit`s sized for the t3.small (2GB). If the
+  OOM killer visits, upgrade to t3.medium before tuning anything else.
+- **AI team drop-off**: `scp` files into `/opt/threadly/models/`, then
+  `sudo docker compose restart orchestrator inference` (first BERT landing:
+  rebuild inference with `--build-arg WITH_BERT=1`).
+- **Mac down?** Nothing to do — the 2s health check fails and traffic falls
+  back to OpenRouter (PII-masked) automatically; inference `/healthz` shows it.
 
-```bash
-# on the Mac (M4 16GB)
-brew install ollama tailscale
-tailscale up                      # same tailnet as the EC2 box
-OLLAMA_HOST=0.0.0.0 ollama serve  # listens on :11434
-ollama pull qwen3.5:4b && ollama pull qwen3.5:2b && ollama pull nomic-embed-text
-# QLoRA adapter (from models/adapter/): create a Modelfile FROM qwen3.5:4b
-# with ADAPTER, then `ollama create threadly-4b` and set
-# THREADLY_OLLAMA_MODEL=threadly-4b in .env
-```
+## Honest caveats
 
-On the EC2 box: `tailscale up`, then verify
-`curl http://<mac-ip>:11434/api/tags`. Inference traffic never leaves the
-tailnet unmasked; OpenRouter fallback is PII-masked by the inference service.
-
-## 4. Launch + verify
-
-```bash
-docker compose up -d --build
-docker compose ps                          # everything healthy
-curl -s https://$DOMAIN/healthz            # gateway + db
-docker compose exec inference python -c "print('ok')"  # container sanity
-```
-
-`GET /healthz` on the inference service reports which backends are live
-(`ollama: up|down|unconfigured`).
-
-## 5. Operate
-
-- **Logs**: `docker compose logs -f --tail=100` (one chat turn is greppable by
-  its `X-Request-ID` across services).
-- **Update**: `git pull && docker compose up -d --build` (volumes survive).
-- **Backup** (nightly cron):
-  `docker compose exec -T postgres pg_dump -U threadly threadly | gzip > backup-$(date +%F).sql.gz`
-  — keep the last 7, copy off-box. Chroma is derived data (re-embeddable from
-  postgres), so pgdata is the only thing that must survive.
-- **AI team drop-off**: `scp` new files into `models/`, then
-  `docker compose restart orchestrator inference` (or rebuild inference with
-  `--build-arg WITH_BERT=1` the first time BERT lands).
-- **Mac down?** Nothing to do: the 2s health check fails and traffic falls
-  back to OpenRouter automatically; `/healthz` on inference shows it.
+- `deploy/provision.sh` is syntax-checked and reviewed but was written without
+  a live AWS account to run against — expect the first run to need small
+  fixes (IAM permissions, region quirks). It is idempotent, so iterate freely.
+- A private repo needs a read credential on the box: use a tokenized
+  `REPO_URL` or install a deploy key before re-running bootstrap.
+- The chroma image is deliberately unpinned until the first prod pull; pin the
+  resolved version in `docker-compose.yml` right after deploy.

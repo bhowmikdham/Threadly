@@ -9,6 +9,14 @@ from . import classify as classify_mod
 from . import config
 from .backends import router
 
+from threadly_common.prodcheck import assert_prod_config
+
+assert_prod_config(
+    "inference", config.DEV_MODE,
+    {"THREADLY_INTERNAL_TOKEN": config.INTERNAL_TOKEN},
+    min_lengths={"THREADLY_INTERNAL_TOKEN": 16},
+)
+
 app = FastAPI(title="Threadly Inference")
 install_error_handlers(app)
 install_request_id(app)

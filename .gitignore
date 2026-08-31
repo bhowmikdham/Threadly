@@ -8,3 +8,4 @@ docker-compose.override.yml
 models/*
 !models/README.md
 .DS_Store
+backups/

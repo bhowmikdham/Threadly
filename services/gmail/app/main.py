@@ -12,6 +12,16 @@ from . import config, crypto, db, gmail_client, sync
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from threadly_common.prodcheck import assert_prod_config
+    assert_prod_config(
+        "gmail", config.DEV_MODE,
+        {
+            "THREADLY_INTERNAL_TOKEN": config.INTERNAL_TOKEN,
+            "THREADLY_FERNET_KEY": config.FERNET_KEY,
+            "THREADLY_DATABASE_URL": config.DATABASE_URL,
+        },
+        min_lengths={"THREADLY_INTERNAL_TOKEN": 16},
+    )
     await db.init_pool()
     task = asyncio.create_task(sync.sync_loop())
     yield

@@ -13,6 +13,12 @@ from . import config, db, inference_client, orchestrator, rag
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from threadly_common.prodcheck import assert_prod_config
+    assert_prod_config(
+        "orchestrator", config.DEV_MODE,
+        {"THREADLY_INTERNAL_TOKEN": config.INTERNAL_TOKEN, "THREADLY_DATABASE_URL": config.DATABASE_URL},
+        min_lengths={"THREADLY_INTERNAL_TOKEN": 16},
+    )
     await db.init_pool()
     yield
     await db.close_pool()
