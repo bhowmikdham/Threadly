@@ -243,3 +243,19 @@ coordinator answered PITCH FIRST: a Chaser expands send-path autonomy and is
 the user's product call; and the backend is far ahead of a frontend that
 cannot yet authenticate. Ordered: 1) STATUS.md + FRONTEND_INTEGRATION.md +
 gateway CORS, 2) feature pitch doc, 3) user-picked feature build.
+
+### Round 11 — 2026-08-31 (~15:35 UTC)
+
+Worker pushed c837133 "one-command deploy kit and production hardening":
+deploy/provision.sh + bootstrap.sh (idempotent AWS day-0 with random
+secrets), update.sh, schema_migrations ledger + migrate.sh, **prodcheck
+fail-fast guard in every service (round-2 item 5 DELIVERED)**, draft reaper
+for crash-stranded sends, compose log rotation + mem limits, nightly backup.
+
+Coordinator verification: 61/61 unit tests locally, **CI run #8 green**;
+prodcheck.py read and confirmed well-designed.
+
+Remaining critical path (round 11 sent, hammered as the single gap): the
+frontend integration set — STATUS.md, docs/FRONTEND_INTEGRATION.md, gateway
+CORS, google_exchange error-body guard. Everything shipped so far is
+unreachable by the extension until this lands.
