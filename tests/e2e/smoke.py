@@ -71,6 +71,48 @@ check("typo GIG -> GYG via fuzzy tier",
       and all(i["merchant"] == "GYG" for i in ent3["items"]), ent3)
 r = c.get(f"{BASE}/v1/entities", params={"type": "amount", "merchant": "GIG"}, headers=H)
 check("REST fuzzy flag", r.json().get("fuzzy") is True and len(r.json()["items"]) >= 1, r.text)
+
+# --- edge-case register fixes (E1-E9, see the Search Lifecycle HLD) ---
+# E1: a second trigger word never leaks into the merchant; JSON key names never match
+evs = chat("invoices from GYG from last month")
+meta_e1, ent_e1 = dict(evs)["meta"], dict(evs).get("entities", {})
+check("E1 merchant parsed clean", meta_e1["params"].get("merchant") == "GYG" and meta_e1["params"].get("window_days") == 30, meta_e1)
+check("E1 no cross-merchant leak", bool(ent_e1.get("items")) and all(i["merchant"] == "GYG" for i in ent_e1["items"]), ent_e1.get("items"))
+
+# E2: the same $21.00 charged by two merchants -> both rows survive
+r = c.get(f"{BASE}/v1/entities", params={"type": "amount", "key": "$21.00", "window_days": 0}, headers=H)
+m2100 = sorted(i["merchant"] for i in r.json()["items"])
+check("E2 amount collision fixed", m2100 == ["GYG", "OTHERCORP"], m2100)
+
+# E3: summarise + merchant = lookup, not a thread summary
+evs = chat("summarise my GYG orders")
+check("E3 summarise precedence", dict(evs)["meta"]["intent"] == "FETCH_ENTITY", dict(evs)["meta"])
+
+# E4: pasted reference narrows to exactly that row
+evs = chat("order GYG-84640")
+items_e4 = dict(evs).get("entities", {}).get("items", [])
+check("E4 pasted key filter", len(items_e4) == 1 and items_e4[0]["key"] == "GYG-84640", items_e4)
+
+# E5: possessive merchant ("my gyg orders") captured without a trigger word
+evs = chat("show my gyg orders")
+meta_e5 = dict(evs)["meta"]
+check("E5 possessive merchant", meta_e5["params"].get("merchant") == "gyg" and len(dict(evs)["entities"]["items"]) == 4, meta_e5)
+
+# E6: empty and oversized messages rejected at the gateway
+r = c.post(f"{BASE}/v1/chat", json={"message": "   "}, headers=H)
+check("E6 empty message 422", r.status_code == 422 and r.json()["error"]["code"] == "empty_message", r.text)
+r = c.post(f"{BASE}/v1/chat", json={"message": "x" * 3000}, headers=H)
+check("E6 long message 422", r.status_code == 422 and r.json()["error"]["code"] == "message_too_long", r.text)
+
+# E8: repeated-character typo squeezes to a match without loosening edit budget
+evs = chat("orders from GYGGG")
+ent_e8 = dict(evs).get("entities", {})
+check("E8 squeeze typo GYGGG -> GYG", ent_e8.get("fuzzy") is True and len(ent_e8.get("items", [])) == 4, ent_e8)
+
+# E9: stopword-only question gets guidance instead of a fake empty search
+evs = chat("what is it about?")
+res_e9 = dict(evs).get("results", {})
+check("E9 too-general guidance", res_e9.get("reason") == "query_too_general" and "too general" in dict(evs).get("token", {}).get("text", ""), dict(evs).get("token"))
 r = c.get(f"{BASE}/v1/entities", params={"type": "order", "merchant": "GYG", "cursor": ent["cursor"]}, headers=H)
 check("cursor pages older", len(r.json()["items"]) == 2 and r.json()["has_more"] is False, r.text)
 

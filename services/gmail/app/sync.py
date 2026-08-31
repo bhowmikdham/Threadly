@@ -17,11 +17,16 @@ http = httpx.AsyncClient(timeout=60.0)
 async def _upsert_entities(conn, user_id: int, entities: list[dict]) -> int:
     inserted = 0
     for entity in entities:
+        # Amounts dedupe per source message; reference keys per user (E2).
+        if entity["type"] == "amount":
+            conflict = "(user_id, type, key, source_msg_id) WHERE type = 'amount'"
+        else:
+            conflict = "(user_id, type, key) WHERE type <> 'amount'"
         done = await conn.execute(
-            """
+            f"""
             INSERT INTO entities (user_id, type, key, value, merchant, source_msg_id, occurred_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (user_id, type, key) DO NOTHING
+            ON CONFLICT {conflict} DO NOTHING
             """,
             user_id, entity["type"], entity["key"], json.dumps(entity["value"]),
             entity["merchant"], entity["source_msg_id"], entity["occurred_at"],

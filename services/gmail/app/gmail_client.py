@@ -193,6 +193,19 @@ class MockGmail:
                 "is_sent": False,
             },
             {
+                # Same $21.00 as the GYG HTML order but a different merchant:
+                # proves amount dedupe is per-message, not per-user (E2).
+                "gmail_msg_id": _mock_id(u, "pay-1"),
+                "gmail_thread_id": _mock_id(u, "thread-pay-1"),
+                "from_addr": "billing@othercorp.io",
+                "to_addrs": ["me@example.com"],
+                "subject": "Payment receipt",
+                "sent_at": now - dt.timedelta(days=8),
+                "snippet": "Total charged: $21.00",
+                "body_text": "Payment received. Total charged: $21.00. Thanks for shopping with OtherCorp.",
+                "is_sent": False,
+            },
+            {
                 "gmail_msg_id": _mock_id(u, "invoice-1"),
                 "gmail_thread_id": _mock_id(u, "thread-invoice-1"),
                 "from_addr": "billing@hostcorp.io",

@@ -25,8 +25,16 @@ async def rate_limited_user(user_id: int = Depends(security.current_user)) -> in
 
 @router.post("/chat")
 async def chat(body: ChatRequest, request: Request, user_id: int = Depends(rate_limited_user)):
-    """The chat entrypoint. The gateway authenticates, rate-limits, and streams
-    the orchestrator's SSE byte-for-byte back to the extension."""
+    """The chat entrypoint. The gateway authenticates, validates, rate-limits,
+    and streams the orchestrator's SSE byte-for-byte back to the extension."""
+    if not body.message.strip():
+        raise APIError("empty_message", "Say something first — the message is empty.", status=422)
+    if len(body.message) > config.MAX_MESSAGE_CHARS:
+        raise APIError(
+            "message_too_long",
+            f"Messages are limited to {config.MAX_MESSAGE_CHARS} characters.",
+            status=422,
+        )
     headers = security.internal_headers(user_id)
     headers[REQUEST_ID_HEADER] = request.state.request_id
 

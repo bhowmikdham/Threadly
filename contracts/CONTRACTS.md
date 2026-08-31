@@ -31,7 +31,7 @@ POST /v1/chat                  {message, thread_id?}    -> SSE stream (§3)
 GET  /v1/threads?limit&offset
 GET  /v1/threads/{id}                                   -> thread + messages (incl. labels)
 GET  /v1/messages?priority&action&category&limit&offset -> triage / priority inbox
-GET  /v1/entities?type&merchant&window_days&cursor&limit -> §4
+GET  /v1/entities?type&merchant&key&window_days&cursor&limit -> §4
 GET  /v1/commitments?status&direction&limit             -> asks + promises, by deadline
 POST /v1/commitments/{id}/done
 GET  /v1/drafts                / GET /v1/drafts/{id}
@@ -83,9 +83,16 @@ shaped like the AI team's cleaned training data.
 `merchant` (in chat and `GET /v1/entities`) is a fuzzy phrase, not an exact
 value, matched in two tiers: substring/initialism first — "guzman y gomez",
 "gyg" and "GYG" all find orders from `no-reply@em.gyg.com.au` — then, only
-when that finds nothing, an edit-distance fallback for typos ("GIG" → GYG).
-Responses set `fuzzy: true` when the fallback tier answered, so the UI can
-show "closest match" phrasing.
+when that finds nothing, an edit-distance fallback for typos ("GIG" → GYG;
+repeated characters are squeezed, so "GYGGG" matches too). Responses set
+`fuzzy: true` when the fallback tier answered, so the UI can show
+"closest match" phrasing. A pasted reference in the message ("order
+GYG-84640") becomes a `key` filter narrowing to that row. `POST /v1/chat`
+rejects empty (`422 empty_message`) and >2000-char (`422 message_too_long`)
+messages. SEARCH with a stopword-only query returns `results` with
+`reason: "query_too_general"` plus a guidance line instead of an LLM call.
+Amounts dedupe per source message (two merchants can both charge $21.00);
+order/tracking keys stay unique per user.
 
 ## 4. Progressive disclosure (the "want more?" pattern)
 

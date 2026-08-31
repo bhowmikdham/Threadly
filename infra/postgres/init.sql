@@ -84,9 +84,13 @@ CREATE TABLE entities (
     merchant       TEXT,                       -- derived from sender domain
     source_msg_id  TEXT NOT NULL,
     occurred_at    TIMESTAMPTZ NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (user_id, type, key)
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Reference identifiers (order/tracking/...) are globally unique per user.
+-- Amounts are NOT identifiers — two merchants can both charge $21.00 — so
+-- they dedupe per source message instead (E2).
+CREATE UNIQUE INDEX entities_ref_unique ON entities (user_id, type, key) WHERE type <> 'amount';
+CREATE UNIQUE INDEX entities_amount_unique ON entities (user_id, type, key, source_msg_id) WHERE type = 'amount';
 CREATE INDEX entities_browse_idx ON entities (user_id, type, occurred_at DESC, id DESC);
 CREATE INDEX entities_merchant_idx ON entities (user_id, merchant);
 

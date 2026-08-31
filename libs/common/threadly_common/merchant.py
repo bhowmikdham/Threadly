@@ -39,8 +39,13 @@ def fuzzy_terms(phrase: str) -> list[str]:
 
 
 # SQL fragment for the fallback tier: allow 1 edit on short names, 2 on long.
+# Both sides are also compared with repeated characters squeezed ("gyggg" ->
+# "gyg"), so key-bounce typos match without loosening the real edit budget.
 # Used with an unnested text[] of fuzzy_terms().
+_SQUEEZE = "regexp_replace({expr}, '(.)\\1+', '\\1', 'g')"
 FUZZY_MERCHANT_SQL = (
-    "EXISTS (SELECT 1 FROM unnest({param}::text[]) AS t(term) "
-    "WHERE levenshtein(lower(merchant), term) <= CASE WHEN length(term) <= 5 THEN 1 ELSE 2 END)"
+    "EXISTS (SELECT 1 FROM unnest({param}::text[]) AS t(term) WHERE "
+    "levenshtein(lower(merchant), term) <= CASE WHEN length(term) <= 5 THEN 1 ELSE 2 END "
+    "OR levenshtein(" + _SQUEEZE.format(expr="lower(merchant)") + ", " + _SQUEEZE.format(expr="term") + ") "
+    "<= CASE WHEN length(" + _SQUEEZE.format(expr="term") + ") <= 5 THEN 1 ELSE 2 END)"
 )

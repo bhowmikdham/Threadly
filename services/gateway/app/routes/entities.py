@@ -16,6 +16,7 @@ async def list_entities(
     user_id: int = Depends(security.current_user),
     type: str | None = Query(default=None),
     merchant: str | None = Query(default=None),
+    key: str | None = Query(default=None, description="reference key filter, substring match"),
     window_days: int | None = Query(default=None, description="lookback window; omit for default, 0 = all time"),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=None),
@@ -45,13 +46,18 @@ async def list_entities(
         if type:
             args.append(type)
             base_conditions.append(f"type = ${len(args)}")
+        if key:
+            args.append(f"%{key}%")
+            base_conditions.append(f"key ILIKE ${len(args)}")
         if merchant:
             if fuzzy:
                 args.append(fuzzy_terms(merchant))
                 base_conditions.append(FUZZY_MERCHANT_SQL.format(param=f"${len(args)}"))
             else:
+                # value->>'from' (the sender), never value::text — raw JSON
+                # matching let the literal key name "from" pollute results (E1).
                 args.append(merchant_candidates(merchant))
-                base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
+                base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value->>'from' ILIKE ANY(${len(args)}::text[]))")
         base_arg_count = len(args)
 
         conditions = list(base_conditions)

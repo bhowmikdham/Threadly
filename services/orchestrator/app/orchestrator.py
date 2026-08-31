@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 async def handle(user_id: int, message: str, thread_id: int | None, request_id: str | None = None) -> AsyncIterator[str]:
     request_id = request_id or str(uuid.uuid4())
-    the_plan = planner.plan(message)
+    the_plan = planner.plan(message, has_thread=thread_id is not None)
 
     if the_plan.intent == Intent.UNKNOWN:
         # Classifier fallback: BERT (or keyword rules) in the inference service.
@@ -85,15 +85,21 @@ async def _fetch_entities(user_id: int, the_plan: Plan, message: str) -> AsyncIt
         if params.get("type"):
             args.append(params["type"])
             base_conditions.append(f"type = ${len(args)}")
+        if params.get("key"):
+            # Pasted reference ("order GYG-84640") narrows to that key (E4).
+            args.append(f"%{params['key']}%")
+            base_conditions.append(f"key ILIKE ${len(args)}")
         if params.get("merchant"):
             if fuzzy:
-                # Edit-distance fallback: GIG finds GYG.
+                # Edit-distance fallback: GIG finds GYG, GYGGG squeezes to GYG.
                 args.append(fuzzy_terms(params["merchant"]))
                 base_conditions.append(FUZZY_MERCHANT_SQL.format(param=f"${len(args)}"))
             else:
-                # Substring/initialism match: derived merchant OR raw sender.
+                # Substring/initialism match against the derived merchant OR the
+                # sender value — value->>'from', never value::text, so the JSON
+                # key names can't produce false matches (E1).
                 args.append(merchant_candidates(params["merchant"]))
-                base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value::text ILIKE ANY(${len(args)}::text[]))")
+                base_conditions.append(f"(merchant ILIKE ANY(${len(args)}::text[]) OR value->>'from' ILIKE ANY(${len(args)}::text[]))")
         base_args = list(args)
 
         args.append(window_start)
@@ -320,6 +326,15 @@ async def _draft(user_id: int, thread_id: int | None, instruction: str) -> Async
 
 async def _search(user_id: int, query: str) -> AsyncIterator[str]:
     async with db.pool().acquire() as conn:
+        # Stopword-only questions ("what is it about?") produce an empty
+        # tsquery: guide the user instead of pretending to search (E9).
+        meaningful = await conn.fetchval("SELECT numnode(plainto_tsquery('english', $1))", query)
+        if not meaningful:
+            yield sse_event(EVENT_RESULTS, {"items": [], "count": 0, "reason": "query_too_general"})
+            yield sse_event(EVENT_TOKEN, {
+                "text": "That's a bit too general for me to search on — try naming a person, company, or topic."
+            })
+            return
         rows = await conn.fetch(
             """
             SELECT m.id, m.thread_id, m.from_addr, m.sent_at, t.subject,
