@@ -228,3 +228,18 @@ land E1+E2 with regression tests first, then the gaps, push incrementally;
 commit the HLD under docs/. Bug fixes outrank all feature work. Standing
 asks unchanged after the batch: STATUS.md, docs/FRONTEND_INTEGRATION.md,
 gateway CORS.
+
+### Round 10 — 2026-08-31 (~02:55 UTC)
+
+Worker landed 14354d5 "Fix edge-case register E1-E9": E1 leak fixed by
+matching value->>'from' instead of value::text (the serialized-JSON key
+"from" had matched every row) plus merchant stopwords; E2 fixed with
+per-source-message partial unique indexes; E3–E9 routing/validation/fuzzy
+polish. Coordinator verification: 56/56 unit tests locally, **CI run #7
+green** (41-check E2E), E1/E2 diffs read and confirmed correct.
+
+Worker's next question ("Commitment Ledger + Chaser, or pitch first?") —
+coordinator answered PITCH FIRST: a Chaser expands send-path autonomy and is
+the user's product call; and the backend is far ahead of a frontend that
+cannot yet authenticate. Ordered: 1) STATUS.md + FRONTEND_INTEGRATION.md +
+gateway CORS, 2) feature pitch doc, 3) user-picked feature build.
