@@ -28,7 +28,6 @@
     "permissions": [
       "sidePanel", "identity"
     ],
-    "oauth2": { "client_id": "1054567044769-6dk3mi16v6k1m5omlc5g8akdd94kgv1j.apps.googleusercontent.com", "scopes": [ "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/gmail.readonly" ] },
     "host_permissions": [
       "https://*/*"
     ],

@@ -3,10 +3,17 @@ import "./style.css"
 
 const ELEVENLABS_API_KEY="sk_476386bd65baf349698531a300fdbf63503a2a3d5fbea555"
 
+const BACKEND_URL = "https://YOUR_BACKEND_DOMAIN"
+
 function SidePanel() {
   const [signedIn, setSignedIn] = useState(false)
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
+
+   // ===== CHANGED: added to hold our backend's JWT, not Google's token =====
+  const [authToken, setAuthToken] = useState("")
+  // ===== END CHANGED =====
+
 
   // State for the bottom chat input
   const [message, setMessage] = useState("")
@@ -18,26 +25,54 @@ function SidePanel() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  const signIn = () => {
+  // ===== CHANGED: signIn rewritten to go through backend, not getAuthToken =====
+  const signIn = async () => {
     setLoading(true)
-    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-      if (chrome.runtime.lastError || !token) {
-        console.error(chrome.runtime.lastError)
-        setLoading(false)
-        return
-      }
+    try {
+      // Step 1: ask our backend for the Google consent URL
+      const urlRes = await fetch(`${BACKEND_URL}/v1/auth/google/url`)
+      const { url: consentUrl } = await urlRes.json()
 
-      const res = await fetch(
-        "https://www.googleapis.com/oauth2/v2/userinfo",
-        { headers: { Authorization: `Bearer ${token}` } }
+      // Step 2: launch the real OAuth flow through Chrome, using OUR backend's consent URL
+      chrome.identity.launchWebAuthFlow(
+        { url: consentUrl, interactive: true },
+        async (redirectedTo) => {
+          if (chrome.runtime.lastError || !redirectedTo) {
+            console.error(chrome.runtime.lastError)
+            setLoading(false)
+            return
+          }
+
+          // Step 3: pull the ?code=... param out of the redirect
+          const redirectUrl = new URL(redirectedTo)
+          const code = redirectUrl.searchParams.get("code")
+          if (!code) {
+            console.error("No code returned from OAuth redirect")
+            setLoading(false)
+            return
+          }
+
+          // Step 4: exchange the code with OUR backend (backend talks to Google itself)
+          const exchangeRes = await fetch(`${BACKEND_URL}/v1/auth/google/exchange`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code })
+          })
+          const data = await exchangeRes.json()
+
+          // Step 5: store OUR backend's JWT + user info, not any Google token
+          setAuthToken(data.token)
+          setEmail(data.email)
+          setSignedIn(true)
+          setLoading(false)
+        }
       )
-      const profile = await res.json()
-
-      setEmail(profile.email)
-      setSignedIn(true)
+    } catch (err) {
+      console.error("Sign-in failed:", err)
       setLoading(false)
-    })
+    }
   }
+  // ===== END CHANGED =====
 
   const handleSendMessage = (e) => {
     e.preventDefault()
@@ -102,45 +137,116 @@ function SidePanel() {
     }
   }
   return (
-    <div className="container">
-      <header className="header">
-        <h1>Threadly</h1>
-        <p>Your email assistant</p>
-      </header>
+    <div className="container" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
 
-      <main className="content">
-        <h2>Welcome to Threadly</h2>
+      {!signedIn && (
+        <main
+          className="content"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            flex: 1
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              padding: "40px 20px",
+              gap: 4
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📥✨</div>
 
-        {signedIn ? (
-          <>
-          <p>Signed in as {email}</p>
-          </>
-        ) : (
-          <>
-            <p>Your email assistant will appear here.</p>
-            {/* Google-styled button wrapper */}
-            <button className="gsi-material-button" onClick={signIn} disabled={loading}>
-              <div className="gsi-material-button-state"></div>
-              <div 
-                className="gsi-material-button-content-wrapper" 
-                style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "10px" }}
-              >
-                <div className="gsi-material-button-icon" style={{ width: "20px", height: "20px" }}>
-                  <svg version="1.1" xmlns="http://w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: "block", width: "100%", height: "100%" }}>
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                    <path fill="#4285F4" d="M46.5 24c0-1.61-.15-3.16-.43-4.69H24v9.03h12.75c-.55 2.92-2.2 5.39-4.68 7.05v5.86h7.59c4.44-4.09 7-10.1 7-17.25z"></path>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.59-5.86c-2.11 1.41-4.8 2.25-8.3 2.25-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                  </svg>
-                </div>
-                <span className="gsi-material-button-contents">
-                  {loading ? "Signing in..." : "Sign in with Google"}
-                </span>
-              </div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Sign in to chat with Threadly</h2>
+
+            <p style={{ color: "#666", margin: "12px 0", fontSize: 14 }}>
+              Get help with your emails.
+            </p>
+            <p style={{ color: "#666", margin: "0 0 12px", fontSize: 14 }}>
+              Sign in so our AI can:
+            </p>
+
+            <ul
+              style={{
+                textAlign: "left",
+                color: "#444",
+                fontSize: 14,
+                margin: "8px 0 24px",
+                paddingLeft: 20
+              }}
+            >
+              <li style={{ marginBottom: 8 }}>Categorise Emails</li>
+              <li style={{ marginBottom: 8 }}>Summarise multiple threads</li>
+              <li style={{ marginBottom: 8 }}>Draft replies to emails</li>
+            </ul>
+
+            <button
+              onClick={signIn}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "14px",
+                borderRadius: "10px",
+                border: "none",
+                backgroundColor: "#e8590c",
+                color: "#000",
+                fontWeight: 600,
+                fontSize: 16,
+                cursor: "pointer"
+              }}
+            >
+              {loading ? "Signing in..." : "Sign in"}
             </button>
-          </>
-        )}
-      </main>
+          </div>
+        </main>
+      )}
+
+      {/* Display a message above the chat box */}
+
+       {signedIn && (
+        <div
+          style={{
+            position: "absolute",
+            top: "33%",
+            left: 0,
+            right: 0,
+            transform: "translateY(-50%)",
+            textAlign: "center",
+            padding: "0 20px"
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 20, color: "#222" }}>
+          Welcome to our LLM
+          </h2>
+        </div>
+      )}
+
+
+      {signedIn && (
+        <div
+          style={{
+            position: "absolute",
+            top: "66%",
+            left: 0,
+            right: 0,
+            transform: "translateY(-50%)",
+            textAlign: "center",
+            padding: "0 20px"
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: 16, color: "#333" }}>
+            Your next insight is waiting ✨
+          </h3>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#888" }}>
+            Ask me to summarize, draft, or find anything in your inbox.
+          </p>
+        </div>
+      )}
+
       {/* Bottom Chat Input Section */}
       {signedIn && (
         <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "8px", marginTop: "auto", paddingTop: "12px", alignItems: "center" }}>
