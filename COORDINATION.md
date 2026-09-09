@@ -259,3 +259,14 @@ Remaining critical path (round 11 sent, hammered as the single gap): the
 frontend integration set — STATUS.md, docs/FRONTEND_INTEGRATION.md, gateway
 CORS, google_exchange error-body guard. Everything shipped so far is
 unreachable by the extension until this lands.
+
+### Round 12 — 2026-09-09 (~03:50 UTC)
+
+Worker was active Sept 8 (~11:12 UTC) without pushing; now blocked asking:
+"three draft-path fixes ('make me an email' rules, recipient extraction,
+subject derivation) + tier-3 decision log?" Coordinator sent GO on all four,
+with a privacy guardrail on the decision log: minimum data (decision, label,
+derived features — no raw bodies unless ARCHITECTURE.md documents retention),
+per-user deletable (purge must cascade), schema noted in contracts for the
+AI team. Frontend integration set remains the standing first-priority ask.
+Branch still at c837133; CI green.
