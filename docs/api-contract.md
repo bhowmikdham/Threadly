@@ -45,6 +45,44 @@ event: error        data: {"error": {envelope}}     # terminal on failure
 
 ## Endpoints
 
+### Assistant intent preview (implemented; no workflow execution)
+
+`POST /assistant/route-preview` requires the session JWT and accepts:
+
+```json
+{"instruction": "Summarise this thread", "intent_hint": null}
+```
+
+`instruction` is required, nonblank, maximum 8,000 characters. `intent_hint` is
+optional and accepts the five canonical intents or null. Unknown fields are
+rejected, including user IDs, context IDs and continuation objects. This initial
+endpoint reads no mailbox or calendar state and persists no task or approval.
+
+Returns HTTP 200 with `{decision, router_version, source, execution_ready: false}`.
+`decision` follows the playbook route-decision contract; `source` is `rule|model`.
+An exact summary command returns intent `summarise`, operation `summarise_thread`,
+status `needs_clarification`, and missing field `source_context`. A known intent
+does not mean an executable workflow exists. The frontend must not dispatch tools
+or send messages from this response.
+
+Simple exact commands avoid inference. Richer requests use the selected model's
+small-model configuration, one bounded attempt and strict JSON validation. A hint
+cannot override a compound request. The initial allowed combinations are summary,
+work plan, availability check or slot suggestion followed by reply; entity/mail
+lookup followed by reply or compose; commitment lookup followed by reply.
+Unsupported or reversed sequences are rejected, not executed.
+
+Errors: 401 missing/invalid session, 422 invalid request, 502
+`invalid_route_output` for invalid model proposals, 503
+`upstream_model_unavailable` for inference failure. Error details do not expose
+raw model output. Request validation detail entries contain `loc`, `type`, `msg`.
+
+The planned `POST /assistant/requests`, saved context, durable jobs, continuation,
+artifacts and approval APIs are **not implemented by this preview endpoint**.
+The typed `AssistantRequest` model exists for that next integration, but has no
+registered route yet. Existing `/threads/{thread_id}/summary` remains the working
+summary execution endpoint.
+
 ### Auth
 | Method | Path                    | Body                    | Returns |
 |--------|-------------------------|-------------------------|---------|

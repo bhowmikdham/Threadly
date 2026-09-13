@@ -26,7 +26,13 @@ async def get_current_user_id(
         raise ApiError(401, "token_expired", "Session expired — refresh and retry.") from exc
     except jwt.InvalidTokenError as exc:
         raise ApiError(401, "unauthorized", "Invalid token.") from exc
-    return int(payload["sub"])
+    try:
+        user_id = int(payload["sub"])
+        if user_id <= 0:
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise ApiError(401, "unauthorized", "Invalid token subject.") from None
+    return user_id
 
 
 CurrentUser = Annotated[int, Depends(get_current_user_id)]

@@ -4,7 +4,7 @@ Generated from [backlog.json](backlog.json). Edit the JSON and regenerate with `
 
 ## T01 · Agree contracts and supersede inference architecture
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** No implementation dependency; review the playbook.
 
@@ -90,7 +90,7 @@ AI gets verified model/profile choices; tool bridge gets approved connectivity.
 
 ## T04 · Bedrock model provider and typed inference harness
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T01, T03
 
@@ -150,7 +150,7 @@ All workflows can persist progress and pause for users.
 
 ## T06 · Intent routing and contextual reference resolution
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T02, T04, T05
 

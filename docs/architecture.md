@@ -47,6 +47,14 @@ Rules encoded by this topology:
 
 ## Inside the api container — module map
 
+Assistant migration: `app/planner/intent_router.py` provides the five-intent
+proposal router through authenticated `POST /assistant/route-preview`.
+`app/schemas/assistant.py` contains strict runtime contracts and
+`app/planner/intent_prompt.py` the versioned prompt. The historical planner below
+is retained for compatibility; the preview does not call its broad regex rules.
+No additional service/container is needed for routing. Backend task dispatch and
+Bedrock Flow invocation remain separate upcoming work.
+
 | # | Box (architecture doc)      | Folder                      | Responsibilities                                            | Week |
 |---|-----------------------------|-----------------------------|-------------------------------------------------------------|------|
 | 1 | API layer                   | `backend/app/api/`          | routes, JWT check, error envelope (R18)                     | W1+  |

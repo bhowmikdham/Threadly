@@ -49,9 +49,15 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
+        # Pydantic context may contain exception objects; raw input can contain
+        # mailbox content. Return only JSON-safe field locations and explanations.
+        errors = [
+            {"loc": list(error["loc"]), "type": error["type"], "msg": error["msg"]}
+            for error in exc.errors()
+        ]
         return JSONResponse(
             status_code=422,
-            content=envelope("validation_error", "Request failed validation.", exc.errors()),
+            content=envelope("validation_error", "Request failed validation.", errors),
         )
 
     @app.exception_handler(Exception)

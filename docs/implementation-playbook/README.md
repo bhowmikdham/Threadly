@@ -69,7 +69,7 @@ task may reuse reply generation; a cached summary may need no model call.
 6. Source-linked summaries/answers, inspectable assumptions and editable plans.
 7. A shared evaluation suite, staged release gates and actionable operational runbooks.
 
-## What is already real
+## Baseline before implementation
 
 This checkout has FastAPI, encrypted Google tokens, Gmail sync, PostgreSQL models,
 summary SSE, and an Ollama/OpenRouter model client. Draft/send, entities,
@@ -86,7 +86,8 @@ These observations are code inspection findings, not a successful deployment aud
   [architecture](../architecture.md) describe the current application. Their changes
   belong in the implementation PRs. This playbook does not silently change them.
 - The requested direction is Bedrock + visual Flows. ADR 001 still documents the
-  old inference policy and needs a superseding ADR in task `T01`.
+  old inference policy; [ADR 003](../decisions/003-bedrock-migration.md) now supersedes
+  its placement decision. The remaining T01 contract review is still pending.
 - Confirmed primary audience: individual professionals and small teams using
   their own Gmail account. Enterprise shared mailboxes, organization-wide policy
   and non-Google providers are later scope.

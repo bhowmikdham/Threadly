@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
-  "status": "planning",
+  "status": "implementation_started",
   "audience": "Individual professionals and small teams",
   "tasks": [
     {
       "id": "T01",
       "title": "Agree contracts and supersede inference architecture",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -39,7 +39,9 @@
       ],
       "handoff": "AI and frontend receive versioned schemas and fixture inputs.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+      ]
     },
     {
       "id": "T02",
@@ -123,7 +125,7 @@
     {
       "id": "T04",
       "title": "Bedrock model provider and typed inference harness",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -159,7 +161,9 @@
       ],
       "handoff": "Router and workflow teams receive a tested inference interface.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+      ]
     },
     {
       "id": "T05",
@@ -206,7 +210,7 @@
     {
       "id": "T06",
       "title": "Intent routing and contextual reference resolution",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -244,7 +248,9 @@
       ],
       "handoff": "Dispatcher receives validated operations and bound context.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+      ]
     },
     {
       "id": "T07",
