@@ -9,8 +9,9 @@ Claude project / drive). Every box below maps to exactly one folder in this repo
 Implementation update (13 September 2026): [ADR 003](decisions/003-bedrock-migration.md)
 supersedes the inference placement below. `INFERENCE_PROVIDER=bedrock` routes
 generation through the new Bedrock Converse adapter. `legacy` retains the
-original topology during migration. Durable assistant runs and Bedrock Flows
-remain planned in the [implementation playbook](implementation-playbook/README.md).
+original topology during migration. Durable explicit-summary tasks now use a
+separate native backend worker and PostgreSQL state; Bedrock Flow invocation
+remains planned in the [implementation playbook](implementation-playbook/README.md).
 
 ```
 Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.small+, Elastic IP)
@@ -23,7 +24,7 @@ Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.sm
   │  auto-TLS, SSE passthrough      │        │                 │
   │                              SQL│        │vectors          │
   │                        postgres:16     chroma              │
-  │                        7 tables        per-user            │
+  │                        12 tables       per-user            │
   │                                        sent-mail embeddings│
   │  named volumes (survive redeploys): pgdata · chromadata ·  │
   │  caddy_data (certs)                                        │
@@ -52,8 +53,13 @@ proposal router through authenticated `POST /assistant/route-preview`.
 `app/schemas/assistant.py` contains strict runtime contracts and
 `app/planner/intent_prompt.py` the versioned prompt. The historical planner below
 is retained for compatibility; the preview does not call its broad regex rules.
-No additional service/container is needed for routing. Backend task dispatch and
-Bedrock Flow invocation remain separate upcoming work.
+No additional service/container is needed for routing. Explicit summary execution
+uses `app/assistant/` and the optional Compose `assistant-worker` service. Request
+acceptance persists context/task/job/event state; the worker claims and commits,
+generates outside a transaction, then publishes a fenced artifact. Browser state
+and SSE connections do not own execution. Bedrock Flow invocation and the other
+four execution workflows remain upcoming work. See the
+[worker runbook](assistant-worker.md) and [runtime API contract](api-contract.md).
 
 | # | Box (architecture doc)      | Folder                      | Responsibilities                                            | Week |
 |---|-----------------------------|-----------------------------|-------------------------------------------------------------|------|

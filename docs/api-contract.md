@@ -77,11 +77,80 @@ Errors: 401 missing/invalid session, 422 invalid request, 502
 `upstream_model_unavailable` for inference failure. Error details do not expose
 raw model output. Request validation detail entries contain `loc`, `type`, `msg`.
 
-The planned `POST /assistant/requests`, saved context, durable jobs, continuation,
-artifacts and approval APIs are **not implemented by this preview endpoint**.
-The typed `AssistantRequest` model exists for that next integration, but has no
-registered route yet. Existing `/threads/{thread_id}/summary` remains the working
-summary execution endpoint.
+The preview does not execute work. Explicit summary execution is available through
+the separate durable API below. Existing `/threads/{thread_id}/summary` stays
+available with its original cache and SSE behavior.
+
+### Durable summary tasks (initial execution slice)
+
+Requires migration `8f3a7c2d901b` and a separately running assistant worker.
+All routes require JWT authentication and enforce ownership. Context captures
+server-side synced message excerpts; clients cannot upload authoritative mailbox
+text, source IDs, user IDs, job state or generated artifacts through these APIs.
+
+| Method/path | Request | Response |
+|---|---|---|
+| `POST /assistant/context-snapshots` | `{"schema_version":"1.0","thread_id":"<Gmail thread ID>"}` | 201: `context_snapshot_id`, `captured_at`, `source_hash`, scope, captured messages and coverage counts |
+| `GET /assistant/context-snapshots/{id}` | — | Owned immutable excerpt snapshot |
+| `POST /assistant/requests` | Versioned assistant request below | 202: saved task, state, version, event cursor and URLs |
+| `GET /assistant/tasks` | `cursor` (previous page's ID), `page_size` 1–100, optional `state` | `tasks`, `next_cursor`; newest creation time/ID first, owner scoped |
+| `GET /assistant/tasks/{id}` | — | Task state, version, latest sequence, snapshot/artifact references, release fingerprint, error code and timestamps |
+| `GET /assistant/tasks/{id}/events` | `after` or `Last-Event-ID`, nonnegative sequence | Finite SSE replay batch after that sequence; closes after currently saved events |
+| `POST /assistant/tasks/{id}/cancel` | `{"expected_version":1}` | Updated cancelled task; stale version or finished task returns 409 |
+| `GET /assistant/artifacts/{id}` | — | `artifact_id`, `task_id`, `revision`, typed `artifact`, model/prompt `provenance` |
+
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "client-generated-unique-key",
+  "instruction": "Summarise this thread",
+  "intent_hint": "summarise",
+  "context_snapshot_id": "<ID returned by snapshot capture>",
+  "continuation": null
+}
+```
+
+`request_id` is 1–128 characters. The unique key is owner + request ID, bound to
+the canonical request hash. Identical replay returns the existing task (202 even
+if already complete); different input with the same key returns 409
+`idempotency_conflict`. Task, initial event and job are committed atomically.
+
+This release executes exact commands `Summarise this`, `Summarise this thread`,
+or `Summarise this email` (also US spelling; case and terminal punctuation ignored),
+with hint null or `summarise`. Other or compound requests return 501
+`workflow_not_available`, without enqueueing a partial interpretation. Non-null
+continuations return 501 `continuation_not_available`. Unknown/inaccessible
+context returns 404; empty captured text returns 409 `context_empty`.
+
+States: `queued → running → succeeded|failed|cancelled`; a retryable generation
+failure can return to `queued`. The worker persists at most three attempts with
+short backoff and a 180-second lease; generation has a 120-second timeout. A
+lost/expired lease cannot publish an artifact. Cancellation is read-only workflow
+cancellation: it suppresses publication but may not stop an already-dispatched
+provider request. Retrying cancellation with the original or current cancelled
+version is idempotent. There is no external send/calendar action in this slice.
+
+SSE IDs are persisted task-local sequence numbers. Events are `task.accepted`,
+`task.stage_changed`, `artifact.ready`, and `task.finished`, carrying sequence,
+task version, timestamp and payload. Replay returns at most 100 saved events,
+with no database transaction held during network streaming. Clients reconnect
+using the last seen ID; poll task state with backoff when a batch is empty. Stream
+closure alone does not mean the task finished. Browser disconnect never cancels
+the task. A cursor ahead of stored state returns 409; malformed/conflicting
+cursors return 422. If a history cursor's task was deleted, restart pagination.
+
+Summary artifacts contain overview, decisions, inferred action suggestions, open
+questions and backend-resolved evidence IDs. Source-number validation prevents
+invented ID references; it does not prove every generated claim is correct.
+`coverage` remains `partial` because Gmail sync does not yet guarantee a complete
+live view. The snapshot includes at most 50 messages / 12,000 body characters,
+records omission/truncation, and persists ordering independently of later sync.
+No task result uses the legacy summary cache.
+
+Not yet implemented: task continuation, editable artifact revisions, approval
+actions, Calendar workflows, context expiry/cleanup, live event following, Flow
+invocation or frontend integration. See the
+[worker runbook](assistant-worker.md) for startup, recovery and test instructions.
 
 ### Auth
 | Method | Path                    | Body                    | Returns |

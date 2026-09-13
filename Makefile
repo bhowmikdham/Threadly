@@ -1,7 +1,7 @@
 COMPOSE=docker compose
 DEV=$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: help dev up down logs ps test lint fmt db-revision db-upgrade psql
+.PHONY: help dev up down logs ps test lint fmt db-revision db-upgrade psql assistant-worker
 
 help: ## list targets
 	@grep -E "^[a-zA-Z_-]+:.*?## " Makefile | awk -F":.*?## " "{printf \"%-14s %s\\n\", \$$1, \$$2}"
@@ -26,6 +26,9 @@ test: ## run backend tests
 
 lint: ## ruff check
 	cd backend && python -m ruff check app tests
+
+assistant-worker: ## run the durable assistant worker (apply migrations first)
+	cd backend && python -m app.assistant.worker
 
 fmt: ## ruff format
 	cd backend && python -m ruff format app tests

@@ -33,6 +33,19 @@ services:
         condition: service_started
     networks: [threadly_net]
 
+  assistant-worker:
+    build: ./backend
+    command: python -m app.assistant.worker
+    profiles: ["assistant"]
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./ml:/ml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [threadly_net]
+
   postgres:
     image: postgres:16
     restart: unless-stopped
