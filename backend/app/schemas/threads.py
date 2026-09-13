@@ -8,6 +8,7 @@ class ThreadOut(BaseModel):
     subject: str | None
     last_msg_at: datetime | None
     needs_reply: bool | None
+    version: int = 0
     snippet: str | None = None
 
 

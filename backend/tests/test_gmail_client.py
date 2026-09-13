@@ -1,4 +1,5 @@
 """Gmail REST client: pagination MUST walk every page; parsing MUST survive MIME trees."""
+
 import base64
 
 import httpx
@@ -12,37 +13,54 @@ def _b64(s: str) -> str:
 
 
 def gmail_transport():
+    backfilling = False
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal backfilling
         path, params = request.url.path, dict(request.url.params)
         if path.endswith("/messages") and "pageToken" not in params:
-            return httpx.Response(200, json={
-                "messages": [{"id": "m1", "threadId": "t1"}, {"id": "m2", "threadId": "t1"}],
-                "nextPageToken": "page2",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "messages": [{"id": "m1", "threadId": "t1"}, {"id": "m2", "threadId": "t1"}],
+                    "nextPageToken": "page2",
+                },
+            )
         if path.endswith("/messages") and params.get("pageToken") == "page2":
             return httpx.Response(200, json={"messages": [{"id": "m3", "threadId": "t2"}]})
         if "/messages/" in path:
             mid = path.rsplit("/", 1)[1]
-            return httpx.Response(200, json={
-                "id": mid, "threadId": "t1", "internalDate": "1755600000000",
-                "payload": {
-                    "mimeType": "multipart/alternative",
-                    "headers": [
-                        {"name": "From", "value": "Priya <p@x.com>"},
-                        {"name": "Subject", "value": f"Subject {mid}"},
-                    ],
-                    "parts": [
-                        {"mimeType": "text/plain", "body": {"data": _b64(f"body of {mid}")}},
-                    ],
+            return httpx.Response(
+                200,
+                json={
+                    "id": mid,
+                    "threadId": "t1",
+                    "internalDate": "1755600000000",
+                    "payload": {
+                        "mimeType": "multipart/alternative",
+                        "headers": [
+                            {"name": "From", "value": "Priya <p@x.com>"},
+                            {"name": "Subject", "value": f"Subject {mid}"},
+                        ],
+                        "parts": [
+                            {"mimeType": "text/plain", "body": {"data": _b64(f"body of {mid}")}},
+                        ],
+                    },
                 },
-            })
+            )
         if path.endswith("/profile"):
+            backfilling = True
             return httpx.Response(200, json={"emailAddress": "me@x.com", "historyId": "9000"})
         if path.endswith("/history"):
-            return httpx.Response(200, json={
-                "historyId": "9001",
-                "history": [{"messagesAdded": [{"message": {"id": "m9", "threadId": "t9"}}]}],
-            })
+            if backfilling:
+                return httpx.Response(200, json={"historyId": "9000", "history": []})
+            return httpx.Response(
+                200,
+                json={
+                    "historyId": "9001",
+                    "history": [{"messagesAdded": [{"message": {"id": "m9", "threadId": "t9"}}]}],
+                },
+            )
         return httpx.Response(404, json={})
 
     return httpx.MockTransport(handler)

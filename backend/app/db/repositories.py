@@ -1,8 +1,10 @@
 """Data-layer repositories (W1). All writes are UPSERTS against the uniqueness
 rules in docs/data-model.md — sync must be safely re-runnable at any time."""
+
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import String, all_, any_, cast, delete, func, select, update
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,73 +54,104 @@ async def upsert_user(
     return existing
 
 
-async def set_history_id(session: AsyncSession, user_id: int, history_id: str) -> None:
-    await session.execute(
-        update(User).where(User.id == user_id).values(gmail_history_id=history_id)
-    )
-
-
 # ---------------------------------------------------------------- threads / messages
 
 
-async def upsert_thread(
-    session: AsyncSession,
-    *,
-    user_id: int,
-    gmail_thread_id: str,
-    subject: str | None,
-    last_msg_id: str | None,
-    last_msg_at: datetime | None,
-) -> int:
-    """ON CONFLICT (user_id, gmail_thread_id) — keeps last_msg_* fresh. Returns thread pk."""
-    stmt = (
-        pg_insert(Thread)
-        .values(
-            user_id=user_id,
-            gmail_thread_id=gmail_thread_id,
-            subject=subject,
-            last_msg_id=last_msg_id,
-            last_msg_at=last_msg_at,
-        )
-        .on_conflict_do_update(
-            index_elements=[Thread.user_id, Thread.gmail_thread_id],
-            set_={"subject": subject, "last_msg_id": last_msg_id, "last_msg_at": last_msg_at},
-        )
-        .returning(Thread.id)
-    )
-    return (await session.execute(stmt)).scalar_one()
+def message_order(*, newest_first: bool = False):
+    """Provider receipt time, legacy Date fallback, then a locale-independent ID tie-break."""
+    timestamp = func.coalesce(Message.received_at, Message.sent_at)
+    mid = Message.gmail_msg_id.collate("C")
+    if newest_first:
+        return timestamp.desc().nulls_last(), mid.desc()
+    return timestamp.asc().nulls_first(), mid.asc()
 
 
-async def upsert_message(
+async def apply_mailbox_changes(
     session: AsyncSession,
-    *,
     user_id: int,
-    thread_pk: int,
-    gmail_msg_id: str,
-    from_addr: str | None,
-    to_addrs: str | None,
-    sent_at: datetime | None,
-    is_from_user: bool,
-    body_clean: str | None,
-) -> None:
-    stmt = (
-        pg_insert(Message)
-        .values(
-            user_id=user_id,
-            thread_id=thread_pk,
-            gmail_msg_id=gmail_msg_id,
-            from_addr=from_addr,
-            to_addrs=to_addrs,
-            sent_at=sent_at,
-            is_from_user=is_from_user,
-            body_clean=body_clean,
+    messages: list[dict],
+    removed: set[str],
+    *,
+    full: bool = False,
+) -> tuple[int, int]:
+    """Caller holds the user's sync fence. Change detection makes replays idempotent."""
+    touched: set[int] = set()
+    incoming = {m["gmail_msg_id"] for m in messages}
+    removal = select(Message).where(Message.user_id == user_id)
+    if full:
+        removal = removal.where(Message.gmail_msg_id != all_(cast(list(incoming), ARRAY(String))))
+    else:
+        removal = removal.where(Message.gmail_msg_id == any_(cast(list(removed), ARRAY(String))))
+    for old in (await session.execute(removal)).scalars():
+        touched.add(old.thread_id)
+        await session.delete(old)
+
+    for values in messages:
+        values = dict(values)
+        gmail_thread_id = values.pop("gmail_thread_id")
+        # A no-op on conflict, so ingestion order cannot rewrite the thread head.
+        await session.execute(
+            pg_insert(Thread)
+            .values(
+                user_id=user_id,
+                gmail_thread_id=gmail_thread_id,
+            )
+            .on_conflict_do_nothing(index_elements=[Thread.user_id, Thread.gmail_thread_id])
         )
-        .on_conflict_do_update(
-            index_elements=[Message.user_id, Message.gmail_msg_id],
-            set_={"body_clean": body_clean, "is_from_user": is_from_user},
+        thread_pk = (
+            await session.execute(
+                select(Thread.id).where(
+                    Thread.user_id == user_id,
+                    Thread.gmail_thread_id == gmail_thread_id,
+                )
+            )
+        ).scalar_one()
+        values.update(user_id=user_id, thread_id=thread_pk)
+        existing = (
+            await session.execute(
+                select(Message).where(
+                    Message.user_id == user_id,
+                    Message.gmail_msg_id == values["gmail_msg_id"],
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            session.add(Message(**values))
+            touched.add(thread_pk)
+        elif any(getattr(existing, key) != value for key, value in values.items()):
+            touched.update((existing.thread_id, thread_pk))
+            for key, value in values.items():
+                setattr(existing, key, value)
+    await session.flush()
+    for thread_pk in sorted(touched):
+        latest = (
+            await session.execute(
+                select(Message)
+                .where(
+                    Message.user_id == user_id,
+                    Message.thread_id == thread_pk,
+                )
+                .order_by(*message_order(newest_first=True))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        await session.execute(
+            update(Thread)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_pk,
+            )
+            .values(
+                last_msg_id=latest.gmail_msg_id if latest else None,
+                last_msg_at=(latest.received_at or latest.sent_at) if latest else None,
+                subject=latest.subject if latest else None,
+                version=Thread.version + 1,
+                needs_reply=None,
+            )
         )
-    )
-    await session.execute(stmt)
+        await session.execute(delete(Summary).where(Summary.thread_id == thread_pk))
+    # Keep empty thread rows: saved snapshots/tasks reference them and remain immutable.
+    return len(messages), len(touched)
 
 
 async def list_threads(
@@ -127,7 +160,7 @@ async def list_threads(
     q = (
         select(Thread)
         .where(Thread.user_id == user_id)
-        .order_by(Thread.last_msg_at.desc().nulls_last())
+        .order_by(Thread.last_msg_at.desc().nulls_last(), Thread.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
@@ -152,9 +185,7 @@ async def thread_messages(session: AsyncSession, thread_pk: int) -> list[Message
     return list(
         (
             await session.execute(
-                select(Message)
-                .where(Message.thread_id == thread_pk)
-                .order_by(Message.sent_at.asc().nulls_last())
+                select(Message).where(Message.thread_id == thread_pk).order_by(*message_order())
             )
         ).scalars()
     )
@@ -184,7 +215,21 @@ async def store_summary(
     last_msg_id: str,
     body: str,
     model_used: str | None,
-) -> None:
+    expected_version: int,
+) -> bool:
+    # Serialize publication with sync's thread update, then compare the source version.
+    current = (
+        await session.execute(
+            select(Thread.version)
+            .where(
+                Thread.id == thread_pk,
+                Thread.user_id == user_id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if current != expected_version:
+        return False
     stmt = (
         pg_insert(Summary)
         .values(
@@ -200,3 +245,4 @@ async def store_summary(
         )
     )
     await session.execute(stmt)
+    return True

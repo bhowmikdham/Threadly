@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "8f3a7c2d901b"
+HEAD = "3c6e9a1207bd"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -82,9 +82,15 @@ def test_migration_installs_and_preserves_existing_mailbox():
         )
         migrate("upgrade", "head")
         rows = asyncio.run(
-            execute("SELECT body_clean FROM messages WHERE gmail_msg_id='existing-message'")
+            execute(
+                "SELECT body_clean, received_at, reply_metadata FROM messages "
+                "WHERE gmail_msg_id='existing-message'"
+            )
         )
         assert rows[0]["body_clean"] == "Keep the existing body"
+        assert rows[0]["received_at"] is None
+        assert rows[0]["reply_metadata"] is None
+        assert asyncio.run(execute("SELECT version FROM threads WHERE id=91"))[0]["version"] == 0
         assert (
             asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
             == HEAD

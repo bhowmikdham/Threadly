@@ -46,7 +46,7 @@
     {
       "id": "T02",
       "title": "Repair Gmail fidelity and preserve reply metadata",
-      "status": "planned",
+      "status": "in_review",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -80,7 +80,10 @@
       ],
       "handoff": "Context and sender services can rely on stable source identifiers.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (Gmail fidelity: PostgreSQL and simulated Gmail evidence; live account validation pending)",
+        "../gmail-sync.md (runtime lifecycle, metadata contract and migration rollout)"
+      ]
     },
     {
       "id": "T03",

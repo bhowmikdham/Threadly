@@ -79,7 +79,7 @@ raw model output. Request validation detail entries contain `loc`, `type`, `msg`
 
 The preview does not execute work. Explicit summary execution is available through
 the separate durable API below. Existing `/threads/{thread_id}/summary` stays
-available with its original cache and SSE behavior.
+available; source changes invalidate its cache as described below.
 
 ### Durable summary tasks (initial execution slice)
 
@@ -145,6 +145,10 @@ invented ID references; it does not prove every generated claim is correct.
 `coverage` remains `partial` because Gmail sync does not yet guarantee a complete
 live view. The snapshot includes at most 50 messages / 12,000 body characters,
 records omission/truncation, and persists ordering independently of later sync.
+New snapshot payloads also include the captured `thread_version`; historical
+snapshots may lack that field. Ordering follows provider receipt time, then the
+legacy sent time fallback and a bytewise message ID tie-break. Missing dates sort
+first in the oldest-first transcript. See [sync details](gmail-sync.md).
 No task result uses the legacy summary cache.
 
 Not yet implemented: task continuation, editable artifact revisions, approval
@@ -169,7 +173,19 @@ invocation or frontend integration. See the
 |--------|---------|------|---------|
 | POST   | `/sync` | —    | `{"mode": "backfill|incremental", "messages_upserted": n, "threads_touched": n}` — first call walks the whole mailbox (ALL pages), later calls use the Gmail history cursor; expired cursor transparently re-backfills |
 
-Call it right after login, then on side-panel open. Runs inline in W1 (a few seconds for test inboxes).
+Call it right after login, then on side-panel open. Runs inline; duration depends
+on mailbox size. Scope excludes SPAM/TRASH. Backfill captures a starting cursor
+before scanning and replays all changes before committing. History includes
+additions, deletions and label changes. Concurrent syncs use a per-user version
+fence; the losing request returns 409 `sync_conflict` and should retry from current
+state. No Gmail network request holds a database transaction.
+
+`messages_upserted` counts in-scope detail records processed (including unchanged
+replays); `threads_touched` counts threads whose stored content/metadata changed.
+Errors: 401 `gmail_reauth_required`, 503 `gmail_sync_unavailable`; provider error
+bodies are omitted. Failure does not advance the cursor or partially commit mail.
+Migration `3c6e9a1207bd` clears existing cursors to force metadata rehydration on the
+next sync. See [sync lifecycle and rollout](gmail-sync.md).
 
 ### Threads
 | Method | Path                      | Query                                   | Returns |
@@ -177,6 +193,22 @@ Call it right after login, then on side-panel open. Runs inline in W1 (a few sec
 | GET    | `/threads`                | `filter=needs_reply|all`, `page`, `page_size` | `{"threads": [ThreadOut], "next_page": int|null}` |
 | GET    | `/threads/{thread_id}`    | —                                       | `ThreadOut` + messages |
 | GET    | `/threads/{thread_id}/summary` | `Accept: text/event-stream`        | SSE stream; cached summaries emit one `token` then `done` |
+
+Thread list entries include an additive integer `version`. Detail response is
+`{"thread": ThreadOut, "messages": [...]}`. Messages include `gmail_msg_id`,
+`from_addr`, `sent_at`, `is_from_user`, `body_clean`, plus nullable `received_at`
+and `reply_metadata` (original selected header arrays, parsed address arrays and
+labels; [shape](gmail-sync.md#reply-and-sender-metadata)). Treat headers as
+untrusted data. Missing metadata on existing rows remains null until backfilled.
+The list orders by newest receipt time then thread ID; message order is shared
+with context capture. Empty source threads remain addressable so saved task
+references survive, but have null head/time/subject.
+
+Thread versions increase for any stored source change, even when the newest
+message ID does not change. Such changes invalidate the legacy summary cache.
+If a source changes during summary generation, the SSE endpoint emits terminal
+`error` with `context_changed`, no `done`, and does not cache the stale result.
+The client must show an incomplete result and allow retry.
 
 ### Drafting
 | Method | Path      | Body | Returns |

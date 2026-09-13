@@ -95,3 +95,20 @@ Mounted read-only into the api container at `/ml`. Contract details: `ml/README.
 - **W2**: summary cache · `/threads` · extractor (6) · `/entities`
 - **W3**: RAG (7) · `/draft` · voice + PII (9) · planner (4)
 - **W4**: load drill · PII hardening · golden tests · freeze
+
+## Gmail source consistency (T02)
+
+`app/sync/worker.py` captures a pre-scan cursor and replays Gmail history before
+committing a backfill. All network reads happen outside DB transactions. A
+per-user `sync_version` compare under a row lock rejects stale concurrent work;
+message changes, deterministic thread heads/versions, cache invalidation and
+cursor advancement commit together. Incremental sync includes deletions and
+label changes, maintaining the same non-SPAM/non-TRASH scope as backfill.
+
+`app/db/repositories.py:message_order` is shared by thread details, context
+capture and legacy summary rendering. Selected RFC reply headers and parsed
+mailboxes are stored for later recipient services. The legacy summary cache
+checks the captured thread version before publication. Durable summaries retain
+their immutable input even after later sync. This remains inline sync, with
+large-mailbox/background scheduling work outstanding; see the
+[Gmail lifecycle, diagram and rollout guide](gmail-sync.md).

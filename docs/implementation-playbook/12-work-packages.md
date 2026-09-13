@@ -32,7 +32,7 @@ AI and frontend receive versioned schemas and fixture inputs.
 
 ## T02 · Repair Gmail fidelity and preserve reply metadata
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_review · **Release:** Initial release
 
 **Depends on:** T01
 
