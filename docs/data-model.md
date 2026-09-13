@@ -1,4 +1,4 @@
-# Data model — postgres (12 tables)
+# Data model — postgres (13 tables)
 
 Owner: backend. SQLAlchemy models live in `backend/app/db/models.py`; schema
 changes go through alembic (`make db-revision m="..."` then `make db-upgrade`)
@@ -35,7 +35,7 @@ of existing messages. Downgrading removes all state in the five new tables.
 | `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, nullable owned context FK, nullable intent hint/route checkpoint, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
 | `assistant_jobs` | One row per task; owned task FK, queued/running/done, due time, attempts 0–3, lease token/deadline. Checks require both lease fields only while running. Claim index supports polling/recovery. |
 | `task_events` | Append-only composite PK `(task_id,sequence)`, owned task FK, task version, kind, redacted JSONB payload and timestamp. Sequence assigned under the task row lock. |
-| `artifact_revisions` | UUID ID, owned task FK, revision 1, typed JSONB artifact and provenance. Unique task ID ensures one published summary. No update endpoint; revision editing is a later migration. |
+| `artifact_revisions` | UUID ID, owned task FK, numbered immutable typed JSONB artifact/provenance and nullable revision envelope/edit key. Unique `(task_id,revision)`; initial generation is revision 1. See the revision migration below. |
 
 Task-to-context and child-to-task ownership are also enforced by composite foreign
 keys. Source ownership is checked when capturing context. Jobs, events and artifacts
@@ -127,3 +127,25 @@ thread version in their hashed payload; old snapshots are left unchanged.
 - Timestamps: `TIMESTAMPTZ`, always UTC.
 - Gmail ids stored as opaque strings, never parsed.
 - No raw/unclean email bodies at rest; PII minimisation starts at the sync worker.
+
+## Draft revisions and reviews (migration `e9b7120c4a63`)
+
+`artifact_revisions` adds nullable `draft_envelope`, `edit_request_id` (128) and
+`edit_request_hash` (64). Existing draft envelopes are copied from owned tasks;
+summary envelopes stay null. Unique `(task_id,revision)` replaces unique task ID;
+unique `(task_id,edit_request_id)` deduplicates edits and unique `(id,user_id)`
+supports owned child references. Checks require positive revisions and complete
+edit metadata/draft envelopes for revisions >1. Original task input stays frozen.
+
+`draft_reviews` stores `artifact_id` (PK), `user_id`, exact `payload_hash` and
+`created_at`; its composite artifact FK enforces ownership and cascades deletion.
+It records review acknowledgement, not an ActionApproval or permission to send.
+Only the latest revision with unchanged hash and no local blockers is effectively
+reviewed. Historical acknowledgement records remain visible after supersession.
+
+The API appends edits and reviews while locking the task, advancing task version
+and redacted event sequence in the same transaction. Generation state stays
+`succeeded`. Readers obtain latest artifact by descending revision. Old readers
+and workers must be stopped during migration. Downgrade refuses with any edited
+revision or review record; no user data is automatically discarded. Details and
+client recovery: [revision/review handoff](assistant-draft-review.md).

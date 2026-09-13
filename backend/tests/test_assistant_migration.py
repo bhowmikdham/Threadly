@@ -15,13 +15,14 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "c6e0419a72df"
+HEAD = "e9b7120c4a63"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
     "assistant_jobs",
     "task_events",
     "artifact_revisions",
+    "draft_reviews",
 }
 
 
@@ -124,6 +125,7 @@ def test_migration_installs_and_preserves_existing_mailbox():
             asyncio.run(execute("SELECT body FROM drafts WHERE id=91"))[0]["body"]
             == "Keep the legacy draft"
         )
+        migrate("downgrade", "c6e0419a72df")
         asyncio.run(
             execute(
                 """
@@ -136,6 +138,57 @@ def test_migration_installs_and_preserves_existing_mailbox():
                 script=True,
             )
         )
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO artifact_revisions (id, task_id, user_id, revision, payload, provenance)
+              VALUES ('old-draft', 'draft-task', 91, 1,
+                '{"kind":"draft","content":{"body":"Keep generated text"}}', '{"model":"old"}');
+        """,
+                script=True,
+            )
+        )
+        migrate("upgrade", "head")
+        artifact = asyncio.run(execute("SELECT * FROM artifact_revisions WHERE id='old-draft'"))[0]
+        assert "Keep generated text" in artifact["payload"]
+        assert "person@example.test" in artifact["draft_envelope"]
+        assert artifact["edit_request_id"] is None
+        # Review-only data must also prevent destructive downgrade.
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO draft_reviews (artifact_id, user_id, payload_hash)
+              VALUES ('old-draft', 91, repeat('a', 64));
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "c6e0419a72df", fails=True)
+        assert asyncio.run(execute("SELECT * FROM draft_reviews"))
+        asyncio.run(execute("DELETE FROM draft_reviews", script=True))
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO artifact_revisions (id, task_id, user_id, revision, payload, provenance,
+                draft_envelope, edit_request_id, edit_request_hash)
+              VALUES ('edited-draft', 'draft-task', 91, 2, '{"kind":"draft"}', '{}',
+                '{"to":["edited@example.test"]}', 'edit-1', repeat('b',64));
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "c6e0419a72df", fails=True)
+        assert asyncio.run(execute("SELECT * FROM artifact_revisions WHERE revision=2"))
+        asyncio.run(execute("DELETE FROM artifact_revisions WHERE revision=2", script=True))
+        migrate("downgrade", "c6e0419a72df")
+        assert (
+            "Keep generated text"
+            in asyncio.run(execute("SELECT payload FROM artifact_revisions WHERE id='old-draft'"))[
+                0
+            ]["payload"]
+        )
+        migrate("upgrade", "head")
+        migrate("check")
         migrate("downgrade", "b7a219c40e6d", fails=True)
         assert asyncio.run(execute("SELECT draft_input FROM assistant_tasks WHERE id='draft-task'"))
         asyncio.run(execute("DELETE FROM assistant_tasks WHERE id='draft-task'", script=True))

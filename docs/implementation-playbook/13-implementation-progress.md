@@ -236,3 +236,46 @@ tasks exist. No live migration or deployment was performed. See [draft handoff](
 Next: persistent editable draft revisions and exact review state, then approved
 sending/reconciliation. UI integration, attachments, Calendar, retrieval, in-place
 continuation, Bedrock Flows and live model evaluation remain separate work.
+
+## Persistent draft revisions and review — T10 partial
+
+Branch: `codex/draft-revisions-review`, based on PR #8 merge `9059e36` into
+`codex/assistant-intent-routing`. Implemented and locally tested; team review and
+frontend integration remain pending. T10 remains in progress: contact resolution,
+artifact-to-action proposal and executable send approval are not implemented.
+
+Users can save full subject/body/To/Cc/Bcc edits as immutable numbered artifacts,
+read revision history and acknowledge review of one exact saved hash. The task
+keeps its original input; each artifact has its own envelope. Concurrent edits
+serialize under the task lock and stale saves fail. Replayed edit IDs return the
+original revision without duplicating history. Latest-task/artifact views and
+redacted edit/review events let the frontend track changes after generation ends.
+
+Review is an acknowledgement only, never permission to send. Edits, changed local
+reply source or changed sender make effective review stale. Unresolved fields,
+common placeholders and missing reply headers block review. User-edited text uses
+user-input evidence with parent provenance rather than retaining model citations
+as proof of modified claims. Semantic fact/attachment-claim validation remains
+limited; future execution requires independent validation and exact action approval.
+
+Migration `e9b7120c4a63` adds revision envelopes/edit keys and owned review records,
+backfills existing draft envelopes, preserves initial generated text/legacy drafts,
+and refuses downgrade while edits or reviews exist. Matching API/workers must run
+after migrating with old processes stopped. No production migration/deployment.
+
+Verification on Python 3.12.14 / isolated PostgreSQL 16: **233 tests passed, zero
+skipped**; Ruff and planning validator passed. Added 27 edit/review cases including
+concurrent saves/reviews, stale revision/hash rejection, recipient isolation,
+immutable history/pagination, local source/sender invalidation, blocked placeholders,
+missing headers, summary rejection and deletion cascades. Migration tests cover
+empty install/schema drift, preserving existing text and envelope backfill,
+review-only and edit-only downgrade refusal, and allowed rollback with initial
+artifacts preserved. Two existing dependency deprecation warnings remain.
+Generation prompts, release selection and model behavior are unchanged.
+No live AWS/Google calls or live quality evaluation.
+See [revision API, diagram and rollout](../assistant-draft-review.md) and
+[remaining backend delivery checklist](../backend-remaining-work.md).
+
+Next: outgoing action proposal, exact Send approval and Gmail execution/reconciliation.
+Calendar, bounded other/planning, UI context/continuation, Bedrock Flow invocation,
+live model evaluation and operational release gates remain outstanding.

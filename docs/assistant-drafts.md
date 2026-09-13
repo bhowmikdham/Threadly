@@ -3,7 +3,8 @@
 The durable worker now generates initial reply and compose drafts. It saves an
 immutable artifact in Threadly with an explicit envelope for review. It does not
 create a Gmail draft, insert text in an editor, send mail, upload attachments,
-create approval records, or call Calendar. The legacy `/draft` and
+create send approval records, or call Calendar. User editing and review acknowledgements
+are now available through the [revision/review APIs](assistant-draft-review.md). The legacy `/draft` and
 `/draft/{id}/send` routes remain 501 stubs; use the assistant API below.
 
 ## End-to-end workflow
@@ -122,8 +123,8 @@ and original RFC Message-ID. Ownership checks protect both task and artifact rea
 
 `GET /assistant/artifacts/{id}` returns the usual `artifact`, `revision` and
 `provenance`, plus `draft_envelope` (null for non-drafts) and
-`sending_available: false`. The envelope comes from the saved task, never from
-model output. Reference `to-1` maps to `draft_envelope.to[0]`, likewise `cc-1` and
+`sending_available: false`. The initial envelope comes from the saved task; each artifact revision now stores
+its own copy, never supplied by model output. Read the artifact envelope after edits. Reference `to-1` maps to `draft_envelope.to[0]`, likewise `cc-1` and
 `bcc-1`. These are positional bindings within this immutable envelope, not global
 contact IDs. Display the literal addresses with the text before reuse.
 
@@ -174,10 +175,11 @@ Apply the migration with older API/workers stopped, then start matching code.
 Downgrade refuses while draft-release tasks or bound draft inputs exist; it does
 not silently lose recipient/target data. No live migration was performed here.
 
-This slice supports initial immutable revision 1 only. Editing, AI rewrites,
-in-place clarification continuation, approval invalidation and a sender are still
-open T10/T11/T12 work. To change input now, submit a fresh request ID and review the
-new artifact. Do not interpret task success as approval, sending or Gmail persistence.
+Generation publishes immutable revision 1. User edits now append revisions through
+the [editing/review service](assistant-draft-review.md). AI rewrites, in-place
+clarification continuation, executable approval invalidation and a sender remain
+open T10/T11/T12 work. Changing generation context still needs a fresh request ID.
+Do not interpret task success or review as approval, sending or Gmail persistence.
 
 ## Evidence and next work
 
@@ -189,7 +191,14 @@ and calendar-dependent rejection. Migration tests verify existing drafts/tasks
 survive and incompatible downgrade fails. See the
 [progress record](implementation-playbook/13-implementation-progress.md) for results.
 
-Next: persistent draft editing/revisions and exact review state, then approved
-sending and uncertain-outcome reconciliation. Calendar availability, attachment
+Implemented next slice: [draft editing/revisions and exact review state](assistant-draft-review.md).
+Next: approved sending and uncertain-outcome reconciliation. Calendar availability, attachment
 uploads, authorized retrieval and writing-style retrieval remain separate services;
 Bedrock Flow execution and live model-quality evaluations also remain outstanding.
+
+## Follow-up implementation
+
+The initial generation behavior above remains unchanged. Persistent user edits,
+revision history and exact review acknowledgements are implemented in the
+[revision/review slice](assistant-draft-review.md). Approval-to-send and external execution are
+still pending. See [remaining backend delivery order](backend-remaining-work.md).

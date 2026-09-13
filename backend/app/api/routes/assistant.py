@@ -10,7 +10,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import tasks
+from app.assistant import draft_review, tasks
 from app.assistant.context import capture_thread
 from app.db.engine import get_session
 from app.db.models import ArtifactRevision, AssistantTask, ContextSnapshot, TaskEvent
@@ -22,6 +22,7 @@ from app.schemas.assistant import (
     RoutePreview,
     RoutePreviewRequest,
 )
+from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 
 router = APIRouter()
 DB = Annotated[AsyncSession, Depends(get_session)]
@@ -46,9 +47,10 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
     artifact_id = None
     if task.state == "succeeded":
         artifact_id = await session.scalar(
-            select(ArtifactRevision.id).where(
-                ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == task.user_id
-            )
+            select(ArtifactRevision.id)
+            .where(ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == task.user_id)
+            .order_by(ArtifactRevision.revision.desc())
+            .limit(1)
         )
     return {
         "task_id": task.id,
@@ -168,28 +170,61 @@ async def list_tasks(
 
 @router.get("/artifacts/{artifact_id}")
 async def get_artifact(artifact_id: str, user_id: CurrentUser, session: DB):
-    artifact = (
-        await session.execute(
-            select(ArtifactRevision).where(
-                ArtifactRevision.id == artifact_id, ArtifactRevision.user_id == user_id
-            )
-        )
-    ).scalar_one_or_none()
-    if artifact is None:
-        raise ApiError(404, "not_found", "Unknown artifact.")
-    draft_envelope = None
-    if artifact.payload.get("kind") == "draft":
-        task = await tasks.owned_task(session, user_id, artifact.task_id)
-        draft_envelope = task.draft_input
+    artifact = await draft_review.owned_artifact(session, user_id, artifact_id)
+    task = await tasks.owned_task(session, user_id, artifact.task_id, lock=True)
+    return await draft_review.artifact_view(session, task, artifact)
+
+
+@router.post("/tasks/{task_id}/draft-revisions", status_code=201)
+async def edit_draft(task_id: str, request: EditDraftRequest, user_id: CurrentUser, session: DB):
+    task, artifact = await draft_review.edit(session, user_id, task_id, request)
+    result = await draft_review.artifact_view(session, task, artifact)
+    await session.commit()
+    return result
+
+
+@router.get("/tasks/{task_id}/draft-revisions")
+async def draft_history(
+    task_id: str,
+    user_id: CurrentUser,
+    session: DB,
+    before_revision: Annotated[int | None, Query(ge=1)] = None,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    task = await tasks.owned_task(session, user_id, task_id, lock=True)
+    current = await draft_review.latest(session, task)
+    draft_review.require_draft(current)
+    query = select(ArtifactRevision).where(
+        ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == user_id
+    )
+    if before_revision is not None:
+        query = query.where(ArtifactRevision.revision < before_revision)
+    rows = (
+        await session.scalars(query.order_by(ArtifactRevision.revision.desc()).limit(page_size + 1))
+    ).all()
+    page = rows[:page_size]
     return {
-        "draft_envelope": draft_envelope,
-        "sending_available": False,
-        "artifact_id": artifact.id,
-        "task_id": artifact.task_id,
-        "revision": artifact.revision,
-        "artifact": artifact.payload,
-        "provenance": artifact.provenance,
+        "revisions": [
+            {"artifact_id": a.id, "revision": a.revision, "created_at": a.created_at.isoformat()}
+            for a in page
+        ],
+        "latest_artifact_id": current.id,
+        "latest_revision": current.revision,
+        "next_before_revision": page[-1].revision if len(rows) > page_size else None,
     }
+
+
+@router.post("/artifacts/{artifact_id}/review")
+async def review_draft(
+    artifact_id: str,
+    request: ReviewDraftRequest,
+    user_id: CurrentUser,
+    session: DB,
+):
+    task, artifact = await draft_review.review(session, user_id, artifact_id, request)
+    result = await draft_review.artifact_view(session, task, artifact)
+    await session.commit()
+    return result
 
 
 @router.get("/tasks/{task_id}/events")
