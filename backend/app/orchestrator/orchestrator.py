@@ -74,7 +74,7 @@ async def summarise_thread(
         thread_pk=thread.id,
         last_msg_id=thread.last_msg_id,
         body=body,
-        model_used=f"{info.provider}:{info.model}@prompts-{prompts_version()}",
+        model_used=info.storage_label(prompts_version()),
     )
     await session.commit()
     yield SummaryEvent("done", provider=info.provider)

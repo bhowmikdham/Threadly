@@ -6,6 +6,12 @@ Claude project / drive). Every box below maps to exactly one folder in this repo
 
 ## Topology
 
+Implementation update (13 September 2026): [ADR 003](decisions/003-bedrock-migration.md)
+supersedes the inference placement below. `INFERENCE_PROVIDER=bedrock` routes
+generation through the new Bedrock Converse adapter. `legacy` retains the
+original topology during migration. Durable assistant runs and Bedrock Flows
+remain planned in the [implementation playbook](implementation-playbook/README.md).
+
 ```
 Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.small+, Elastic IP)
                                                         security group: 443 + 22 only
@@ -33,7 +39,8 @@ Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.sm
 
 Rules encoded by this topology:
 
-- Inference NEVER runs on AWS (decisions/001). The EC2 box orchestrates.
+- Legacy inference runs on the Mac/OpenRouter; Bedrock mode uses AWS managed
+  inference (decisions/003). The EC2 box orchestrates in both modes.
 - Anything leaving the box for a cloud model or SaaS goes through PII masking first.
 - Data stores are off-the-shelf containers; we own the schema, not the images.
 - Voice/API keys live server-side only. The extension holds a session JWT, nothing else.

@@ -7,6 +7,12 @@ and update this file in the same PR. Baseline migration: `26902c33da74_w1_initia
 
 Column lists below are the v0 starting point — expected to evolve.
 
+Bedrock migration: `summaries.model_used` remains VARCHAR(80). Provider/model/prompt
+labels that exceed 80 characters (for example inference-profile ARNs) are stored
+as `sha256:<digest>` of the full label. Reproduce it from deployment configuration
+using `GenResult.storage_label`; this is provenance, not a new cache key. No schema
+migration is required for the provider adapter.
+
 | Table         | Purpose                          | Keys & rules |
 |---------------|----------------------------------|--------------|
 | `users`       | account + oauth + sync cursor    | `google_sub` UNIQUE; refresh + access tokens stored Fernet-encrypted (`auth/crypto.py`) with `access_token_expires_at`; `gmail_history_id` = incremental sync cursor |

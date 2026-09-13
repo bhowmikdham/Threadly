@@ -2,6 +2,9 @@
 
 **Version 1.0 · 13 September 2026 · Implementation specification, not deployed functionality.**
 
+Implementation has started. See [current evidence and remaining work](13-implementation-progress.md)
+for branch-specific results; the architecture below remains the target design.
+
 This is the shared build plan for a Gmail assistant with five user intents:
 **summarise, plan/schedule, reply, compose and other**. It covers user triggers,
 Bedrock routing/Flows, backend services, Google integrations, evidence, approvals,

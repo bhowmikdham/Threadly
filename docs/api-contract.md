@@ -8,6 +8,13 @@ Status: v0.1 — W1 endpoints are LIVE: `/auth/google/exchange`, `/auth/refresh`
 `/healthz`, `/readyz`, `/sync`, `/threads`, `/threads/{id}`, `/threads/{id}/summary` (SSE).
 Still stubbed (501): `/draft*`, `/entities`, `/commitments`, `/voice/*`.
 
+Inference migration: uncached summaries support `INFERENCE_PROVIDER=bedrock`
+([ADR 003](decisions/003-bedrock-migration.md)). The initial Bedrock adapter buffers
+and validates the full response before emitting one `token` event, followed by
+`done` with provider `bedrock`. Model failure emits terminal `error` with code
+`upstream_model_unavailable`; no success event or cache write follows. Existing
+cached results may still come from legacy inference.
+
 ## Conventions
 
 - Base URL: `https://<DOMAIN>` (dev: `http://localhost:8000`)

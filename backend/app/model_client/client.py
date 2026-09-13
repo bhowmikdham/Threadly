@@ -1,17 +1,19 @@
-"""Module 8 — MODEL CLIENT (W1, implemented).
+"""Module 8 — model selection and cloud input masking.
 
 One entrypoint for all generation. Owns:
-- the fallback chain: 2s health probe on the Mac -> ollama, else openrouter
+- explicit Bedrock mode, or the legacy Mac health probe -> OpenRouter path
 - PII masking before ANY cloud egress (module 9's rule, enforced here)
-- hard token caps + thinking OFF (providers)
+- bounded text generation (provider-specific configuration)
 - provider bookkeeping (the ablation study needs to know who served what)
 """
 import logging
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from hashlib import sha256
 
 from app.config import get_settings
+from app.model_client.bedrock import BedrockProvider
 from app.model_client.providers import OllamaProvider, OpenRouterProvider, ProviderError
 from app.pii.masking import mask
 
@@ -25,15 +27,22 @@ class GenResult:
     provider: str
     model: str
 
+    def storage_label(self, prompt_version: str) -> str:
+        """Fit the existing VARCHAR(80), including long inference-profile ARNs."""
+        label = f"{self.provider}:{self.model}@prompts-{prompt_version}"
+        return label if len(label) <= 80 else f"sha256:{sha256(label.encode()).hexdigest()}"
+
 
 class ModelClient:
     def __init__(
         self,
         ollama: OllamaProvider | None = None,
         openrouter: OpenRouterProvider | None = None,
+        bedrock: BedrockProvider | None = None,
     ):
         self.ollama = ollama or OllamaProvider()
         self.openrouter = openrouter or OpenRouterProvider()
+        self.bedrock = bedrock or BedrockProvider()
         self._mac_ok: bool | None = None
         self._mac_checked = 0.0
 
@@ -50,6 +59,16 @@ class ModelClient:
         """Pick a provider, return (token iterator, bookkeeping). Falls back to
         openrouter mid-decision (not mid-stream) when the Mac probe fails."""
         settings = get_settings()
+        if settings.inference_provider == "bedrock":
+            model = (
+                settings.bedrock_small_model_id or settings.bedrock_model_id
+                if small else settings.bedrock_model_id
+            )
+            masked_prompt, _mapping = mask(prompt)
+            return self.bedrock.stream(
+                masked_prompt, model=model, max_tokens=max_tokens
+            ), GenResult("bedrock", model)
+
         if await self._mac_healthy():
             model = settings.model_small if small else settings.model_main
             try:

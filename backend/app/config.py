@@ -4,7 +4,9 @@ Values come from the environment (compose injects repo-root .env via env_file).
 Defaults are dev-safe placeholders; prod MUST override the obvious ones.
 """
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,7 +30,14 @@ class Settings(BaseSettings):
     google_redirect_uri: str = ""
     fernet_key: str = ""  # encrypts refresh tokens at rest (auth/crypto.py)
 
-    # inference — primary mac via tailscale, fallback openrouter (ADR 001)
+    # Explicit migration switch; Bedrock never falls back to another cloud.
+    inference_provider: Literal["legacy", "bedrock"] = "legacy"
+    bedrock_region: str = "ap-southeast-2"
+    bedrock_model_id: str = ""
+    bedrock_small_model_id: str = ""
+    bedrock_read_timeout_s: int = Field(default=90, ge=1, le=300)
+
+    # Legacy rollback path (superseded by ADR 003).
     ollama_base_url: str = "http://localhost:11434"
     model_main: str = "qwen3.5:4b-threadly"
     model_small: str = "qwen3.5:2b"

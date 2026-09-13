@@ -15,6 +15,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError, envelope
 from app.db.engine import get_session
+from app.model_client.providers import ProviderError
 from app.orchestrator.orchestrator import summarise_thread
 
 log = logging.getLogger("threadly.api")
@@ -36,6 +37,13 @@ async def summary_sse(thread_id: str, user_id: CurrentUser, session: DB):
             yield {
                 "event": "error",
                 "data": json.dumps(envelope(exc.code, exc.message, exc.detail)),
+            }
+        except ProviderError:
+            yield {
+                "event": "error",
+                "data": json.dumps(envelope(
+                    "upstream_model_unavailable", "Summary generation did not complete."
+                )),
             }
         except Exception:
             log.exception("summary stream failed")
