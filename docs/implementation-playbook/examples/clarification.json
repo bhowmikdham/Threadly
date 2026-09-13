@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "kind": "clarification",
+  "context_snapshot_id": "ctx-example-006",
+  "coverage": "partial",
+  "assumptions": [],
+  "evidence": [],
+  "content": {
+    "question_id": "q-6",
+    "question": "Do you mean the third message in this conversation or the third thread in your inbox?",
+    "missing_fields": [
+      "target_reference"
+    ],
+    "choices": [
+      "Third message in this conversation",
+      "Third thread in the saved inbox list"
+    ]
+  }
+}

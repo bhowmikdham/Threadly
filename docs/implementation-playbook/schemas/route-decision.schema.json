@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://threadly.example/spec/route-decision",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "needs_clarification",
+        "unsupported"
+      ]
+    },
+    "intent": {
+      "enum": [
+        "summarise",
+        "plan_schedule",
+        "reply",
+        "compose",
+        "other"
+      ]
+    },
+    "output_kind": {
+      "enum": [
+        "summary",
+        "draft",
+        "plan",
+        "schedule_options",
+        "answer",
+        "clarification"
+      ]
+    },
+    "operations": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "enum": [
+          "summarise_thread",
+          "plan_actions",
+          "check_time",
+          "suggest_slots",
+          "draft_reply",
+          "draft_new",
+          "lookup_entity",
+          "search_mail",
+          "lookup_commitments",
+          "transform_text",
+          "help"
+        ]
+      }
+    },
+    "context_snapshot_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date_phrase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time_phrase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 5,
+          "maximum": 480
+        },
+        "slot_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 3
+        },
+        "tone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recipient_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "date_phrase",
+        "time_phrase",
+        "duration_minutes",
+        "slot_count",
+        "tone",
+        "recipient_refs"
+      ]
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "clarification": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rationale": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "requested_action": {
+      "enum": [
+        "none",
+        "send_email",
+        "create_event"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "intent",
+    "output_kind",
+    "operations",
+    "context_snapshot_id",
+    "parameters",
+    "missing_fields",
+    "clarification",
+    "rationale",
+    "requested_action"
+  ]
+}

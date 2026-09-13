@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "kind": "schedule_options",
+  "context_snapshot_id": "ctx-example-005",
+  "coverage": "complete",
+  "assumptions": [
+    "Synthetic calendar data; these are not the user's real free times."
+  ],
+  "evidence": [
+    {
+      "ref_id": "check-1",
+      "source_kind": "calendar_check",
+      "source_id": "calendar-query-example-1",
+      "source_version": "1",
+      "quote": null
+    }
+  ],
+  "content": {
+    "duration_minutes": 30,
+    "slots": [
+      {
+        "slot_id": "option-1",
+        "start": "2026-09-14T10:00:00+10:00",
+        "end": "2026-09-14T10:30:00+10:00",
+        "timezone": "Australia/Melbourne",
+        "check_ref": "check-1"
+      }
+    ],
+    "calendars_checked": [
+      "primary"
+    ],
+    "checked_at": "2026-09-13T07:00:00Z",
+    "expires_at": "2026-09-13T07:10:00Z",
+    "availability_scope": "user_selected_calendars",
+    "insufficient_slots_reason": "Only one slot fits the synthetic test constraints."
+  }
+}

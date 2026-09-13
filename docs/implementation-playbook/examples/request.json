@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "request_id": "example-request-001",
+  "instruction": "Reply with three meeting times next week",
+  "intent_hint": null,
+  "context_snapshot_id": "ctx-example-001",
+  "continuation": null
+}

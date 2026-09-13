@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "kind": "answer",
+  "context_snapshot_id": "ctx-example-002",
+  "coverage": "complete",
+  "assumptions": [],
+  "evidence": [
+    {
+      "ref_id": "ev-1",
+      "source_kind": "message",
+      "source_id": "msg-example-3",
+      "source_version": "mail-v4",
+      "quote": "Thanks for clarifying."
+    }
+  ],
+  "content": {
+    "text": "The third message acknowledges the clarification.",
+    "claims": [
+      {
+        "text": "It says: Thanks for clarifying.",
+        "evidence_ref_ids": [
+          "ev-1"
+        ]
+      }
+    ],
+    "search_scope": "Third message in the pinned conversation ordering"
+  }
+}

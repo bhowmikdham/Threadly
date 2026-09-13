@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "kind": "draft",
+  "context_snapshot_id": "ctx-example-003",
+  "coverage": "complete",
+  "assumptions": [],
+  "evidence": [
+    {
+      "ref_id": "ev-user",
+      "source_kind": "user_input",
+      "source_id": "input-example-3",
+      "source_version": "1",
+      "quote": "Tell them I will send the report Friday."
+    }
+  ],
+  "content": {
+    "mode": "reply",
+    "thread_ref": "thread-example-3",
+    "to_refs": [
+      "participant-confirmed-1"
+    ],
+    "cc_refs": [],
+    "bcc_refs": [],
+    "subject": "Re: Project update",
+    "body": "Thanks for the update. I will send the report on Friday.",
+    "unresolved_fields": [],
+    "attachment_refs": [],
+    "fact_ref_ids": [
+      "ev-user"
+    ]
+  }
+}

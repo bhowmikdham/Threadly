@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "status": "proposed",
+  "tools": [
+    {
+      "name": "context.read",
+      "access": "read",
+      "inputs": [
+        "thread/selection references",
+        "snapshot version"
+      ],
+      "outputs": [
+        "ordered evidence",
+        "coverage",
+        "source versions"
+      ],
+      "errors": [
+        "not_found",
+        "context_stale",
+        "permission_denied"
+      ],
+      "policy": "Resolve owner from grant; bound number of messages and bytes."
+    },
+    {
+      "name": "mail.search",
+      "access": "read",
+      "inputs": [
+        "validated query constraints",
+        "limit"
+      ],
+      "outputs": [
+        "source IDs and snippets",
+        "search/index coverage"
+      ],
+      "errors": [
+        "index_unavailable",
+        "query_too_broad",
+        "permission_denied"
+      ],
+      "policy": "Bound owner/time range/result count; return structured refs."
+    },
+    {
+      "name": "entities.lookup",
+      "access": "read",
+      "inputs": [
+        "entity type",
+        "key"
+      ],
+      "outputs": [
+        "exact value",
+        "source evidence"
+      ],
+      "errors": [
+        "not_found",
+        "index_incomplete"
+      ],
+      "policy": "Database-backed; no generative answer substitution."
+    },
+    {
+      "name": "commitments.read",
+      "access": "read",
+      "inputs": [
+        "status",
+        "thread or time scope"
+      ],
+      "outputs": [
+        "confirmed/proposed items",
+        "provenance"
+      ],
+      "errors": [
+        "not_found",
+        "scope_invalid"
+      ],
+      "policy": "Maintain source and confirmation status."
+    },
+    {
+      "name": "calendar.availability",
+      "access": "read",
+      "inputs": [
+        "date window",
+        "duration",
+        "preference version"
+      ],
+      "outputs": [
+        "slots",
+        "busy coverage status",
+        "check ID",
+        "checked_at",
+        "availability status including successful no_slots result"
+      ],
+      "errors": [
+        "reauth_required",
+        "insufficient_scope",
+        "calendar_partial_error"
+      ],
+      "policy": "Calendar IDs resolved from user preferences; never model-selected unknown accounts."
+    },
+    {
+      "name": "recipients.resolve",
+      "access": "read",
+      "inputs": [
+        "user supplied names/addresses",
+        "reply context"
+      ],
+      "outputs": [
+        "candidates",
+        "ambiguity",
+        "verified aliases"
+      ],
+      "errors": [
+        "ambiguous",
+        "recipient_unknown"
+      ],
+      "policy": "No invented address; do not use a model's recipient as approval."
+    },
+    {
+      "name": "style.retrieve",
+      "access": "read_optional",
+      "inputs": [
+        "topic",
+        "tone preference"
+      ],
+      "outputs": [
+        "bounded user-consented style examples"
+      ],
+      "errors": [
+        "disabled",
+        "unavailable"
+      ],
+      "policy": "Cannot supply facts/recipients; per-user isolation."
+    },
+    {
+      "name": "artifact.validate",
+      "access": "validation",
+      "inputs": [
+        "kind",
+        "candidate payload",
+        "snapshot"
+      ],
+      "outputs": [
+        "validated payload or typed violations"
+      ],
+      "errors": [
+        "schema_invalid",
+        "evidence_invalid",
+        "claims_unresolved"
+      ],
+      "policy": "No external write; source/date/identity checks in code."
+    },
+    {
+      "name": "gmail.send_approved",
+      "access": "write_executor_only",
+      "inputs": [
+        "stored action ID"
+      ],
+      "outputs": [
+        "provider message/thread ID or unknown outcome"
+      ],
+      "errors": [
+        "approval_stale",
+        "reauth_required",
+        "outcome_unknown"
+      ],
+      "policy": "Not exposed to proposal flows; execute exact stored bytes."
+    },
+    {
+      "name": "calendar.create_approved",
+      "access": "write_executor_only",
+      "inputs": [
+        "stored action ID"
+      ],
+      "outputs": [
+        "event ID",
+        "notification behavior",
+        "provider outcome"
+      ],
+      "errors": [
+        "approval_stale",
+        "slot_conflict",
+        "outcome_unknown"
+      ],
+      "policy": "Not exposed to proposal flows; stable event ID and revalidation."
+    }
+  ]
+}

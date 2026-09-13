@@ -1,0 +1,981 @@
+{
+  "schema_version": "1.0",
+  "status": "planning",
+  "audience": "Individual professionals and small teams",
+  "tasks": [
+    {
+      "id": "T01",
+      "title": "Agree contracts and supersede inference architecture",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [],
+      "implementation_targets": [
+        "docs/api-contract.md",
+        "docs/data-model.md",
+        "docs/architecture.md",
+        "docs/decisions/",
+        "backend/app/schemas/",
+        "ml/README.md"
+      ],
+      "deliverables": [
+        "Runtime contract definitions derived from reviewed examples",
+        "New ADR for Bedrock and backend-owned workflow state",
+        "Document artifact/action/task semantics and agreed review rules"
+      ],
+      "acceptance": [
+        "Five intents, continuation, source context and approval examples reviewed across teams",
+        "Current versus proposed paths and API compatibility documented",
+        "No production behavior claimed before implementation"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "AI and frontend receive versioned schemas and fixture inputs.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T02",
+      "title": "Repair Gmail fidelity and preserve reply metadata",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T01"
+      ],
+      "implementation_targets": [
+        "backend/app/sync/",
+        "backend/app/db/repositories.py",
+        "backend/app/db/models.py",
+        "backend/alembic/versions/"
+      ],
+      "deliverables": [
+        "Monotonic thread version and stable message order",
+        "Backfill starting-cursor plus replay strategy",
+        "Parsed sender equality and RFC reply metadata"
+      ],
+      "acceptance": [
+        "Reverse/equal-time ingestion cannot regress newest context",
+        "Concurrent arrival during initial sync is captured",
+        "Alias/substring spoof and missing Date fixtures handled",
+        "Migration preserves current message rows"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Context and sender services can rely on stable source identifiers.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T03",
+      "title": "Google capabilities and AWS connectivity foundation",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T01"
+      ],
+      "implementation_targets": [
+        "backend/app/auth/",
+        "backend/app/config.py",
+        ".env.example",
+        "infra/bedrock/",
+        "infra/deploy/"
+      ],
+      "deliverables": [
+        "Incremental scopes and actual-grant capability tracking",
+        "Revocation/transient-error distinction and safe token refresh",
+        "Verified model/role/region access and authenticated Lambda-to-backend connectivity"
+      ],
+      "acceptance": [
+        "Existing Gmail users add Calendar without losing refresh token",
+        "Wrong-account linking and denied scopes fail safely",
+        "No secret enters extension or flow prompt",
+        "Deployment-role and runtime-role permissions tested"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "AI gets verified model/profile choices; tool bridge gets approved connectivity.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T04",
+      "title": "Bedrock model provider and typed inference harness",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T01",
+        "T03"
+      ],
+      "implementation_targets": [
+        "backend/app/model_client/",
+        "backend/app/config.py",
+        "backend/pyproject.toml",
+        "ml/prompts/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Bedrock adapter for text/typed inference with fake provider",
+        "Task-oriented model configuration and bounded retries",
+        "Router/generation model benchmark and PII/reference handling"
+      ],
+      "acceptance": [
+        "Iteration-time errors handled without splicing providers",
+        "Malformed/schema-incompatible responses are bounded failures",
+        "No silent region/provider fallback",
+        "Model selection report includes latency, cost inputs and limitations"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Router and workflow teams receive a tested inference interface.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T05",
+      "title": "Durable task, artifact, action and job infrastructure",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T01"
+      ],
+      "implementation_targets": [
+        "backend/app/jobs/",
+        "backend/app/actions/",
+        "backend/app/db/",
+        "backend/app/api/routes/assistant.py",
+        "backend/alembic/versions/"
+      ],
+      "deliverables": [
+        "Generic owner-scoped task/artifact/action records",
+        "Transactional job enqueue, leases and fencing",
+        "API snapshots and replayable task events",
+        "Exact approval binding and cancellation semantics"
+      ],
+      "acceptance": [
+        "Real PostgreSQL races produce one valid action claim",
+        "Duplicate request key with different body returns conflict",
+        "Restart resumes read stages and reconciles in-flight writes first",
+        "Artifact-only completion differs from sent/booked objective",
+        "Cross-user IDs never disclose or mutate records"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "All workflows can persist progress and pause for users.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T06",
+      "title": "Intent routing and contextual reference resolution",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T02",
+        "T04",
+        "T05"
+      ],
+      "implementation_targets": [
+        "backend/app/planner/",
+        "backend/app/context/",
+        "backend/app/orchestrator/intents.py",
+        "ml/prompts/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Five-intent router with explicit-action fast path",
+        "Bounded multi-step plan validator",
+        "Snapshot-bound this/third/that/second-option resolver"
+      ],
+      "acceptance": [
+        "Explicit actions deterministic",
+        "Third thread versus third message ambiguity asks correct question",
+        "Task continuation wins over global rerouting",
+        "Calendar-required reply uses scheduling capability",
+        "Unknown/unsupported/missing-permission results are distinct"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Dispatcher receives validated operations and bound context.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T07",
+      "title": "Flow registry, read-tool bridge and versioned promotion",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T03",
+        "T04",
+        "T05"
+      ],
+      "implementation_targets": [
+        "backend/app/orchestrator/registry.py",
+        "backend/app/model_client/flow_client.py",
+        "backend/app/api/routes/internal_tools.py",
+        "infra/bedrock/",
+        "infra/lambda/"
+      ],
+      "deliverables": [
+        "InvokeFlow adapter and registry",
+        "Named read adapters with task-bound grants",
+        "Exported test flows, immutable versions and release aliases"
+      ],
+      "acceptance": [
+        "Fake and live adapter contracts match",
+        "No write tool is exposed in proposal graphs",
+        "Model cannot change user context or tool grant",
+        "Pinned release survives deployment of a new version",
+        "Node error branches become typed app outcomes"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "AI can author tested flow graphs against stable tool contracts.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T08",
+      "title": "Source-linked summary vertical slice",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T02",
+        "T05",
+        "T07"
+      ],
+      "implementation_targets": [
+        "backend/app/orchestrator/",
+        "backend/app/context/",
+        "backend/app/api/routes/summary.py",
+        "ml/prompts/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Structured summary with coverage/evidence",
+        "Release-aware cache key",
+        "Long-thread chunking with original evidence retained"
+      ],
+      "acceptance": [
+        "New message or prompt release invalidates cache",
+        "Collapsed content fetched or marked unavailable",
+        "Material claims have valid source IDs and reviewed support",
+        "Selection scope and full-thread scope distinguishable"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Frontend receives first fully functioning read-only result.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T09",
+      "title": "Evidence retrieval and bounded Other handlers",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T02",
+        "T04",
+        "T05"
+      ],
+      "implementation_targets": [
+        "backend/app/extractor/",
+        "backend/app/db/",
+        "backend/app/api/routes/entities.py",
+        "backend/app/retrieval/"
+      ],
+      "deliverables": [
+        "Entity/commitment extraction and provenance",
+        "Bounded mail search with indexing status",
+        "Help and selection-transform handlers"
+      ],
+      "acceptance": [
+        "Exact entity lookup avoids unnecessary generation",
+        "Empty index does not imply absent email",
+        "All retrieved evidence owner-scoped",
+        "Unknown operation cannot run arbitrary SQL/tool",
+        "Source deletion/revocation reported"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Reply, Compose and Plan can use grounded facts and commitments.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T10",
+      "title": "Shared draft artifacts, recipients and revisions",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T01",
+        "T05",
+        "T09"
+      ],
+      "implementation_targets": [
+        "backend/app/drafting/",
+        "backend/app/schemas/draft.py",
+        "backend/app/db/models.py",
+        "backend/app/api/routes/draft.py"
+      ],
+      "deliverables": [
+        "Draft revision model with subject/To/Cc/Bcc/body",
+        "Recipient resolution and missing-fact validator",
+        "Artifact-to-action proposal builder"
+      ],
+      "acceptance": [
+        "No guessed recipient addresses or inferred Bcc",
+        "Edits invalidate previous approval",
+        "Missing attachment/placeholder blocks send",
+        "Existing draft rows have a coherent migration/link strategy"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Reply and Compose share the same review and sender contracts.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T11",
+      "title": "Reply workflow",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T06",
+        "T07",
+        "T10"
+      ],
+      "implementation_targets": [
+        "backend/app/drafting/service.py",
+        "ml/prompts/",
+        "ml/evals/",
+        "infra/bedrock/flows/"
+      ],
+      "deliverables": [
+        "Grounded reply flow and prompts",
+        "Reply/reply-all and optional shared capabilities",
+        "Revision handling and current-thread recheck policy"
+      ],
+      "acceptance": [
+        "Scheduling-dependent reply fetches real availability",
+        "No unsupported promises or attachment claims",
+        "Correct target and recipients remain visible",
+        "Follow-up rewrite edits current artifact without wrong-task routing"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Reviewable thread reply integrates with shared sender.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T12",
+      "title": "Approved Gmail sender and uncertain-outcome reconciliation",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T02",
+        "T03",
+        "T05",
+        "T10"
+      ],
+      "implementation_targets": [
+        "backend/app/actions/",
+        "backend/app/sync/gmail.py",
+        "backend/app/drafting/mime.py",
+        "backend/app/api/routes/draft.py"
+      ],
+      "deliverables": [
+        "Exact reviewed MIME send",
+        "RFC Message-ID and provider result persistence",
+        "Unknown-send reconciliation and duplicate/cancel handling"
+      ],
+      "acceptance": [
+        "Reply thread headers correct; new mail has no inherited thread",
+        "Double approval/redelivery cannot blindly resend",
+        "Timeout after provider acceptance enters outcome_unknown",
+        "Old send route cannot bypass shared approvals",
+        "Reported sent status backed by provider evidence"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Reply/Compose can complete approved actions with recovery evidence.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T13",
+      "title": "Compose workflow and missing-information handling",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T06",
+        "T07",
+        "T10"
+      ],
+      "implementation_targets": [
+        "backend/app/drafting/",
+        "ml/prompts/",
+        "ml/evals/",
+        "infra/bedrock/flows/"
+      ],
+      "deliverables": [
+        "New-email purpose/recipient clarification",
+        "Subject/body generation using authorized facts",
+        "New-message draft output"
+      ],
+      "acceptance": [
+        "Ambiguous names ask for recipient choice",
+        "Unknown project facts are not invented",
+        "Background thread evidence does not make it a reply",
+        "Unresolved placeholders cannot be approved for send"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Frontend receives new-email artifacts using shared editor/executor.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T14",
+      "title": "Non-calendar action planning",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T06",
+        "T07",
+        "T09"
+      ],
+      "implementation_targets": [
+        "backend/app/planning/",
+        "backend/app/db/",
+        "ml/prompts/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Editable plan artifact with dependencies/evidence",
+        "Explicit/inferred/confirmed commitment distinctions",
+        "Internal accept-plan operation and linked draft path"
+      ],
+      "acceptance": [
+        "Dependency cycles and impossible dates rejected",
+        "No invented owner/deadline treated as confirmed",
+        "User chooses which commitments enter a reply",
+        "Plan edits invalidate dependent claims/actions"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Plan/schedule category supports actual work planning independently of Calendar.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T15",
+      "title": "Calendar preferences and deterministic availability",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T03",
+        "T05"
+      ],
+      "implementation_targets": [
+        "backend/app/calendar/",
+        "backend/app/api/routes/calendar.py",
+        "backend/app/db/",
+        "backend/alembic/versions/"
+      ],
+      "deliverables": [
+        "Calendar selection/preferences/versioning",
+        "Freebusy REST client and pure slot engine",
+        "Time-zone/date assumption records"
+      ],
+      "acceptance": [
+        "DST gap/fold, buffers, all-day busy and overlapping calendars pass fixtures",
+        "Per-calendar error means unknown",
+        "Fewer-than-three result supported without invented slots",
+        "Permission/ACL checks enforced",
+        "No sender-availability claim without access"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Scheduling flow gets verified slot IDs and availability evidence.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T16",
+      "title": "Scheduling negotiation and approved booking",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T06",
+        "T07",
+        "T12",
+        "T15"
+      ],
+      "implementation_targets": [
+        "backend/app/planning/",
+        "backend/app/calendar/",
+        "backend/app/actions/",
+        "ml/prompts/",
+        "infra/bedrock/flows/"
+      ],
+      "deliverables": [
+        "Check-time/suggest-slots workflow",
+        "Pinned offers and delayed reply resolution",
+        "Event preview, exact approval and stable-ID reconciliation"
+      ],
+      "acceptance": [
+        "Second-option reply resolves original offer version",
+        "Calendar/thread changes invalidate old proposal",
+        "Sending options does not create events",
+        "Create/notify payload exactly matches approval",
+        "Existing invite is linked instead of duplicated",
+        "Event created is distinct from attendee acceptance"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "All planning/scheduling milestones ready for complete UI acceptance.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T17",
+      "title": "All-intent frontend integration and contextual actions",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Frontend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T01",
+        "T05",
+        "T06"
+      ],
+      "implementation_targets": [
+        "frontend/",
+        "docs/api-contract.md"
+      ],
+      "deliverables": [
+        "Task composer/list/clarification/evidence/review components",
+        "Snapshot/reference mapping adapter",
+        "Copy/Insert/Send distinct UX and provider outcome display"
+      ],
+      "acceptance": [
+        "All five intents accessible through buttons and text",
+        "Third-message versus third-thread fixtures pass",
+        "Multiple tasks/composers retain correct targets",
+        "Reconnect recovers current state",
+        "Insert preserves user content or previews replacement",
+        "No false send on Copy/Insert"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Joint E2E can exercise every artifact/action in the actual extension.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T18",
+      "title": "Joint all-intent quality and recovery gate",
+      "status": "planned",
+      "release": "initial",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T08",
+        "T09",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T16",
+        "T17"
+      ],
+      "implementation_targets": [
+        "backend/tests/",
+        "ml/evals/",
+        ".github/workflows/",
+        "docs/implementation-playbook/"
+      ],
+      "deliverables": [
+        "Held-out evaluation and scorecard",
+        "Real DB and provider failure-injection suite",
+        "All-intent extension walkthrough with evidence"
+      ],
+      "acceptance": [
+        "Chapter 08 hard invariants pass",
+        "Reported latency/quality metrics separate warm/cold and partial coverage",
+        "Skipped DB tests fail required gate rather than masquerading as verification",
+        "No critical wrong-recipient/unsupported-write/false-success defect remains"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Release owner gets complete evidence package and known limitations.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T19",
+      "title": "Staged pilot deployment, monitoring and rollback",
+      "status": "planned",
+      "release": "initial",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T18"
+      ],
+      "implementation_targets": [
+        "infra/deploy/",
+        "infra/bedrock/",
+        "backend/app/config.py",
+        "docker-compose.yml"
+      ],
+      "deliverables": [
+        "Worker deployment, manifests and independent write flags",
+        "Dashboards, budgets and unknown-action alerts",
+        "Backup/restore and release rollback drill"
+      ],
+      "acceptance": [
+        "Read pilot followed by controlled writes passes checkpoints",
+        "Old active tasks retain compatible release assets",
+        "Kill switches disable writes without prompt redeploy",
+        "Operational owner and recovery playbooks assigned"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Initial five-intent product can be enabled for the agreed audience.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T20",
+      "title": "Opt-in proactive suggestions and follow-up nudges",
+      "status": "planned",
+      "release": "follow_on",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T19"
+      ],
+      "implementation_targets": [
+        "backend/app/sync/",
+        "backend/app/jobs/",
+        "backend/app/suggestions/",
+        "frontend/"
+      ],
+      "deliverables": [
+        "New-mail/due-item eligibility and suppression",
+        "Watch/poll reconciliation and quiet-hour controls"
+      ],
+      "acceptance": [
+        "Historical backfill produces no unsolicited flood",
+        "Dismissed/replied/stale suggestions suppressed",
+        "No autonomous send implied by detection"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Measured proactive pilot.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T21",
+      "title": "Consent-based sent-mail style retrieval",
+      "status": "planned",
+      "release": "follow_on",
+      "owner": "AI",
+      "reviewers": [
+        "Backend",
+        "Frontend"
+      ],
+      "depends_on": [
+        "T10",
+        "T18"
+      ],
+      "implementation_targets": [
+        "backend/app/rag/",
+        "ml/evals/",
+        "frontend/"
+      ],
+      "deliverables": [
+        "Per-user style indexing and consent controls",
+        "Style-only retrieval with graceful fallback"
+      ],
+      "acceptance": [
+        "Retrieved style cannot introduce facts or recipients",
+        "Cross-user retrieval impossible",
+        "Chroma outage preserves core drafting"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Optional personalization release.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T22",
+      "title": "Voice input/output through existing task contracts",
+      "status": "planned",
+      "release": "follow_on",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T04",
+        "T17"
+      ],
+      "implementation_targets": [
+        "backend/app/voice/",
+        "backend/app/api/routes/voice.py",
+        "frontend/"
+      ],
+      "deliverables": [
+        "STT input bound to task/snapshot",
+        "Optional TTS with privacy controls"
+      ],
+      "acceptance": [
+        "Low-confidence names/dates require confirmation",
+        "Transcription never directly executes a write",
+        "Typed and voice routing behavior is equivalent"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Optional accessible input modality.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T23",
+      "title": "Attachment-aware understanding and sending",
+      "status": "planned",
+      "release": "follow_on",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T19"
+      ],
+      "implementation_targets": [
+        "backend/app/context/",
+        "backend/app/attachments/",
+        "backend/app/actions/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Supported file allowlist, size/type validation and provenance",
+        "Attachment extraction coverage and approval binding"
+      ],
+      "acceptance": [
+        "Unsupported or unsafe file type handled explicitly",
+        "Draft attachment claims match actual approved files",
+        "Ownership and duplicate-upload constraints enforced"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Separately evaluated attachment capability.",
+      "assignee": null,
+      "evidence": []
+    },
+    {
+      "id": "T24",
+      "title": "Calendar changes and richer meeting resources",
+      "status": "planned",
+      "release": "follow_on",
+      "owner": "Backend",
+      "reviewers": [
+        "AI",
+        "Backend"
+      ],
+      "depends_on": [
+        "T16",
+        "T19"
+      ],
+      "implementation_targets": [
+        "backend/app/calendar/",
+        "backend/app/actions/",
+        "ml/evals/"
+      ],
+      "deliverables": [
+        "Reschedule/cancel and recurrence/resource-specific policies",
+        "New action contracts and compensating-action previews"
+      ],
+      "acceptance": [
+        "Existing event identity/organizer permissions checked",
+        "Changes and notifications separately approved",
+        "Recurring-event scope explicit; no silent whole-series mutation"
+      ],
+      "evidence_required": [
+        "Relevant test/evaluation commands and results",
+        "Contract/configuration changes and known limitations",
+        "Reviewable implementation diff or versioned asset"
+      ],
+      "handoff": "Optional advanced scheduling release.",
+      "assignee": null,
+      "evidence": []
+    }
+  ]
+}

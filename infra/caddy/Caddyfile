@@ -1,0 +1,12 @@
+# Caddy: TLS termination + reverse proxy for the api container.
+# Port 80 is NOT open in the security group, so cert issuance relies on the
+# TLS-ALPN-01 challenge over 443 (caddy does this automatically).
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy api:8000 {
+		# SSE passthrough: disable response buffering so streamed tokens
+		# reach the extension immediately.
+		flush_interval -1
+	}
+}

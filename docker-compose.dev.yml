@@ -1,0 +1,25 @@
+# Dev overrides: `make dev` == compose -f docker-compose.yml -f docker-compose.dev.yml up api postgres chroma
+# - api: hot reload, port published directly (no caddy/TLS locally)
+# - postgres/chroma: ports published for psql / debugging
+# - caddy: gets a profile so it simply doesn't start in dev
+services:
+  api:
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/code/app        # live code mount for --reload
+      - ./ml:/ml:ro
+    environment:
+      APP_ENV: dev
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  chroma:
+    ports:
+      - "8001:8000"                    # host 8001 -> chroma 8000 (api owns host 8000)
+
+  caddy:
+    profiles: ["prod"]
