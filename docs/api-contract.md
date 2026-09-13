@@ -81,9 +81,9 @@ The preview does not execute work. Contextual summary execution is available thr
 the separate durable API below. Existing `/threads/{thread_id}/summary` stays
 available; source changes invalidate its cache as described below.
 
-### Durable contextual tasks (summary execution installed)
+### Durable contextual tasks (summary, reply and compose drafts installed)
 
-Requires migrations through `b7a219c40e6d` and a separately running assistant worker.
+Requires migrations through `c6e0419a72df` and a separately running assistant worker.
 All routes require JWT authentication and enforce ownership. Context captures
 server-side synced message excerpts; clients cannot upload authoritative mailbox
 text, source IDs, user IDs, job state or generated artifacts through these APIs.
@@ -121,12 +121,13 @@ returns 404 before task creation. Non-null continuations still return 501
 `continuation_not_available` and are never reinterpreted as fresh instructions.
 
 The worker classifies using exact commands or the selected small model, validates
-and saves its proposal, then dispatches only a single read-only summary with bound
-source context. Free-text summary preferences are included in generation. Reply,
-compose, calendar and other execution workflows are not installed; no supported
-subset of a compound request runs. A ready route is a proposal, not execution.
+and saves its proposal, then dispatches a single summary, reply draft or compose
+draft. Summary/reply source context and draft recipients are backend-bound.
+Free-text preferences are included in generation. Calendar and other execution
+workflows are not installed; no supported subset of a compound request runs. A ready route is a proposal, not execution.
 
-Task views include `instruction`, nullable `intent` and nullable `route`. Before
+Task views include `instruction`, nullable `intent`, nullable `route`, and nullable
+`draft_input` with the frozen sender, recipients and reply target. Before
 routing, intent/route are null (legacy summary-release tasks retain their original
 intent). Route contains `decision`, rule/model `source`, nullable routing model
 `provenance`, `router_version`, and contextual `release`. The backend binds its
@@ -231,10 +232,48 @@ If a source changes during summary generation, the SSE endpoint emits terminal
 The client must show an incomplete result and allow retry.
 
 ### Drafting
-| Method | Path      | Body | Returns |
-|--------|-----------|------|---------|
-| POST   | `/draft`  | `{"thread_id", "instruction", "tone": "match_my_voice|formal|brief"}` | SSE stream of the draft |
-| POST   | `/draft/{draft_id}/send` | — | `{"sent": true, "gmail_msg_id"}` — only after explicit user approval in the UI |
+
+Draft generation now uses `POST /assistant/requests` with optional `draft_options`:
+
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "compose-001",
+  "instruction": "Write an email asking whether the report is ready",
+  "intent_hint": "compose",
+  "context_snapshot_id": null,
+  "continuation": null,
+  "draft_options": {"to": ["person@example.test"], "cc": [], "bcc": [], "reply_message_id": null}
+}
+```
+
+To/Cc/Bcc accept at most 20 distinct ASCII mailbox literals total, normalized to
+lowercase; invalid address syntax, display names, duplicates and control characters
+return 422. To is required for generation; no address is inferred from natural
+language or From/Reply-To headers. A missing recipient becomes a saved clarification.
+Reply requires an owned snapshot and an explicitly selected captured message ID.
+Its current local thread version must match the snapshot when accepted.
+
+Source binding errors before acceptance: 404 `reply_target_not_found`, 409
+`reply_context_required`, `reply_context_changed`, `reply_subject_unavailable`.
+Changed recipients/target with the same request ID return 409 `idempotency_conflict`.
+Old clients omitting/null `draft_options` retain their original replay hashes.
+
+Successful draft tasks return an immutable revision-1 `kind=draft` artifact.
+`GET /assistant/artifacts/{id}` adds `draft_envelope` (null for non-drafts) and
+`sending_available: false`. References `to-1`, `cc-1`, `bcc-1` resolve to the
+corresponding zero-based list entry in that envelope. Model output cannot change
+those lists or reply subject. Context-free compose may have a null snapshot;
+compose always has a null thread reference even when using background mail.
+
+Display subject/body, literal recipients and unresolved fields for review. Extra
+model fields, invalid source numbers or unsafe text fail with `invalid_draft_output`.
+Initial draft generation does not approve, insert, upload, create a Gmail draft
+or send. See [full draft contract and examples](assistant-drafts.md).
+
+Legacy `POST /draft` and `POST /draft/{integer_id}/send` still return 501. Existing
+integer-ID draft rows are preserved and are not the new UUID assistant artifacts.
+No edit/revision or approval/send endpoint exists in this slice.
 
 ### Entities & commitments
 | Method | Path           | Query                        | Returns |

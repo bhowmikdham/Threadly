@@ -195,3 +195,44 @@ Next execution slice: bounded reply/compose draft artifacts using the dispatcher
 Still required alongside that work: UI reference binding, in-place clarification
 continuation, granted capabilities, Bedrock Flows/Google integration and live evals.
 Human-approved external sending/calendar creation remains a separate gated service.
+
+## Initial reply/compose drafts — T10/T11/T13 partial
+
+Branch: `codex/reply-compose-drafts`, based on the merged PR #7 branch. Status:
+implemented and locally tested; review and live model evaluation pending. These
+packages remain in progress because revisions, approvals, retrieval, full reply-all
+resolution and external integration are not complete.
+
+The assistant API accepts explicit To/Cc/Bcc literals and an optional exact reply
+message. Ownership, snapshot membership and current local thread version are
+checked before binding the reply. The connected sender, recipients, subject and
+reply identity are copied into the task. The model supplies only subject/body,
+missing facts and source numbers; it cannot change envelope addresses or the reply
+subject. Context-free compose works, and background mail does not make it a reply.
+
+The worker saves initial immutable draft artifacts with user/source evidence and
+visible unresolved fields. No Gmail draft, editor insertion, send, attachment or
+approval record is created. Calendar-dependent compound requests do not fall back
+to plain drafting. Cancellation, fenced publication and checkpoint retries are
+shared with summary tasks. Older request hashes and both previous workflow releases
+remain supported; new requests pin `contextual-task-1.1.0` with draft prompt/schema
+fingerprints for `draft-artifact-1.0.0`.
+
+Verification: **206 tests passed, zero skipped**, Python 3.12.14 / isolated
+PostgreSQL 16. Ruff passed. Added 30 synthetic draft/envelope and lifecycle cases:
+recipient/header validation, stale/cross-owner targets, subject integrity, invalid
+citations/model fields, missing facts/placeholders, background-context compose,
+retry/cancellation and old-release replay. Extended migration checks preserve old
+drafts/tasks and refuse loss of draft bindings on downgrade. Two existing dependency
+deprecation warnings remain. Tests establish schema/control-flow behavior, not live
+Bedrock factual quality, promise detection, attachment-claim accuracy or writing style.
+
+Migration `c6e0419a72df` adds nullable `assistant_tasks.draft_input`; legacy draft
+rows remain untouched and new artifacts have a separate UUID namespace. Stop old
+API/workers, migrate and run matching code. Downgrade refuses while draft-release
+tasks exist. No live migration or deployment was performed. See [draft handoff](../assistant-drafts.md),
+[API contract](../api-contract.md) and [data model](../data-model.md).
+
+Next: persistent editable draft revisions and exact review state, then approved
+sending/reconciliation. UI integration, attachments, Calendar, retrieval, in-place
+continuation, Bedrock Flows and live model evaluation remain separate work.

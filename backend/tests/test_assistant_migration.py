@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "b7a219c40e6d"
+HEAD = "c6e0419a72df"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -79,6 +79,8 @@ def test_migration_installs_and_preserves_existing_mailbox():
               VALUES (91, 91, 'existing-thread', 'Keep this subject');
             INSERT INTO messages (user_id, thread_id, gmail_msg_id, body_clean, is_from_user)
               VALUES (91, 91, 'existing-message', 'Keep the existing body', false);
+            INSERT INTO drafts (id, user_id, body, status)
+              VALUES (91, 91, 'Keep the legacy draft', 'draft');
         """,
                 script=True,
             )
@@ -117,6 +119,26 @@ def test_migration_installs_and_preserves_existing_mailbox():
         old = asyncio.run(execute("SELECT * FROM assistant_tasks WHERE id='old-task'"))[0]
         assert old["context_snapshot_id"] == "old-context" and old["state"] == "queued"
         assert old["route"] is None and old["intent_hint"] is None
+        assert old["draft_input"] is None
+        assert (
+            asyncio.run(execute("SELECT body FROM drafts WHERE id=91"))[0]["body"]
+            == "Keep the legacy draft"
+        )
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO assistant_tasks (id, user_id, request_id, request_hash, instruction,
+                state, version, latest_sequence, release, draft_input)
+              VALUES ('draft-task', 91, 'draft-request', 'draft-hash', 'Write an email',
+                'queued', 1, 1, '{"workflow":"contextual-task-1.1.0"}',
+                '{"to":["person@example.test"]}');
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "b7a219c40e6d", fails=True)
+        assert asyncio.run(execute("SELECT draft_input FROM assistant_tasks WHERE id='draft-task'"))
+        asyncio.run(execute("DELETE FROM assistant_tasks WHERE id='draft-task'", script=True))
         asyncio.run(
             execute(
                 """

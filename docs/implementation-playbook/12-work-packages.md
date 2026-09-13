@@ -269,7 +269,7 @@ Reply, Compose and Plan can use grounded facts and commitments.
 
 ## T10 · Shared draft artifacts, recipients and revisions
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T01, T05, T09
 
@@ -298,7 +298,7 @@ Reply and Compose share the same review and sender contracts.
 
 ## T11 · Reply workflow
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T06, T07, T10
 
@@ -357,7 +357,7 @@ Reply/Compose can complete approved actions with recovery evidence.
 
 ## T13 · Compose workflow and missing-information handling
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T06, T07, T10
 

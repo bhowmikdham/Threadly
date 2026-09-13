@@ -61,6 +61,7 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
             else None
         ),
         "route": task.route,
+        "draft_input": task.draft_input,
         "state": task.state,
         "version": task.version,
         "latest_sequence": task.latest_sequence,
@@ -176,7 +177,13 @@ async def get_artifact(artifact_id: str, user_id: CurrentUser, session: DB):
     ).scalar_one_or_none()
     if artifact is None:
         raise ApiError(404, "not_found", "Unknown artifact.")
+    draft_envelope = None
+    if artifact.payload.get("kind") == "draft":
+        task = await tasks.owned_task(session, user_id, artifact.task_id)
+        draft_envelope = task.draft_input
     return {
+        "draft_envelope": draft_envelope,
+        "sending_available": False,
         "artifact_id": artifact.id,
         "task_id": artifact.task_id,
         "revision": artifact.revision,

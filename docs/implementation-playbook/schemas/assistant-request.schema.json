@@ -64,6 +64,58 @@
           ]
         }
       ]
+    },
+    "draft_options": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "to": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "To",
+              "type": "array"
+            },
+            "cc": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "Cc",
+              "type": "array"
+            },
+            "bcc": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "title": "Bcc",
+              "type": "array"
+            },
+            "reply_message_id": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reply Message Id"
+            }
+          },
+          "title": "DraftOptions",
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

@@ -7,7 +7,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import routing
+from app.assistant import drafting, routing, routing_v1
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
@@ -27,7 +27,8 @@ async def run_once(factory=None, model=None) -> bool:
     payload, provenance, error, retryable = None, None, None, False
     stopped_state = None
     legacy = claim.release == release_manifest()
-    if not legacy and claim.release != routing.release_manifest():
+    previous = claim.release == routing_v1.release_manifest()
+    if not legacy and not previous and claim.release != routing.release_manifest():
         error = "release_unavailable"
     else:
         stage = "routing" if not legacy else "summary"
@@ -37,30 +38,54 @@ async def run_once(factory=None, model=None) -> bool:
                 route = claim.route
                 if not legacy:
                     if route is None:
-                        route = await routing.route_request(
+                        router = routing_v1 if previous else routing
+                        options = {} if previous else {"draft_input": claim.draft_input}
+                        route = await router.route_request(
                             claim.instruction,
                             claim.intent_hint,
                             claim.context_id,
                             claim.snapshot,
                             model,
+                            **options,
                         )
                         async with factory.begin() as session:
                             if not await save_route(session, claim, route):
                                 return True  # cancelled, deleted or replaced during classification
-                    outcome, error = routing.dispatch_outcome(route, claim.snapshot)
+                    outcome, error = (
+                        routing_v1.dispatch_outcome(route, claim.snapshot)
+                        if previous
+                        else routing.dispatch_outcome(route, claim.snapshot, claim.draft_input)
+                    )
                     if outcome in {"needs_clarification", "unsupported"}:
                         stopped_state = outcome
                 if not stopped_state and not error:
-                    stage = "summary"
-                    prompt = (
-                        make_prompt(claim.snapshot)
-                        if legacy
-                        else routing.summary_prompt(claim.snapshot, claim.instruction)
+                    is_draft = (
+                        not legacy
+                        and not previous
+                        and route["decision"]["intent"] in {"reply", "compose"}
                     )
+                    stage = "draft" if is_draft else "summary"
+                    mode = "reply" if is_draft and route["decision"]["intent"] == "reply" else "new"
+                    if is_draft:
+                        prompt = drafting.make_prompt(
+                            claim.instruction, claim.snapshot, claim.draft_input, mode
+                        )
+                    else:
+                        prompt = (
+                            make_prompt(claim.snapshot)
+                            if legacy
+                            else (routing_v1 if previous else routing).summary_prompt(
+                                claim.snapshot, claim.instruction
+                            )
+                        )
                     text, info = await (model or get_model_client()).generate(
-                        prompt, max_tokens=1800
+                        prompt, max_tokens=2500 if is_draft else 1800
                     )
-                    payload = make_artifact(text, claim.context_id, claim.snapshot)
+                    payload = (
+                        drafting.make_artifact(text, claim, mode)
+                        if is_draft
+                        else make_artifact(text, claim.context_id, claim.snapshot)
+                    )
                     provenance = {
                         "provider": info.provider,
                         "model": info.model,
@@ -71,7 +96,11 @@ async def run_once(factory=None, model=None) -> bool:
         except (ProviderError, TimeoutError):
             error, retryable = "upstream_model_unavailable", True
         except (ValueError, TypeError):
-            error = "invalid_route_output" if stage == "routing" else "invalid_summary_output"
+            error = {
+                "routing": "invalid_route_output",
+                "draft": "invalid_draft_output",
+                "summary": "invalid_summary_output",
+            }[stage]
         except SQLAlchemyError:
             raise  # Checkpoint failure belongs to durable lease recovery, not model failure.
         except Exception:

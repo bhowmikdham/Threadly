@@ -1,5 +1,9 @@
 # Contextual task routing — T06 implementation slice
 
+**Historical routing slice:** the guide below describes `contextual-task-1.0.0`.
+The current `contextual-task-1.1.0` release also supports initial reply/compose
+drafts; see [draft inputs and current behavior](assistant-drafts.md).
+
 This release connects the five-intent classifier to durable assistant requests.
 It executes free-text summaries of a saved thread. Other workflows produce saved
 clarification/unavailable outcomes rather than running a partial request. Bedrock

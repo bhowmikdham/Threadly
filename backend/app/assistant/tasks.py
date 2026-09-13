@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
+from app.assistant.drafting import bind_input
 from app.assistant.routing import release_manifest
 from app.assistant.summary import digest
 from app.db.models import (
@@ -43,7 +44,12 @@ async def owned_task(
 
 
 async def submit(session: AsyncSession, user_id: int, request: AssistantRequest) -> AssistantTask:
-    request_hash = digest(request.model_dump())
+    value = request.model_dump()
+    if request.draft_options is None:
+        value.pop(
+            "draft_options"
+        )  # Preserve replay hashes for requests accepted before this field.
+    request_hash = digest(value)
     existing = (
         await session.execute(
             select(AssistantTask).where(
@@ -55,7 +61,8 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         if existing.request_hash != request_hash:
             raise ApiError(409, "idempotency_conflict", "Request ID was used for different input.")
         return existing
-    if await session.get(User, user_id) is None:
+    user = await session.get(User, user_id)
+    if user is None:
         raise ApiError(401, "unauthorized", "The account no longer exists.")
     if request.continuation is not None:
         raise ApiError(
@@ -73,6 +80,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         ).scalar_one_or_none()
         if context is None:
             raise ApiError(404, "context_not_found", "Select an accessible saved thread snapshot.")
+    draft_input = await bind_input(session, user, request.draft_options, context)
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -85,6 +93,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 instruction=request.instruction,
                 context_snapshot_id=context.id if context else None,
                 intent_hint=request.intent_hint,
+                draft_input=draft_input,
                 state="queued",
                 version=1,
                 latest_sequence=1,
@@ -168,6 +177,7 @@ class JobClaim:
     instruction: str
     intent_hint: str | None
     route: dict | None
+    draft_input: dict | None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -225,6 +235,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.instruction,
         task.intent_hint,
         task.route,
+        task.draft_input,
     )
 
 
