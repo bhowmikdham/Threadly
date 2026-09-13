@@ -4,7 +4,7 @@ import json
 
 from app.schemas.assistant import RouteDecision, RoutePreviewRequest
 
-ROUTER_VERSION = "intent-preview-1.0.0"
+ROUTER_VERSION = "intent-preview-1.1.0"
 
 INSTRUCTIONS = """You classify a Gmail assistant user's request. Return ONLY one JSON object.
 Five intents: summarise, plan_schedule (work plans AND calendar), reply, compose,
@@ -31,10 +31,11 @@ Match this JSON schema exactly:
 """
 
 
-def routing_prompt(request: RoutePreviewRequest) -> str:
+def routing_prompt(request: RoutePreviewRequest, *, policy_suffix: str = "") -> str:
     return (
         INSTRUCTIONS
         + json.dumps(RouteDecision.model_json_schema())
+        + ("\n" + policy_suffix if policy_suffix else "")
         + "\nUSER_REQUEST_JSON:\n"
         + request.model_dump_json()
     )

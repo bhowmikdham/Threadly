@@ -1,4 +1,4 @@
-"""Intent preview and the durable explicit-summary workflow."""
+"""Intent preview, saved contextual requests, and durable task history."""
 
 import json
 from typing import Annotated, Literal
@@ -52,7 +52,15 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
         )
     return {
         "task_id": task.id,
-        "intent": "summarise",
+        "instruction": task.instruction,
+        "intent": (
+            task.route["decision"]["intent"]
+            if task.route
+            else "summarise"
+            if task.release.get("workflow") == "summary-task-1.0.0"
+            else None
+        ),
+        "route": task.route,
         "state": task.state,
         "version": task.version,
         "latest_sequence": task.latest_sequence,
@@ -114,7 +122,16 @@ async def list_tasks(
     user_id: CurrentUser,
     session: DB,
     cursor: Annotated[str | None, Query(max_length=36)] = None,
-    state: Literal["queued", "running", "succeeded", "failed", "cancelled"] | None = None,
+    state: Literal[
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "needs_clarification",
+        "unsupported",
+    ]
+    | None = None,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     q = select(AssistantTask).where(AssistantTask.user_id == user_id)

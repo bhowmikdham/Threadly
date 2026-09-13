@@ -255,7 +255,9 @@
       "handoff": "Dispatcher receives validated operations and bound context.",
       "assignee": null,
       "evidence": [
-        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)",
+        "13-implementation-progress.md (contextual durable routing slice; UI reference maps, continuation and live evaluation pending)",
+        "../assistant-routing.md (worker dispatch, saved clarification, source boundaries and release contract)"
       ]
     },
     {

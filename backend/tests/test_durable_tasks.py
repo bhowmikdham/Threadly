@@ -10,7 +10,6 @@ import pytest
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.api.errors import ApiError
 from app.assistant import tasks
 from app.assistant.context import CHAR_BUDGET, capture_thread
 from app.assistant.summary import make_artifact
@@ -154,8 +153,8 @@ def test_api_snapshot_request_worker_artifact_and_event_replay(
     model = FakeModel()
     assert asyncio.run(run_once(db_sessionmaker, model))
     final = db_client.get(f"/assistant/tasks/{task_id}", headers=headers).json()
-    assert final["state"] == "succeeded" and final["version"] == 3
-    assert final["latest_sequence"] == 4
+    assert final["state"] == "succeeded" and final["version"] == 4
+    assert final["latest_sequence"] == 5
     artifact_id = final["artifact_id"]
     artifact = db_client.get(f"/assistant/artifacts/{artifact_id}", headers=headers).json()[
         "artifact"
@@ -176,6 +175,7 @@ def test_api_snapshot_request_worker_artifact_and_event_replay(
         "id: 2",
         "id: 3",
         "id: 4",
+        "id: 5",
     ]
     replay = db_client.get(final["events_url"], headers={**headers, "Last-Event-ID": "2"})
     assert "id: 1" not in replay.text and "id: 3" in replay.text
@@ -297,7 +297,7 @@ async def test_cancellation_during_generation_discards_result_without_waiting_fo
     try:
         async with db_sessionmaker.begin() as session:
             # A held DB transaction/row lock during inference would block this.
-            task = await asyncio.wait_for(tasks.cancel(session, mailbox[0], task_id, 2), 2)
+            task = await asyncio.wait_for(tasks.cancel(session, mailbox[0], task_id, 3), 2)
             assert task.state == "cancelled"
     finally:
         release.set()
@@ -332,7 +332,7 @@ async def test_provider_retry_budget_is_persisted(db_sessionmaker, mailbox):
             assert task.state == ("failed" if attempt == 3 else "queued")
             job.available_at = datetime.now(UTC) - timedelta(seconds=1)
     assert not await run_once(db_sessionmaker, FakeModel())
-    assert await counts(db_sessionmaker) == [1, 1, 7, 0]
+    assert await counts(db_sessionmaker) == [1, 1, 8, 0]
 
 
 async def test_repeated_crashes_exhaust_attempts(db_sessionmaker, mailbox):
@@ -407,17 +407,14 @@ async def test_account_deletion_cascades_and_fences_worker(db_sessionmaker, mail
     assert await counts(db_sessionmaker) == [0, 0, 0, 0]
 
 
-async def test_unsupported_compound_request_is_not_silently_reduced_to_summary(
-    db_sessionmaker, mailbox
-):
+async def test_compound_request_is_durably_accepted_for_routing(db_sessionmaker, mailbox):
     async with db_sessionmaker.begin() as session:
         context = await capture_thread(session, mailbox[0], "thread-one")
-        with pytest.raises(ApiError) as exc:
-            await tasks.submit(
-                session, mailbox[0], request(context.id, instruction="Summarise and send a reply")
-            )
-        assert exc.value.code == "workflow_not_available"
-    assert await counts(db_sessionmaker) == [0, 0, 0, 0]
+        task = await tasks.submit(
+            session, mailbox[0], request(context.id, instruction="Summarise and send a reply")
+        )
+        assert task.state == "queued" and task.route is None
+    assert await counts(db_sessionmaker) == [1, 1, 1, 0]
 
 
 def test_history_pagination_survives_new_tasks_and_is_owner_scoped(

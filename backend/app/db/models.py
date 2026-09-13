@@ -164,7 +164,9 @@ class AssistantTask(TimestampMixin, Base):
             name="fk_task_owned_context",
         ),
         CheckConstraint(
-            "state IN ('queued','running','succeeded','failed','cancelled')", name="ck_task_state"
+            "state IN ('queued','running','succeeded','failed','cancelled',"
+            "'needs_clarification','unsupported')",
+            name="ck_task_state",
         ),
         CheckConstraint("version >= 1 AND latest_sequence >= 1", name="ck_task_versions"),
     )
@@ -174,8 +176,10 @@ class AssistantTask(TimestampMixin, Base):
     request_id: Mapped[str] = mapped_column(String(128))
     request_hash: Mapped[str] = mapped_column(String(64))
     instruction: Mapped[str] = mapped_column(Text)
-    context_snapshot_id: Mapped[str] = mapped_column(String(36))
-    state: Mapped[str] = mapped_column(String(16))
+    context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
+    intent_hint: Mapped[str | None] = mapped_column(String(16))
+    route: Mapped[dict | None] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(24))
     version: Mapped[int] = mapped_column(default=1)
     latest_sequence: Mapped[int] = mapped_column(default=1)
     release: Mapped[dict] = mapped_column(JSONB)

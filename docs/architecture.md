@@ -9,7 +9,7 @@ Claude project / drive). Every box below maps to exactly one folder in this repo
 Implementation update (13 September 2026): [ADR 003](decisions/003-bedrock-migration.md)
 supersedes the inference placement below. `INFERENCE_PROVIDER=bedrock` routes
 generation through the new Bedrock Converse adapter. `legacy` retains the
-original topology during migration. Durable explicit-summary tasks now use a
+original topology during migration. Durable contextual requests now use a
 separate native backend worker and PostgreSQL state; Bedrock Flow invocation
 remains planned in the [implementation playbook](implementation-playbook/README.md).
 
@@ -53,7 +53,7 @@ proposal router through authenticated `POST /assistant/route-preview`.
 `app/schemas/assistant.py` contains strict runtime contracts and
 `app/planner/intent_prompt.py` the versioned prompt. The historical planner below
 is retained for compatibility; the preview does not call its broad regex rules.
-No additional service/container is needed for routing. Explicit summary execution
+No additional service/container is needed for routing. Contextual summary execution
 uses `app/assistant/` and the optional Compose `assistant-worker` service. Request
 acceptance persists context/task/job/event state; the worker claims and commits,
 generates outside a transaction, then publishes a fenced artifact. Browser state
@@ -112,3 +112,14 @@ checks the captured thread version before publication. Durable summaries retain
 their immutable input even after later sync. This remains inline sync, with
 large-mailbox/background scheduling work outstanding; see the
 [Gmail lifecycle, diagram and rollout guide](gmail-sync.md).
+
+## Durable routing and dispatch (T06 partial)
+
+`app/assistant/routing.py` binds the stateless classifier to authorized snapshot
+capabilities. Request acceptance persists instructions before inference; the
+existing worker routes, checkpoints under its lease, then runs the installed
+summary workflow. Clarification and unsupported outcomes persist as distinct
+stopped task states. Uninstalled compound workflows do not execute a supported
+subset. Source bodies never enter classification, and only the backend binds
+snapshot IDs. New task release manifests pin both routing and generation assets.
+See [contextual routing diagrams and handoff](assistant-routing.md).
