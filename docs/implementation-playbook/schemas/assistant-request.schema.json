@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://threadly.example/spec/assistant-request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "intent_hint": {
+      "enum": [
+        null,
+        "summarise",
+        "plan_schedule",
+        "reply",
+        "compose",
+        "other"
+      ]
+    },
+    "context_snapshot_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "continuation": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "question_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "task_id",
+            "expected_version",
+            "question_id"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "instruction",
+    "intent_hint",
+    "context_snapshot_id",
+    "continuation"
+  ]
+}

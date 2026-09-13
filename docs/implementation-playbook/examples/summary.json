@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "kind": "summary",
+  "context_snapshot_id": "ctx-example-002",
+  "coverage": "complete",
+  "assumptions": [],
+  "evidence": [
+    {
+      "ref_id": "ev-1",
+      "source_kind": "message",
+      "source_id": "msg-example-3",
+      "source_version": "mail-v4",
+      "quote": "Thanks for clarifying."
+    }
+  ],
+  "content": {
+    "overview": "The sender acknowledged the clarification.",
+    "decisions": [],
+    "actions": [],
+    "open_questions": []
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "status": "needs_clarification",
+  "intent": "plan_schedule",
+  "output_kind": "draft",
+  "operations": [
+    "suggest_slots",
+    "draft_reply"
+  ],
+  "context_snapshot_id": "ctx-example-001",
+  "parameters": {
+    "date_phrase": "next week",
+    "time_phrase": null,
+    "duration_minutes": null,
+    "slot_count": 3,
+    "tone": "brief",
+    "recipient_refs": [
+      "sender"
+    ]
+  },
+  "missing_fields": [
+    "duration_minutes"
+  ],
+  "clarification": "How long should the meeting be?",
+  "rationale": "The reply needs verified availability before drafting.",
+  "requested_action": "none"
+}

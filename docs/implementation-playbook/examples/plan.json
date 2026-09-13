@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "kind": "plan",
+  "context_snapshot_id": "ctx-example-004",
+  "coverage": "complete",
+  "assumptions": [
+    "Effort estimates have not been supplied."
+  ],
+  "evidence": [
+    {
+      "ref_id": "ev-4",
+      "source_kind": "message",
+      "source_id": "msg-example-4",
+      "source_version": "1",
+      "quote": "Please review the draft before preparing the final version."
+    }
+  ],
+  "content": {
+    "objective": "Prepare a reviewed final version",
+    "items": [
+      {
+        "item_id": "p1",
+        "description": "Review the draft",
+        "owner_ref": null,
+        "due_at": null,
+        "dependency_ids": [],
+        "confirmation": "explicit_source",
+        "evidence_ref_ids": [
+          "ev-4"
+        ]
+      },
+      {
+        "item_id": "p2",
+        "description": "Prepare the final version after review",
+        "owner_ref": null,
+        "due_at": null,
+        "dependency_ids": [
+          "p1"
+        ],
+        "confirmation": "explicit_source",
+        "evidence_ref_ids": [
+          "ev-4"
+        ]
+      }
+    ],
+    "open_questions": [
+      "Who owns each step and when is the final version needed?"
+    ]
+  }
+}

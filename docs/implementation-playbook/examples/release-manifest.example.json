@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "deployable": false,
+  "release": "example-only",
+  "code_revision": "REPLACE_WITH_VERIFIED_COMMIT",
+  "contract_version": "1.0",
+  "prompt_bundle_version": "REPLACE_WITH_VERSION",
+  "region": "ap-southeast-2",
+  "router_model": "REPLACE_WITH_VERIFIED_MODEL_OR_PROFILE",
+  "workflow_registry": {
+    "summarise": {
+      "handler": "bedrock_flow",
+      "flow_id": "REPLACE",
+      "alias_id": "REPLACE_WITH_RELEASE_ALIAS",
+      "flow_version": "REPLACE"
+    },
+    "plan_schedule": {
+      "handler": "bedrock_flow",
+      "flow_id": "REPLACE",
+      "alias_id": "REPLACE_WITH_RELEASE_ALIAS",
+      "flow_version": "REPLACE"
+    },
+    "reply": {
+      "handler": "bedrock_flow",
+      "flow_id": "REPLACE",
+      "alias_id": "REPLACE_WITH_RELEASE_ALIAS",
+      "flow_version": "REPLACE"
+    },
+    "compose": {
+      "handler": "bedrock_flow",
+      "flow_id": "REPLACE",
+      "alias_id": "REPLACE_WITH_RELEASE_ALIAS",
+      "flow_version": "REPLACE"
+    },
+    "other": {
+      "handler": "bounded_native_dispatch"
+    }
+  },
+  "lambda_versions": [
+    "REPLACE_WITH_PUBLISHED_VERSION_ARNS"
+  ],
+  "tool_schema_version": "1.0",
+  "evaluation_report": "REPLACE_WITH_VERIFIED_REPORT",
+  "feature_flags": {
+    "gmail_send": false,
+    "calendar_write": false,
+    "proactive": false,
+    "style_rag": false,
+    "voice": false
+  }
+}

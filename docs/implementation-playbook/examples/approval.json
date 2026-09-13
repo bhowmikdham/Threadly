@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "request_id": "example-approve-001",
+  "action_id": "action-example-001",
+  "expected_version": 2,
+  "payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

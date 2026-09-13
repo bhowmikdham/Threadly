@@ -1,0 +1,38 @@
+[
+  {
+    "file": "examples/request.json",
+    "schema": "schemas/assistant-request.schema.json"
+  },
+  {
+    "file": "examples/route.json",
+    "schema": "schemas/route-decision.schema.json"
+  },
+  {
+    "file": "examples/summary.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/draft.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/plan.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/slots.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/answer.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/clarification.json",
+    "schema": "schemas/artifact.schema.json"
+  },
+  {
+    "file": "examples/approval.json",
+    "schema": "schemas/action-approval.schema.json"
+  }
+]

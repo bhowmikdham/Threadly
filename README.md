@@ -52,3 +52,5 @@ W4 drill, PII hardening, goldens, freeze.
 1. `docs/architecture.md` — what runs where, and why
 2. `docs/api-contract.md` — the frontend<->backend seam (contract-first: change via PR)
 3. `docs/data-model.md` — tables, cache keys, uniqueness rules
+4. `docs/implementation-playbook/README.md` — proposed Bedrock implementation plan
+   for all five intents, team work packages, diagrams and coding-agent guidance
