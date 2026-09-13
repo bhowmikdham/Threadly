@@ -32,7 +32,7 @@ of existing messages. Downgrading removes all state in the five new tables.
 | Table | Purpose and constraints |
 |---|---|
 | `context_snapshots` | UUID string ID, owner, thread FK, SHA-256 source hash and JSONB immutable excerpt payload. Unique `(id,user_id)` enables owned references. Thread/user deletion cascades. |
-| `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, owned context FK, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
+| `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, nullable owned context FK, nullable intent hint/route checkpoint, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
 | `assistant_jobs` | One row per task; owned task FK, queued/running/done, due time, attempts 0–3, lease token/deadline. Checks require both lease fields only while running. Claim index supports polling/recovery. |
 | `task_events` | Append-only composite PK `(task_id,sequence)`, owned task FK, task version, kind, redacted JSONB payload and timestamp. Sequence assigned under the task row lock. |
 | `artifact_revisions` | UUID ID, owned task FK, revision 1, typed JSONB artifact and provenance. Unique task ID ensures one published summary. No update endpoint; revision editing is a later migration. |
@@ -52,6 +52,23 @@ Snapshots copy only cleaned, bounded text already authorized through sync. They
 do not store raw MIME. Retention/expiry jobs remain future work; currently copies
 remain until their source thread or account is deleted. SQL engine exception
 logging hides bound parameters to avoid dumping these payloads into application logs.
+
+## Contextual routing fields (migration `b7a219c40e6d`)
+
+`assistant_tasks.context_snapshot_id` becomes nullable; non-null references retain
+the composite ownership FK and cascade behavior. The separate user FK continues
+to protect context-free tasks. Nullable `intent_hint` stores advisory input and
+nullable JSONB `route` stores the validated bound decision, rule/model source,
+provider provenance and router/contextual release versions. There is no public
+route mutation API. State is widened to VARCHAR(24); its check adds
+`needs_clarification` and `unsupported`, both stopped outcomes with closed jobs.
+
+A `task.routed` event and task version increment accompany the lease-fenced route
+checkpoint. Retries reuse that checkpoint; request hashes still cover original
+client input. New tasks pin `contextual-task-1.0.0`; existing summary tasks keep their
+release, state, context and original prompt. Downgrade refuses to proceed while
+contextual tasks exist instead of deleting or reinterpreting them. See the
+[routing lifecycle and migration notes](assistant-routing.md).
 
 ## Gmail fidelity columns (migration `3c6e9a1207bd`)
 

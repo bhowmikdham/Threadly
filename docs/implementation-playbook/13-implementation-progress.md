@@ -150,3 +150,48 @@ Gmail reads are simulated in tests; no real mail/calendar write was performed.
 
 Next: T06 bind authorized context and free-text routing to durable task dispatch,
 then add bounded reply/compose execution and exact human approval services.
+
+## Contextual routing into durable tasks — T06/T08 partial
+
+Branch: `codex/contextual-task-routing`, based on the PR #6 merge into
+`codex/assistant-intent-routing`. Status: implemented and locally tested; review
+and live model evaluation pending. T06 remains in progress because UI reference
+maps, full continuation and capability integration are not complete.
+
+The request API now saves free-text requests before inference, including requests
+without selected context. The worker classifies all five intents, binds only
+owner-authorized snapshot IDs, checkpoints the validated route under its lease,
+and dispatches the installed summary path. Summary preferences are passed with
+immutable excerpts. Missing information becomes a saved clarification; unsupported
+and uninstalled workflows are distinct from execution failure. Compound operations
+are not partially executed. English ordinal references stop for selection rather
+than guessing current UI order.
+
+Release `contextual-task-1.0.0` pins base router `intent-preview-1.1.0`, contextual
+policy/schema/reference fingerprints, small/main model settings and summary policy.
+Actual routing model provenance is saved. Retries reuse checkpoints; cancellation,
+expired claims and deleted owners cannot checkpoint or publish. Original queued
+`summary-task-1.0.0` tasks retain the original prompt and bypass the new classifier.
+There is still no Flow invocation or external mail/calendar write.
+
+Verification: **176 tests passed, zero skipped**, using Python 3.12.14 and an
+isolated PostgreSQL 16 database. Ruff passed. Added 27 synthetic routing/dispatch
+and PostgreSQL lifecycle cases, including context-free requests, all five intents,
+compound plans, source isolation, missing UI maps, generation retry checkpoints,
+routing failure budgets, cancellation and expired routing claims. Extended migration
+checks verify old queued-task preservation and rejection of a downgrade that would
+lose contextual tasks. Two existing dependency deprecation warnings remain.
+Synthetic replay establishes control-flow and schema behavior; it does not measure
+Bedrock classification accuracy, summary preference-following or citation quality.
+
+Migration `b7a219c40e6d` adds nullable route/intent hint, optional owned context and
+two stopped task states. Stop older API/workers before migrating and run matching
+new versions. Downgrade refuses while contextual tasks exist. No live migration
+or deployment was performed. See [routing handoff and diagram](../assistant-routing.md),
+[API contract](../api-contract.md), [data model](../data-model.md) and
+[worker runbook](../assistant-worker.md).
+
+Next execution slice: bounded reply/compose draft artifacts using the dispatcher.
+Still required alongside that work: UI reference binding, in-place clarification
+continuation, granted capabilities, Bedrock Flows/Google integration and live evals.
+Human-approved external sending/calendar creation remains a separate gated service.

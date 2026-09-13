@@ -1,6 +1,6 @@
 """Version 1 assistant contracts, aligned with the implementation playbook.
 
-The preview endpoint is deliberately separate from future durable requests.
+The preview endpoint remains separate from worker-routed durable requests.
 Model proposals cannot contain tool URLs, caller identities or executable writes.
 """
 

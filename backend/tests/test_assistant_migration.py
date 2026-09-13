@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "3c6e9a1207bd"
+HEAD = "b7a219c40e6d"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -48,7 +48,7 @@ def test_migration_installs_and_preserves_existing_mailbox():
         finally:
             await connection.close()
 
-    def migrate(*args):
+    def migrate(*args, fails=False):
         result = subprocess.run(
             [sys.executable, "-m", "alembic", *args],
             cwd=Path(__file__).resolve().parents[1],
@@ -57,7 +57,10 @@ def test_migration_installs_and_preserves_existing_mailbox():
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, result.stderr
+        if fails:
+            assert result.returncode != 0 and "Cannot downgrade" in result.stderr
+        else:
+            assert result.returncode == 0, result.stderr
 
     asyncio.run(admin(f'CREATE DATABASE "{database}"'))
     try:
@@ -95,6 +98,44 @@ def test_migration_installs_and_preserves_existing_mailbox():
             asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
             == HEAD
         )
+        # The immediately previous release can have queued summary tasks at upgrade.
+        migrate("downgrade", "3c6e9a1207bd")
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO context_snapshots (id, user_id, thread_id, source_hash, payload)
+              VALUES ('old-context', 91, 91, 'old-hash', '{}');
+            INSERT INTO assistant_tasks (id, user_id, request_id, request_hash, instruction,
+                context_snapshot_id, state, version, latest_sequence, release)
+              VALUES ('old-task', 91, 'old-request', 'old-hash', 'Summarise this',
+                'old-context', 'queued', 1, 1, '{"workflow":"summary-task-1.0.0"}');
+        """,
+                script=True,
+            )
+        )
+        migrate("upgrade", "head")
+        old = asyncio.run(execute("SELECT * FROM assistant_tasks WHERE id='old-task'"))[0]
+        assert old["context_snapshot_id"] == "old-context" and old["state"] == "queued"
+        assert old["route"] is None and old["intent_hint"] is None
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO assistant_tasks (id, user_id, request_id, request_hash, instruction,
+                state, version, latest_sequence, release)
+              VALUES ('new-task', 91, 'new-request', 'new-hash', 'Summarise this',
+                'queued', 1, 1, '{"workflow":"contextual-task-1.0.0"}');
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "3c6e9a1207bd", fails=True)
+        assert asyncio.run(execute("SELECT id FROM assistant_tasks WHERE id='new-task'"))
+        assert (
+            asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
+            == HEAD
+        )
+        # Test-only removal, never an automatic downgrade action.
+        asyncio.run(execute("DELETE FROM assistant_tasks WHERE id='new-task'", script=True))
         migrate("downgrade", BASELINE)
         assert (
             asyncio.run(execute("SELECT subject FROM threads WHERE id=91"))[0]["subject"]

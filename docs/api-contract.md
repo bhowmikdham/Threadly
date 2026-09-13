@@ -77,13 +77,13 @@ Errors: 401 missing/invalid session, 422 invalid request, 502
 `upstream_model_unavailable` for inference failure. Error details do not expose
 raw model output. Request validation detail entries contain `loc`, `type`, `msg`.
 
-The preview does not execute work. Explicit summary execution is available through
+The preview does not execute work. Contextual summary execution is available through
 the separate durable API below. Existing `/threads/{thread_id}/summary` stays
 available; source changes invalidate its cache as described below.
 
-### Durable summary tasks (initial execution slice)
+### Durable contextual tasks (summary execution installed)
 
-Requires migration `8f3a7c2d901b` and a separately running assistant worker.
+Requires migrations through `b7a219c40e6d` and a separately running assistant worker.
 All routes require JWT authentication and enforce ownership. Context captures
 server-side synced message excerpts; clients cannot upload authoritative mailbox
 text, source IDs, user IDs, job state or generated artifacts through these APIs.
@@ -115,23 +115,43 @@ the canonical request hash. Identical replay returns the existing task (202 even
 if already complete); different input with the same key returns 409
 `idempotency_conflict`. Task, initial event and job are committed atomically.
 
-This release executes exact commands `Summarise this`, `Summarise this thread`,
-or `Summarise this email` (also US spelling; case and terminal punctuation ignored),
-with hint null or `summarise`. Other or compound requests return 501
-`workflow_not_available`, without enqueueing a partial interpretation. Non-null
-continuations return 501 `continuation_not_available`. Unknown/inaccessible
-context returns 404; empty captured text returns 409 `context_empty`.
+Requests are durably accepted before routing, including free-text and compound
+instructions. Context may be null; an explicitly supplied inaccessible snapshot
+returns 404 before task creation. Non-null continuations still return 501
+`continuation_not_available` and are never reinterpreted as fresh instructions.
 
-States: `queued → running → succeeded|failed|cancelled`; a retryable generation
-failure can return to `queued`. The worker persists at most three attempts with
-short backoff and a 180-second lease; generation has a 120-second timeout. A
-lost/expired lease cannot publish an artifact. Cancellation is read-only workflow
-cancellation: it suppresses publication but may not stop an already-dispatched
-provider request. Retrying cancellation with the original or current cancelled
-version is idempotent. There is no external send/calendar action in this slice.
+The worker classifies using exact commands or the selected small model, validates
+and saves its proposal, then dispatches only a single read-only summary with bound
+source context. Free-text summary preferences are included in generation. Reply,
+compose, calendar and other execution workflows are not installed; no supported
+subset of a compound request runs. A ready route is a proposal, not execution.
+
+Task views include `instruction`, nullable `intent` and nullable `route`. Before
+routing, intent/route are null (legacy summary-release tasks retain their original
+intent). Route contains `decision`, rule/model `source`, nullable routing model
+`provenance`, `router_version`, and contextual `release`. The backend binds its
+context ID; the model cannot invent or select source/recipient IDs.
+
+States: `queued → running → succeeded|failed|cancelled|needs_clarification|unsupported`.
+All are accepted by the task list state filter. Missing data saves
+`needs_clarification` with `route.decision.missing_fields` and `clarification`;
+no artifact is created. Show the question and submit the user's fully restated
+request/context with a new request ID. These tasks do not resume in place yet.
+Unsupported requests use `unsupported_request`; recognized but uninstalled
+workflows use `workflow_not_available`, both with state `unsupported`. Invalid
+model routes fail with `invalid_route_output`. Full details and examples are in
+[the routing handoff](assistant-routing.md).
+
+A transient model failure can return to `queued`. The worker permits at most
+three claims total, with short backoff, a 180-second lease and a 120-second timeout
+for routing/checkpoint/generation together. Generation retries reuse a saved route.
+A cancelled, deleted or expired worker cannot checkpoint a route or publish an
+artifact. Cancellation suppresses publication but may not stop an already-issued
+model call. Retrying cancellation with the original or current cancelled version
+is idempotent. There is no external send/calendar action in this slice.
 
 SSE IDs are persisted task-local sequence numbers. Events are `task.accepted`,
-`task.stage_changed`, `artifact.ready`, and `task.finished`, carrying sequence,
+`task.stage_changed`, `task.routed`, `artifact.ready`, and `task.finished`, carrying sequence,
 task version, timestamp and payload. Replay returns at most 100 saved events,
 with no database transaction held during network streaming. Clients reconnect
 using the last seen ID; poll task state with backoff when a batch is empty. Stream

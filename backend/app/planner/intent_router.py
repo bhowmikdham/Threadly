@@ -24,6 +24,7 @@ _EXACT_COMMANDS = {
     "summarise this thread": ("summarise", "summary", ["summarise_thread"]),
     "summarize this thread": ("summarise", "summary", ["summarise_thread"]),
     "summarise this email": ("summarise", "summary", ["summarise_thread"]),
+    "summarize this email": ("summarise", "summary", ["summarise_thread"]),
     "draft a reply": ("reply", "draft", ["draft_reply"]),
     "draft a reply; do not send it": ("reply", "draft", ["draft_reply"]),
     "write an email": ("compose", "draft", ["draft_new"]),
@@ -79,13 +80,15 @@ def parse_decision(text: str) -> RouteDecision:
     return decision
 
 
-def _require_preview_context(decision: RouteDecision) -> RouteDecision:
-    """Deterministic preconditions. Preview has no trusted context whatsoever."""
+def require_context(decision: RouteDecision, *, has_source: bool = False) -> RouteDecision:
+    """Deterministic preconditions; a snapshot binds source text, never a reply/action target."""
     if decision.status == "unsupported":
         return decision
-    missing = list(decision.missing_fields)
+    missing = [
+        field for field in decision.missing_fields if not (has_source and field == "source_context")
+    ]
     operations = set(decision.operations)
-    if operations & {"summarise_thread", "plan_actions", "transform_text"}:
+    if not has_source and operations & {"summarise_thread", "plan_actions", "transform_text"}:
         missing.append("source_context")
     if "draft_reply" in operations:
         missing.append("reply_target")
@@ -114,12 +117,16 @@ def _require_preview_context(decision: RouteDecision) -> RouteDecision:
             clarification="Please provide or select: " + ", ".join(missing) + ".",
         )
         return RouteDecision.model_validate(value)
+    if decision.status == "needs_clarification":
+        value = decision.model_dump()
+        value.update(status="ready", missing_fields=[], clarification=None)
+        return RouteDecision.model_validate(value)
     return decision
 
 
-async def preview_route(
-    request: RoutePreviewRequest, model: ModelClient | None = None
-) -> RoutePreview:
+async def propose_route(
+    request: RoutePreviewRequest, model: ModelClient | None = None, *, policy_suffix: str = ""
+) -> tuple[RouteDecision, str, dict | None]:
     normalized = request.instruction.strip().casefold().rstrip(".!?")
     command = _EXACT_COMMANDS.get(normalized)
     # Conflicting hints are sent to the model, never allowed to force a rule.
@@ -138,11 +145,11 @@ async def preview_route(
             rationale="Exact supported user command.",
             requested_action="none",
         )
-        source = "rule"
+        source, provenance = "rule", None
     else:
         try:
             text, _info = await (model or get_model_client()).generate(
-                routing_prompt(request), small=True, max_tokens=1200
+                routing_prompt(request, policy_suffix=policy_suffix), small=True, max_tokens=1200
             )
             decision = parse_decision(text)
         except ProviderError:
@@ -155,8 +162,16 @@ async def preview_route(
                 502, "invalid_route_output", "The model returned an invalid route."
             ) from None
         source = "model"
+        provenance = {"provider": _info.provider, "model": _info.model}
+    return decision, source, provenance
+
+
+async def preview_route(
+    request: RoutePreviewRequest, model: ModelClient | None = None
+) -> RoutePreview:
+    decision, source, _ = await propose_route(request, model)
     return RoutePreview(
-        decision=_require_preview_context(decision),
+        decision=require_context(decision),
         router_version=ROUTER_VERSION,
         source=source,
     )

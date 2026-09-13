@@ -13,7 +13,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
-from app.assistant.summary import digest, release_manifest
+from app.assistant.routing import release_manifest
+from app.assistant.summary import digest
 from app.db.models import (
     ArtifactRevision,
     AssistantJob,
@@ -26,15 +27,7 @@ from app.schemas.assistant import AssistantRequest
 
 LEASE_SECONDS = 180
 MAX_ATTEMPTS = 3
-SUMMARY_COMMANDS = {
-    "summarise this",
-    "summarize this",
-    "summarise this thread",
-    "summarize this thread",
-    "summarise this email",
-    "summarize this email",
-}
-TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
+TERMINAL_STATES = {"succeeded", "failed", "cancelled", "needs_clarification", "unsupported"}
 
 
 async def owned_task(
@@ -64,25 +57,22 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         return existing
     if await session.get(User, user_id) is None:
         raise ApiError(401, "unauthorized", "The account no longer exists.")
-    normalized = request.instruction.strip().casefold().rstrip(".!?")
     if request.continuation is not None:
         raise ApiError(
             501, "continuation_not_available", "Saved task continuation is not available yet."
         )
-    if request.intent_hint not in (None, "summarise") or normalized not in SUMMARY_COMMANDS:
-        raise ApiError(
-            501, "workflow_not_available", "This release executes explicit thread summaries only."
-        )
-    context = (
-        await session.execute(
-            select(ContextSnapshot).where(
-                ContextSnapshot.id == request.context_snapshot_id,
-                ContextSnapshot.user_id == user_id,
+    context = None
+    if request.context_snapshot_id is not None:
+        context = (
+            await session.execute(
+                select(ContextSnapshot).where(
+                    ContextSnapshot.id == request.context_snapshot_id,
+                    ContextSnapshot.user_id == user_id,
+                )
             )
-        )
-    ).scalar_one_or_none()
-    if context is None:
-        raise ApiError(404, "context_not_found", "Select an accessible saved thread snapshot.")
+        ).scalar_one_or_none()
+        if context is None:
+            raise ApiError(404, "context_not_found", "Select an accessible saved thread snapshot.")
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -93,7 +83,8 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 request_id=request.request_id,
                 request_hash=request_hash,
                 instruction=request.instruction,
-                context_snapshot_id=context.id,
+                context_snapshot_id=context.id if context else None,
+                intent_hint=request.intent_hint,
                 state="queued",
                 version=1,
                 latest_sequence=1,
@@ -171,9 +162,12 @@ class JobClaim:
     task_id: str
     user_id: int
     token: str
-    context_id: str
-    snapshot: dict
+    context_id: str | None
+    snapshot: dict | None
     release: dict
+    instruction: str
+    intent_hint: str | None
+    route: dict | None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -219,9 +213,19 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
                 ContextSnapshot.user_id == task.user_id,
             )
         )
-    ).scalar_one()
+    ).scalar_one_or_none()
     await session.flush()
-    return JobClaim(task.id, task.user_id, token, context.id, context.payload, task.release)
+    return JobClaim(
+        task.id,
+        task.user_id,
+        token,
+        context.id if context else None,
+        context.payload if context else None,
+        task.release,
+        task.instruction,
+        task.intent_hint,
+        task.route,
+    )
 
 
 async def finish(
@@ -232,6 +236,7 @@ async def finish(
     provenance: dict | None = None,
     error_code: str | None = None,
     retryable: bool = False,
+    stopped_state: str | None = None,
 ) -> bool:
     task = (
         await session.execute(
@@ -252,7 +257,15 @@ async def finish(
     ):
         return False
     task.version += 1
-    if error_code:
+    if stopped_state:
+        if stopped_state not in {"needs_clarification", "unsupported"}:
+            raise ValueError("invalid stopped state")
+        task.state, task.error_code = stopped_state, error_code
+        close_job(job)
+        add_event(
+            session, task, "task.finished", {"state": stopped_state, "error_code": error_code}
+        )
+    elif error_code:
         task.error_code = error_code
         if retryable and job.attempts < MAX_ATTEMPTS:
             task.state, job.state = "queued", "queued"
@@ -283,5 +296,42 @@ async def finish(
         add_event(
             session, task, "task.finished", {"state": "succeeded", "artifact_id": artifact_id}
         )
+    await session.flush()
+    return True
+
+
+async def save_route(session: AsyncSession, claim: JobClaim, route: dict) -> bool:
+    """Checkpoint the validated proposal only while this worker still owns its lease."""
+    task = (
+        await session.execute(
+            select(AssistantTask)
+            .where(
+                AssistantTask.id == claim.task_id,
+                AssistantTask.user_id == claim.user_id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if task is None:
+        return False
+    job = await session.get(AssistantJob, task.id)
+    now = await session.scalar(select(func.clock_timestamp()))
+    if (
+        task.state != "running"
+        or job.state != "running"
+        or job.lease_token != claim.token
+        or job.lease_expires_at <= now
+    ):
+        return False
+    if task.route is not None:
+        return task.route == route
+    task.route = route
+    task.version += 1
+    add_event(
+        session,
+        task,
+        "task.routed",
+        {"intent": route["decision"]["intent"], "route_status": route["decision"]["status"]},
+    )
     await session.flush()
     return True

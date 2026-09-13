@@ -1,8 +1,9 @@
 # Durable summary worker: implementation and operations
 
 This is the first native backend execution path behind the assistant API. It
-executes explicit summaries of saved synced-thread excerpts. Bedrock Flows,
-other intents, continuation and approval/external execution remain later slices.
+routes saved free-text requests across five intents and executes summaries of
+saved synced-thread excerpts. Bedrock Flows, other intent execution, continuation
+and approval/external execution remain later slices. See [routing handoff](assistant-routing.md).
 
 ## Local startup
 
@@ -40,7 +41,8 @@ There is no Chroma dependency in this workflow.
 2. Capture `POST /assistant/context-snapshots` with the active Gmail thread ID.
    Show saved scope and omission/truncation counts to the user.
 3. Submit `POST /assistant/requests` with a new request ID, the returned snapshot
-   ID, `Summarise this thread`, and `continuation: null`.
+   ID, the full user instruction, and `continuation: null`. Context may be null
+   when the user needs to select a source; the worker saves a clarification.
 4. Keep the returned task ID. Fetch task state or replay saved SSE events. Use
    `GET /assistant/tasks` to recover task history after reopening the application.
 5. On success, fetch the artifact and display source references. The saved
@@ -49,8 +51,10 @@ There is no Chroma dependency in this workflow.
    409, reload state; never infer cancellation from a disconnected browser.
 
 The preview classifier is separate. Do not take its proposed operations and invoke
-tools in the browser. The request service currently accepts only exact summary
-commands; richer instructions return an explicit unavailable-workflow error.
+tools in the browser. The worker checkpoints validated routes and dispatches the installed summary
+workflow; other intents return saved clarification/unavailable outcomes. Render
+`needs_clarification` questions from the task view and submit a fully restated
+request with a new ID after the user answers. In-place continuation is not yet installed.
 
 ## Persistence and recovery
 
@@ -59,7 +63,8 @@ transaction. A worker claims using a task row lock with `SKIP LOCKED`, commits a
 unique lease token, then runs inference outside the database transaction.
 [PostgreSQL documents this locking option for queue-like consumers](https://www.postgresql.org/docs/16/sql-select.html).
 
-The lease lasts 180 seconds and generation is bounded to 120 seconds. Up to three
+The lease lasts 180 seconds and routing/checkpoint/generation together are bounded
+to 120 seconds. A saved route is reused when generation is retried. Up to three
 claims are allowed, including crash recovery. Provider/timeout failures retry
 after 2 then 4 seconds; expired leases can be reclaimed. Schema/source-reference
 failures stop immediately. Cancelling or replacing the lease makes a previous
@@ -73,7 +78,9 @@ of silently generating with a different release. Restore the matching worker to
 process still-queued work; for an already-failed task, submit a new request ID after
 reviewing configuration. There is no mutation/retry endpoint for terminal tasks.
 
-The versioned prompt is `summary-task-1.0.0` in `app/assistant/summary.py`. AI changes
+New requests pin `contextual-task-1.0.0` in `app/assistant/routing.py`, including
+routing policy/schema and small-model configuration plus summary preferences.
+Older `summary-task-1.0.0` requests still use their original prompt unchanged. AI changes
 must update the release/version and replayable evaluation evidence. Results record
 the actual provider/model as well as pinned fingerprints. An inference cache is
 not implemented; the old summary cache is deliberately not read by this path.
