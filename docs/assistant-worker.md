@@ -70,14 +70,15 @@ claims are allowed, including crash recovery. Provider/timeout failures retry
 after 2 then 4 seconds; expired leases can be reclaimed. Schema/source-reference
 failures stop immediately. Cancelling or replacing the lease makes a previous
 worker's result ineligible for publication. This can repeat a billed model call,
-but cannot publish two artifacts for one task. External writes need a separate
+but cannot publish two initial generation artifacts for one task. External writes need a separate
 approval/reconciliation service and are not part of this worker.
 
 Before generation, the worker compares saved workflow, prompt and configuration
 fingerprints with its runtime. A mismatch fails with `release_unavailable` instead
 of silently generating with a different release. Restore the matching worker to
 process still-queued work; for an already-failed task, submit a new request ID after
-reviewing configuration. There is no mutation/retry endpoint for terminal tasks.
+reviewing configuration. There is no generation retry endpoint for terminal tasks. Successful draft tasks
+now support user edits and review through separate revision APIs.
 
 New requests pin `contextual-task-1.1.0` in `app/assistant/routing.py`, including
 routing policy/schema and small-model configuration plus summary and draft policies.
@@ -127,3 +128,11 @@ replacement, cancellation during inference, retry exhaustion, source pinning,
 owner isolation, event replay, artifact schema validation and migration upgrades.
 Model responses in these tests are synthetic; no real mail is sent or cloud
 inference billed by the test suite.
+
+## Revision/review schema compatibility
+
+Current code requires migration `e9b7120c4a63`. The worker now copies initial draft
+envelopes into revision 1; user edits append revisions through the API without
+reopening generation jobs. Stop older API/workers before migration and start
+matching versions. Generation prompts/releases are unchanged by this migration.
+See [draft editor/review handoff](assistant-draft-review.md).

@@ -24,7 +24,7 @@ Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.sm
   │  auto-TLS, SSE passthrough      │        │                 │
   │                              SQL│        │vectors          │
   │                        postgres:16     chroma              │
-  │                        12 tables       per-user            │
+  │                        13 tables       per-user            │
   │                                        sent-mail embeddings│
   │  named volumes (survive redeploys): pgdata · chromadata ·  │
   │  caddy_data (certs)                                        │
@@ -57,8 +57,8 @@ No additional service/container is needed for routing. Contextual summary execut
 uses `app/assistant/` and the optional Compose `assistant-worker` service. Request
 acceptance persists context/task/job/event state; the worker claims and commits,
 generates outside a transaction, then publishes a fenced artifact. Browser state
-and SSE connections do not own execution. Bedrock Flow invocation and the other
-four execution workflows remain upcoming work. See the
+and SSE connections do not own execution. Bedrock Flow invocation, planning/scheduling and bounded other
+execution workflows remain upcoming work; draft execution is described below. See the
 [worker runbook](assistant-worker.md) and [runtime API contract](api-contract.md).
 
 | # | Box (architecture doc)      | Folder                      | Responsibilities                                            | Week |
@@ -134,3 +134,14 @@ compound scheduling requests remain unavailable. `routing_v1.py` retains the pri
 contextual release for already-queued work. All generation/publication uses the
 existing lease/cancellation protocol. Drafts are stored in Threadly only; no Gmail
 write client or approval executor is installed. See [draft lifecycle](assistant-drafts.md).
+
+## Draft editing and review (T10 partial)
+
+`app/assistant/draft_review.py` provides a DB-only editing/review service through
+the existing assistant API. It serializes mutations on the task row, appends new
+artifact/envelope revisions and records exact-hash review acknowledgements.
+It does not enqueue a job, call a model or perform a provider write. Saved task
+inputs and historical artifacts stay immutable. UI task reads resolve the latest
+revision; review validity also checks local reply/source and sender changes.
+A separate action proposal/approval/execution service is still required to send.
+See [editor lifecycle](assistant-draft-review.md) and [backend remaining work](backend-remaining-work.md).

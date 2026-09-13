@@ -247,8 +247,16 @@ class ArtifactRevision(TimestampMixin, Base):
             ondelete="CASCADE",
             name="fk_artifact_owned_task",
         ),
-        UniqueConstraint("task_id", name="uq_summary_task_artifact"),
-        CheckConstraint("revision = 1", name="ck_artifact_initial_revision"),
+        UniqueConstraint("task_id", "revision", name="uq_artifact_task_revision"),
+        UniqueConstraint("task_id", "edit_request_id", name="uq_artifact_edit_request"),
+        UniqueConstraint("id", "user_id", name="uq_artifact_owner"),
+        CheckConstraint("revision >= 1", name="ck_artifact_revision"),
+        CheckConstraint(
+            "(revision = 1 AND edit_request_id IS NULL AND edit_request_hash IS NULL) OR "
+            "(revision > 1 AND edit_request_id IS NOT NULL AND edit_request_hash IS NOT NULL "
+            "AND draft_envelope IS NOT NULL AND COALESCE(payload->>'kind', '') = 'draft')",
+            name="ck_artifact_edit",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -257,3 +265,24 @@ class ArtifactRevision(TimestampMixin, Base):
     revision: Mapped[int] = mapped_column(default=1)
     payload: Mapped[dict] = mapped_column(JSONB)
     provenance: Mapped[dict] = mapped_column(JSONB)
+    draft_envelope: Mapped[dict | None] = mapped_column(JSONB)
+    edit_request_id: Mapped[str | None] = mapped_column(String(128))
+    edit_request_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class DraftReview(Base):
+    """An exact-revision review acknowledgement, never authorization to send."""
+
+    __tablename__ = "draft_reviews"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["artifact_id", "user_id"],
+            ["artifact_revisions.id", "artifact_revisions.user_id"],
+            ondelete="CASCADE",
+            name="fk_review_owned_artifact",
+        ),
+    )
+    artifact_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column()
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

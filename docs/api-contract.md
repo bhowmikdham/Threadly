@@ -45,6 +45,27 @@ event: error        data: {"error": {envelope}}     # terminal on failure
 
 ## Endpoints
 
+### Draft editing and review (implemented in assistant API)
+
+See [the full revision/review contract](assistant-draft-review.md) for request examples,
+validation, concurrency, blockers, events and rollout. These APIs use assistant UUID
+artifacts; the legacy integer `/draft*` routes remain 501.
+
+| Method/path | Request | Response |
+|---|---|---|
+| `POST /assistant/tasks/{id}/draft-revisions` | Full subject/body/recipients/unresolved fields, `request_id`, `expected_revision` | 201 saved immutable revision; matching replay returns the same revision; stale distinct edit is 409 |
+| `GET /assistant/tasks/{id}/draft-revisions` | `page_size` 1–100, optional `before_revision` | Newest-first revision metadata, latest ID/version and `next_before_revision` |
+| `POST /assistant/artifacts/{id}/review` | `expected_revision`, exact `payload_hash` from artifact view | Review acknowledgement of the current unblocked revision, never authorization to send |
+
+Artifact views now include `is_latest`, `latest_artifact_id`, `latest_revision` and
+nullable `review` with policy/hash/state/time/blockers/`authorization:none`.
+Draft envelopes are revision-specific. Task views reference the latest artifact;
+`task.draft_input` continues to describe the original request. Draft edits/reviews
+advance task version/event sequence but leave generation state `succeeded`.
+`draft.revised` and `draft.reviewed` events contain IDs/status only, no mail text.
+An edit makes the prior review stale; a changed locally saved reply source or sender
+also invalidates effective review. `sending_available` remains false.
+
 ### Assistant intent preview (implemented; no workflow execution)
 
 `POST /assistant/route-preview` requires the session JWT and accepts:
@@ -83,7 +104,7 @@ available; source changes invalidate its cache as described below.
 
 ### Durable contextual tasks (summary, reply and compose drafts installed)
 
-Requires migrations through `c6e0419a72df` and a separately running assistant worker.
+Requires migrations through `e9b7120c4a63` and a separately running assistant worker.
 All routes require JWT authentication and enforce ownership. Context captures
 server-side synced message excerpts; clients cannot upload authoritative mailbox
 text, source IDs, user IDs, job state or generated artifacts through these APIs.
@@ -172,7 +193,7 @@ legacy sent time fallback and a bytewise message ID tie-break. Missing dates sor
 first in the oldest-first transcript. See [sync details](gmail-sync.md).
 No task result uses the legacy summary cache.
 
-Not yet implemented: task continuation, editable artifact revisions, approval
+Not yet implemented: task continuation, executable approval
 actions, Calendar workflows, context expiry/cleanup, live event following, Flow
 invocation or frontend integration. See the
 [worker runbook](assistant-worker.md) for startup, recovery and test instructions.
@@ -273,7 +294,8 @@ or send. See [full draft contract and examples](assistant-drafts.md).
 
 Legacy `POST /draft` and `POST /draft/{integer_id}/send` still return 501. Existing
 integer-ID draft rows are preserved and are not the new UUID assistant artifacts.
-No edit/revision or approval/send endpoint exists in this slice.
+Assistant editing and review endpoints are documented above. Executable approval/send
+endpoints remain pending.
 
 ### Entities & commitments
 | Method | Path           | Query                        | Returns |

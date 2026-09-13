@@ -431,7 +431,8 @@
       "assignee": null,
       "evidence": [
         "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
-        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
+        "../assistant-draft-review.md (persistent revisions and exact review acknowledgements; action/send approval remains pending)"
       ]
     },
     {

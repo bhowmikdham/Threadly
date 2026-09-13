@@ -299,6 +299,7 @@ async def finish(
                 revision=1,
                 payload=payload,
                 provenance=provenance,
+                draft_envelope=task.draft_input if payload.get("kind") == "draft" else None,
             )
         )
         task.state, task.error_code = "succeeded", None
