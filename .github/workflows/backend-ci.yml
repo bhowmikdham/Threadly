@@ -36,4 +36,5 @@ jobs:
       - name: Tests
         env:
           THREADLY_TEST_DB: postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test
+          THREADLY_REQUIRE_TEST_DB: "1"
         run: python -m pytest -q

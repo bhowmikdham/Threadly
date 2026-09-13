@@ -168,7 +168,7 @@
     {
       "id": "T05",
       "title": "Durable task, artifact, action and job infrastructure",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -183,7 +183,8 @@
         "backend/app/actions/",
         "backend/app/db/",
         "backend/app/api/routes/assistant.py",
-        "backend/alembic/versions/"
+        "backend/alembic/versions/",
+        "backend/app/assistant/"
       ],
       "deliverables": [
         "Generic owner-scoped task/artifact/action records",
@@ -205,7 +206,9 @@
       ],
       "handoff": "All workflows can persist progress and pause for users.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)"
+      ]
     },
     {
       "id": "T06",
@@ -298,7 +301,7 @@
     {
       "id": "T08",
       "title": "Source-linked summary vertical slice",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -315,7 +318,8 @@
         "backend/app/context/",
         "backend/app/api/routes/summary.py",
         "ml/prompts/",
-        "ml/evals/"
+        "ml/evals/",
+        "backend/app/assistant/"
       ],
       "deliverables": [
         "Structured summary with coverage/evidence",
@@ -335,7 +339,9 @@
       ],
       "handoff": "Frontend receives first fully functioning read-only result.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)"
+      ]
     },
     {
       "id": "T09",

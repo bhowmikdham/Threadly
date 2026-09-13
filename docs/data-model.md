@@ -1,4 +1,4 @@
-# Data model — postgres (7 tables)
+# Data model — postgres (12 tables)
 
 Owner: backend. SQLAlchemy models live in `backend/app/db/models.py`; schema
 changes go through alembic (`make db-revision m="..."` then `make db-upgrade`)
@@ -23,6 +23,36 @@ migration is required for the provider adapter.
 | `commitments` | who owes what, cross-thread      | `direction` = user_owes / owed_to_user; `status` = open/done/lapsed; dedupe on `(user_id, source_msg_id, fingerprint)` |
 | `drafts`      | generated drafts + approval state| `status` = draft/approved/sent/discarded; **GIN FTS index on `body`** for "what did I already say about X" |
 
+## Durable assistant tables (migration `8f3a7c2d901b`)
+
+The migration adds five tables and does not modify existing mailbox rows. The
+upgrade/downgrade test covers empty install, model/schema drift and preservation
+of existing messages. Downgrading removes all state in the five new tables.
+
+| Table | Purpose and constraints |
+|---|---|
+| `context_snapshots` | UUID string ID, owner, thread FK, SHA-256 source hash and JSONB immutable excerpt payload. Unique `(id,user_id)` enables owned references. Thread/user deletion cascades. |
+| `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, owned context FK, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
+| `assistant_jobs` | One row per task; owned task FK, queued/running/done, due time, attempts 0–3, lease token/deadline. Checks require both lease fields only while running. Claim index supports polling/recovery. |
+| `task_events` | Append-only composite PK `(task_id,sequence)`, owned task FK, task version, kind, redacted JSONB payload and timestamp. Sequence assigned under the task row lock. |
+| `artifact_revisions` | UUID ID, owned task FK, revision 1, typed JSONB artifact and provenance. Unique task ID ensures one published summary. No update endpoint; revision editing is a later migration. |
+
+Task-to-context and child-to-task ownership are also enforced by composite foreign
+keys. Source ownership is checked when capturing context. Jobs, events and artifacts
+cascade with their task; deleting an account or source thread removes its saved
+assistant work and fences a worker's subsequent completion attempt.
+
+Model calls run outside transactions. Task/job claim, cancellation and completion
+all serialize through the task row lock. Completion checks current lease token,
+deadline and state before atomically publishing artifact + terminal events. A
+crashed worker may repeat inference; the database rejects stale publication. This
+is not an exactly-once guarantee for model calls or a design for external writes.
+
+Snapshots copy only cleaned, bounded text already authorized through sync. They
+do not store raw MIME. Retention/expiry jobs remain future work; currently copies
+remain until their source thread or account is deleted. SQL engine exception
+logging hides bound parameters to avoid dumping these payloads into application logs.
+
 ## Chroma (vectors)
 
 - One collection per user: `user_{user_id}_sent` — embeddings of the user's SENT
@@ -32,7 +62,9 @@ migration is required for the provider adapter.
 
 ## Conventions
 
-- All tables carry `id` (surrogate PK), `created_at`, `updated_at`.
+- Mailbox tables use integer surrogate IDs. Assistant tasks, snapshots and artifacts
+  use UUID strings. Jobs use task ID as PK; events use task ID + sequence and only
+  `created_at` because they are append-only. Other tables also carry `updated_at`.
 - Timestamps: `TIMESTAMPTZ`, always UTC.
 - Gmail ids stored as opaque strings, never parsed.
 - No raw/unclean email bodies at rest; PII minimisation starts at the sync worker.

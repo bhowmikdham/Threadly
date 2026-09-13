@@ -71,3 +71,48 @@ drop/truncate tables, so never point this variable at a live mailbox database.
 Next implementation branch: T05 durable task/job storage plus T02 source fidelity;
 then bind authorized snapshots and integrate the first summary task. Add the
 Flow registry/invocation adapter after AWS configuration and live smoke tests.
+
+## Durable summary workflow — T05/T08 partial
+
+Branch: `codex/durable-summary-tasks`, stacked on `codex/assistant-intent-routing`.
+Status: implemented and locally tested; team review, live model evaluation and
+frontend integration remain pending. This does not complete the action/approval
+portions of T05 or all acceptance criteria of T08.
+
+Implemented the first executable assistant path: authenticated snapshot capture →
+atomic task/job acceptance → separate worker → validated summary artifact → saved
+task state/event replay. Added owner-scoped history, cancellation, request hash
+conflicts, recovery after expired leases, bounded provider retries and source ID
+validation. A browser disconnect does not cancel execution. Artifacts contain
+overview, decisions, inferred action suggestions, questions and source references.
+
+The worker pins `summary-task-1.0.0` plus prompt/configuration hashes. Context copies
+bounded synced excerpts in stable message order; later sync changes cannot switch
+its input. This avoids relying on the legacy thread-head cache but does not repair
+Gmail sync completeness. Coverage stays partial and discloses truncated/omitted
+messages. The legacy summary endpoint remains unchanged.
+
+Migration `8f3a7c2d901b` adds five tables with owned composite foreign keys, unique
+request/artifact constraints and lease/state checks. The separate worker is enabled
+through an optional Compose profile; it is not automatically launched by FastAPI.
+The [API contract](../api-contract.md), [data model](../data-model.md) and
+[runbook](../assistant-worker.md) document startup and recovery.
+
+Verification on Python 3.12.14 / PostgreSQL 16: **123 tests passed, zero skipped**,
+including the previously skipped integration tests. Ruff passed. Migration checks
+covered empty install, model/schema drift, upgrade with existing mailbox rows and
+downgrade preservation. Concurrency tests covered duplicate requests/claims,
+expired-lease fencing, cancellation while the model waits, crash exhaustion,
+provider retries, ownership and event replay. The new slice adds 33 tests; all
+model output is synthetic and no AWS/Google write was made.
+
+CI now requires PostgreSQL. Test setup only uses `THREADLY_TEST_DB` (or its test
+default), ignoring application `DATABASE_URL`; it also prevents accidental live
+Bedrock calls from inherited provider configuration. The local database was an
+isolated disposable Docker container, separate from all existing user databases.
+
+Still to implement: T02 Gmail fidelity/metadata, authorized UI selection and
+ordinal reference resolution, task continuation, full Flow registry/bridge, other
+intent execution, approvals/external writes, retention, operational metrics and
+frontend integration. Next start with source fidelity, then bind free-text routing
+to durable dispatch without bypassing these ownership/recovery boundaries.

@@ -9,12 +9,11 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789abcdef-32b!")
 os.environ.setdefault("FERNET_KEY", "F3EhFuo7yg2vcXW615VjV0zmVUCTe9h8O_dcHZZk_NM=")
 os.environ.setdefault("OPENROUTER_API_KEY", "test-or-key")
-os.environ.setdefault(
-    "DATABASE_URL",
-    os.environ.get(
-        "THREADLY_TEST_DB",
-        "postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test",
-    ),
+os.environ["INFERENCE_PROVIDER"] = "legacy"  # individual adapter tests explicitly opt into fakes
+# Never inherit the API's DATABASE_URL: test fixtures below drop/truncate tables.
+os.environ["DATABASE_URL"] = os.environ.get(
+    "THREADLY_TEST_DB",
+    "postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test",
 )
 
 import jwt as pyjwt  # noqa: E402
@@ -42,6 +41,8 @@ def _pg_available() -> bool:
 
 
 PG_UP = _pg_available()
+if os.environ.get("THREADLY_REQUIRE_TEST_DB") == "1" and not PG_UP:
+    raise RuntimeError("PostgreSQL is required for this test run but is not reachable")
 needs_pg = pytest.mark.skipif(
     not PG_UP, reason="postgres not reachable — run `make dev` or set THREADLY_TEST_DB"
 )

@@ -37,7 +37,7 @@ class Continuation(StrictModel):
 
 class AssistantRequest(StrictModel):
     schema_version: Literal["1.0"]
-    request_id: str = Field(min_length=1)
+    request_id: str = Field(min_length=1, max_length=128)
     instruction: str = Field(min_length=1, max_length=8000, pattern=r"\S")
     intent_hint: Intent | None
     context_snapshot_id: str | None
@@ -102,3 +102,12 @@ class RoutePreview(StrictModel):
     router_version: str
     source: Literal["rule", "model"]
     execution_ready: Literal[False] = False
+
+
+class ContextSnapshotRequest(StrictModel):
+    schema_version: Literal["1.0"]
+    thread_id: str = Field(min_length=1, max_length=128)
+
+
+class CancelTaskRequest(StrictModel):
+    expected_version: int = Field(ge=1)

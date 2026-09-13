@@ -119,11 +119,11 @@ Router and workflow teams receive a tested inference interface.
 
 ## T05 · Durable task, artifact, action and job infrastructure
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T01
 
-**Implementation targets (may not exist yet):** `backend/app/jobs/`, `backend/app/actions/`, `backend/app/db/`, `backend/app/api/routes/assistant.py`, `backend/alembic/versions/`
+**Implementation targets (may not exist yet):** `backend/app/jobs/`, `backend/app/actions/`, `backend/app/db/`, `backend/app/api/routes/assistant.py`, `backend/alembic/versions/`, `backend/app/assistant/`
 
 ### Deliverables
 
@@ -210,11 +210,11 @@ AI can author tested flow graphs against stable tool contracts.
 
 ## T08 · Source-linked summary vertical slice
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T02, T05, T07
 
-**Implementation targets (may not exist yet):** `backend/app/orchestrator/`, `backend/app/context/`, `backend/app/api/routes/summary.py`, `ml/prompts/`, `ml/evals/`
+**Implementation targets (may not exist yet):** `backend/app/orchestrator/`, `backend/app/context/`, `backend/app/api/routes/summary.py`, `ml/prompts/`, `ml/evals/`, `backend/app/assistant/`
 
 ### Deliverables
 

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.model_client.client import ModelClient, get_model_client
 from app.model_client.providers import ProviderError
+from app.model_client.structured import reject_duplicate_keys
 from app.planner.intent_prompt import ROUTER_VERSION, routing_prompt
 from app.schemas.assistant import (
     RouteDecision,
@@ -52,20 +53,11 @@ _COMBINATIONS = {
 }
 
 
-def _reject_duplicate_keys(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate JSON key")
-        result[key] = value
-    return result
-
-
 def parse_decision(text: str) -> RouteDecision:
     """No markdown stripping, arbitrary JSON extraction or permissive coercion."""
     if len(text) > 16000:
         raise ValueError("route response exceeds the size budget")
-    value = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+    value = json.loads(text, object_pairs_hook=reject_duplicate_keys)
     decision = RouteDecision.model_validate(value)
     if decision.context_snapshot_id is not None or decision.parameters.recipient_refs:
         raise ValueError("model invented unbound context or recipient references")
