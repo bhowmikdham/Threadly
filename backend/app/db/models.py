@@ -45,6 +45,7 @@ class User(TimestampMixin, Base):
     access_token_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # Fernet; short-lived
     access_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     gmail_history_id: Mapped[str | None] = mapped_column(String(32))  # incremental sync cursor
+    sync_version: Mapped[int] = mapped_column(server_default="0")
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -59,6 +60,7 @@ class Thread(TimestampMixin, Base):
     last_msg_id: Mapped[str | None] = mapped_column(String(32))  # half of the summary cache key
     last_msg_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     needs_reply: Mapped[bool | None] = mapped_column(Boolean)  # classifier output, set at ingest
+    version: Mapped[int] = mapped_column(server_default="0")
 
 
 class Message(TimestampMixin, Base):
@@ -72,6 +74,9 @@ class Message(TimestampMixin, Base):
     from_addr: Mapped[str | None] = mapped_column(String(320))
     to_addrs: Mapped[str | None] = mapped_column(Text)  # comma-joined; normalise later if needed
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    subject: Mapped[str | None] = mapped_column(Text)
+    reply_metadata: Mapped[dict | None] = mapped_column(JSONB)
     is_from_user: Mapped[bool] = mapped_column(Boolean, default=False)  # feeds RAG (sent mail)
     body_clean: Mapped[str | None] = mapped_column(Text)  # cleaned; raw is NEVER stored
 

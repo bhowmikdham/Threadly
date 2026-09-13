@@ -21,6 +21,7 @@ _PAGE_SIZE = 25
 def _to_out(t) -> ThreadOut:
     return ThreadOut(
         thread_id=t.gmail_thread_id,
+        version=t.version,
         subject=t.subject,
         last_msg_at=t.last_msg_at,
         needs_reply=t.needs_reply,  # NULL until the classifier ships (= "unclassified")
@@ -57,6 +58,8 @@ async def get_thread(thread_id: str, user_id: CurrentUser, session: DB) -> dict:
                 "gmail_msg_id": m.gmail_msg_id,
                 "from_addr": m.from_addr,
                 "sent_at": m.sent_at.isoformat() if m.sent_at else None,
+                "received_at": m.received_at.isoformat() if m.received_at else None,
+                "reply_metadata": m.reply_metadata,
                 "is_from_user": m.is_from_user,
                 "body_clean": m.body_clean,
             }

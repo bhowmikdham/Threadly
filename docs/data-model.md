@@ -18,7 +18,7 @@ migration is required for the provider adapter.
 | `users`       | account + oauth + sync cursor    | `google_sub` UNIQUE; refresh + access tokens stored Fernet-encrypted (`auth/crypto.py`) with `access_token_expires_at`; `gmail_history_id` = incremental sync cursor |
 | `threads`     | conversation index               | UNIQUE `(user_id, gmail_thread_id)`; caches `last_msg_id`, `last_msg_at` for ordering + summary cache key |
 | `messages`    | cleaned message bodies           | UNIQUE `(user_id, gmail_msg_id)`; `body_clean` = quotes/signatures stripped by sync worker; raw bodies are NOT stored |
-| `summaries`   | thread summary cache             | **cache key = UNIQUE `(thread_id, last_msg_id)`** — new message ⇒ new key ⇒ regeneration; old rows are cheap history |
+| `summaries`   | thread summary cache             | **cache key = UNIQUE `(thread_id, last_msg_id)`** — source changes invalidate all cached rows for that thread; publication checks the captured thread version |
 | `entities`    | extractor output (structured)    | **UNIQUE `(user_id, type, key)`** — upsert on conflict; `source_msg_id` for provenance; served to the UI with NO model call |
 | `commitments` | who owes what, cross-thread      | `direction` = user_owes / owed_to_user; `status` = open/done/lapsed; dedupe on `(user_id, source_msg_id, fingerprint)` |
 | `drafts`      | generated drafts + approval state| `status` = draft/approved/sent/discarded; **GIN FTS index on `body`** for "what did I already say about X" |
@@ -52,6 +52,28 @@ Snapshots copy only cleaned, bounded text already authorized through sync. They
 do not store raw MIME. Retention/expiry jobs remain future work; currently copies
 remain until their source thread or account is deleted. SQL engine exception
 logging hides bound parameters to avoid dumping these payloads into application logs.
+
+## Gmail fidelity columns (migration `3c6e9a1207bd`)
+
+- `users.sync_version`: non-null integer, starts at 0; each successful sync
+  increments it while holding the user row lock. Fetches happen outside DB
+  transactions, and stale versions cannot commit.
+- `threads.version`: non-null integer, starts at 0; increments once per sync for
+  each thread with changed stored source data. Exact replay does not increment it.
+- `messages.received_at`: nullable UTC provider `internalDate`. Ordering uses this,
+  then the legacy `sent_at` fallback, then opaque message ID in bytewise order.
+- `messages.subject`: nullable message-level subject for deterministic head repair.
+- `messages.reply_metadata`: nullable JSONB with selected original header arrays,
+  parsed addresses and labels. No raw MIME/body is stored. See the
+  [field contract](gmail-sync.md#reply-and-sender-metadata).
+
+Existing messages and assistant records survive upgrade. It clears sync cursors
+for one full metadata backfill and deletes regenerable legacy summary caches.
+Downgrade drops new columns but cannot restore old cursor/cache values. Sync
+removes deleted/out-of-scope messages while retaining empty thread rows and
+immutable saved snapshots. Historical snapshot excerpts are governed by future
+retention work, not automatically purged by message removal. New snapshots capture
+thread version in their hashed payload; old snapshots are left unchanged.
 
 ## Chroma (vectors)
 

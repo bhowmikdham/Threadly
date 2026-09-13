@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.db.models import ContextSnapshot, Message, Thread
+from app.db.repositories import message_order
 
 CHAR_BUDGET = 12000
 MESSAGE_LIMIT = 50
@@ -21,6 +22,7 @@ async def capture_thread(
         await session.execute(
             select(
                 Thread.id.label("thread_pk"),
+                Thread.version.label("thread_version"),
                 Message.gmail_msg_id,
                 Message.from_addr,
                 Message.sent_at,
@@ -34,9 +36,7 @@ async def capture_thread(
                 Message.user_id == user_id,
                 Thread.gmail_thread_id == gmail_thread_id,
             )
-            .order_by(
-                Message.sent_at.desc().nulls_first(), Message.gmail_msg_id.collate("C").desc()
-            )
+            .order_by(*message_order(newest_first=True))
             .limit(MESSAGE_LIMIT)
         )
     ).all()
@@ -65,6 +65,7 @@ async def capture_thread(
         "schema_version": "1.0",
         "scope": "synced_thread_excerpts",
         "thread_id": gmail_thread_id,
+        "thread_version": rows[0].thread_version,
         "messages": messages,
         "total_synced_messages": rows[0].total,
         "omitted_messages": rows[0].total - len(messages),

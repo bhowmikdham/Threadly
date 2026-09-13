@@ -116,3 +116,37 @@ ordinal reference resolution, task continuation, full Flow registry/bridge, othe
 intent execution, approvals/external writes, retention, operational metrics and
 frontend integration. Next start with source fidelity, then bind free-text routing
 to durable dispatch without bypassing these ownership/recovery boundaries.
+
+## Gmail sync fidelity — T02
+
+Branch: `codex/gmail-sync-fidelity`, based on the merged PR #5 commit on
+`codex/assistant-intent-routing`. Status: **in review**. Local acceptance fixtures
+pass; live Google account validation and team review remain pending.
+
+Implemented pre-scan cursor capture plus paginated history replay, deterministic
+provider-time/message-ID ordering, exact parsed sender matching, preserved RFC
+reply metadata, monotonic thread revisions and a per-user concurrent sync fence.
+Deletion/label changes reconcile mailbox scope. Changed older messages invalidate
+legacy summaries, and generation cannot republish a cache after its source changes.
+New snapshots record source thread version while historical snapshots stay immutable.
+
+Verification on Python 3.12.14 / PostgreSQL 16: **149 tests passed, zero skipped**;
+Ruff passed. This adds 26 Gmail fidelity cases using simulated HTTP responses and
+real PostgreSQL for state/concurrency. Migration tests verify an empty install,
+upgrade preserving current message rows, downgrade and schema/model drift. Tests
+include a blocked Gmail request while another sync commits, and sync completing
+while legacy summary generation waits. Two existing dependency deprecation
+warnings remain. No model prompt changed or live model evaluation was claimed.
+
+Migration `3c6e9a1207bd` adds versions and nullable message metadata, resets cursors
+for a one-time backfill, and clears regenerable legacy caches. Existing message
+rows and saved assistant work are preserved. Apply matching API/worker code with
+old sync processes stopped. No live database migration or deployment was performed.
+
+See [Gmail sync lifecycle and rollout](../gmail-sync.md), [API contract](../api-contract.md)
+and [data model](../data-model.md). Still outstanding: Google test-account runs,
+large-mailbox/background sync, UI ordinal binding, verified aliases and retention.
+Gmail reads are simulated in tests; no real mail/calendar write was performed.
+
+Next: T06 bind authorized context and free-text routing to durable task dispatch,
+then add bounded reply/compose execution and exact human approval services.
