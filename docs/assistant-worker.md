@@ -1,8 +1,8 @@
 # Durable summary worker: implementation and operations
 
 This is the first native backend execution path behind the assistant API. It
-routes saved free-text requests across five intents and executes summaries of
-saved synced-thread excerpts. Bedrock Flows, other intent execution, continuation
+routes saved free-text requests across five intents and executes summaries plus
+initial reply/compose draft artifacts. See [draft request bindings](assistant-drafts.md). Bedrock Flows, planning/other intent execution, continuation
 and approval/external execution remain later slices. See [routing handoff](assistant-routing.md).
 
 ## Local startup
@@ -51,8 +51,9 @@ There is no Chroma dependency in this workflow.
    409, reload state; never infer cancellation from a disconnected browser.
 
 The preview classifier is separate. Do not take its proposed operations and invoke
-tools in the browser. The worker checkpoints validated routes and dispatches the installed summary
-workflow; other intents return saved clarification/unavailable outcomes. Render
+tools in the browser. The worker checkpoints validated routes and dispatches single summary/reply/compose
+workflows with their required bindings; other operations return saved
+clarification/unavailable outcomes. Render
 `needs_clarification` questions from the task view and submit a fully restated
 request with a new ID after the user answers. In-place continuation is not yet installed.
 
@@ -78,8 +79,9 @@ of silently generating with a different release. Restore the matching worker to
 process still-queued work; for an already-failed task, submit a new request ID after
 reviewing configuration. There is no mutation/retry endpoint for terminal tasks.
 
-New requests pin `contextual-task-1.0.0` in `app/assistant/routing.py`, including
-routing policy/schema and small-model configuration plus summary preferences.
+New requests pin `contextual-task-1.1.0` in `app/assistant/routing.py`, including
+routing policy/schema and small-model configuration plus summary and draft policies.
+Previous `contextual-task-1.0.0` requests use `routing_v1.py` unchanged.
 Older `summary-task-1.0.0` requests still use their original prompt unchanged. AI changes
 must update the release/version and replayable evaluation evidence. Results record
 the actual provider/model as well as pinned fingerprints. An inference cache is

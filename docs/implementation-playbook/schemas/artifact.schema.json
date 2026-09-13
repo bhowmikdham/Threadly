@@ -18,7 +18,10 @@
       ]
     },
     "context_snapshot_id": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "minLength": 1
     },
     "coverage": {
@@ -589,6 +592,25 @@
               "missing_fields",
               "choices"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "not": {
+              "const": "draft"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context_snapshot_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }

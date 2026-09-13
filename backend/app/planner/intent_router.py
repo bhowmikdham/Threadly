@@ -80,19 +80,31 @@ def parse_decision(text: str) -> RouteDecision:
     return decision
 
 
-def require_context(decision: RouteDecision, *, has_source: bool = False) -> RouteDecision:
+def require_context(
+    decision: RouteDecision,
+    *,
+    has_source: bool = False,
+    has_reply_target: bool = False,
+    has_recipients: bool = False,
+) -> RouteDecision:
     """Deterministic preconditions; a snapshot binds source text, never a reply/action target."""
     if decision.status == "unsupported":
         return decision
     missing = [
-        field for field in decision.missing_fields if not (has_source and field == "source_context")
+        field
+        for field in decision.missing_fields
+        if not (
+            (has_source and field == "source_context")
+            or (has_reply_target and field == "reply_target")
+            or (has_recipients and field == "recipient")
+        )
     ]
     operations = set(decision.operations)
     if not has_source and operations & {"summarise_thread", "plan_actions", "transform_text"}:
         missing.append("source_context")
-    if "draft_reply" in operations:
+    if "draft_reply" in operations and not has_reply_target:
         missing.append("reply_target")
-    if "draft_new" in operations:
+    if "draft_new" in operations and not has_recipients:
         missing.append("recipient")
     if operations & {"check_time", "suggest_slots"}:
         missing.append("timezone")

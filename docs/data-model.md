@@ -70,6 +70,26 @@ release, state, context and original prompt. Downgrade refuses to proceed while
 contextual tasks exist instead of deleting or reinterpreting them. See the
 [routing lifecycle and migration notes](assistant-routing.md).
 
+## Bound draft inputs (migration `c6e0419a72df`)
+
+`assistant_tasks.draft_input` is nullable JSONB holding validated literal To/Cc/Bcc,
+the connected sender email, selected reply message ID and a copied reply binding
+(thread/message IDs, local version, subject and RFC Message-ID when available).
+The server constructs it at acceptance; no endpoint mutates it. Request hashes
+include draft options, with absent/null options omitted for old-client compatibility.
+
+New draft results use `artifact_revisions`, revision 1, with kind `draft`. They
+reference recipient positions inside the task's bound envelope. The artifact API
+returns that envelope separately under ownership checks; models cannot author it.
+Context-free compose permits a null artifact snapshot ID. The legacy integer-ID
+`drafts` table is unchanged; no automatic conversion/link or sender integration is
+implied. See [draft storage and review contract](assistant-drafts.md).
+
+New tasks pin `contextual-task-1.1.0`; prior contextual/summary tasks retain their
+old release behavior. Downgrade refuses while tasks requiring draft inputs/new
+release exist, preventing silent loss of envelope bindings. Apply matching API
+and worker versions after migration with older workers stopped.
+
 ## Gmail fidelity columns (migration `3c6e9a1207bd`)
 
 - `users.sync_version`: non-null integer, starts at 0; each successful sync

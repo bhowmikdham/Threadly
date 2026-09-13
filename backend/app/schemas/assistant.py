@@ -4,9 +4,10 @@ The preview endpoint remains separate from worker-routed durable requests.
 Model proposals cannot contain tool URLs, caller identities or executable writes.
 """
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Intent = Literal["summarise", "plan_schedule", "reply", "compose", "other"]
 Operation = Literal[
@@ -35,6 +36,40 @@ class Continuation(StrictModel):
     question_id: str | None
 
 
+class DraftOptions(StrictModel):
+    to: list[str] = Field(default_factory=list, max_length=20)
+    cc: list[str] = Field(default_factory=list, max_length=20)
+    bcc: list[str] = Field(default_factory=list, max_length=20)
+    reply_message_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+    @field_validator("to", "cc", "bcc")
+    @classmethod
+    def literal_mailboxes(cls, values):
+        # Deliberately accept ASCII mailbox literals only, not display names or address groups.
+        label = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+        pattern = r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@" + label + r"(?:\." + label + r")*"
+        for value in values:
+            if (
+                len(value) > 320
+                or len(value.split("@", 1)[0]) > 64
+                or not re.fullmatch(pattern, value)
+                or ".." in value
+                or value.startswith(".")
+                or ".@" in value
+            ):
+                raise ValueError(
+                    "Use a literal email address without display names or control characters"
+                )
+        return [value.casefold() for value in values]
+
+    @model_validator(mode="after")
+    def distinct_recipients(self):
+        recipients = self.to + self.cc + self.bcc
+        if len(recipients) > 20 or len(recipients) != len(set(recipients)):
+            raise ValueError("Use at most 20 distinct recipients across To, Cc and Bcc")
+        return self
+
+
 class AssistantRequest(StrictModel):
     schema_version: Literal["1.0"]
     request_id: str = Field(min_length=1, max_length=128)
@@ -42,6 +77,7 @@ class AssistantRequest(StrictModel):
     intent_hint: Intent | None
     context_snapshot_id: str | None
     continuation: Continuation | None
+    draft_options: DraftOptions | None = None
 
 
 class RouteParameters(StrictModel):

@@ -77,6 +77,7 @@ async def test_context_binds_this_but_not_reply_target_or_timezone():
     assert route["decision"]["context_snapshot_id"] == "owned"
     assert set(route["decision"]["missing_fields"]) == {
         "reply_target",
+        "recipient",
         "timezone",
         "duration_minutes",
         "date_range",

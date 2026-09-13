@@ -393,7 +393,7 @@
     {
       "id": "T10",
       "title": "Shared draft artifacts, recipients and revisions",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -429,12 +429,15 @@
       ],
       "handoff": "Reply and Compose share the same review and sender contracts.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+      ]
     },
     {
       "id": "T11",
       "title": "Reply workflow",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -470,7 +473,10 @@
       ],
       "handoff": "Reviewable thread reply integrates with shared sender.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+      ]
     },
     {
       "id": "T12",
@@ -518,7 +524,7 @@
     {
       "id": "T13",
       "title": "Compose workflow and missing-information handling",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -554,7 +560,10 @@
       ],
       "handoff": "Frontend receives new-email artifacts using shared editor/executor.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+      ]
     },
     {
       "id": "T14",

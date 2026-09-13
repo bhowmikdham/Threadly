@@ -123,3 +123,14 @@ stopped task states. Uninstalled compound workflows do not execute a supported
 subset. Source bodies never enter classification, and only the backend binds
 snapshot IDs. New task release manifests pin both routing and generation assets.
 See [contextual routing diagrams and handoff](assistant-routing.md).
+
+## Initial reply/compose artifacts (T10/T11/T13 partial)
+
+`app/assistant/drafting.py` binds explicit recipients and a selected reply message
+at acceptance, constructs generation input without adding envelope addresses,
+validates model text/source numbers and produces a reviewable draft artifact.
+`app/assistant/routing.py` now dispatches single summary/reply/compose operations;
+compound scheduling requests remain unavailable. `routing_v1.py` retains the prior
+contextual release for already-queued work. All generation/publication uses the
+existing lease/cancellation protocol. Drafts are stored in Threadly only; no Gmail
+write client or approval executor is installed. See [draft lifecycle](assistant-drafts.md).

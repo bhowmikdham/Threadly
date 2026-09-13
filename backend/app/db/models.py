@@ -178,6 +178,7 @@ class AssistantTask(TimestampMixin, Base):
     instruction: Mapped[str] = mapped_column(Text)
     context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
     intent_hint: Mapped[str | None] = mapped_column(String(16))
+    draft_input: Mapped[dict | None] = mapped_column(JSONB)
     route: Mapped[dict | None] = mapped_column(JSONB)
     state: Mapped[str] = mapped_column(String(24))
     version: Mapped[int] = mapped_column(default=1)
