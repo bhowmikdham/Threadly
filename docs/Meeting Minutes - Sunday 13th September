@@ -1,0 +1,75 @@
+# Architecture Overview: Hybrid LLM Design
+
+- Not multiple separate LLMs: one fine-tuned model given task-specific input structures
+- BERT classifier routes emails into 4 active categories (summarize removed from classifier)
+  - Reply, Compose, Plan/Schedule, Other
+  - Summarize handled via dedicated button, not classification
+- Each category triggers a specialized skill/prompt on Amazon Bedrock
+
+# Planning and Scheduling Workflow
+
+- Agreed approach: LLM extracts structured JSON from email body (date, time, attendees, duration, timezone)
+  - Backend parses JSON deterministically, no agentic loop needed
+  - Backend calls Google Calendar API to check availability
+- Proposed time constraints: 9 AM to 5 PM only (baked into planning skill/prompt)
+- Slot selection UI: ChatGPT-style multiple choice with a free-text override field
+  - User picks a slot, backend books it and LLM drafts the reply
+  - If user disputes a slot, cycle repeats until confirmed
+- Two LLM calls for scheduling: planning LLM extracts intent, main LLM drafts the reply
+
+# Amazon Bedrock Flow Builder
+
+- Flow Builder identified as a strong fit for orchestrating the scheduling workflow
+- Proposed flow: email in → intent router → validate/resolve dates → check calendar → compose reply → user review → send/create event → store outcome
+- Configured Prompt Routers can route between planning LLM and main LLM
+- BERT classifier can potentially trigger Bedrock flows directly
+- Separate flows for each of the 5 task categories under consideration
+
+# Amazon Bedrock and SageMaker Access
+
+- Anansh set up IAM users and shared credentials with Kelly and Bhomik
+- $120 credits currently available on the account
+- Claude models available only in the legacy Bedrock console (serverless)
+- Fine-tuning via continued pre-training in Bedrock discontinued from 7th October 2025
+  - SageMaker is the alternative: GPU environment for training and deploying custom models
+- Open question: use Bedrock frontier models via API, or train and deploy Quen on SageMaker?
+  - Latency tradeoff is hit-and-trial; both options viable
+  - If Bedrock models can’t be fine-tuned for the 5 tasks, SageMaker deployment is the fallback
+
+# Summarize Feature
+
+- Triggered by a dedicated button (not typed prompt, not classifier)
+- Clicking an email shows a “Summarize this thread” button → summary appears in chatbox
+- Follow-up questions on the email (e.g. “what’s in thread 3?”) fall under “Other” category
+  - Each follow-up passes full email thread + user question to LLM (no prior LLM responses)
+  - Rationale: passing prior LLM responses adds latency and repetition
+
+# Reply and Compose Features
+
+- Reply button added alongside Summarize for one-click draft generation
+  - User can still type “reply to this email saying X” for custom prompts
+  - Button reduces classifier load (though BERT classification is ~0.01ms, largely negligible)
+- Backend passes sender info (from/to fields) to LLM for all tasks
+  - Handles edge case where email signature is an image (not parseable text)
+  - Username stored in backend; passed as JSON variable to LLM
+- Compose also receives from/to for accurate sign-off generation
+
+# UI and Email Badges
+
+- Priority and category badges displayed inline on emails in the inbox view
+- Two badge types: priority level, meeting/scheduling indicator
+- Exact placement TBD (front-end decision for Tushar)
+- Superhuman AI reviewed as reference for summarize, reply, and insert UX patterns
+
+# Next Steps and Alignment
+
+- Bhomik to send full implementation document (generated via Codex) to the team for review
+  - Document covers end-to-end workflow, backend/AI coordination, per-service breakdown
+- Anansh to review Amazon Bedrock Flows and SageMaker before Tuesday’s class
+- Emailed Hassan regarding AWS Bedrock situation and fallback API options (OpenAI)
+- Tushar not yet looped in on UI integration; plan to align with him in Tuesday’s class
+  - He has not started frontend integration yet; Bhomik to contact him
+- Team acknowledged communication gaps caused diverging product visions; agreed to meet more frequently
+
+
+Chat with meeting transcript: https://notes.granola.ai/t/86ad15f3-ddc8-4b0f-bca7-81f2d7031d27
