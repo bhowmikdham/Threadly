@@ -11,6 +11,17 @@ PREFLIGHT = ROOT / "infra/deploy/ec2/preflight.py"
 
 
 class PreflightTests(unittest.TestCase):
+    def test_alembic_console_entry_point_imports_app_without_pythonpath(self):
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        env["DATABASE_URL"] = "postgresql+asyncpg://threadly:test@localhost/threadly"
+        result = subprocess.run(
+            [str(Path(sys.executable).with_name("alembic")), "upgrade", "head", "--sql"],
+            cwd=ROOT / "backend", env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CREATE TABLE assistant_jobs", result.stdout)
+        self.assertIn("e9b7120c4a63", result.stdout)
+
     def run_preflight(self, **overrides):
         env = {
             **os.environ,
