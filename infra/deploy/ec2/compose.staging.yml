@@ -1,0 +1,71 @@
+# Domain-free staging. Use deploy-app.sh; the API binds only to host loopback.
+name: threadly
+
+services:
+  api:
+    image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
+    build: ../../../backend
+    restart: unless-stopped
+    env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../../../ml:/ml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()"]
+      interval: 10s
+      timeout: 8s
+      retries: 18
+      start_period: 20s
+    networks: [threadly_net]
+
+  assistant-worker:
+    image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
+    command: python -m app.assistant.worker
+    restart: unless-stopped
+    stop_grace_period: 130s
+    env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
+    volumes:
+      - ../../../ml:/ml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [threadly_net]
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [threadly_net]
+
+  chroma:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chromadata:/data
+    networks: [threadly_net]
+
+networks:
+  threadly_net:
+
+volumes:
+  pgdata:
+  chromadata:

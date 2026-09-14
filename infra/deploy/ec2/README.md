@@ -130,6 +130,11 @@ cancel CloudFormation creation. Keep the printed work directory and outputs.
 
 ## Application deployment handoff
 
+For the current domain-free staging phase, use the
+[API/database/worker deployment runbook](APP-DEPLOYMENT.md). It uses the existing
+data disk and credentials, binds the API to loopback for SSM tunnelling, and
+records a specific Git commit. The domain-based handoff below remains later work.
+
 1. Confirm the host checks above, and record stack name, instance ID, IP, volume
    ID and bucket name in the team's deployment record.
 2. Choose a reviewed merged **application commit** and clone it into a dedicated
