@@ -5,6 +5,11 @@
 Implementation has started. See [current evidence and remaining work](13-implementation-progress.md)
 for branch-specific results; the architecture below remains the target design.
 
+For implementation after merged PR #9, use the [backend execution handoff](../backend-execution/README.md):
+26 dependency-ordered slices, a copy-paste coding-agent prompt, source maps,
+acceptance assertions and resume checkpoints. The original T backlog remains the
+product-level acceptance record.
+
 This is the shared build plan for a Gmail assistant with five user intents:
 **summarise, plan/schedule, reply, compose and other**. It covers user triggers,
 Bedrock routing/Flows, backend services, Google integrations, evidence, approvals,
