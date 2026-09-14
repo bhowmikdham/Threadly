@@ -1,5 +1,10 @@
 # Deploy runbook — AWS EC2
 
+For the current **Bedrock staging deployment**, use the
+[CloudShell launcher and runbook](ec2/README.md). It creates a separate stack with
+SSM administration and no public SSH. The instructions below describe the legacy
+Mac/Ollama deployment and must not be combined with the new launcher.
+
 Target: t3.small or larger, Elastic IP attached, Ubuntu LTS.
 Reminder: inference NEVER runs on this box (docs/decisions/001).
 
