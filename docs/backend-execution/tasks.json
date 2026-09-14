@@ -1,0 +1,1330 @@
+{
+  "schema_version": "1.0",
+  "baseline_commit": "4474322a93b63016aeaf34121121c528d75930c9",
+  "integration_branch": "codex/assistant-intent-routing",
+  "note": "Proposed slices; status changes require checkpoint evidence. External gates are separate from local implementation dependencies.",
+  "tasks": [
+    {
+      "id": "B00",
+      "title": "Verify baseline and settle shared contracts",
+      "status": "planned",
+      "work_packages": [
+        "T01",
+        "T02",
+        "T04",
+        "T05",
+        "T08",
+        "T10",
+        "T11",
+        "T13"
+      ],
+      "depends_on": [],
+      "design_sections": [
+        "D1",
+        "D2"
+      ],
+      "read_existing": [
+        "AGENTS.md",
+        "docs/api-contract.md",
+        "docs/data-model.md",
+        "docs/architecture.md",
+        "backend/tests/conftest.py",
+        "backend/app/db/models.py",
+        "frontend/README.md"
+      ],
+      "proposed_paths": [
+        "docs/backend-execution/checkpoints/B00.md"
+      ],
+      "objective": "Prepare a reproducible implementation baseline; preserve merged behavior and record the exact integration targets.",
+      "implementation": [
+        "Verify PR #9 ancestry, current integration branch, clean/dirty tree and Alembic head. Locate actual frontend code from its README/remote branches without merging it blindly.",
+        "Read current APIs and action/slot/route planning schemas; record proposed API naming, sender scope, default-disabled writes and legacy /draft mapping policy. Keep legacy send stub until safe delegation exists.",
+        "Set up Python 3.12+ and backend dev dependencies in an isolated environment. Start an isolated PostgreSQL 16 test DB and run baseline checks; record exact commands/environment.",
+        "Create the first committed checkpoint and a concrete migration/PR sequence. No new production endpoint is needed in this task."
+      ],
+      "acceptance_tests": [
+        "Run current full backend tests with THREADLY_REQUIRE_TEST_DB=1; investigate any regression from historical 233 baseline, do not force a count.",
+        "Run Ruff and both documentation validators; confirm all referenced code paths exist and migration graph has one current head.",
+        "Verify known examples still route summary/reply/compose and leave unavailable capabilities explicit; use existing tests, no live provider call needed."
+      ],
+      "external_gate": "Frontend branch and live deployment state must be discovered, not assumed. Missing cloud credentials do not block local baseline work.",
+      "handoff": "B01 can implement capabilities; B02 can implement action storage against the recorded contract. T packages remain partial until their wider criteria pass.",
+      "checkpoint": "checkpoints/B00.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B01",
+      "title": "Persist actual Google capabilities and harden auth boundaries",
+      "status": "planned",
+      "work_packages": [
+        "T03"
+      ],
+      "depends_on": [
+        "B00"
+      ],
+      "design_sections": [
+        "D1",
+        "D3"
+      ],
+      "read_existing": [
+        "backend/app/auth/google.py",
+        "backend/app/auth/service.py",
+        "backend/app/auth/crypto.py",
+        "backend/app/api/routes/auth.py",
+        "backend/app/db/repositories.py",
+        "backend/app/db/models.py",
+        "backend/app/config.py"
+      ],
+      "proposed_paths": [
+        "backend/app/capabilities/",
+        "backend/app/api/routes/capabilities.py"
+      ],
+      "objective": "Expose installed/enabled/granted capabilities and support reconnect without treating requested scopes as granted scopes.",
+      "implementation": [
+        "Extend token response parsing and persistence with actual grants, verified account identity, connection/revocation state and a monotonic capability/account version. Legacy unknown grants stay unknown; do not auto-grant send or Calendar.",
+        "Separate token network refresh from caller-owned transactions. Avoid internal commit of unrelated action work; preserve valid refresh tokens when absent in a response and fence concurrent refresh/disconnect.",
+        "Inspect actual extension OAuth flow; validate redirect allowlist, state/PKCE responsibility, userinfo identity and email verification before connecting accounts. Do not bolt on incompatible untested auth parameters.",
+        "Add GET /assistant/capabilities with implementation/flag/scope/source readiness, and incremental-consent/reconnect contract. Sanitize upstream errors and logs; no raw token endpoint bodies.",
+        "Update config/env examples, auth API docs and migration tests. Calendar scope requests must be deliberate; alias/send-as support remains unavailable until verified."
+      ],
+      "acceptance_tests": [
+        "Partial grant, absent scope metadata, revoked access and grant reduction never advertise unavailable send/calendar capability.",
+        "Refresh without a replacement refresh token preserves the original; concurrent refresh/disconnect cannot restore a revoked connection.",
+        "Wrong account subject, invalid redirect, replayed state or failed verifier is rejected according to the actual OAuth integration contract.",
+        "Provider error body containing synthetic tokens does not appear in API errors/log capture.",
+        "Caller rollback after token retrieval does not accidentally commit an unrelated pending action; migration preserves encrypted legacy tokens."
+      ],
+      "external_gate": "Google test-account consent/reconnect and deployment redirect configuration require authorized accounts. Record fixture-only results separately.",
+      "handoff": "Capability snapshots and token provider interface for B03\u2013B06/B12; AI and frontend receive explicit unavailable reasons.",
+      "checkpoint": "checkpoints/B01.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B02",
+      "title": "Add durable action, approval and attempt storage",
+      "status": "planned",
+      "work_packages": [
+        "T05",
+        "T10",
+        "T12"
+      ],
+      "depends_on": [
+        "B00"
+      ],
+      "design_sections": [
+        "D2",
+        "D3"
+      ],
+      "read_existing": [
+        "backend/app/db/models.py",
+        "backend/app/assistant/tasks.py",
+        "backend/app/assistant/draft_review.py",
+        "backend/tests/test_assistant_migration.py",
+        "docs/implementation-playbook/schemas/action-approval.schema.json"
+      ],
+      "proposed_paths": [
+        "backend/app/actions/models.py",
+        "backend/app/actions/service.py",
+        "backend/app/schemas/actions.py"
+      ],
+      "objective": "Persist external-action state independently of generation jobs and draft review, with ownership and concurrency constraints.",
+      "implementation": [
+        "Implement proposed action/approval/job/attempt tables or consistent model placement in existing models.py. Use composite owned FKs, version/state checks, unique proposal/approval keys and one active dispatch attempt.",
+        "Implement pure transition rules and task-first locking helpers; retain exact immutable payload/hash and references. No provider client or external dispatch in this slice.",
+        "Coordinate draft edits with pending-action supersession using task \u2192 action lock order. After dispatch-intent cutoff, show the old action as possibly executing rather than claiming recall.",
+        "Define account/thread deletion handling for in-flight/unknown actions before adding cascading FKs. Keep new dispatch disabled; record minimal reconciliation-retention decision and pending policy gate.",
+        "Migration must preserve every existing artifact UUID, review and legacy draft row; refuse destructive downgrade when action history exists."
+      ],
+      "acceptance_tests": [
+        "Cross-owner action/approval/attempt insertion fails in service and DB constraints; unknown IDs do not leak existence.",
+        "Duplicate proposal keys return one action; same key/different content returns conflict; concurrent transitions serialize.",
+        "Illegal state transitions and duplicate active attempts fail; draft edit invalidates pending proposals under the same lock.",
+        "Existing 233 baseline cases still run; migration empty/upgrade/drift/downgrade preservation includes edited draft/review rows.",
+        "Deleting a source/account cannot silently erase an in-flight action without the coordinated deletion policy being applied."
+      ],
+      "external_gate": "Deletion/audit policy must be recorded with the team before writes are enabled; it need not prevent fixture-based storage implementation.",
+      "handoff": "Owned durable action primitives ready for exact payload construction and approval. External writes remain disabled.",
+      "checkpoint": "checkpoints/B02.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B03",
+      "title": "Build immutable MIME payloads and send previews",
+      "status": "planned",
+      "work_packages": [
+        "T02",
+        "T10",
+        "T12"
+      ],
+      "depends_on": [
+        "B01",
+        "B02"
+      ],
+      "design_sections": [
+        "D2",
+        "D4"
+      ],
+      "read_existing": [
+        "backend/app/assistant/drafting.py",
+        "backend/app/assistant/draft_review.py",
+        "backend/app/schemas/assistant.py",
+        "backend/app/sync/worker.py",
+        "backend/app/db/models.py"
+      ],
+      "proposed_paths": [
+        "backend/app/actions/email_payload.py",
+        "backend/app/api/routes/actions.py"
+      ],
+      "objective": "Create an inspectable send_email action from the current edited draft without sending it.",
+      "implementation": [
+        "Add the artifact-to-action proposal endpoint with request/revision preconditions. Read artifact.draft_envelope; never use original task recipients after edits.",
+        "Build deterministic plain-text MIME with Python email primitives, frozen Date/Message-ID, validated sender/To/Cc/Bcc and safe encoding; persist exact bytes/hash plus user preview.",
+        "Validate reply thread identity, References/In-Reply-To chain and source version from owned synced metadata; pin sender/capability versions. If exact headers are unavailable, stop for refresh/rebinding.",
+        "Preserve unresolved-fact/placeholder checks, reject unsupported attachments/aliases, and ensure UI distinguishes Mark reviewed from a send preview.",
+        "Specify legacy integer draft linkage or keep legacy routes explicit 501; no second independent authority for outgoing content."
+      ],
+      "acceptance_tests": [
+        "Editing Bcc/To/body/subject produces a different proposal/hash; replay cannot substitute the original task envelope.",
+        "Header injection, Unicode/header folding, duplicate addresses and malformed reply IDs are handled by independent MIME parse assertions.",
+        "MIME bytes, Date and Message-ID remain stable across proposal reads/retries; user-visible envelope matches submitted intended recipients.",
+        "Stale source or other-owner artifact cannot produce an action; source email instructions cannot create an approval.",
+        "Missing headers, unresolved placeholders, unverified sender alias and attachment refs yield explicit blockers, not silently stripped fields."
+      ],
+      "external_gate": "Controlled Gmail threading/Bcc behavior must be verified before public sending; offline MIME correctness does not establish provider behavior.",
+      "handoff": "Exact preview/hash + expiry + source/version envelope available to B04; no HTTP send operation exists here.",
+      "checkpoint": "checkpoints/B03.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B04",
+      "title": "Implement explicit approval, rejection and cancellation",
+      "status": "planned",
+      "work_packages": [
+        "T05",
+        "T12"
+      ],
+      "depends_on": [
+        "B03"
+      ],
+      "design_sections": [
+        "D2",
+        "D3"
+      ],
+      "read_existing": [
+        "backend/app/api/routes/assistant.py",
+        "backend/app/assistant/draft_review.py",
+        "backend/app/assistant/tasks.py",
+        "docs/implementation-playbook/schemas/action-approval.schema.json"
+      ],
+      "proposed_paths": [
+        "backend/app/api/routes/actions.py",
+        "backend/app/actions/approval.py"
+      ],
+      "objective": "Let a user approve one exact saved action and atomically queue it, with safe replay and stale-state handling.",
+      "implementation": [
+        "Implement GET action, approve/reject/cancel contracts from DESIGN D2 with strict identity/version/hash/request ID checks and expiry policy.",
+        "Approval loads stored payload; no replacement action arguments allowed. Persist approval and outbox enqueue in one transaction; revalidate latest draft/context/capability under ordered locks.",
+        "Support idempotent retries after outcomes advance; reject changed request bodies. Store events without body, addresses, tokens or full hashes that are unnecessary in logs.",
+        "Before dispatch, cancellation/rejection can close pending work. After dispatch intent, record cancellation requested and return honest executing/unknown status.",
+        "Keep public approval unavailable until the executor is installed/enabled; exercise internal enqueue with a fake dispatcher. Mark reviewed never implicitly calls approve."
+      ],
+      "acceptance_tests": [
+        "Concurrent duplicate approvals produce one approval/job; same key/different hash conflicts; wrong version/hash cannot enqueue.",
+        "Approval racing draft edit or expiry is serialized: only the still-valid exact version can be queued.",
+        "Queue failure rolls back approval, and approval failure creates no orphan runnable job.",
+        "Cross-owner IDs, injected replacement recipients/body, expired/rejected/superseded actions and missing scope fail.",
+        "Cancel before dispatch suppresses send; cancel after cutoff cannot report not-sent without evidence."
+      ],
+      "external_gate": "Frontend must display exact action and use an explicit Send control. No live dispatch until B06 and authorized integration gates.",
+      "handoff": "B05 can consume approved jobs with a fake HTTP transport; B18 connects the explicit approval UI.",
+      "checkpoint": "checkpoints/B04.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B05",
+      "title": "Implement the Gmail executor with writes disabled",
+      "status": "planned",
+      "work_packages": [
+        "T12"
+      ],
+      "depends_on": [
+        "B01",
+        "B04"
+      ],
+      "design_sections": [
+        "D3",
+        "D4"
+      ],
+      "read_existing": [
+        "backend/app/sync/gmail.py",
+        "backend/app/auth/service.py",
+        "backend/app/assistant/worker.py",
+        "backend/app/config.py",
+        "docker-compose.yml"
+      ],
+      "proposed_paths": [
+        "backend/app/actions/worker.py",
+        "backend/app/actions/gmail_sender.py"
+      ],
+      "objective": "Execute stored approved MIME via an isolated action worker and distinguish confirmed from uncertain outcomes.",
+      "implementation": [
+        "Implement action job claim/fence/expiry and short transaction preflight. Refresh credentials/perform source reads outside DB locks, then compare versions again before committed dispatch intent.",
+        "Call Gmail with frozen approved bytes and thread ID only. No model call, MIME regeneration or recipient expansion in executor.",
+        "Persist confirmed provider ID/result or sanitized definite failure; any may-have-dispatched timeout, disconnect, malformed success or worker crash becomes outcome_unknown.",
+        "Expired generation leases must never pick up action jobs; expired dispatch leases become reconciliation work. Disable automatic HTTP retry for write calls.",
+        "Add separate default-off write flag and optional worker service/config. No live activation in this PR; B06 is a hard enabling dependency."
+      ],
+      "acceptance_tests": [
+        "Capture HTTP request bytes and compare to stored approved payload; mutated live draft cannot alter an in-flight payload.",
+        "Two workers/expired leases cannot issue a second send; stale completion cannot overwrite newer reconciliation state.",
+        "Inject crash before/after dispatch-intent commit, timeout before/after simulated provider acceptance, 401/403/429/5xx and invalid JSON success.",
+        "No DB row lock is held during blocked HTTP call; cancellation/edit can record correct post-cutoff state.",
+        "Disabling writes or revoking account capabilities prevents new dispatch while leaving unknown attempts visible."
+      ],
+      "external_gate": "Only mock transport in this slice. Live sends explicitly gated until B06 plus authorized test-account validation.",
+      "handoff": "B06 receives durable identifiers, attempts and outcome_unknown states; no blind automatic resend path.",
+      "checkpoint": "checkpoints/B05.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B06",
+      "title": "Reconcile uncertain Gmail sends and complete email gate",
+      "status": "planned",
+      "work_packages": [
+        "T12"
+      ],
+      "depends_on": [
+        "B05"
+      ],
+      "design_sections": [
+        "D3",
+        "D4"
+      ],
+      "read_existing": [
+        "backend/app/sync/gmail.py",
+        "backend/app/db/models.py",
+        "backend/tests/test_draft_workflows.py",
+        "docs/assistant-draft-review.md"
+      ],
+      "proposed_paths": [
+        "backend/app/actions/gmail_reconciliation.py",
+        "docs/email-actions.md"
+      ],
+      "objective": "Recover ambiguous sends using provider evidence while refusing duplicate sends from inconclusive results.",
+      "implementation": [
+        "Implement bounded, paginated Sent candidate lookup by persisted Message-ID and time/account scope, followed by matching headers/content/thread/recipients as observable.",
+        "Document provider-normalized MIME comparison, Bcc visibility limits and confidence criteria. Empty immediate search, mismatched/multiple candidates or lost read scope remain unknown.",
+        "Persist reconciliation observations/due times/attempt limits; expose outcome_unknown and manual inspection guidance. Reconciliation is read-only; never auto-resend merely due timeout/budget exhaustion.",
+        "Handle late worker success as evidence without bypassing fencing, and definitive non-execution separately from unproven absence.",
+        "Integrate legacy send only if it maps to the same owned action/approval path; otherwise retain 501. Complete email runbook and live test-account checklist."
+      ],
+      "acceptance_tests": [
+        "Simulated accepted send with lost response reconciles to one known Gmail ID and never issues a second POST.",
+        "Delayed indexing, empty pages, duplicate/mismatched Message-ID candidates, wrong account and incomplete Bcc evidence stay unknown.",
+        "Repeated reconciliation, process restart and late responses are idempotent and auditable; unknown work is not exhausted into a fresh send.",
+        "Definite rejection follows tested transition policy; manual retry uses a new explicit action only when justified and authorized.",
+        "One controlled end-to-end new email and reply demonstrate threading/recipient behavior and result IDs before write flag enablement."
+      ],
+      "external_gate": "The last case requires explicit authorization, Google test accounts and verified scopes. Report simulated pass and live pending separately.",
+      "handoff": "Email lifecycle is ready for integration once live gate passes. B15 may reuse action infrastructure with Calendar-specific reconciliation.",
+      "checkpoint": "checkpoints/B06.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B07",
+      "title": "Bind UI selections and ordinal references",
+      "status": "planned",
+      "work_packages": [
+        "T06",
+        "T17"
+      ],
+      "depends_on": [
+        "B00"
+      ],
+      "design_sections": [
+        "D5"
+      ],
+      "read_existing": [
+        "backend/app/assistant/context.py",
+        "backend/app/assistant/routing.py",
+        "backend/app/schemas/assistant.py",
+        "backend/app/api/routes/assistant.py",
+        "backend/app/db/repositories.py",
+        "frontend/README.md"
+      ],
+      "proposed_paths": [
+        "backend/app/assistant/ui_context.py"
+      ],
+      "objective": "Resolve this/selected/third message against an immutable authorized view, never guessed backend chronology.",
+      "implementation": [
+        "Define strict capture contract for surface kind, visible-order IDs, selected IDs, capture time and version. Validate every reference against authenticated ownership and bounded supported scope.",
+        "Persist the UI mapping independently from backend chronology, hydrating authoritative text from synced records. Label arbitrary selected text as user input, not provider evidence.",
+        "Extend routing/reference binder with exact map semantics and typed ambiguity outcomes. Missing, changed or cross-surface references request clarification.",
+        "Add versioned context schema/manifest policy without altering old snapshots. Preserve thread excerpt coverage/limits and avoid unnecessarily collecting full screen contents."
+      ],
+      "acceptance_tests": [
+        "Third message resolves to the captured visible third entry even when current inbox/thread order changes.",
+        "Third thread versus third message versus third schedule option have distinct maps; absent/ambiguous map clarifies.",
+        "Cross-owner, deleted, duplicated, over-limit or unsupported IDs fail before inference; client body spoofing cannot replace backend text.",
+        "Later navigation/reordering cannot mutate existing evidence; old snapshots still read and old queued releases retain behavior.",
+        "Follow-up examples from the user's screenshots return exact selected-message evidence, not a whole-thread summary."
+      ],
+      "external_gate": "Actual extension selection map integration requires frontend code; synthetic maps can verify backend semantics first.",
+      "handoff": "Owned context/ref maps available to B08/B09 and frontend reference rendering.",
+      "checkpoint": "checkpoints/B07.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B08",
+      "title": "Resume clarification with durable typed inputs",
+      "status": "planned",
+      "work_packages": [
+        "T05",
+        "T06",
+        "T17"
+      ],
+      "depends_on": [
+        "B07"
+      ],
+      "design_sections": [
+        "D5"
+      ],
+      "read_existing": [
+        "backend/app/assistant/tasks.py",
+        "backend/app/assistant/routing.py",
+        "backend/app/assistant/worker.py",
+        "backend/app/schemas/assistant.py"
+      ],
+      "proposed_paths": [
+        "backend/app/assistant/continuation.py"
+      ],
+      "objective": "Resolve an outstanding question without losing the original request, source bindings or retry safety.",
+      "implementation": [
+        "Add durable questions and append-only user input records with question identity, kind/schema, task version, selected refs, source/input version and request hash.",
+        "Implement POST /assistant/tasks/{id}/inputs; validate owned current question and typed input under task lock, consume once and atomically requeue with new effective input/checkpoint.",
+        "Keep original instruction/request hash immutable; pin context/reference and release changes explicitly. Invalidate only dependent route/step outputs and require fresh source capture when needed.",
+        "Support repeated clarifications and user cancellation; reject answers to finished/expired/stale questions. Raw yes is never send approval.",
+        "Version worker/route behavior and maintain previous queued-release support. Return current task and event cursor for frontend continuation."
+      ],
+      "acceptance_tests": [
+        "Duplicate/concurrent answers consume one question and queue once; changed payload with same request ID conflicts.",
+        "Stale question/task version, wrong owner and unrelated choices cannot change task state.",
+        "Answer after cancellation or after a newer question fails; restart during input commit cannot lose/duplicate effective input.",
+        "A timezone/recipient answer continues the original scheduling/drafting goal rather than being classified as unrelated new work.",
+        "Source changes require fresh binding; continuation cannot retain a stale send approval or authorize writes."
+      ],
+      "external_gate": "AI question extraction and frontend typed answer forms need joint fixtures; live classification quality remains separate.",
+      "handoff": "Continuation contract available to compound workflow and schedule clarification.",
+      "checkpoint": "checkpoints/B08.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B09",
+      "title": "Implement bounded Other and evidence retrieval",
+      "status": "planned",
+      "work_packages": [
+        "T09"
+      ],
+      "depends_on": [
+        "B07"
+      ],
+      "design_sections": [
+        "D1",
+        "D5"
+      ],
+      "read_existing": [
+        "backend/app/api/routes/entities.py",
+        "backend/app/extractor/extractor.py",
+        "backend/app/extractor/patterns.py",
+        "backend/app/db/repositories.py",
+        "backend/app/assistant/summary.py",
+        "backend/app/planner/intent_router.py"
+      ],
+      "proposed_paths": [
+        "backend/app/assistant/retrieval.py",
+        "backend/app/assistant/answers.py"
+      ],
+      "objective": "Execute supported search, exact lookup, selected-message answers, transforms and help with honest evidence coverage.",
+      "implementation": [
+        "Define bounded native handlers for supported operations. Use parameterized owner-filtered queries, explicit time/folder/source scope, result caps and stable cursors.",
+        "Implement entity/commitment source records where required; distinguish extracted/inferred facts from user-confirmed state and retain provenance/corrections.",
+        "Generate an answer only over returned evidence refs; deterministic help/exact lookup can avoid a model. No result is explicit, not fabricated content.",
+        "Transform selected text as a bounded user-input artifact without granting mailbox/action authority. Clearly mark truncated/missing sources.",
+        "Wire installed handlers into capabilities/dispatcher and preserve unavailable compound behavior until B10. Add prompt/release versions and replayable model fixtures."
+      ],
+      "acceptance_tests": [
+        "Same query from two owners cannot cross rows, caches or evidence refs; malicious query strings cannot alter SQL or tool host.",
+        "Missing/empty/truncated scope produces accurate coverage and no invented entity/message IDs.",
+        "Answer about selected third message cites exactly that bound message; deleted source returns a stale/no-source outcome.",
+        "Source text requesting send or broad search cannot expand authorized scope or create actions.",
+        "Native deterministic paths, malformed generated answers and schema/evidence rejection all have fixtures; live quality requires separate evaluation."
+      ],
+      "external_gate": "AI supplies labelled lookup/answer cases; real mailbox search quality and extraction accuracy are joint live gates.",
+      "handoff": "Validated evidence handles available to B10/B11 and future reply/compose grounding.",
+      "checkpoint": "checkpoints/B09.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B10",
+      "title": "Execute compound steps with explicit artifact streams",
+      "status": "planned",
+      "work_packages": [
+        "T05",
+        "T06",
+        "T08",
+        "T09",
+        "T11",
+        "T13"
+      ],
+      "depends_on": [
+        "B08",
+        "B09"
+      ],
+      "design_sections": [
+        "D5",
+        "D7"
+      ],
+      "read_existing": [
+        "backend/app/db/models.py",
+        "backend/app/assistant/tasks.py",
+        "backend/app/assistant/worker.py",
+        "backend/app/assistant/routing.py",
+        "backend/app/api/routes/assistant.py",
+        "backend/tests/test_assistant_migration.py"
+      ],
+      "proposed_paths": [
+        "backend/app/assistant/steps.py"
+      ],
+      "objective": "Run a fully installed multi-step request without losing intermediate evidence or confusing final draft revisions.",
+      "implementation": [
+        "Introduce bounded task steps with ordinal/DAG, owned typed inputs/outputs, state, retry budget and pinned per-step release. Validate entire supported operation sequence before starting.",
+        "Migrate artifact identity to explicit streams and a task final-result pointer as DESIGN D5. Preserve all existing UUIDs, draft revision numbers, reviews and action bindings.",
+        "Checkpoint successful read/generated steps; retries reuse unaffected outputs and recompute only invalidated dependencies. Keep external approvals/actions outside autonomous step execution.",
+        "Map intermediate versus final artifacts/events explicitly; allow lookup \u2192 reply/compose and later availability \u2192 draft without publishing intermediate output as final success.",
+        "Reject unsupported/reversed/cyclic sequences; one task's context does not authorize another's result refs. Bound steps, token/tool calls and total time."
+      ],
+      "acceptance_tests": [
+        "Lookup succeeds then generation fails: retry reuses valid lookup checkpoint and publishes one final result stream.",
+        "Old draft history/review/action refs survive migration; latest task points to final artifact rather than largest unrelated revision.",
+        "Cancel/lease replacement during any step fences publication; duplicate workers cannot double-publish step outputs.",
+        "Changing a selected source invalidates dependent outputs but cannot mutate historical artifacts or approved outgoing payload.",
+        "Every installed compound pair has end-to-end replay; unsupported full plans execute zero partial steps and return clear outcome."
+      ],
+      "external_gate": "This touches shared state and migrations: require a focused human/reviewer pass before merging, after producing the tested implementation.",
+      "handoff": "Compound kernel ready for plan/schedule and Flow adapters; no arbitrary autonomous tool loop.",
+      "checkpoint": "checkpoints/B10.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B11",
+      "title": "Add non-calendar plans and explicit commitment acceptance",
+      "status": "planned",
+      "work_packages": [
+        "T14"
+      ],
+      "depends_on": [
+        "B10"
+      ],
+      "design_sections": [
+        "D5"
+      ],
+      "read_existing": [
+        "backend/app/db/models.py",
+        "backend/app/api/routes/entities.py",
+        "backend/app/assistant/draft_review.py",
+        "docs/implementation-playbook/examples/plan.json"
+      ],
+      "proposed_paths": [
+        "backend/app/assistant/planning.py"
+      ],
+      "objective": "Produce editable evidence-backed plans and let users choose which commitments are accepted or included in a draft.",
+      "implementation": [
+        "Define versioned plan content with stable item IDs, dependencies, optional owners/deadlines, evidence and explicit/inferred/confirmed status.",
+        "Validate DAG, dates/timezones and allowed source refs deterministically; unknown owner/deadline remains unresolved.",
+        "Add plan revision/accept-selection operations with optimistic versions and idempotency. Accepting internal work does not send or book anything.",
+        "Generate a linked draft from only selected confirmed commitments; edits supersede dependent proposals and preserve historical plan evidence.",
+        "Add capabilities, prompts, replay fixtures and frontend examples using existing artifact streams."
+      ],
+      "acceptance_tests": [
+        "Dependency cycles, impossible dates, unknown evidence and cross-owner item IDs are rejected.",
+        "Inferred promises remain unconfirmed until explicit selection; plan text cannot itself authorize external actions.",
+        "Concurrent plan edits/acceptance cannot confirm a superseded item version.",
+        "Linked draft contains only selected commitments and valid evidence; unselected inferred deadline is not stated as fact.",
+        "Restart/replay preserves accepted item identity and does not create duplicate commitments."
+      ],
+      "external_gate": "AI/backend jointly evaluate deadline/owner extraction and frontend plan-selection semantics before release.",
+      "handoff": "plan_schedule category supports real action planning independent of Calendar.",
+      "checkpoint": "checkpoints/B11.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B12",
+      "title": "Add Calendar preferences, capabilities and freebusy reads",
+      "status": "planned",
+      "work_packages": [
+        "T03",
+        "T15"
+      ],
+      "depends_on": [
+        "B01"
+      ],
+      "design_sections": [
+        "D6"
+      ],
+      "read_existing": [
+        "backend/app/auth/service.py",
+        "backend/app/db/models.py",
+        "backend/app/config.py",
+        "backend/app/api/routes/assistant.py"
+      ],
+      "proposed_paths": [
+        "backend/app/calendar/client.py",
+        "backend/app/calendar/preferences.py",
+        "backend/app/api/routes/calendar.py"
+      ],
+      "objective": "Expose authorized calendar selection and versioned user preferences with trustworthy busy/unknown results.",
+      "implementation": [
+        "Add owned calendar preferences: IANA zone, selected calendar IDs, working periods, buffers, notice/default duration and policy/version. Validate ranges and expected_version.",
+        "Implement calendar connection/list endpoints and paginated REST client with httpx transports and granted capability checks. Validate selectable calendars/ACLs; freebusy access and event-write access differ.",
+        "Implement bounded freebusy query for authorized calendar set/time window, normalized aware instants and per-calendar errors/omissions as unknown.",
+        "No DB transaction spans Google reads; recheck preference/capability version before persisting evidence. Store minimal source/check time and expiry metadata.",
+        "Choose explicit maximum horizon, calendar count and interval count with tests/config docs. Do not expose arbitrary URLs or calendar IDs from model output."
+      ],
+      "acceptance_tests": [
+        "Partial scope, revoked grant, non-writable calendar, unknown calendar and other-owner preference IDs fail appropriately.",
+        "Concurrent preference updates conflict instead of silently overwriting timezone/calendar choices.",
+        "Freebusy response with per-calendar error or missing entry returns unknown even if other calendars are empty.",
+        "Malformed naive times, reversed ranges, excessive horizon/calendar count and pagination cycles are rejected.",
+        "Provider latency does not hold DB locks; changed preferences during fetch invalidate evidence."
+      ],
+      "external_gate": "Google Calendar consent/list/freebusy needs authorized test-account smoke checks; fixtures alone do not prove ACL access.",
+      "handoff": "B13 receives normalized busy intervals and explicit coverage/preferences, never a guessed free flag.",
+      "checkpoint": "checkpoints/B12.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B13",
+      "title": "Implement the deterministic timezone and slot engine",
+      "status": "planned",
+      "work_packages": [
+        "T15"
+      ],
+      "depends_on": [
+        "B12"
+      ],
+      "design_sections": [
+        "D6"
+      ],
+      "read_existing": [
+        "backend/app/schemas/assistant.py",
+        "docs/implementation-playbook/examples/slots.json",
+        "backend/tests/conftest.py"
+      ],
+      "proposed_paths": [
+        "backend/app/calendar/availability.py",
+        "backend/app/calendar/time_resolution.py"
+      ],
+      "objective": "Compute real available slots from bounded busy data and confirmed temporal assumptions without model arithmetic.",
+      "implementation": [
+        "Implement pure interval functions with UTC normalization and IANA display zone: merge/clip busy periods, apply buffers, generate working windows, enforce duration/notice and choose up to three deterministic candidates.",
+        "Resolve request-relative date anchor from persisted request/message time with explicit origin; never datetime.now at retry. Treat ambiguous AM/PM, zone or duration as missing input unless a confirmed displayed preference applies.",
+        "Handle DST gaps/folds and cross-midnight working windows explicitly. Persist option IDs, preference/source versions, checked_at, expiry and assumptions.",
+        "Return zero/fewer than requested slots honestly; unknown calendar coverage prevents a confident availability claim.",
+        "Add a bounded read endpoint/handler used by scheduling; no event reservation or write occurs."
+      ],
+      "acceptance_tests": [
+        "Independent interval fixtures cover overlap/nesting/adjacency, all-day busy, buffers, weekends, notice and fewer-than-three slots.",
+        "Australia/Melbourne DST gap/fold, UTC conversion and participant zones produce correct instants or clarification.",
+        "Delayed task/retry resolves tomorrow using original anchor; 4 without AM/PM does not silently become 16:00.",
+        "Changing calendar/preference version or expired evidence invalidates stored slot offers.",
+        "No overlap between any proposed slot and expanded busy intervals; metamorphic tests show adding busy time cannot add availability."
+      ],
+      "external_gate": "Team confirms proposed policy defaults; live freebusy comparison validates the adapter/engine seam.",
+      "handoff": "B14 consumes stable verified slot IDs/labels; AI may write prose but cannot generate alternative times.",
+      "checkpoint": "checkpoints/B13.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B14",
+      "title": "Add scheduling offers and meeting negotiation state",
+      "status": "planned",
+      "work_packages": [
+        "T06",
+        "T11",
+        "T16"
+      ],
+      "depends_on": [
+        "B10",
+        "B13"
+      ],
+      "design_sections": [
+        "D5",
+        "D6"
+      ],
+      "read_existing": [
+        "backend/app/assistant/routing.py",
+        "backend/app/assistant/drafting.py",
+        "backend/app/db/models.py",
+        "docs/implementation-playbook/examples/slots.json"
+      ],
+      "proposed_paths": [
+        "backend/app/calendar/negotiations.py",
+        "backend/app/assistant/scheduling.py"
+      ],
+      "objective": "Handle availability questions and slot-offer replies across user clarification and subsequent email responses.",
+      "implementation": [
+        "Add negotiation identity linked to owner/thread, offer revision, selected slot, related task IDs and optional created event. This outlives a single generation task.",
+        "Extract scheduling constraints to strict proposals, validate/clarify temporal fields through B08 and run B13. Persist assumptions and unknown invitee availability.",
+        "Create schedule_options or availability answer artifacts, then optional draft using stored slot labels/IDs only. Entire availability\u2192draft plan must be installed.",
+        "Bind selected offered option to exact negotiation/offer/source version; a later email selection is a proposal requiring user confirmation, not approval to book.",
+        "Offer expiry/new replies/preference changes invalidate affected choices and require recheck; sending a slot offer still uses B03\u2013B06."
+      ],
+      "acceptance_tests": [
+        "Original examples tomorrow at 4 and three meeting slots exercise clarification, fewer slots, unknown calendar and generated reply.",
+        "Model attempts to invent slot IDs/times or assert other attendee availability are rejected.",
+        "Selection from an expired/superseded/cross-owner offer cannot create an event action.",
+        "Concurrent new email/selection/edit preserves negotiation versions and does not silently choose a different slot.",
+        "Sending an offer and receiving an email yes never creates an approved invite automatically."
+      ],
+      "external_gate": "AI scheduling extraction/reply wording needs labelled live evaluation; Google/model fixtures must be distinguishable.",
+      "handoff": "B15 receives a current explicit selected-slot proposal; frontend can explain assumptions and show exact options.",
+      "checkpoint": "checkpoints/B14.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B15",
+      "title": "Create approved Calendar events and reconcile outcomes",
+      "status": "planned",
+      "work_packages": [
+        "T12",
+        "T16"
+      ],
+      "depends_on": [
+        "B06",
+        "B14"
+      ],
+      "design_sections": [
+        "D2",
+        "D3",
+        "D6"
+      ],
+      "read_existing": [
+        "backend/app/db/models.py",
+        "backend/app/auth/service.py",
+        "docs/implementation-playbook/schemas/action-approval.schema.json"
+      ],
+      "proposed_paths": [
+        "backend/app/actions/calendar_executor.py"
+      ],
+      "objective": "Book the explicitly approved selected slot with separate event authorization and safe recovery.",
+      "implementation": [
+        "Add create_event payload/preview and capability checks using common action lifecycle. Freeze destination calendar, stable event ID, fields/attendees/timezone, notification policy and slot source versions.",
+        "Recheck freebusy/ACL/account/preferences immediately before dispatch outside locks, then fence versions under ordered locks. Conflict produces new options/approval, never substituted time.",
+        "Call events.insert only from approved action worker. Persist action marker/event ID and result; timeout becomes unknown and reconciles with events.get plus field/marker comparison.",
+        "Handle ID collision/different event, lost scope, partial combined send+event outcomes and cancellation-after-dispatch without compensating deletes.",
+        "Keep writes default off until live Calendar gate; support only single event creation initially, no recurrence/reschedule/cancel."
+      ],
+      "acceptance_tests": [
+        "Busy-after-approval race prevents dispatch when observed; user-visible docs acknowledge non-atomic external freebusy/insert boundary.",
+        "Email approval cannot authorize Calendar action; attendee, calendar, time or notification change needs new hash/approval.",
+        "Accepted insert with lost response reconciles to one matching event; wrong marker/fields at same ID is conflict.",
+        "Duplicate clicks/workers, expired lease, deleted account and late response do not duplicate creation.",
+        "Controlled account event creation verifies ID, timezone, notification behavior and UI outcome before enabling pilot flag."
+      ],
+      "external_gate": "Explicit authorization required for test invites and notifications; documented single-event gate before public enablement.",
+      "handoff": "Initial scheduling write lifecycle ready for B18/B20; advanced mutations remain B25.",
+      "checkpoint": "checkpoints/B15.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B16",
+      "title": "Create the versioned native/Flow operation registry",
+      "status": "planned",
+      "work_packages": [
+        "T03",
+        "T04",
+        "T07"
+      ],
+      "depends_on": [
+        "B00"
+      ],
+      "design_sections": [
+        "D1",
+        "D7"
+      ],
+      "read_existing": [
+        "backend/app/assistant/routing.py",
+        "backend/app/assistant/routing_v1.py",
+        "backend/app/assistant/worker.py",
+        "backend/app/model_client/bedrock.py",
+        "backend/app/config.py",
+        "docs/implementation-playbook/examples/release-manifest.example.json"
+      ],
+      "proposed_paths": [
+        "backend/app/workflows/registry.py",
+        "infra/bedrock/"
+      ],
+      "objective": "Pin implementation, schemas, prompts, tools and budgets for each operation without breaking existing queued work.",
+      "implementation": [
+        "Define strict registry manifest mapping operation to native handler or published flow release identity and input/output schemas, tool grants, budgets and model/prompt/validator fingerprints.",
+        "Keep native current summary/reply/compose and all historical queued releases runnable; new tasks pin the selected manifest, retries retain it.",
+        "Validate enabled entries at startup/readiness and capabilities; unknown operation, missing release, mutable-only draft or malformed identifiers fail closed.",
+        "Add env/config samples and reproducible promotion/rollback interface with placeholders clearly labelled; no guessed AWS account/model/alias IDs.",
+        "Prepare summary flow definition source and fixtures but do not mark it deployed until B17 actual invocation succeeds."
+      ],
+      "acceptance_tests": [
+        "Old summary/contextual 1.0/1.1 queued fixtures preserve exact prior prompts and binding behavior.",
+        "Changing enabled manifest routes only new tasks; retry after alias/config movement does not silently change release.",
+        "Unknown operation/schema/tool, budget overflow and missing resource configuration are rejected deterministically.",
+        "Native registry execution passes existing outputs and provenance tests without extra model calls.",
+        "Malformed registry/unsupported region-model configuration yields explicit unavailable readiness rather than fallback to another provider."
+      ],
+      "external_gate": "Release owner supplies actual Sydney/account role/model availability; no console or deployment action in fixture-only implementation.",
+      "handoff": "B17 consumes versioned registry and source assets; AI can review exact flow/prompt definitions.",
+      "checkpoint": "checkpoints/B16.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B17",
+      "title": "Invoke Bedrock Flows through an authorized read bridge",
+      "status": "planned",
+      "work_packages": [
+        "T03",
+        "T07",
+        "T08",
+        "T11",
+        "T13",
+        "T14",
+        "T16"
+      ],
+      "depends_on": [
+        "B10",
+        "B16"
+      ],
+      "design_sections": [
+        "D1",
+        "D7"
+      ],
+      "read_existing": [
+        "backend/app/model_client/bedrock.py",
+        "backend/app/model_client/providers.py",
+        "backend/app/assistant/worker.py",
+        "backend/app/pii/masking.py",
+        "docs/implementation-playbook/tool-catalog.json"
+      ],
+      "proposed_paths": [
+        "backend/app/workflows/bedrock_flows.py",
+        "backend/app/workflows/read_bridge.py",
+        "infra/bedrock/flows/"
+      ],
+      "objective": "Run exported visual per-intent pipelines with bounded read tools and backend-owned validation/state.",
+      "implementation": [
+        "Implement InvokeFlow adapter with lazy SDK, bounded off-event-loop blocking work, stream size/time limits, validated outputs and saved execution/node provenance.",
+        "Map output/completion/error/input-required events to typed application results; missing completion, duplicate terminal data or stream truncation cannot publish success. Persist human waits in Threadly.",
+        "Implement service-authenticated read grants bound to owner/run/context/tool/expiry/nonce. No token pass-through or arbitrary URLs; apply existing cloud masking/privacy policy to new paths.",
+        "Export and version summary then reply/compose/other/plan/schedule graphs, prompt assets, Lambda read/validator configs and least-privilege role templates. Never add send/create_event nodes.",
+        "Replay identical native/flow contract fixtures; preserve old queued releases and provide rollback to prior pinned resources. Promote only after authorized AWS smoke tests."
+      ],
+      "acceptance_tests": [
+        "Mock streams cover output then failure, missing completion, multiple outputs, timeout, throttling, access denied and user-input-required.",
+        "Cross-owner/run/context, expired/replayed grants and unauthorized operation names cannot read source data.",
+        "Adversarial source/model text cannot invoke writes or change tool host/IDs; trace/log captures exclude credentials/mail bodies.",
+        "Native and flow paths satisfy the same artifact/evidence schemas and cancellation/lease fencing.",
+        "Actual exported flow invoked with configured deployment role produces a valid summary and subsequent per-intent fixtures before enabling each entry."
+      ],
+      "external_gate": "AWS IDs/IAM/network and billed live invocation require authorized environment access. Assets/fakes may be complete while live promotion remains pending.",
+      "handoff": "B18 evaluates deployed flow versions; screenshots alone are insufficient release evidence.",
+      "checkpoint": "checkpoints/B17.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B18",
+      "title": "Run all-intent UI, model-quality and recovery gates",
+      "status": "planned",
+      "work_packages": [
+        "T08",
+        "T09",
+        "T11",
+        "T13",
+        "T14",
+        "T16",
+        "T17",
+        "T18"
+      ],
+      "depends_on": [
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10",
+        "B11",
+        "B14",
+        "B15",
+        "B17"
+      ],
+      "design_sections": [
+        "D1",
+        "D8"
+      ],
+      "read_existing": [
+        "docs/implementation-playbook/routing-fixtures.json",
+        "docs/implementation-playbook/08-quality-and-operations.md",
+        "frontend/README.md",
+        "backend/tests/conftest.py"
+      ],
+      "proposed_paths": [
+        "ml/evals/",
+        "docs/integration/"
+      ],
+      "objective": "Establish reproducible end-to-end and language-quality evidence for the actual product, not just mocked control flow.",
+      "implementation": [
+        "Locate frontend source and integrate shared request/context/question/editor/action APIs with generated types/examples. Preserve finite event replay and continue following edits after generation completes.",
+        "Build labelled evaluation sets across five intents and compound/ambiguous/adversarial/partial-context cases. Separate train/dev/holdout examples and pin dataset/prompt/model/flow versions.",
+        "Measure routing/clarification correctness, evidence grounding, temporal extraction, missing facts, unsafe actions and outcome honesty; agree thresholds before evaluating the release.",
+        "Run browser UI scenarios for original examples, edit/review/send, stale conflict, cancellation, reconnect and outcome_unknown. Copy/Insert/Save/Send must display distinct states.",
+        "Add crash/recovery and deployment-role integration tests; summarize failures, exclusions, latency/cost and raw redacted evidence. Fix failures before claiming initial all-intent completion."
+      ],
+      "acceptance_tests": [
+        "All original user examples pass on actual frontend/backend with controlled data; third-message answer stays bound after navigation.",
+        "Browser close/reconnect during generation/approval/send resumes accurate state without duplicate requests/actions.",
+        "Failure injection spans OAuth revocation, model failure, Google timeout, expired lease and migration compatibility.",
+        "Held-out model quality is reported with denominators, per-intent results, ambiguity cases and manual review; synthetic tests are not counted as live accuracy.",
+        "No unsupported route is presented as successful; review and send controls bind the displayed exact revision/recipients."
+      ],
+      "external_gate": "Live models, AWS/Google accounts, frontend checkout and explicit test-write authorization required. Record hard blockers rather than fabricate passing metrics.",
+      "handoff": "Release owner receives measured gate report and exact release manifest for staged pilot.",
+      "checkpoint": "checkpoints/B18.md",
+      "owner": "Release owner with Backend/AI/Frontend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B19",
+      "title": "Add operational controls, retention and background reliability",
+      "status": "planned",
+      "work_packages": [
+        "T02",
+        "T03",
+        "T05",
+        "T19"
+      ],
+      "depends_on": [
+        "B00",
+        "B06",
+        "B15",
+        "B17"
+      ],
+      "design_sections": [
+        "D3",
+        "D8"
+      ],
+      "read_existing": [
+        "backend/app/config.py",
+        "backend/app/api/routes/health.py",
+        "backend/app/db/models.py",
+        "backend/app/sync/worker.py",
+        "docker-compose.yml",
+        "infra/deploy/README.md",
+        ".github/workflows/backend-ci.yml"
+      ],
+      "proposed_paths": [
+        "backend/app/operations/",
+        "docs/operations/"
+      ],
+      "objective": "Make the service observable, recoverable and privacy-aware before pilot activation.",
+      "implementation": [
+        "Add redacted structured metrics/events for queue age, lease recovery, routing errors, upstream failures, action unknown backlog, scope failures and budgets; correlation IDs must not contain mail text.",
+        "Implement feature flags/kill switches per intent and write type, configurable limits, readiness dependencies and worker health. Disabling writes prevents new dispatch but allows reconciliation reads.",
+        "Define and implement approved retention/deletion lifecycle for snapshots/artifacts/actions/tokens/vectors, preserving minimum unknown-attempt recovery state only under explicit policy.",
+        "Move large-mailbox sync to bounded durable background work with pagination/checkpoints/backpressure; keep sync-version fencing and deletions consistent.",
+        "Update deployment docs for actual Bedrock mode, separate API/generation/action workers, migrations/backups/restore/rollback and concurrency sizing. Add CI coverage for new schemas/assets/config as needed."
+      ],
+      "acceptance_tests": [
+        "Synthetic private mail/token content never appears in logs/events/metrics; observability failures cannot corrupt action state.",
+        "Kill switch during queued and dispatched work stops only eligible new writes and preserves unknown outcome evidence.",
+        "Retention skips active dependencies, deletes expired owner data correctly and cannot cascade away unresolved attempts contrary to policy.",
+        "Interrupted large-mailbox sync resumes without losing cursor/order or overwriting newer sync; memory/concurrency limits are exercised.",
+        "Backup/restore and migration rehearsal on disposable data demonstrate preserved tasks/actions and safe recovery without duplicate writes."
+      ],
+      "external_gate": "Retention defaults, operational owner, alert thresholds and deployment sizing require documented release-owner decisions; no live cleanup/deployment authorization implied.",
+      "handoff": "Operational gate must be integrated and rerun against final B18 release, even if scaffolding starts early.",
+      "checkpoint": "checkpoints/B19.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B20",
+      "title": "Run staged pilot and close original initial-release packages",
+      "status": "planned",
+      "work_packages": [
+        "T01",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19"
+      ],
+      "depends_on": [
+        "B18",
+        "B19"
+      ],
+      "design_sections": [
+        "D8"
+      ],
+      "read_existing": [
+        "docs/implementation-playbook/backlog.json",
+        "docs/implementation-playbook/13-implementation-progress.md",
+        "infra/deploy/README.md",
+        "docs/backend-remaining-work.md"
+      ],
+      "proposed_paths": [
+        "docs/pilot-release.md"
+      ],
+      "objective": "Promote only a measured, recoverable all-intent release and record what is actually enabled.",
+      "implementation": [
+        "Audit each original T-package acceptance item against code/tests/live evidence. Close only proven criteria; do not mark all complete because every B card has a PR.",
+        "Record release commits, migration head, native/Flow manifests, IAM/scopes/config, account cohort and operational owner. Verify backups and rollback/migration ordering.",
+        "With explicit deployment authorization, promote read-only all-intent pilot first, then Gmail sends, then Calendar creation through independent flags/gates.",
+        "Measure pilot failures/latency/cost and user-visible outcomes; exercise kill switch and rollback without deleting action history.",
+        "Publish handoff/runbooks, known limitations and next optional capabilities. Resolve remaining alias/contact/legacy-interface claims to match actual support."
+      ],
+      "acceptance_tests": [
+        "Fresh deployment from documented artifacts works; upgrade from representative previous data preserves drafts/reviews/actions.",
+        "Real pilot role has only necessary permissions; missing scope/model/resource produces honest capability status.",
+        "End-to-end approval and unknown-write recovery verified before each write flag; rollback does not resend unresolved actions.",
+        "All T acceptance criteria have linked evidence or explicit pending entries; no false overall completion percentage.",
+        "Release metrics/alerts and designated incident owner respond to an injected failure."
+      ],
+      "external_gate": "Deployment, cloud spend, real messages/invites and rollout require explicit user/team authorization; a prepared release is reviewable before approval.",
+      "handoff": "Initial release evidence available. Only then enable optional proactive/voice/style/attachments/advanced scheduling packages.",
+      "checkpoint": "checkpoints/B20.md",
+      "owner": "Release owner with Backend/AI/Frontend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B21",
+      "title": "Add opt-in proactive suggestions and follow-up triggers",
+      "status": "planned",
+      "work_packages": [
+        "T20"
+      ],
+      "depends_on": [
+        "B20"
+      ],
+      "design_sections": [
+        "D1",
+        "D8"
+      ],
+      "read_existing": [
+        "backend/app/sync/worker.py",
+        "backend/app/assistant/tasks.py",
+        "backend/app/config.py",
+        "docs/implementation-playbook/01-product.md"
+      ],
+      "proposed_paths": [
+        "backend/app/proactive/"
+      ],
+      "objective": "Create useful suggestions from incoming events without silently initiating external actions.",
+      "implementation": [
+        "Persist per-user consent, scope, quiet hours, cooldown/budget, dismiss/snooze feedback and version.",
+        "Implement authenticated Gmail push/watch renewal or approved polling with history cursor recovery, message/event dedupe and owned task linkage.",
+        "Run bounded suggestion eligibility/classification after sync; untrusted email cannot request broader tools or approve actions.",
+        "Persist suggestions as separate reviewable artifacts and user-triggered continuation; support stop/revoke and replay suppression."
+      ],
+      "acceptance_tests": [
+        "Duplicate/out-of-order events, expired watch/history cursor and process restart create at most one eligible suggestion per event policy.",
+        "Opt-out/revocation/quiet hours/budget prevent generation and notification; consent changes fence queued work.",
+        "Prompt-injection email cannot send, book, change recipients or schedule its own follow-up.",
+        "Dismiss/snooze survives restart; no unchanged repetitive notifications."
+      ],
+      "external_gate": "Authorized Google event configuration and opt-in user testing; do not activate notifications merely by deploying code.",
+      "handoff": "Proactive behavior independently measured without weakening explicit approval lifecycle.",
+      "checkpoint": "checkpoints/B21.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Product/Frontend"
+      ]
+    },
+    {
+      "id": "B22",
+      "title": "Add consented sent-mail style personalization",
+      "status": "planned",
+      "work_packages": [
+        "T21"
+      ],
+      "depends_on": [
+        "B20"
+      ],
+      "design_sections": [
+        "D8"
+      ],
+      "read_existing": [
+        "backend/app/rag/service.py",
+        "backend/app/pii/masking.py",
+        "backend/app/assistant/drafting.py",
+        "backend/app/model_client/client.py"
+      ],
+      "proposed_paths": [
+        "backend/app/rag/style.py"
+      ],
+      "objective": "Use user-consented style examples without importing facts, recipients or private material across users.",
+      "implementation": [
+        "Add opt-in indexing/deletion/versioning for sent mail with bounded retrieval and per-owner collections/access checks.",
+        "Supply style-only examples to draft generation separately from factual evidence; examples cannot supply commitments, names or recipients.",
+        "Gracefully fall back to unpersonalized draft generation when vector store is unavailable; record provenance and explicit limits.",
+        "Version prompt/evaluation data and run style-versus-factual-contamination eval before enabling."
+      ],
+      "acceptance_tests": [
+        "Cross-user collection/query/cache access impossible; user deletion clears index data.",
+        "Retrieved email with facts or malicious tool instructions cannot introduce recipients/commitments into a new draft.",
+        "Chroma outage leaves core drafting functional without silent third-party egress.",
+        "Measured writing style improves against agreed cases without factual regression."
+      ],
+      "external_gate": "User consent and live evaluation required; do not ingest a mailbox automatically.",
+      "handoff": "Optional personalization flag and deletion runbook; core draft behavior retained.",
+      "checkpoint": "checkpoints/B22.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI"
+      ]
+    },
+    {
+      "id": "B23",
+      "title": "Add voice through the same task and approval contracts",
+      "status": "planned",
+      "work_packages": [
+        "T22"
+      ],
+      "depends_on": [
+        "B20"
+      ],
+      "design_sections": [
+        "D1",
+        "D8"
+      ],
+      "read_existing": [
+        "backend/app/voice/proxy.py",
+        "backend/app/api/routes/voice.py",
+        "backend/app/pii/masking.py",
+        "backend/app/schemas/assistant.py"
+      ],
+      "proposed_paths": [
+        "backend/app/voice/transcription.py"
+      ],
+      "objective": "Offer voice input/output while keeping ambiguous transcription and writes under the same explicit controls.",
+      "implementation": [
+        "Implement bounded STT/TTS proxy with declared provider/config, file limits, consent/privacy and sanitized error handling.",
+        "Bind transcription as user input to task/context with uncertainty markers; names/addresses/dates with low confidence require confirmation.",
+        "Route typed and voice intent through the same API/worker; no transcript phrase bypasses Send/event approval.",
+        "Add optional playback controls and retention policy without logging raw sensitive audio/transcripts."
+      ],
+      "acceptance_tests": [
+        "Mistranscribed recipient/date forces confirmation; no automatic recipient guessing.",
+        "Equivalent typed/voice instructions yield equivalent bounded routes and source bindings.",
+        "Upload limits, unsupported media, upstream timeout and cancellation behave honestly.",
+        "Audio/text consent and deletion are honored; voice cannot approve unseen exact payloads."
+      ],
+      "external_gate": "Authorized voice provider/keys and UI integration plus live transcription evaluation.",
+      "handoff": "Optional accessibility modality; no separate agent/executor authority.",
+      "checkpoint": "checkpoints/B23.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "AI",
+        "Frontend"
+      ]
+    },
+    {
+      "id": "B24",
+      "title": "Add attachment-aware understanding and approved sending",
+      "status": "planned",
+      "work_packages": [
+        "T23"
+      ],
+      "depends_on": [
+        "B20"
+      ],
+      "design_sections": [
+        "D2",
+        "D4",
+        "D8"
+      ],
+      "read_existing": [
+        "backend/app/assistant/drafting.py",
+        "backend/app/assistant/draft_review.py",
+        "backend/app/schemas/draft_review.py",
+        "backend/app/db/models.py"
+      ],
+      "proposed_paths": [
+        "backend/app/attachments/"
+      ],
+      "objective": "Bind real validated files to evidence and exact send approval rather than trusting attachment claims in text.",
+      "implementation": [
+        "Add owned uploads/file references with type/size allowlist, safe extraction, malware/content policy and bounded storage/retention.",
+        "Bind attachment IDs/hashes/MIME/filenames into artifact revisions and outgoing MIME/action payload; add/remove/replace always requires new approval.",
+        "Distinguish unreadable/unsupported/extraction-partial attachments from complete evidence; model text cannot invent file refs.",
+        "Update UI preview, MIME builder, reconciliation comparison and all relevant release/evaluation fixtures."
+      ],
+      "acceptance_tests": [
+        "Unsupported/oversized/malicious files, path traversal names and cross-owner refs rejected.",
+        "Replacing same filename with different bytes changes payload/hash and invalidates approval.",
+        "Body saying attached with no actual approved file is blocked or explicitly corrected.",
+        "Extraction failure preserves partial coverage; no hidden external network fetch from document content.",
+        "Provider send/reconciliation with controlled attachments matches approved identities before enabling."
+      ],
+      "external_gate": "Attachment content policy, storage/security review and controlled sends require explicit integration authorization.",
+      "handoff": "Attachment support is a separately gated extension, not assumed by earlier plain-text sender.",
+      "checkpoint": "checkpoints/B24.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    },
+    {
+      "id": "B25",
+      "title": "Add event changes, recurrence and richer meeting resources",
+      "status": "planned",
+      "work_packages": [
+        "T24"
+      ],
+      "depends_on": [
+        "B20"
+      ],
+      "design_sections": [
+        "D2",
+        "D3",
+        "D6"
+      ],
+      "read_existing": [
+        "backend/app/db/models.py",
+        "docs/implementation-playbook/04-workflows.md"
+      ],
+      "proposed_paths": [
+        "backend/app/calendar/changes.py"
+      ],
+      "objective": "Extend scheduling beyond single-event creation with explicit existing-event identity and mutation scope.",
+      "implementation": [
+        "Define distinct reschedule/cancel/update action types with event/organizer/ACL checks and current etag/source version.",
+        "Make single occurrence versus full recurring series explicit; include attendees/resources/conference and notification policy in preview.",
+        "Use provider concurrency preconditions and action-specific reconciliation; compensation such as canceling an event requires a new approved action.",
+        "Preserve independent action results and create new approval whenever time/resource/recipient/notification scope changes."
+      ],
+      "acceptance_tests": [
+        "Unauthorized organizer/calendar, stale event version and wrong recurring instance are rejected.",
+        "Single-instance request cannot mutate full series; notification policy changes are visible and require approval.",
+        "Timeout after patch/delete is reconciled without applying a second unintended mutation.",
+        "Resource conflict or unavailable conference creation is explicit; no silent substitution of time/room.",
+        "Controlled-account scenarios establish actual notification and recurrence behavior."
+      ],
+      "external_gate": "Live calendar mutation tests require explicit user authorization and carefully isolated accounts/events.",
+      "handoff": "Advanced scheduling may be enabled independently after new action-specific recovery evidence.",
+      "checkpoint": "checkpoints/B25.md",
+      "owner": "Backend",
+      "reviewers": [
+        "Backend",
+        "Security/release owner"
+      ]
+    }
+  ]
+}

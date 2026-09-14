@@ -5,6 +5,11 @@ Read `docs/implementation-playbook/README.md` for the target architecture and
 work package. Tasks and dependencies are in
 `docs/implementation-playbook/backlog.json`.
 
+For the next backend implementation slices, use
+`docs/backend-execution/START-HERE.md` and the selected B-task card. That handoff
+maps remaining T work into bounded PRs with source references, acceptance tests
+and checkpoints. Treat its proposed routes/tables as plans until implemented.
+
 The product targets individual professionals and small teams. User intents are
 summarise, plan/schedule, reply, compose and bounded other assistance. The requested
 direction is Bedrock with visual Flows and backend-owned context, approvals and

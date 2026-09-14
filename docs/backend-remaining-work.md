@@ -1,5 +1,10 @@
 # Remaining backend work after draft revisions/review
 
+Execution update, 14 September 2026: PR #9 is now merged. Use the
+[coding-agent handoff](backend-execution/README.md) and its
+[task index](backend-execution/INDEX.md) for the next implementation slices.
+The checkpoint below describes the preceding implementation branch.
+
 13 September 2026. This is a source-code and automated-test checkpoint, not a
 production deployment report. PR #8 is merged; the revision/review slice is on
 `codex/draft-revisions-review`. Refer to the [implementation evidence](implementation-playbook/13-implementation-progress.md)
