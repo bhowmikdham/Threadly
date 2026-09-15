@@ -201,6 +201,11 @@ class FlowInvoker:
                 "ThrottlingException",
                 "InternalServerException",
                 "ServiceQuotaExceededException",
+            } or type(exc).__name__ in {
+                "EndpointConnectionError",
+                "ConnectTimeoutError",
+                "ReadTimeoutError",
+                "ConnectionClosedError",
             }
             raise FlowError(
                 "workflow_upstream_unavailable" if retryable else "workflow_upstream_rejected",

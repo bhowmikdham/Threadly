@@ -7,7 +7,7 @@ import threading
 from datetime import UTC, datetime
 
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ReadTimeoutError
 from botocore.session import Session
 from botocore.validate import validate_parameters
 from pydantic import ValidationError
@@ -460,3 +460,12 @@ async def test_replay_harness_uses_runtime_schemas_and_records_no_false_live_res
     assert report["passed"] == report["total"] == replay.calls == 3
     assert not report["production_approved"]
     assert report["language_quality_review"] == "pending"
+
+
+async def test_sdk_read_timeout_is_retryable_and_sanitized():
+    sdk = FakeSdk([output(), ReadTimeoutError(endpoint_url="https://SECRET.invalid")])
+    with pytest.raises(FlowError) as error:
+        await sdk.invoker().invoke(registry.FlowEntry.model_validate(TARGET), "synthetic")
+    assert error.value.retryable and error.value.code == "workflow_upstream_unavailable"
+    assert "SECRET" not in str(error.value)
+    assert sdk.stream.closed
