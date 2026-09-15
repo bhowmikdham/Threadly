@@ -191,3 +191,14 @@ Migration `a6417c29d805` adds nullable `assistant_tasks.read_input` and guards r
 with retained read tasks. No external writes or mailbox-wide search are enabled.
 Source ownership/freshness is checked before execution, publication and artifact
 retrieval. See [request examples, lifecycle, limits and remaining B09 work](assistant-bounded-reads.md).
+
+
+## Scoped local-mail search (B09b)
+
+`POST /assistant/mail-search` adds explicit owner/date/folder search over synced
+cleaned bodies, with bounded exact excerpts and signed pagination tied to the
+mailbox sync version. It is a native read endpoint, not a task, model or Gmail
+invocation. `GET /assistant/workflows` advertises this capability separately.
+Migration `b7180d3f9e62` adds the owner/effective-date/row-ID search index, preserving
+all data and prior task contracts. [Frontend contract, concurrency, coverage and
+rollout](assistant-mail-search.md) describes the remaining extraction/planning gates.

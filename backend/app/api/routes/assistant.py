@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import continuation, draft_review, reads, tasks
+from app.assistant import continuation, draft_review, mail_search, reads, tasks
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -26,11 +26,19 @@ from app.schemas.assistant import (
 )
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
+from app.schemas.mail_search import MailSearchRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
 
 router = APIRouter()
 DB = Annotated[AsyncSession, Depends(get_session)]
+
+
+@router.post("/mail-search")
+async def search_mail(request: MailSearchRequest, user_id: CurrentUser, session: DB):
+    result = await mail_search.search(session, user_id, request)
+    await session.commit()  # Release the sync fence and transaction-local timeouts.
+    return result
 
 
 @router.get("/workflows")
@@ -45,6 +53,14 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
                 "external_actions": False,
             }
             for op in registry.OPERATIONS
+        },
+        "mail_search": {
+            "installed": True,
+            "scope": "explicit_local_mailbox_window",
+            "folders": ["all_synced", "INBOX", "SENT"],
+            "max_window_days": 366,
+            "page_size": mail_search.PAGE_SIZE,
+            "external_actions": False,
         },
         "read_actions": {
             "release": reads.RELEASE,

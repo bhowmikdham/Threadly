@@ -5,6 +5,10 @@ This is the first bounded B09 slice. B09/T09 remain **in progress**: mailbox-wid
 search/index coverage, entity/commitment extraction and corrections, natural-language
 read planning and general source-grounded answers are not installed here.
 
+The follow-up [scoped local mailbox-search endpoint](assistant-mail-search.md) now
+provides cross-thread retrieval with explicit folder/date bounds. The capture-read
+release described here retains its original behavior.
+
 ## What the frontend can use
 
 Use the existing authenticated `POST /assistant/requests`, task polling/events and

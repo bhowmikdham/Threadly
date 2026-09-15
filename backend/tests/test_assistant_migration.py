@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "a6417c29d805"
+HEAD = "b7180d3f9e62"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",

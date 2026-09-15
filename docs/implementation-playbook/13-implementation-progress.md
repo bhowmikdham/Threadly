@@ -322,3 +322,13 @@ checks, replayable fixtures and migration evidence are recorded in
 [B09 checkpoint](../backend-execution/checkpoints/B09.md). B09/T09 remain in progress:
 mailbox-wide retrieval, entity/commitment extraction/corrections and natural-language
 read planning still need implementation; live rewrite quality is unverified.
+
+
+### B09b — scoped local mailbox retrieval
+
+After merged PR #21 (`9b3b14e`), explicit owner/date/folder local search adds bounded
+source excerpts and sync-version pagination. See [the search contract](../assistant-mail-search.md)
+and [B09 checkpoint](../backend-execution/checkpoints/B09.md). B09/T09 remain in progress:
+entity/commitment provenance and corrections, natural-language read planning and
+compound integration still need implementation. No live mailbox completeness or
+deployment is implied.
