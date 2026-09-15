@@ -261,3 +261,13 @@ fixture hash and verified prompt/model/Flow identity; all structural/regression
 checks pass; human review finds no unsupported work/facts. Missing cases remain
 not run. A different prompt requires a complete new candidate run. Preparing a
 Flow is not release approval. No merge or report tool automatically deploys it.
+
+
+## B09a explicit read entry path
+
+[Bounded read actions](assistant-bounded-reads.md) add an explicit typed UI path
+through the same durable task/worker system for help, saved-capture literal search
+and rewriting one selected message. `read_options` pins one operation; a model
+label alone does not activate retrieval. Existing natural-language routing and
+unavailable compound behavior remain unchanged. B09's broader retrieval work is
+still in progress before the complete multi-intent read/plan pipeline can be claimed.

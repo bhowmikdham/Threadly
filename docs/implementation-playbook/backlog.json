@@ -356,7 +356,7 @@
     {
       "id": "T09",
       "title": "Evidence retrieval and bounded Other handlers",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -393,7 +393,9 @@
       ],
       "handoff": "Reply, Compose and Plan can use grounded facts and commitments.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "docs/assistant-bounded-reads.md"
+      ]
     },
     {
       "id": "T10",

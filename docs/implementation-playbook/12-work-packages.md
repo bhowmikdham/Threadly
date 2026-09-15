@@ -239,7 +239,7 @@ Frontend receives first fully functioning read-only result.
 
 ## T09 · Evidence retrieval and bounded Other handlers
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T02, T04, T05
 

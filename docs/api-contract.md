@@ -388,3 +388,14 @@ request-key uniqueness and bounded versions guard acceptance. Effective source
 deletion cascades the dependent task just like its initial source. Questions and
 answers commit atomically with task/job changes; downgrade rejects remaining new
 state. This adds no Calendar handler, compound executor or approval to send.
+
+
+## Bounded read actions (B09a)
+
+Explicit `AssistantRequest.read_options` adds native help, literal saved-capture
+search and single-message rewriting through the existing durable task API. New
+read tasks pin `bounded-reads-task-1.0.0`; other task hashes/releases are preserved.
+Migration `a6417c29d805` adds nullable `assistant_tasks.read_input` and guards rollback
+with retained read tasks. No external writes or mailbox-wide search are enabled.
+Source ownership/freshness is checked before execution, publication and artifact
+retrieval. See [request examples, lifecycle, limits and remaining B09 work](assistant-bounded-reads.md).

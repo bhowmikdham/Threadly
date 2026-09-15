@@ -182,6 +182,7 @@ class AssistantTask(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     request_id: Mapped[str] = mapped_column(String(128))
     request_hash: Mapped[str] = mapped_column(String(64))
+    read_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     instruction: Mapped[str] = mapped_column(Text)
     context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
     intent_hint: Mapped[str | None] = mapped_column(String(16))

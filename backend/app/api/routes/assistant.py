@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import continuation, draft_review, tasks
+from app.assistant import continuation, draft_review, reads, tasks
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -45,6 +45,14 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
                 "external_actions": False,
             }
             for op in registry.OPERATIONS
+        },
+        "read_actions": {
+            "release": reads.RELEASE,
+            "operations": ["help", "search_mail", "transform_text"],
+            "requires_explicit_read_options": True,
+            "search_scope": "saved_capture",
+            "page_size": reads.PAGE_SIZE,
+            "external_actions": False,
         },
         "ui_context": {
             "capture_schema": "1.1",
@@ -93,6 +101,7 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
     return {
         "task_id": task.id,
         "instruction": task.instruction,
+        "read_options": task.read_input,
         "intent": (
             task.route["decision"]["intent"]
             if task.route
@@ -238,6 +247,20 @@ async def list_tasks(
 async def get_artifact(artifact_id: str, user_id: CurrentUser, session: DB):
     artifact = await draft_review.owned_artifact(session, user_id, artifact_id)
     task = await tasks.owned_task(session, user_id, artifact.task_id, lock=True)
+    if task.release.get("workflow") == reads.RELEASE:
+        snapshot = (
+            await session.scalar(
+                select(ContextSnapshot).where(
+                    ContextSnapshot.id == task.context_snapshot_id,
+                    ContextSnapshot.user_id == user_id,
+                )
+            )
+            if task.context_snapshot_id
+            else None
+        )
+        await reads.validate_source(
+            session, user_id, snapshot.payload if snapshot else None, task.read_input["operation"]
+        )
     return await draft_review.artifact_view(session, task, artifact)
 
 

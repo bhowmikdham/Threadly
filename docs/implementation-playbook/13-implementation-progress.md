@@ -311,3 +311,14 @@ Historical tasks retain their prior behavior. See [the runtime contract](../assi
 and [B08 checkpoint](../backend-execution/checkpoints/B08.md) for migration and tests.
 T05/T06/T17 remain in progress; compound execution and live frontend/provider
 integration are not completed by this continuation slice.
+
+
+### B09a — explicit saved-source assistance
+
+After PR #20 (`ba040b6`), the bounded-read branch implements native help, literal
+search within an owned capture and selected-message rewrite suggestions. Source
+checks, replayable fixtures and migration evidence are recorded in
+[the runtime contract](../assistant-bounded-reads.md) and
+[B09 checkpoint](../backend-execution/checkpoints/B09.md). B09/T09 remain in progress:
+mailbox-wide retrieval, entity/commitment extraction/corrections and natural-language
+read planning still need implementation; live rewrite quality is unverified.
