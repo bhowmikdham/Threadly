@@ -1,18 +1,23 @@
+// contents/hover-trigger.tsx
 import type { PlasmoCSConfig } from "plasmo"
 import { useEffect, useState } from "react"
+import { initGmailClassifier } from "../utils/gmail-classifier"
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"]
+  matches: ["https://mail.google.com/*"]
 }
 
-const FADE_START_PERCENT = 0.6 // starts fading in from here
-const FADE_END_PERCENT = 1.0   // fully solid at the edge
+const FADE_START_PERCENT = 0.6
+const FADE_END_PERCENT = 1.0
 
 const HoverTrigger = () => {
-  const [proximity, setProximity] = useState(0) // 0 = far away, 1 = at the edge
+  const [proximity, setProximity] = useState(0)
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
+    // Initialize classifier after UI mounts
+    initGmailClassifier()
+
     const handleMouseMove = (e: MouseEvent) => {
       const percentAcross = e.clientX / window.innerWidth
       const raw =
@@ -29,9 +34,8 @@ const HoverTrigger = () => {
     chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" })
   }
 
-  const visible = proximity > 0 || hovered
   const effectiveProximity = hovered ? 1 : proximity
-  const eased = Math.pow(effectiveProximity, 3) // slow start, fast finish near the edge
+  const eased = Math.pow(effectiveProximity, 3)
   const opacity = 0.15 + 0.85 * eased
   const translateXPercent = 75 - 55 * eased
   const scale = 0.4 + 0.6 * eased
@@ -52,12 +56,6 @@ const HoverTrigger = () => {
         cursor: "pointer"
       }}
     >
-      {/* 
-        Button updated:
-        - Width increased from 48px to 64px (wider)
-        - Height increased from 48px to 56px (longer)
-        - Padding & border-radius adjusted to preserve pill proportions
-      */}
       <button
         onClick={openChat}
         style={{

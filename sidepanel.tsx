@@ -756,7 +756,7 @@ ${evidenceBlock}`
 
             <input
               type="text"
-              placeholder={transcribing ? "Transcribing..." : "Type 'summarise' or ask a question..."}
+              placeholder={transcribing ? "Transcribing..." : "Ask anything..."}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={transcribing}
