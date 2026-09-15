@@ -163,12 +163,19 @@ class AssistantTask(TimestampMixin, Base):
             ondelete="CASCADE",
             name="fk_task_owned_context",
         ),
+        ForeignKeyConstraint(
+            ["effective_context_snapshot_id", "user_id"],
+            ["context_snapshots.id", "context_snapshots.user_id"],
+            ondelete="CASCADE",
+            name="fk_task_effective_context",
+        ),
         CheckConstraint(
             "state IN ('queued','running','succeeded','failed','cancelled',"
             "'needs_clarification','unsupported')",
             name="ck_task_state",
         ),
         CheckConstraint("version >= 1 AND latest_sequence >= 1", name="ck_task_versions"),
+        CheckConstraint("input_version >= 0 AND input_version <= 5", name="ck_task_input_version"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -185,6 +192,9 @@ class AssistantTask(TimestampMixin, Base):
     latest_sequence: Mapped[int] = mapped_column(default=1)
     release: Mapped[dict] = mapped_column(JSONB)
     error_code: Mapped[str | None] = mapped_column(String(64))
+    continuation_release: Mapped[dict | None] = mapped_column(JSONB)
+    effective_context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
+    input_version: Mapped[int] = mapped_column(server_default="0")
 
 
 class AssistantJob(TimestampMixin, Base):
@@ -285,4 +295,72 @@ class DraftReview(Base):
     artifact_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column()
     payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskQuestion(Base):
+    __tablename__ = "task_questions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            ondelete="CASCADE",
+            name="fk_question_owned_task",
+        ),
+        UniqueConstraint("id", "task_id", "user_id", name="uq_question_owned_id"),
+        UniqueConstraint("task_id", "input_version", name="uq_question_input_version"),
+        CheckConstraint("state IN ('open','answered','cancelled')", name="ck_question_state"),
+        CheckConstraint("task_version >= 1 AND input_version >= 0", name="ck_question_versions"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(36))
+    user_id: Mapped[int] = mapped_column()
+    task_version: Mapped[int] = mapped_column()
+    input_version: Mapped[int] = mapped_column()
+    state: Mapped[str] = mapped_column(String(16))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskInput(Base):
+    """Append-only accepted answer and effective bindings, never an external action approval."""
+
+    __tablename__ = "task_inputs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            ondelete="CASCADE",
+            name="fk_input_owned_task",
+        ),
+        ForeignKeyConstraint(
+            ["question_id", "task_id", "user_id"],
+            ["task_questions.id", "task_questions.task_id", "task_questions.user_id"],
+            ondelete="CASCADE",
+            name="fk_input_owned_question",
+        ),
+        ForeignKeyConstraint(
+            ["context_snapshot_id", "user_id"],
+            ["context_snapshots.id", "context_snapshots.user_id"],
+            ondelete="CASCADE",
+            name="fk_input_owned_context",
+        ),
+        UniqueConstraint("task_id", "request_id", name="uq_task_input_request"),
+        UniqueConstraint("task_id", "input_version", name="uq_task_input_version"),
+        UniqueConstraint("question_id", name="uq_input_question"),
+        CheckConstraint("input_version >= 1 AND input_version <= 5", name="ck_input_version"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(36))
+    user_id: Mapped[int] = mapped_column()
+    question_id: Mapped[str] = mapped_column(String(36))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    input_version: Mapped[int] = mapped_column()
+    answer: Mapped[dict] = mapped_column(JSONB)
+    effective_fields: Mapped[dict] = mapped_column(JSONB)
+    context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    draft_input: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

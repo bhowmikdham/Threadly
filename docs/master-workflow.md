@@ -1,6 +1,7 @@
 # Master workflow: current runtime and compound-request implementation contract
 
-Baseline: integration commit `760b0f5` (PR #17 merged). This document distinguishes
+Baseline for this update: integration commit `7de38d8` (PR #19 merged), plus
+the B08 continuation slice in this branch. This document distinguishes
 working code from the next implementation. It does not claim the EC2 deployment
 has this revision, the trained BERT package is wired in, or six prepared AWS Flows
 are six executable application workflows.
@@ -80,9 +81,10 @@ clause while classifying. Command-to-plan coverage needs separate evaluation.
 B10 must introduce an explicitly versioned planner and executor before advertising
 this capability. Do not merely add the triple to an enum and call it implemented.
 
-Clarification currently stops the task. In-place continuation returns 501; the
-frontend needs a new request with the full updated instruction. B08 supplies the
-durable continuation required by a multi-step plan.
+New tasks now have [typed durable clarification](assistant-continuation.md):
+POST the current question ID/version and typed answer to the task inputs endpoint.
+The original goal is preserved. Historical tasks and the old request.continuation
+field retain their previous behavior; B10 compound execution is still pending.
 
 ## 3. BERT labels and user intent are different contracts
 
@@ -231,7 +233,7 @@ later external action that relies on it.
 | Package | Concrete deliverable / owner | Gate |
 |---|---|---|
 | Classifier integration + T06 | AI supplies command-domain evaluation and versioned multi-label adapter; backend consumes advisory labels | Negation, multiple intents, domain mismatch and unknown labels tested; separate email metadata |
-| B08 | Backend: typed durable clarifications and plan version binding | Resume cannot overwrite another user's task or act as approval |
+| B08 | Backend typed clarification implemented; frontend/staging gate pending | Owned versioned question/input acceptance; original goal preserved; no approval |
 | B09 / B11 | AI + backend: bounded grounded answers / requested work plans | Evidence, no invented commitments, no execution implied |
 | B10 | Backend + AI: versioned multi-step proposal and durable executor; frontend: separate output streams | Triple-intent scenarios, retries, stale refs, cancellation and unsupported-plan tests |
 | B12–B13 | Backend: Calendar capabilities, freebusy, preferences and deterministic slot generation | Unknown access ≠ free; DST/conflict/insufficient-slot tests |

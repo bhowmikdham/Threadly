@@ -1,5 +1,8 @@
 # Contextual task routing — T06 implementation slice
 
+Current B08 adds [typed continuation](assistant-continuation.md) for new tasks;
+older release behavior described below remains historical.
+
 For the current coordinator, classifier boundary and planned multi-intent dependency
 graph, see [master workflow](master-workflow.md).
 

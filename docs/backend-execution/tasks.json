@@ -411,7 +411,7 @@
     {
       "id": "B08",
       "title": "Resume clarification with durable typed inputs",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T05",
         "T06",
@@ -427,7 +427,8 @@
         "backend/app/assistant/tasks.py",
         "backend/app/assistant/routing.py",
         "backend/app/assistant/worker.py",
-        "backend/app/schemas/assistant.py"
+        "backend/app/schemas/assistant.py",
+        "docs/assistant-continuation.md"
       ],
       "proposed_paths": [
         "backend/app/assistant/continuation.py"

@@ -299,3 +299,15 @@ The local full suite passes 345 tests with no skips; this is not evidence of liv
 Haiku relevance or factual quality. Six synthetic cases and a human-review report
 path are included. See [diagnosis and deployment steps](../summary-quality.md) and
 [checkpoint](../backend-execution/checkpoints/summary-quality.md).
+
+
+## B08 — typed durable clarification
+
+The backend slice on `codex/durable-clarification` preserves the original request
+while accepting typed answers on the same task. It adds versioned questions,
+append-only input history, effective source/envelope bindings, cancellation,
+expiry, idempotent requeue and explicit unsupported outcomes for uninstalled work.
+Historical tasks retain their prior behavior. See [the runtime contract](../assistant-continuation.md)
+and [B08 checkpoint](../backend-execution/checkpoints/B08.md) for migration and tests.
+T05/T06/T17 remain in progress; compound execution and live frontend/provider
+integration are not completed by this continuation slice.

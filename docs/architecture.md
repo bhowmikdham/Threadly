@@ -194,3 +194,22 @@ registry coordinator and the planned multi-label → validated step graph integr
 Summary policy 1.0.2 separates descriptive output from requested planning; its
 offline/live evaluation distinguishes JSON validity from known semantic regressions.
 No AWS master orchestrator or compound scheduling executor is added by that fix.
+
+
+## Durable typed clarification (B08)
+
+New requests pin `typed-continuation-1.0.0` separately from their unchanged generation
+release. `POST /assistant/tasks/{task_id}/inputs` consumes a current owned question
+and requeues the same task with typed effective inputs. It preserves the original
+instruction/request hash and does not classify the answer as a new command.
+New task views expose `question`, `input_version`, `continuation_release`,
+`effective_context_snapshot_id`, `effective_draft_input` and `resolved_inputs`.
+Historical tasks keep their prior behavior. See [the complete API and lifecycle
+contract](assistant-continuation.md) for examples, error handling and frontend forms.
+
+Migration `f2b6049c7a81` adds task continuation/effective-context fields and the
+`task_questions` / `task_inputs` tables. Owned composite FKs, one input per question,
+request-key uniqueness and bounded versions guard acceptance. Effective source
+deletion cascades the dependent task just like its initial source. Questions and
+answers commit atomically with task/job changes; downgrade rejects remaining new
+state. This adds no Calendar handler, compound executor or approval to send.

@@ -7,7 +7,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import drafting, routing, routing_v1, summary_quality, ui_routing
+from app.assistant import continuation, drafting, routing, routing_v1, summary_quality, ui_routing
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
@@ -29,12 +29,17 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
     payload, provenance, error, retryable = None, None, None, False
     stopped_state = None
     manifest = None
-    ui_context = claim.release.get("workflow") == ui_routing.RELEASE
+    release_has_ui = claim.release.get("workflow") == ui_routing.RELEASE
+    ui_context = release_has_ui or bool(
+        claim.continuation_release and claim.snapshot and "ui_map" in claim.snapshot
+    )
     dispatch_release = claim.release
     concise = False
     concise_policy = None
     try:
-        if ui_context:
+        if claim.continuation_release is not None:
+            continuation.validate_release(claim.continuation_release)
+        if release_has_ui:
             dispatch_release = ui_routing.unwrap_release(claim.release)
         concise = dispatch_release.get("workflow") == summary_quality.RELEASE
         if concise:
@@ -73,6 +78,14 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                             model,
                             **options,
                         )
+                        if claim.continuation_release:
+                            route = continuation.resolve_time_context(
+                                route,
+                                claim.instruction,
+                                claim.resolved_inputs or {},
+                                claim.snapshot,
+                                claim.draft_input,
+                            )
                         async with factory.begin() as session:
                             if not await save_route(session, claim, route):
                                 return True  # cancelled, deleted or replaced during classification
@@ -166,6 +179,12 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         except Exception:
             # Never log source content, prompt text or provider error bodies.
             error = "routing_failed" if stage == "routing" else "generation_failed"
+    if payload is not None and provenance is not None and claim.continuation_release:
+        provenance = {
+            **provenance,
+            "continuation_release": claim.continuation_release,
+            "input_version": claim.input_version,
+        }
     async with factory.begin() as session:
         await finish(
             session,
