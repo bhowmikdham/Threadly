@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
-from app.assistant import continuation, summary_quality
+from app.assistant import continuation, reads, summary_quality
 from app.assistant.drafting import bind_input
 from app.assistant.summary import digest
 from app.assistant.ui_routing import wrap_release
@@ -51,6 +51,8 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         value.pop(
             "draft_options"
         )  # Preserve replay hashes for requests accepted before this field.
+    if request.read_options is None:
+        value.pop("read_options")  # Retain historical request hashes.
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -82,8 +84,16 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         ).scalar_one_or_none()
         if context is None:
             raise ApiError(404, "context_not_found", "Select an accessible saved thread snapshot.")
+    if request.read_options is not None:
+        reads.validate_input(
+            request.read_options, context, request.draft_options, request.intent_hint
+        )
     draft_input = await bind_input(session, user, request.draft_options, context)
     accepted_release = summary_quality.wrap_release(release_manifest())
+    if context and context.payload.get("schema_version") == "1.1":
+        accepted_release = wrap_release(accepted_release)
+    if request.read_options is not None:
+        accepted_release = reads.wrap_release(accepted_release)
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -94,6 +104,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 request_id=request.request_id,
                 request_hash=request_hash,
                 instruction=request.instruction,
+                read_input=request.read_options.model_dump() if request.read_options else None,
                 continuation_release=continuation.release_manifest(),
                 context_snapshot_id=context.id if context else None,
                 intent_hint=request.intent_hint,
@@ -101,11 +112,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 state="queued",
                 version=1,
                 latest_sequence=1,
-                release=(
-                    wrap_release(accepted_release)
-                    if context and context.payload.get("schema_version") == "1.1"
-                    else accepted_release
-                ),
+                release=accepted_release,
             )
             .on_conflict_do_nothing(constraint="uq_task_request")
             .returning(AssistantTask.id)
@@ -192,6 +199,7 @@ class JobClaim:
     input_version: int = 0
     resolved_inputs: dict | None = None
     request_created_at: datetime | None = None
+    read_input: dict | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -263,6 +271,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.input_version,
         effective.effective_fields if effective else {},
         task.created_at,
+        task.read_input,
     )
 
 

@@ -7,7 +7,15 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import continuation, drafting, routing, routing_v1, summary_quality, ui_routing
+from app.assistant import (
+    continuation,
+    drafting,
+    reads,
+    routing,
+    routing_v1,
+    summary_quality,
+    ui_routing,
+)
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
@@ -26,6 +34,9 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         claim = await claim_next(session)
     if claim is None:
         return False
+    if claim.release.get("workflow") == reads.RELEASE:
+        await reads.run_task(factory, claim, model)
+        return True
     payload, provenance, error, retryable = None, None, None, False
     stopped_state = None
     manifest = None

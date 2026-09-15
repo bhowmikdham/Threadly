@@ -313,7 +313,8 @@ async def test_previous_contextual_release_keeps_original_behavior_and_hash(
 ):
     tid, cid = await create_task(db_sessionmaker, mailbox[0])
     original_request = request(cid)
-    old_value = original_request.model_dump(exclude={"draft_options"})
+    # Reconstruct the actual historical payload, before optional action fields existed.
+    old_value = original_request.model_dump(exclude={"draft_options", "read_options"})
     async with db_sessionmaker.begin() as session:
         task = await session.get(AssistantTask, tid)
         task.release = routing_v1.release_manifest()

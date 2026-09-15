@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "f2b6049c7a81"
+HEAD = "a6417c29d805"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -141,6 +141,29 @@ def test_migration_installs_and_preserves_existing_mailbox():
         """,
                 script=True,
             )
+        )
+        assert (
+            asyncio.run(execute("SELECT read_input FROM assistant_tasks WHERE id='old-task'"))[0][
+                "read_input"
+            ]
+            is None
+        )
+        asyncio.run(
+            execute(
+                "UPDATE assistant_tasks SET read_input='{\"operation\":\"help\"}' "
+                "WHERE id='old-task'",
+                script=True,
+            )
+        )
+        migrate("downgrade", "f2b6049c7a81", fails=True)
+        assert (
+            asyncio.run(execute("SELECT read_input FROM assistant_tasks WHERE id='old-task'"))[0][
+                "read_input"
+            ]
+            is not None
+        )
+        asyncio.run(
+            execute("UPDATE assistant_tasks SET read_input=NULL WHERE id='old-task'", script=True)
         )
         migrate("downgrade", "e9b7120c4a63", fails=True)
         assert "UTC" in asyncio.run(execute("SELECT answer FROM task_inputs"))[0]["answer"]

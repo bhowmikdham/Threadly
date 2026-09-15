@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.reads import ReadOptions
+
 Intent = Literal["summarise", "plan_schedule", "reply", "compose", "other"]
 Operation = Literal[
     "summarise_thread",
@@ -78,6 +80,7 @@ class AssistantRequest(StrictModel):
     context_snapshot_id: str | None
     continuation: Continuation | None
     draft_options: DraftOptions | None = None
+    read_options: ReadOptions | None = None
 
 
 class RouteParameters(StrictModel):

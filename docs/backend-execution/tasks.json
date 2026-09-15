@@ -461,7 +461,7 @@
     {
       "id": "B09",
       "title": "Implement bounded Other and evidence retrieval",
-      "status": "planned",
+      "status": "in_progress",
       "work_packages": [
         "T09"
       ],
@@ -478,7 +478,8 @@
         "backend/app/extractor/patterns.py",
         "backend/app/db/repositories.py",
         "backend/app/assistant/summary.py",
-        "backend/app/planner/intent_router.py"
+        "backend/app/planner/intent_router.py",
+        "docs/assistant-bounded-reads.md"
       ],
       "proposed_paths": [
         "backend/app/assistant/retrieval.py",
