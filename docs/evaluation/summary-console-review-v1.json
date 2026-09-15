@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "candidate": "summary-quality-1.0.0",
+  "evidence_kind": "user-pasted console outputs, manually reviewed in conversation",
+  "flow_id": null,
+  "prompt_hash": null,
+  "invocation_ids": [],
+  "deployment_identity_independently_verified": false,
+  "cases": [
+    {
+      "scenario": "forwarded invoice blocker",
+      "result": "pass_with_wording_note",
+      "review": "Leads with reported unpaid invoice, includes one payment-status action and no unnecessary questions. Replace post-processing payment terms with payment after internal processing."
+    },
+    {
+      "scenario": "later payment confirmation",
+      "result": "pass",
+      "observed": {"overview": "Invoice INV-2047 has been paid and Cedar Catering confirms readiness to proceed with the new order.", "decisions": [], "actions": [], "open_questions": []}
+    },
+    {
+      "scenario": "FYI without action",
+      "result": "pass_with_wording_note",
+      "observed": {"overview": "Committee approved minutes are now available in the shared folder for your records.", "decisions": [], "actions": [], "open_questions": []},
+      "review": "No unnecessary action. Mentioning no response needed would improve clarity."
+    },
+    {
+      "scenario": "unanswered room question",
+      "result": "fail",
+      "observed": {
+        "overview": "Workshop date moved to Tuesday; Room A or Room B booking status unconfirmed and awaiting reply.",
+        "decisions": [],
+        "actions": [{"text": "Confirm which room (A or B) is booked for the rescheduled Tuesday workshop.", "sources": [1]}],
+        "open_questions": [{"text": "Is Room A or Room B booked for the Tuesday workshop?", "sources": [1]}]
+      },
+      "review": "open_questions contains an object instead of a string. Room confirmation is duplicated across actions and questions. Backend rejects the object shape; semantic paraphrase duplication still requires quality review."
+    },
+    {"scenario": "quoted-source instruction injection", "result": "not_run"},
+    {"scenario": "conflicting amounts", "result": "not_run"}
+  ],
+  "separate_anomaly": "An earlier payment-confirmation output used operation=plan and the old prototype envelope. Suspected Flow/prompt mismatch, not independently resolved; excluded from the six-case candidate review.",
+  "conclusion": "Partial user-reported evaluation, not release approval or a measured model success rate.",
+  "next_candidate": "summary-quality-1.0.1",
+  "next_candidate_live_evaluation": "not_run; rerun all six cases"
+}

@@ -6,7 +6,7 @@ import re
 from pydantic import Field, model_validator
 
 from app.api.errors import ApiError
-from app.assistant import summary, summary_policy
+from app.assistant import summary, summary_policy, summary_policy_v1
 from app.model_client.structured import reject_duplicate_keys
 
 RELEASE = "summary-quality-task-1.0.0"
@@ -37,16 +37,17 @@ class ConciseSummary(summary.GeneratedSummary):
         return self
 
 
-def contract_hash() -> str:
+def contract_hash(policy=None) -> str:
+    policy = policy or summary_policy
     return summary.digest(
         {
-            "version": summary_policy.VERSION,
-            "prompt": summary_policy.PROMPT,
+            "version": policy.VERSION,
+            "prompt": policy.PROMPT,
             "schema": ConciseSummary.model_json_schema(),
             "budgets": [
-                summary_policy.OVERVIEW_WORDS,
-                summary_policy.ITEM_WORDS,
-                summary_policy.TOTAL_WORDS,
+                policy.OVERVIEW_WORDS,
+                policy.ITEM_WORDS,
+                policy.TOTAL_WORDS,
             ],
             "validation": "bounded-nonrepeating-fields-native-source-validation-v1",
         }
@@ -57,22 +58,31 @@ def wrap_release(base: dict) -> dict:
     return {"workflow": RELEASE, "base_release": base, "contract_hash": contract_hash()}
 
 
-def unwrap_release(release: dict) -> dict:
-    if set(release) != {"workflow", "base_release", "contract_hash"} or release != wrap_release(
-        release["base_release"]
+def policy_for_release(release: dict):
+    if (
+        set(release) == {"workflow", "base_release", "contract_hash"}
+        and release["workflow"] == RELEASE
     ):
-        raise ApiError(503, "release_unavailable", "The saved summary release is unavailable.")
+        for policy in (summary_policy, summary_policy_v1):
+            if release["contract_hash"] == contract_hash(policy):
+                return policy
+    raise ApiError(503, "release_unavailable", "The saved summary release is unavailable.")
+
+
+def unwrap_release(release: dict) -> dict:
+    policy_for_release(release)
     return release["base_release"]
 
 
-def make_prompt(snapshot: dict, instruction: str) -> str:
+def make_prompt(snapshot: dict, instruction: str, *, policy=None) -> str:
+    policy = policy or summary_policy
     # IDs, recipients and provider metadata remain outside model authority.
     messages = [
         {"number": i, "from": m["from_addr"], "sent_at": m["sent_at"], "body": m["body"]}
         for i, m in enumerate(snapshot["messages"], 1)
     ]
     return (
-        summary_policy.PROMPT
+        policy.PROMPT
         + "\nUSER_SUMMARY_REQUEST_JSON:\n"
         + json.dumps(instruction)
         + "\nSOURCE_JSON:\n"

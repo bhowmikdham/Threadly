@@ -142,15 +142,15 @@ console URL; testing the old Flow continues to use the old prompt.
 set -e
 THREADLY_SUMMARY_DIR="$(mktemp -d)"
 cd "$THREADLY_SUMMARY_DIR"
-THREADLY_RELEASE='53c7e84f70386d35b313d0fce1dd27da0e873249'
+THREADLY_RELEASE='bb994484df64f3cdf0b27e3c75ef500d9d9d7dd1'
 THREADLY_RAW="https://raw.githubusercontent.com/bhowmikdham/Threadly/$THREADLY_RELEASE"
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_flows.py" -o cloudshell_flows.py
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_summary.py" -o cloudshell_summary.py
 curl -fsSL "$THREADLY_RAW/backend/app/assistant/summary_policy.py" -o summary_policy.py
 sha256sum -c - <<'SHA256'
 1d2690bc50c9eabda44fc9e09a70189bb5bd9752c2241ef7162bf32b8e514a95  cloudshell_flows.py
-0981de6a0bc8ac3ae69e4eb9fc45e126a8db7c546f254eaf5c60bad661fb7836  cloudshell_summary.py
-2aa4a3fab38a9dcc5af4580773121de562f96b74bd2844bff605271d99fc25b3  summary_policy.py
+4cfd03f74dff5dda567eefe9f1ed329dcfe36f0cab49f0189b57710c5f2d0fae  cloudshell_summary.py
+fd05fd9ecbcf20d1ff13946c243e58ccdedbca01efd5ee0294134a3216b596d6  summary_policy.py
 SHA256
 python3 cloudshell_summary.py
 )
@@ -214,3 +214,29 @@ instance, Ruff, `python -m unittest discover -s infra/bedrock/tests`, both docum
 validators and cfn-lint on the render-only summary template. See the checkpoint for
 actual results. Outstanding live gates are the new console replay, deployed backend
 runtime verification and frontend rendering/integration.
+
+## Question format correction — policy 1.0.1
+
+A user-reported room test returned an object inside `open_questions` and restated
+that question as an action. The existing backend rejects the object type. Policy
+`summary-quality-1.0.1` now explicitly requires JSON strings, provides a populated
+string example, and prefers one open question for an explicitly unanswered fact or
+choice. Actions should describe distinct work rather than paraphrase that question.
+The schema and budgets stay unchanged. Semantic paraphrase duplication still needs
+human evaluation; the backend does not use unreliable text-similarity heuristics.
+
+The original policy is retained in `summary_policy_v1.py`. Saved contract hashes
+select the matching prompt, so queued 1.0.0 jobs keep their original wording; new
+jobs pin 1.0.1. Unknown policy hashes fail closed. The console launcher creates a
+new content-addressed Flow and prints its prompt release. Use the new printed URL.
+
+[Manual review record](evaluation/summary-console-review-v1.json): three satisfactory
+samples (two with minor wording notes), one failure, two untested. These are pasted
+outputs; Flow/trace identifiers were not supplied, so deployment identity is not
+independently verified. A separate plan-shaped response remains an unresolved
+configuration anomaly. None of these samples is a live pass for policy 1.0.1.
+
+After launching 1.0.1, rerun the room case first. Expect `actions: []` and
+`open_questions: ["Is Room A or Room B booked?"]`, then rerun all six scenarios on
+that same new Flow. Preserve the Flow name/release with results. No claim that
+this prompt correction has passed a live model test is made before those results.
