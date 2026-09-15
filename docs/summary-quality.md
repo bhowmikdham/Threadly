@@ -142,15 +142,15 @@ console URL; testing the old Flow continues to use the old prompt.
 set -e
 THREADLY_SUMMARY_DIR="$(mktemp -d)"
 cd "$THREADLY_SUMMARY_DIR"
-THREADLY_RELEASE='53c7e84f70386d35b313d0fce1dd27da0e873249'
+THREADLY_RELEASE='bb994484df64f3cdf0b27e3c75ef500d9d9d7dd1'
 THREADLY_RAW="https://raw.githubusercontent.com/bhowmikdham/Threadly/$THREADLY_RELEASE"
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_flows.py" -o cloudshell_flows.py
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_summary.py" -o cloudshell_summary.py
 curl -fsSL "$THREADLY_RAW/backend/app/assistant/summary_policy.py" -o summary_policy.py
 sha256sum -c - <<'SHA256'
 1d2690bc50c9eabda44fc9e09a70189bb5bd9752c2241ef7162bf32b8e514a95  cloudshell_flows.py
-0981de6a0bc8ac3ae69e4eb9fc45e126a8db7c546f254eaf5c60bad661fb7836  cloudshell_summary.py
-2aa4a3fab38a9dcc5af4580773121de562f96b74bd2844bff605271d99fc25b3  summary_policy.py
+4cfd03f74dff5dda567eefe9f1ed329dcfe36f0cab49f0189b57710c5f2d0fae  cloudshell_summary.py
+fd05fd9ecbcf20d1ff13946c243e58ccdedbca01efd5ee0294134a3216b596d6  summary_policy.py
 SHA256
 python3 cloudshell_summary.py
 )
