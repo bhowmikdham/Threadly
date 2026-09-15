@@ -135,7 +135,9 @@ For a small CloudShell download, fetch these three files from the **same reviewe
 commit** into a new directory: `infra/bedrock/cloudshell_flows.py`,
 `infra/bedrock/cloudshell_summary.py`, and `backend/app/assistant/summary_policy.py`.
 Verify the supplied SHA-256 hashes, then run `python3 cloudshell_summary.py`.
-The following command pins the tested implementation commit and verifies all three files. The script prints the new Flow's
+After reviewing the ten-case contract and local evidence, the following command
+prepares the isolated **1.0.2 candidate**. It pins the locally tested implementation
+and verifies all three files; it does not establish live model quality or enable the backend. The script prints the new Flow's
 console URL; testing the old Flow continues to use the old prompt.
 
 ```bash
@@ -143,7 +145,7 @@ console URL; testing the old Flow continues to use the old prompt.
 set -e
 THREADLY_SUMMARY_DIR="$(mktemp -d)"
 cd "$THREADLY_SUMMARY_DIR"
-THREADLY_RELEASE='bb994484df64f3cdf0b27e3c75ef500d9d9d7dd1'
+THREADLY_RELEASE='fa5ad150df228743ea00d1b2c46a268786f48aa5'
 THREADLY_RAW="https://raw.githubusercontent.com/bhowmikdham/Threadly/$THREADLY_RELEASE"
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_flows.py" -o cloudshell_flows.py
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_summary.py" -o cloudshell_summary.py
@@ -151,7 +153,7 @@ curl -fsSL "$THREADLY_RAW/backend/app/assistant/summary_policy.py" -o summary_po
 sha256sum -c - <<'SHA256'
 1d2690bc50c9eabda44fc9e09a70189bb5bd9752c2241ef7162bf32b8e514a95  cloudshell_flows.py
 4cfd03f74dff5dda567eefe9f1ed329dcfe36f0cab49f0189b57710c5f2d0fae  cloudshell_summary.py
-fd05fd9ecbcf20d1ff13946c243e58ccdedbca01efd5ee0294134a3216b596d6  summary_policy.py
+6e71ae15aa7f9e3b2f3f2e8e3aeb05cf5ff556f2ba736bddd3523ea4794c6b4b  summary_policy.py
 SHA256
 python3 cloudshell_summary.py
 )
