@@ -2,11 +2,8 @@ import { useState, useRef } from "react"
 import "./style.css"
 
 // API configuration constants
-const ELEVENLABS_API_KEY = process.env.PLASMO_PUBLIC_ELEVENLABS_API_KEY;
-const GEMINI_API_KEY = process.env.PLASMO_PUBLIC_GEMINI_API_KEY;
-const BACKEND_BASE_URL = "http://localhost:8000"
-
-// --- Interfaces mirroring backend app/schemas ---
+const ELEVENLABS_API_KEY = process.env.PLASMO_PUBLIC_ELEVENLABS_API_KEY
+const GEMINI_API_KEY = process.env.PLASMO_PUBLIC_GEMINI_API_KEY
 
 interface ThreadMessage {
   id: string
@@ -52,6 +49,31 @@ interface ChatSession {
   createdAt: Date
 }
 
+// STEP 2: Helper function to query the active Gmail DOM via the content script
+const fetchActiveEmailFromDOM = async (): Promise<EvidenceItem[] | null> => {
+  return new Promise((resolve) => {
+    // lastFocusedWindow prevents the side panel focus from breaking target tab selection
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      const activeTab = tabs[0]
+
+      if (!activeTab?.id || !activeTab.url?.includes("mail.google.com")) {
+        return resolve(null)
+      }
+
+      chrome.tabs.sendMessage(
+        activeTab.id,
+        { action: "GET_OPEN_EMAIL_TEXT" },
+        (response) => {
+          if (chrome.runtime.lastError || !response?.evidence) {
+            return resolve(null)
+          }
+          resolve(response.evidence)
+        }
+      )
+    })
+  })
+}
+
 function SidePanel() {
   const [theme, setTheme] = useState<"dark" | "light">("light")
   const [signedIn, setSignedIn] = useState<boolean>(false)
@@ -65,27 +87,34 @@ function SidePanel() {
   const [savedSessions, setSavedSessions] = useState<ChatSession[]>([])
   const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false)
 
+  // Recording & Voice Bubble States
   const [recording, setRecording] = useState<boolean>(false)
   const [transcribing, setTranscribing] = useState<boolean>(false)
+  const [speaking, setSpeaking] = useState<boolean>(false)
+  const [audioScale, setAudioScale] = useState<number>(1)
+  const [voiceStatus, setVoiceStatus] = useState<string>("Listening...")
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const animFrameRef = useRef<number | null>(null)
 
   const [summarizing, setSummarizing] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
   const isDark = theme === "dark"
   const themeStyles = {
-    bg: isDark ? "#121212" : "#FAF9F6",          
-    headerBg: isDark ? "#1e1e1e" : "#F4F3EF",    
-    drawerBg: isDark ? "#181818" : "#F4F3EF",    
-    cardBg: isDark ? "#222222" : "#FFFFFF",      
-    aiBubbleBg: isDark ? "#1e1e1e" : "#F4F3EF",  
-    inputBg: isDark ? "#1e1e1e" : "#FFFFFF",     
-    border: isDark ? "#2a2a2a" : "#E8E6E1",      
-    text: isDark ? "#e0e0e0" : "#2c2b28",        
-    textMuted: isDark ? "#aaaaaa" : "#787670",   
+    bg: isDark ? "#121212" : "#FAF9F6",
+    headerBg: isDark ? "#1e1e1e" : "#F4F3EF",
+    drawerBg: isDark ? "#181818" : "#F4F3EF",
+    cardBg: isDark ? "#222222" : "#FFFFFF",
+    aiBubbleBg: isDark ? "#1e1e1e" : "#F4F3EF",
+    inputBg: isDark ? "#1e1e1e" : "#FFFFFF",
+    border: isDark ? "#2a2a2a" : "#E8E6E1",
+    text: isDark ? "#e0e0e0" : "#2c2b28",
+    textMuted: isDark ? "#aaaaaa" : "#787670",
     textHeading: isDark ? "#ffffff" : "#2c2b28",
-    buttonBg: isDark ? "#2a2a2a" : "#E8E6E1",    
+    buttonBg: isDark ? "#2a2a2a" : "#E8E6E1",
     menuHoverBg: isDark ? "#2a2a2a" : "#F0EFEA",
     accent: "#e8590c"
   }
@@ -119,11 +148,51 @@ function SidePanel() {
     })
   }
 
+  // Voice & TTS Logic
+  const speakText = (text: string, onComplete?: () => void) => {
+    if (!("speechSynthesis" in window)) {
+      if (onComplete) onComplete()
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1.0
+
+    setSpeaking(true)
+    setVoiceStatus("Replying...")
+
+    const pulseInterval = setInterval(() => {
+      setAudioScale(1 + Math.random() * 0.35)
+    }, 120)
+
+    utterance.onend = () => {
+      clearInterval(pulseInterval)
+      setAudioScale(1)
+      setSpeaking(false)
+      if (onComplete) onComplete()
+    }
+
+    utterance.onerror = () => {
+      clearInterval(pulseInterval)
+      setAudioScale(1)
+      setSpeaking(false)
+      if (onComplete) onComplete()
+    }
+
+    window.speechSynthesis.speak(utterance)
+  }
+
   const transcribeAudio = async (audioBlob: Blob) => {
     setTranscribing(true)
+    setVoiceStatus("Thinking...")
+
     const formData = new FormData()
     formData.append("file", audioBlob, "recording.webm")
     formData.append("model_id", "scribe_v2")
+
+    let transcribedText = ""
+
     try {
       const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
         method: "POST",
@@ -132,29 +201,78 @@ function SidePanel() {
       })
       const data = await res.json()
       if (data.text) {
-        setMessage((prev) => (prev ? prev + " " + data.text : data.text))
+        transcribedText = data.text
       }
     } catch (err) {
       console.error("Transcription failed: ", err)
     } finally {
       setTranscribing(false)
     }
+
+    if (transcribedText.trim()) {
+      setChatHistory((prev) => [
+        ...prev,
+        { id: Date.now().toString(), sender: "user", text: transcribedText }
+      ])
+
+      const isSummarizeIntent = /summarise|summarize/i.test(transcribedText)
+
+      if (isSummarizeIntent) {
+        handleSmartSummarize(true)
+      } else {
+        const responseMessage = `I heard: "${transcribedText}". Try saying "Summarise" to process your email.`
+        setChatHistory((prev) => [
+          ...prev,
+          { id: (Date.now() + 1).toString(), sender: "ai", text: responseMessage }
+        ])
+        speakText(responseMessage)
+      }
+    } else {
+      setVoiceStatus("Could not hear audio.")
+      setTimeout(() => setVoiceStatus("Listening..."), 2000)
+    }
   }
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const analyser = audioCtx.createAnalyser()
+      const source = audioCtx.createMediaStreamSource(stream)
+      analyser.fftSize = 64
+      source.connect(analyser)
+      audioContextRef.current = audioCtx
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+      const updateAudioLevel = () => {
+        analyser.getByteFrequencyData(dataArray)
+        const avg = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length
+        const normalizedScale = 1 + (avg / 255) * 0.8
+        setAudioScale(normalizedScale)
+        animFrameRef.current = requestAnimationFrame(updateAudioLevel)
+      }
+
+      updateAudioLevel()
+
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" })
       chunksRef.current = []
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data)
       recorder.onstop = async () => {
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+        if (audioContextRef.current) audioContextRef.current.close()
+        setAudioScale(1)
         stream.getTracks().forEach((t) => t.stop())
+        
         const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType })
         await transcribeAudio(audioBlob)
       }
+
       recorder.start()
       mediaRecorderRef.current = recorder
       setRecording(true)
+      setVoiceStatus("Listening...")
     } catch (err) {
       console.error("Mic permission error:", err)
       alert("Microphone access was blocked or dismissed.")
@@ -166,7 +284,19 @@ function SidePanel() {
     setRecording(false)
   }
 
-  const toggleMic = () => (recording ? stopRecording() : startRecording())
+  const toggleMic = () => {
+    if (speaking) {
+      window.speechSynthesis.cancel()
+      setSpeaking(false)
+      return
+    }
+
+    if (recording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
 
   const decodeBase64Url = (data: string) => {
     const base64 = data.replace(/-/g, "+").replace(/_/g, "/")
@@ -278,6 +408,82 @@ ${evidenceBlock}`
     return JSON.parse(rawText)
   }
 
+  // STEP 3: Smart Summarize routing - checks DOM scrape first, falls back to API thread list
+  const handleSmartSummarize = async (reciteVoice: boolean = false) => {
+    setSummarizing(true)
+
+    try {
+      // 1. Attempt DOM extraction directly from active tab
+      const domEvidence = await fetchActiveEmailFromDOM()
+
+      if (domEvidence && domEvidence.length > 0) {
+        const result = await generateSummary(domEvidence)
+
+        setChatHistory((prev) => [
+          ...prev,
+          { id: Date.now().toString(), sender: "ai", summary: result }
+        ])
+
+        if (reciteVoice) {
+          speakText(`Here is the summary: ${result.overview}`)
+        }
+        setSummarizing(false)
+        return
+      }
+
+      // 2. Fallback: Prompt user with thread list via Google Auth
+      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+          const errText = "Auth error. Please sign in to access recent threads."
+          setChatHistory((prev) => [
+            ...prev,
+            { id: Date.now().toString(), sender: "ai", text: errText }
+          ])
+          if (reciteVoice) speakText(errText)
+          setSummarizing(false)
+          return
+        }
+
+        const threads = await fetchRecentThreads(token)
+        if (threads.length === 0) {
+          const emptyText = "No open email detected on screen and no recent threads found."
+          setChatHistory((prev) => [
+            ...prev,
+            { id: Date.now().toString(), sender: "ai", text: emptyText }
+          ])
+          if (reciteVoice) speakText(emptyText)
+        } else {
+          const introText = "No open email detected on screen. Select a thread to summarize:"
+          setChatHistory((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              sender: "ai",
+              text: introText,
+              threadsList: threads
+            }
+          ])
+
+          if (reciteVoice) {
+            const fullScript = `${introText} ` + threads
+              .map((t, i) => `Option ${i + 1}: ${t.snippet}`)
+              .join(". ")
+            speakText(fullScript)
+          }
+        }
+        setSummarizing(false)
+      })
+    } catch (err: any) {
+      const errorMsg = `Error processing email: ${err.message}`
+      setChatHistory((prev) => [
+        ...prev,
+        { id: Date.now().toString(), sender: "ai", text: errorMsg }
+      ])
+      if (reciteVoice) speakText(errorMsg)
+      setSummarizing(false)
+    }
+  }
+
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!message.trim()) return
@@ -294,66 +500,25 @@ ${evidenceBlock}`
     const isSummarizeIntent = /summarise|summarize/i.test(userText)
 
     if (isSummarizeIntent) {
-      requestThreadOptions()
+      handleSmartSummarize(false)
     } else {
       setChatHistory((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           sender: "ai",
-          text: "I can help summarize your inbox or process requests. Try clicking 'Summarise' below."
+          text: "I can help summarize your inbox or process requests. Try typing 'Summarise'."
         }
       ])
     }
   }
 
-  const requestThreadOptions = () => {
-    setSummarizing(true)
-    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-      if (chrome.runtime.lastError || !token) {
-        setChatHistory((prev) => [
-          ...prev,
-          { id: Date.now().toString(), sender: "ai", text: "Auth error. Please sign in again." }
-        ])
-        setSummarizing(false)
-        return
-      }
-
-      try {
-        const threads = await fetchRecentThreads(token)
-        if (threads.length === 0) {
-          setChatHistory((prev) => [
-            ...prev,
-            { id: Date.now().toString(), sender: "ai", text: "No email threads found in your inbox." }
-          ])
-        } else {
-          setChatHistory((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              sender: "ai",
-              text: "Which email thread would you like me to summarize?",
-              threadsList: threads
-            }
-          ])
-        }
-      } catch (err: any) {
-        setChatHistory((prev) => [
-          ...prev,
-          { id: Date.now().toString(), sender: "ai", text: `Error fetching emails: ${err.message}` }
-        ])
-      } finally {
-        setSummarizing(false)
-      }
-    })
-  }
-
   const handleQuickSummarize = () => {
     setChatHistory((prev) => [
       ...prev,
-      { id: Date.now().toString(), sender: "user", text: "Summarise my emails" }
+      { id: Date.now().toString(), sender: "user", text: "Summarise my open email" }
     ])
-    requestThreadOptions()
+    handleSmartSummarize(false)
   }
 
   const handleSelectThread = (threadId: string, snippet: string) => {
@@ -449,10 +614,98 @@ ${evidenceBlock}`
     }
   ]
 
+  const isVoiceActive = recording || transcribing || speaking
+
   return (
     <div className="container" style={{ position: "relative", display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", backgroundColor: themeStyles.bg, color: themeStyles.text, transition: "background-color 0.2s, color 0.2s" }}>
       
-      {/* Header bar section */}
+      {/* Voice Bubble Overlay */}
+      {isVoiceActive && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(6px)",
+            zIndex: 200,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fadeIn 0.2s ease-out"
+          }}
+        >
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div
+              style={{
+                position: "absolute",
+                width: 140,
+                height: 140,
+                borderRadius: "50%",
+                background: `radial-gradient(circle, ${themeStyles.accent} 0%, rgba(232, 89, 12, 0) 70%)`,
+                transform: `scale(${audioScale * 1.3})`,
+                opacity: 0.6,
+                transition: "transform 0.08s ease-out"
+              }}
+            />
+            
+            <div
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: "50%",
+                background: speaking
+                  ? "linear-gradient(135deg, #4285F4, #9b51e0)"
+                  : `linear-gradient(135deg, ${themeStyles.accent}, #ff8c00)`,
+                transform: `scale(${audioScale})`,
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                transition: "transform 0.08s ease-out, background 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {speaking ? (
+                  <>
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                  </>
+                )}
+              </svg>
+            </div>
+          </div>
+
+          <p style={{ marginTop: 28, color: "#ffffff", fontSize: 16, fontWeight: 500 }}>
+            {transcribing ? "Transcribing speech..." : voiceStatus}
+          </p>
+
+          <button
+            onClick={toggleMic}
+            style={{
+              marginTop: 16,
+              padding: "8px 20px",
+              borderRadius: 20,
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+              color: "#ffffff",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer"
+            }}
+          >
+            {speaking ? "Stop Response" : "Done Speaking"}
+          </button>
+        </div>
+      )}
+
+      {/* Header section */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.headerBg, zIndex: 1 }}>
         {signedIn ? (
           <button
@@ -529,7 +782,7 @@ ${evidenceBlock}`
         </div>
       )}
 
-      {/* Auth Unauthenticated Screen */}
+      {/* Unauthenticated Screen */}
       {!signedIn && (
         <main className="content" style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "40px 20px", gap: 4 }}>
@@ -548,7 +801,7 @@ ${evidenceBlock}`
         </main>
       )}
 
-      {/* Main Chat / Artifact View */}
+      {/* Main Chat / Output View */}
       {signedIn && (
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
           {chatHistory.length === 0 && (
@@ -628,7 +881,7 @@ ${evidenceBlock}`
         </div>
       )}
 
-      {/* Input area & prompt shortcut section */}
+      {/* Input controls */}
       {signedIn && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "0 16px 16px", position: "relative" }}>
           
@@ -664,9 +917,7 @@ ${evidenceBlock}`
             onSubmit={handleSendMessage}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", backgroundColor: themeStyles.inputBg, border: `1px solid ${themeStyles.border}`, borderRadius: 20, position: "relative" }}
           >
-            {/* Wrapper to anchor the menu directly over the plus button */}
             <div style={{ position: "relative", display: "inline-block" }}>
-              {/* Clean Vector SVG Plus Icon */}
               <button
                 type="button"
                 onClick={() => setShowAppsMenu((prev) => !prev)}
@@ -706,7 +957,6 @@ ${evidenceBlock}`
                 </svg>
               </button>
 
-              {/* Popup menu positioned directly above the plus button */}
               {showAppsMenu && (
                 <div
                   style={{
