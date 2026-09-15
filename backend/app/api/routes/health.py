@@ -1,4 +1,5 @@
 """Liveness + readiness. /healthz never touches dependencies; /readyz does."""
+
 from fastapi import APIRouter
 
 from app.api.errors import ApiError
@@ -14,7 +15,14 @@ async def healthz() -> dict:
 
 @router.get("/readyz")
 async def readyz() -> dict:
-    checks = {"postgres": False, "chroma": False}
+    checks = {"postgres": False, "chroma": False, "workflow_configuration": False}
+    try:
+        from app.workflows.registry import load_manifest
+
+        load_manifest()
+        checks["workflow_configuration"] = True
+    except ApiError:
+        pass
     try:
         from sqlalchemy import text
 

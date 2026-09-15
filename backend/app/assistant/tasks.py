@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
 from app.assistant.drafting import bind_input
-from app.assistant.routing import release_manifest
 from app.assistant.summary import digest
 from app.db.models import (
     ArtifactRevision,
@@ -25,6 +24,7 @@ from app.db.models import (
     User,
 )
 from app.schemas.assistant import AssistantRequest
+from app.workflows.registry import release_manifest
 
 LEASE_SECONDS = 180
 MAX_ATTEMPTS = 3

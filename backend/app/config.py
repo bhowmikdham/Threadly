@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     bedrock_small_model_id: str = ""
     bedrock_read_timeout_s: int = Field(default=90, ge=1, le=300)
 
+    # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
+    assistant_workflow_manifest: str = ""
+
     # Legacy rollback path (superseded by ADR 003).
     ollama_base_url: str = "http://localhost:11434"
     model_main: str = "qwen3.5:4b-threadly"
