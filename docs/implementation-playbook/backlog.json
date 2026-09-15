@@ -394,7 +394,8 @@
       "handoff": "Reply, Compose and Plan can use grounded facts and commitments.",
       "assignee": null,
       "evidence": [
-        "docs/assistant-bounded-reads.md"
+        "docs/assistant-bounded-reads.md",
+        "docs/assistant-mail-search.md"
       ]
     },
     {

@@ -479,7 +479,8 @@
         "backend/app/db/repositories.py",
         "backend/app/assistant/summary.py",
         "backend/app/planner/intent_router.py",
-        "docs/assistant-bounded-reads.md"
+        "docs/assistant-bounded-reads.md",
+        "docs/assistant-mail-search.md"
       ],
       "proposed_paths": [
         "backend/app/assistant/retrieval.py",

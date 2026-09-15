@@ -271,3 +271,12 @@ and rewriting one selected message. `read_options` pins one operation; a model
 label alone does not activate retrieval. Existing natural-language routing and
 unavailable compound behavior remain unchanged. B09's broader retrieval work is
 still in progress before the complete multi-intent read/plan pipeline can be claimed.
+
+
+## B09b scoped local search service
+
+[Scoped mailbox search](assistant-mail-search.md) adds a native authenticated read
+endpoint with explicit folder/date boundaries, local coverage and sync-version
+pagination. It does not invoke the intent router or a model. Clients can select a
+result and capture its source before submitting a task; automatic retrieval-to-
+generation coordination remains pending with the read planner and compound engine.

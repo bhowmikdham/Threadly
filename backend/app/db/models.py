@@ -65,7 +65,15 @@ class Thread(TimestampMixin, Base):
 
 class Message(TimestampMixin, Base):
     __tablename__ = "messages"
-    __table_args__ = (UniqueConstraint("user_id", "gmail_msg_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "gmail_msg_id"),
+        Index(
+            "ix_messages_owner_search_time",
+            "user_id",
+            text("coalesce(received_at, sent_at) DESC"),
+            text('id DESC'),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
