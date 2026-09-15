@@ -26,9 +26,13 @@ based on verified merged integration commit `760b0f5`.
 
 ## Verification
 
-- Final full backend suite: **373 passed, zero skipped**, required disposable
+- Full backend suite before the final offline-mode guard: **373 passed, zero skipped**, required disposable
   PostgreSQL 16, Python 3.12. Tests include migrations, ownership, leases, old releases,
   generation, Flow adapters and the added compound-proposal rejection.
+- Final review found that a JSON `null` observations file could select the wrong
+  evaluator branch. Selection now depends only on the explicit CLI mode; a regression
+  test rejects null without invoking the live evaluator. **23 grounding tests passed**
+  after this change; hosted CI runs the full updated suite.
 - Focused final summary/routing run before full regression: **82 passed**, zero skipped.
 - Infrastructure suite: **19 passed**, no AWS/model calls.
 - Configured Ruff checks (`backend/app`, `backend/tests`, `infra/bedrock`): pass.
