@@ -111,7 +111,7 @@
     {
       "id": "B02",
       "title": "Add durable action, approval and attempt storage",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T05",
         "T10",

@@ -212,7 +212,8 @@
       "evidence": [
         "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)",
         "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)",
-        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete."
+        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete.",
+        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)"
       ]
     },
     {
@@ -442,7 +443,8 @@
       "evidence": [
         "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
         "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
-        "../assistant-draft-review.md (persistent revisions and exact review acknowledgements; action/send approval remains pending)"
+        "../assistant-draft-review.md (persistent revisions and exact review acknowledgements; action/send approval remains pending)",
+        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)"
       ]
     },
     {
@@ -531,7 +533,9 @@
       ],
       "handoff": "Reply/Compose can complete approved actions with recovery evidence.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)"
+      ]
     },
     {
       "id": "T13",

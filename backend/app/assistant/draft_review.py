@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
+from app.actions.service import supersede_for_edit
 from app.api.errors import ApiError
 from app.assistant import tasks
 from app.assistant.summary import digest
@@ -205,9 +206,10 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
         edit_request_hash=hashed,
         provenance={"source": "user_edit", "policy": POLICY, "parent_artifact_id": current.id},
     )
+    task.version += 1
+    await supersede_for_edit(session, task, current.id)
     session.add(artifact)
     task.final_artifact_id = artifact.id
-    task.version += 1
     tasks.add_event(
         session,
         task,

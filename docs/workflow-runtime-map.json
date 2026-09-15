@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "fa23176d45b140aeda2fb0679d3e5bf95dfa71ea",
+  "baseline_commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
   "deployment_evidence": {
     "commit": "9b3b14e8fa71086224bca585a7566ff29dd3775d",
     "source": "user-provided EC2 deployment log",
@@ -75,7 +75,7 @@
     },
     {
       "id": "compound_templates",
-      "status": "implemented_in_this_branch",
+      "status": "merged",
       "entry": "POST /assistant/compound-requests",
       "handlers": [
         "backend/app/assistant/steps.py"
@@ -94,7 +94,7 @@
         "backend/tests/test_assistant_migration.py"
       ],
       "remaining": [
-        "review_merge_deployment",
+        "deployment_confirmation",
         "live_model_quality",
         "natural_language_planner",
         "lookup_steps",
@@ -128,19 +128,22 @@
     },
     {
       "id": "external_actions",
-      "status": "not_installed",
+      "status": "storage_implemented_pending_review",
       "entry": null,
-      "handlers": [],
+      "handlers": [
+        "backend/app/actions/service.py"
+      ],
       "output": "planned_confirmed_or_unknown_outcome",
       "remaining": [
-        "B02",
+        "B02_review_merge",
         "B03",
         "B04",
         "B05",
         "B06",
         "B14",
         "B15"
-      ]
+      ],
+      "storage_checkpoint": "docs/backend-execution/checkpoints/B02.md"
     }
   ],
   "invariants": [
@@ -152,12 +155,18 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
+    "B02 review/merge action storage",
+    "B01 review capability/auth work before B03",
+    "B03-B06 exact email payload, approval, dispatch and recovery",
     "B10 complete command planner and lookup steps",
-    "B01 review capability/auth work",
-    "B12/B13 Calendar read and slots",
-    "B02-B06 exact approval/send/recovery",
     "B11 plans",
-    "B14/B15 event actions",
-    "B17-B19 joint live gates"
-  ]
+    "B12/B13 Calendar reads and deterministic slots",
+    "B14/B15 event actions and recovery",
+    "B17/B19 backend live release gates; B18 frontend deferred"
+  ],
+  "deployment_target": {
+    "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
+    "status": "command_provided_awaiting_host_output",
+    "frontend_integration": "deferred_by_user"
+  }
 }
