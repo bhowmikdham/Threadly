@@ -144,8 +144,8 @@ returns 404 before task creation. Non-null continuations still return 501
 The worker classifies using exact commands or the selected small model, validates
 and saves its proposal, then dispatches a single summary, reply draft or compose
 draft. Summary/reply source context and draft recipients are backend-bound.
-Free-text preferences are included in generation. Calendar and other execution
-workflows are not installed; no supported subset of a compound request runs. A ready route is a proposal, not execution.
+Free-text preferences are included in generation. Calendar and broad other execution
+workflows are not installed; exact UI-message extraction is available as described below; no supported subset of a compound request runs. A ready route is a proposal, not execution.
 
 Task views include `instruction`, nullable `intent`, nullable `route`, and nullable
 `draft_input` with the frozen sender, recipients and reply target. Before
@@ -333,3 +333,23 @@ With a configured registry, accepted tasks pin their full workflow release; task
 artifact formats and source/draft validation are retained. Changed aliases, incomplete
 streams and invalid evidence cannot publish successful artifacts. No send/Calendar
 endpoint is added. See [workflow runtime and remaining gates](workflow-runtime.md).
+
+### Saved UI message mapping (capture schema 1.1)
+
+`POST /assistant/context-snapshots` also accepts schema `1.1` with a required
+`ui_map`: version `1.0`, surface `gmail_thread`, nonnegative `thread_version`,
+offset-aware `captured_at`, 1–50 unique `visible_message_ids` and selected IDs
+from that list. The backend hydrates owned synced text; uploaded bodies are rejected.
+The response adds the immutable map, capture policy and truncated message IDs.
+Old schema `1.0` requests and responses retain their shape and behavior.
+
+`GET /assistant/workflows` adds `ui_context` with capture schema, supported surfaces,
+reference handlers, the 50-message limit and `external_actions: false`.
+`What's in the third message?` on a mapped snapshot produces a source-linked
+`answer` with selection-only coverage using the saved visible order. A mapped
+single-message summary uses the configured native/Flow generation with only that
+message. Missing/ambiguous selections clarify; unknown reference operations are
+unsupported. No continuation or external write is implied.
+
+See [the frontend recipe, JSON examples and error table](ui-context-mapping.md)
+for exact language, limits, source handling and deployment compatibility.

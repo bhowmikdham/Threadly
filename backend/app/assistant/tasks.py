@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import ApiError
 from app.assistant.drafting import bind_input
 from app.assistant.summary import digest
+from app.assistant.ui_routing import wrap_release
 from app.db.models import (
     ArtifactRevision,
     AssistantJob,
@@ -97,7 +98,11 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 state="queued",
                 version=1,
                 latest_sequence=1,
-                release=release_manifest(),
+                release=(
+                    wrap_release(release_manifest())
+                    if context and context.payload.get("schema_version") == "1.1"
+                    else release_manifest()
+                ),
             )
             .on_conflict_do_nothing(constraint="uq_task_request")
             .returning(AssistantTask.id)

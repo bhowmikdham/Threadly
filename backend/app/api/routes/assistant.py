@@ -4,6 +4,7 @@ import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Query
+from pydantic import Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -12,6 +13,7 @@ from app.api.deps import CurrentUser
 from app.api.errors import ApiError
 from app.assistant import draft_review, tasks
 from app.assistant.context import capture_thread
+from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
 from app.db.models import ArtifactRevision, AssistantTask, ContextSnapshot, TaskEvent
 from app.planner.intent_router import preview_route
@@ -23,6 +25,7 @@ from app.schemas.assistant import (
     RoutePreviewRequest,
 )
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
+from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
 
 router = APIRouter()
@@ -41,6 +44,13 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
                 "external_actions": False,
             }
             for op in registry.OPERATIONS
+        },
+        "ui_context": {
+            "capture_schema": "1.1",
+            "surfaces": ["gmail_thread"],
+            "max_visible_messages": 50,
+            "reference_handlers": ["exact_message_excerpt", "single_message_summary"],
+            "external_actions": False,
         },
         "remote_resources_verified": False,
         "note": "Configuration only; source and remote prerequisites are checked per request.",
@@ -97,8 +107,18 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
 
 
 @router.post("/context-snapshots", status_code=201)
-async def create_context(request: ContextSnapshotRequest, user_id: CurrentUser, session: DB):
-    snapshot = await capture_thread(session, user_id, request.thread_id)
+async def create_context(
+    request: Annotated[
+        ContextSnapshotRequest | UIContextSnapshotRequest, Field(discriminator="schema_version")
+    ],
+    user_id: CurrentUser,
+    session: DB,
+):
+    snapshot = (
+        await capture_view(session, user_id, request)
+        if isinstance(request, UIContextSnapshotRequest)
+        else await capture_thread(session, user_id, request.thread_id)
+    )
     result = context_view(snapshot)
     await session.commit()
     return result

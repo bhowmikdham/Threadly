@@ -257,7 +257,8 @@
       "evidence": [
         "13-implementation-progress.md (partial implementation; review and integration gates pending)",
         "13-implementation-progress.md (contextual durable routing slice; UI reference maps, continuation and live evaluation pending)",
-        "../assistant-routing.md (worker dispatch, saved clarification, source boundaries and release contract)"
+        "../assistant-routing.md (worker dispatch, saved clarification, source boundaries and release contract)",
+        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)"
       ]
     },
     {
@@ -696,7 +697,7 @@
     {
       "id": "T17",
       "title": "All-intent frontend integration and contextual actions",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Frontend",
       "reviewers": [
@@ -732,7 +733,9 @@
       ],
       "handoff": "Joint E2E can exercise every artifact/action in the actual extension.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)"
+      ]
     },
     {
       "id": "T18",

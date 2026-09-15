@@ -149,3 +149,15 @@ and redacted event sequence in the same transaction. Generation state stays
 and workers must be stopped during migration. Downgrade refuses with any edited
 revision or review record; no user data is automatically discarded. Details and
 client recovery: [revision/review handoff](assistant-draft-review.md).
+
+## UI context payload 1.1
+
+No table or Alembic change. `context_snapshots.payload` can additionally hold
+`schema_version: 1.1`, `scope: synced_ui_message_excerpts`, the strict `ui_map`,
+`truncated_message_ids` and `capture_policy`. The source hash includes the map as
+well as authoritative excerpts; visible order is independent of chronological
+`messages`. Both schema versions remain immutable. Ownership checks precede capture
+and task submission, and existing owner/thread deletion cascades still apply.
+Tasks on new snapshots wrap their native/Flow manifest in `ui-context-task-1.0.0`.
+The saved route's `reference_binding` pins message ID, excerpt hash and map hash.
+It cannot be retargeted during retries. See [mapping contract](ui-context-mapping.md).

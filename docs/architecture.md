@@ -166,3 +166,15 @@ published graph/alias identity and uses the existing cancellation/lease fencing.
 The six earlier prototypes use a different output envelope; a compatible, evaluated
 runtime release must be published before activation. Other/planning/Calendar, compound
 steps, durable clarification and approved external actions remain pending.
+
+## UI reference binding
+
+Capture schema 1.1 adds an owner-checked, immutable Gmail thread-view map.
+`assistant/ui_context.py` hydrates selected IDs from PostgreSQL in one consistent
+source/version query. `assistant/ui_routing.py` binds supported references against
+visible order and returns exact source quotes natively, or filters a single-message
+summary before the existing generation adapter. No source text can select another
+operation. The worker keeps release compatibility and fenced artifact publication.
+Legacy captures retain their semantics; UI-aware tasks wrap the pinned native/Flow
+release. [Capture lifecycle and frontend integration](ui-context-mapping.md) covers
+bounds, errors, rollback and the remaining B08/B09/browser gates.
