@@ -279,3 +279,13 @@ See [revision API, diagram and rollout](../assistant-draft-review.md) and
 Next: outgoing action proposal, exact Send approval and Gmail execution/reconciliation.
 Calendar, bounded other/planning, UI context/continuation, Bedrock Flow invocation,
 live model evaluation and operational release gates remain outstanding.
+
+## UI message maps — B07 / T06 and T17 partial
+
+The backend now accepts versioned visible-order/selection maps, hydrates owned
+message excerpts, and resolves supported message lookups/summaries against the saved
+view. Native exact answers cite one message; model/Flow summaries receive only that
+message. Historical snapshot/releases remain available. No frontend adapter,
+clarification continuation or broader inbox/option reference map is claimed complete.
+See [the runtime contract](../ui-context-mapping.md) and
+[B07 acceptance checkpoint](../backend-execution/checkpoints/B07.md) for evidence.

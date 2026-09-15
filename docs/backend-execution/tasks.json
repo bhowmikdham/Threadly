@@ -362,7 +362,7 @@
     {
       "id": "B07",
       "title": "Bind UI selections and ordinal references",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T06",
         "T17"

@@ -7,7 +7,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import drafting, routing, routing_v1
+from app.assistant import drafting, routing, routing_v1, ui_routing
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
@@ -29,18 +29,22 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
     payload, provenance, error, retryable = None, None, None, False
     stopped_state = None
     manifest = None
+    ui_context = claim.release.get("workflow") == ui_routing.RELEASE
+    dispatch_release = claim.release
     try:
-        if claim.release.get("workflow") == registry.RELEASE:
-            manifest = registry.pinned_manifest(claim.release)
+        if ui_context:
+            dispatch_release = ui_routing.unwrap_release(claim.release)
+        if dispatch_release.get("workflow") == registry.RELEASE:
+            manifest = registry.pinned_manifest(dispatch_release)
     except ApiError as exc:
         error = exc.code
-    legacy = claim.release == release_manifest()
-    previous = claim.release == routing_v1.release_manifest()
+    legacy = dispatch_release == release_manifest()
+    previous = dispatch_release == routing_v1.release_manifest()
     if error or (
         not legacy
         and not previous
         and manifest is None
-        and claim.release != routing.release_manifest()
+        and dispatch_release != routing.release_manifest()
     ):
         error = "release_unavailable"
     else:
@@ -49,9 +53,11 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
             # One timeout bounds routing + checkpoint + generation inside the same lease.
             async with asyncio.timeout(GENERATION_TIMEOUT_SECONDS):
                 route = claim.route
+                binding = None
+                snapshot = claim.snapshot
                 if not legacy:
                     if route is None:
-                        router = routing_v1 if previous else routing
+                        router = ui_routing if ui_context else routing_v1 if previous else routing
                         options = {} if previous else {"draft_input": claim.draft_input}
                         route = await router.route_request(
                             claim.instruction,
@@ -64,14 +70,29 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                         async with factory.begin() as session:
                             if not await save_route(session, claim, route):
                                 return True  # cancelled, deleted or replaced during classification
-                    outcome, error = (
-                        routing_v1.dispatch_outcome(route, claim.snapshot)
-                        if previous
-                        else routing.dispatch_outcome(route, claim.snapshot, claim.draft_input)
-                    )
+                    if ui_context:
+                        binding = ui_routing.validate_binding(
+                            route, claim.instruction, claim.context_id, snapshot
+                        )
+                    if binding is not None:
+                        outcome = binding["status"]
+                        error = binding.get("reason") if outcome == "unsupported" else None
+                        if claim.draft_input is not None:
+                            outcome, error = "unsupported", "draft_options_intent_mismatch"
+                    else:
+                        outcome, error = (
+                            routing_v1.dispatch_outcome(route, snapshot)
+                            if previous
+                            else routing.dispatch_outcome(route, snapshot, claim.draft_input)
+                        )
                     if outcome in {"needs_clarification", "unsupported"}:
                         stopped_state = outcome
-                if not stopped_state and not error:
+                if not stopped_state and not error and binding and binding["mode"] == "lookup":
+                    payload = ui_routing.lookup_artifact(claim.context_id, snapshot, binding)
+                    provenance = {"provider": "native", "model": None, "release": claim.release}
+                if not stopped_state and not error and payload is None:
+                    if binding:
+                        snapshot = ui_routing.scoped_snapshot(snapshot, binding)
                     is_draft = (
                         not legacy
                         and not previous
@@ -88,7 +109,8 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                             make_prompt(claim.snapshot)
                             if legacy
                             else (routing_v1 if previous else routing).summary_prompt(
-                                claim.snapshot, claim.instruction
+                                snapshot,
+                                ui_routing.SUMMARY_REQUEST if binding else claim.instruction,
                             )
                         )
                     operation = "draft_reply" if mode == "reply" else "draft_new"
@@ -111,7 +133,7 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                     payload = (
                         drafting.make_artifact(text, claim, mode)
                         if is_draft
-                        else make_artifact(text, claim.context_id, claim.snapshot)
+                        else make_artifact(text, claim.context_id, snapshot)
                     )
         except FlowError as exc:
             error, retryable = exc.code, exc.retryable

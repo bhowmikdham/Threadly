@@ -476,7 +476,7 @@ All planning/scheduling milestones ready for complete UI acceptance.
 
 ## T17 · All-intent frontend integration and contextual actions
 
-**Owner:** Frontend · **Status:** planned · **Release:** Initial release
+**Owner:** Frontend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T01, T05, T06
 
