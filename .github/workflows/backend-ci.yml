@@ -2,10 +2,10 @@ name: backend-ci
 
 on:
   pull_request:
-    paths: ["backend/**", ".github/workflows/backend-ci.yml"]
+    paths: ["backend/**", "infra/bedrock/**", ".github/workflows/backend-ci.yml"]
   push:
     branches: [main]
-    paths: ["backend/**"]
+    paths: ["backend/**", "infra/bedrock/**"]
 
 jobs:
   lint-test:
@@ -43,3 +43,10 @@ jobs:
           pip install cfn-lint==1.56.3
           python -m app.workflows.release --profile-arn 'arn:aws:bedrock:ap-southeast-2:123456789012:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0' --output "$RUNNER_TEMP/threadly-runtime-flow"
           cfn-lint -t "$RUNNER_TEMP/threadly-runtime-flow/stack.json"
+      - name: Validate summary console experiment offline
+        run: |
+          python -m unittest discover -s ../infra/bedrock/tests -q
+          mkdir -p "$RUNNER_TEMP/threadly-summary-console"
+          cd "$RUNNER_TEMP/threadly-summary-console"
+          python "$GITHUB_WORKSPACE/infra/bedrock/cloudshell_summary.py" --render-only
+          cfn-lint -t threadly-summary-*/template.json

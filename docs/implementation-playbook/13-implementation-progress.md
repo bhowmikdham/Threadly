@@ -289,3 +289,13 @@ message. Historical snapshot/releases remain available. No frontend adapter,
 clarification continuation or broader inbox/option reference map is claimed complete.
 See [the runtime contract](../ui-context-mapping.md) and
 [B07 acceptance checkpoint](../backend-execution/checkpoints/B07.md) for evidence.
+
+## Concise summary correction — T07/T18 partial
+
+A user-reported prototype summary prompted a versioned issue-first summary policy,
+word/repetition limits and a separate one-Flow console experiment. Native/Flow
+application summaries share the policy; historical queued jobs retain old behavior.
+The local full suite passes 345 tests with no skips; this is not evidence of live
+Haiku relevance or factual quality. Six synthetic cases and a human-review report
+path are included. See [diagnosis and deployment steps](../summary-quality.md) and
+[checkpoint](../backend-execution/checkpoints/summary-quality.md).

@@ -180,7 +180,7 @@ Dispatcher receives validated operations and bound context.
 
 ## T07 · Flow registry, read-tool bridge and versioned promotion
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T03, T04, T05
 
@@ -507,7 +507,7 @@ Joint E2E can exercise every artifact/action in the actual extension.
 
 ## T18 · Joint all-intent quality and recovery gate
 
-**Owner:** AI · **Status:** planned · **Release:** Initial release
+**Owner:** AI · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T08, T09, T11, T12, T13, T14, T16, T17
 

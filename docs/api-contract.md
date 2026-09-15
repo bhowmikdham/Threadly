@@ -353,3 +353,13 @@ unsupported. No continuation or external write is implied.
 
 See [the frontend recipe, JSON examples and error table](ui-context-mapping.md)
 for exact language, limits, source handling and deployment compatibility.
+
+### Concise summary generation release
+
+New requests pin `summary-quality-task-1.0.0` around their native/Flow release (inside
+the UI wrapper when present). The summary artifact shape is unchanged. Generation
+now has hard budgets: overview 80 words, list items 35 words, 3 decisions, 3 actions,
+2 questions and 180 words total. Extra fields, fenced JSON and repeated normalized
+fields fail as `invalid_summary_output`; existing source validation still applies.
+Historical queued releases retain their old prompt and validator. See
+[summary quality and frontend presentation](summary-quality.md).

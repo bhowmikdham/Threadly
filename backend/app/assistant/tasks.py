@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
+from app.assistant import summary_quality
 from app.assistant.drafting import bind_input
 from app.assistant.summary import digest
 from app.assistant.ui_routing import wrap_release
@@ -82,6 +83,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         if context is None:
             raise ApiError(404, "context_not_found", "Select an accessible saved thread snapshot.")
     draft_input = await bind_input(session, user, request.draft_options, context)
+    accepted_release = summary_quality.wrap_release(release_manifest())
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -99,9 +101,9 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 version=1,
                 latest_sequence=1,
                 release=(
-                    wrap_release(release_manifest())
+                    wrap_release(accepted_release)
                     if context and context.payload.get("schema_version") == "1.1"
-                    else release_manifest()
+                    else accepted_release
                 ),
             )
             .on_conflict_do_nothing(constraint="uq_task_request")

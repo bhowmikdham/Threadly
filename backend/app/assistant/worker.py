@@ -7,7 +7,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import drafting, routing, routing_v1, ui_routing
+from app.assistant import drafting, routing, routing_v1, summary_quality, ui_routing
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
@@ -31,9 +31,13 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
     manifest = None
     ui_context = claim.release.get("workflow") == ui_routing.RELEASE
     dispatch_release = claim.release
+    concise = False
     try:
         if ui_context:
             dispatch_release = ui_routing.unwrap_release(claim.release)
+        concise = dispatch_release.get("workflow") == summary_quality.RELEASE
+        if concise:
+            dispatch_release = summary_quality.unwrap_release(dispatch_release)
         if dispatch_release.get("workflow") == registry.RELEASE:
             manifest = registry.pinned_manifest(dispatch_release)
     except ApiError as exc:
@@ -108,6 +112,11 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                         prompt = (
                             make_prompt(claim.snapshot)
                             if legacy
+                            else summary_quality.make_prompt(
+                                snapshot,
+                                ui_routing.SUMMARY_REQUEST if binding else claim.instruction,
+                            )
+                            if concise
                             else (routing_v1 if previous else routing).summary_prompt(
                                 snapshot,
                                 ui_routing.SUMMARY_REQUEST if binding else claim.instruction,
@@ -133,7 +142,9 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                     payload = (
                         drafting.make_artifact(text, claim, mode)
                         if is_draft
-                        else make_artifact(text, claim.context_id, snapshot)
+                        else (summary_quality.make_artifact if concise else make_artifact)(
+                            text, claim.context_id, snapshot
+                        )
                     )
         except FlowError as exc:
             error, retryable = exc.code, exc.retryable

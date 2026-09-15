@@ -264,7 +264,7 @@
     {
       "id": "T07",
       "title": "Flow registry, read-tool bridge and versioned promotion",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -302,7 +302,9 @@
       ],
       "handoff": "AI can author tested flow graphs against stable tool contracts.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)"
+      ]
     },
     {
       "id": "T08",
@@ -740,7 +742,7 @@
     {
       "id": "T18",
       "title": "Joint all-intent quality and recovery gate",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "AI",
       "reviewers": [
@@ -781,7 +783,9 @@
       ],
       "handoff": "Release owner gets complete evidence package and known limitations.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)"
+      ]
     },
     {
       "id": "T19",

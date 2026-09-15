@@ -207,3 +207,11 @@ with B02–B06 and B14/B15 completing external actions. The current invocation l
 can be reused throughout; no need to invent another router microservice or give
 Bedrock authority to send/book. Optional proactive monitoring, voice, attachments,
 style personalization and recurring-event mutation remain B21–B25 after the core.
+
+## Concise summary policy update
+
+New tasks use the versioned summary-quality wrapper described in
+[summary-quality.md](summary-quality.md). The runtime graph contract stays unchanged:
+it receives the backend's complete prompt. The separate one-Flow console experiment
+has a fixed prompt and input adapter and cannot be used as a runtime registry entry.
+Older jobs retain the old validator. Live semantic evaluation is still pending.

@@ -1,5 +1,9 @@
 # CloudShell: six Bedrock Flow prototypes
 
+For the newer concise summary experiment and the diagnosis of verbose prototype
+output, use [the summary quality guide](../../docs/summary-quality.md). The six
+original prototype definitions below remain unchanged for reproducibility.
+
 Status: provisioning code and offline tests; **not an integrated backend release**.
 This is a user-requested preparatory subset of B16/B17, not completion of those tasks.
 The current assistant worker continues to use its native handlers. No API, database,
