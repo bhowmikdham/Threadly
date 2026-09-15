@@ -104,6 +104,37 @@ def test_unknown_observation_id_cannot_be_silently_skipped():
         evaluate_observations(FIXTURES, observations_for({"id": "misspelled"}, {}))
 
 
+def test_null_offline_file_cannot_select_live_invocation(tmp_path, monkeypatch):
+    import sys
+
+    from app.workflows import evaluate_summary
+
+    fixtures = tmp_path / "fixtures.json"
+    observations = tmp_path / "observations.json"
+    fixtures.write_text(json.dumps(FIXTURES))
+    observations.write_text("null")
+
+    def no_invoke(*_args):
+        pytest.fail("Offline mode must never fall through to live invocation")
+
+    monkeypatch.setattr(evaluate_summary, "evaluate", no_invoke)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_summary",
+            "--fixtures",
+            str(fixtures),
+            "--observations",
+            str(observations),
+            "--output",
+            str(tmp_path / "report.json"),
+        ],
+    )
+    with pytest.raises(ValueError, match="Invalid observations envelope"):
+        evaluate_summary.main()
+
+
 def test_all_three_policy_identities_remain_replayable_and_distinct():
     hashes = []
     for policy in (summary_policy_v1, summary_policy_v1_0_1, summary_policy):

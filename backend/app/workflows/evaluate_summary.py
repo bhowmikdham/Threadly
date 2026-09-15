@@ -118,7 +118,8 @@ def evaluate_observations(fixtures: dict, observations: dict) -> dict:
     """Replay supplied synthetic outputs. Missing cases remain failures to complete the suite."""
     cases = validate_fixtures(fixtures)
     if (
-        set(observations) != {"schema_version", "candidate", "outputs"}
+        not isinstance(observations, dict)
+        or set(observations) != {"schema_version", "candidate", "outputs"}
         or observations["schema_version"] != "1.0"
         or not isinstance(observations["candidate"], str)
         or not observations["candidate"].strip()
@@ -187,7 +188,7 @@ def main():
     with args.output.open("x") as file:
         result = (
             evaluate_observations(fixtures, observations)
-            if observations is not None
+            if args.observations is not None
             else asyncio.run(evaluate(entry, fixtures))
         )
         file.write(json.dumps(result, indent=2) + "\n")
