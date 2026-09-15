@@ -6,7 +6,7 @@ import re
 from pydantic import Field, model_validator
 
 from app.api.errors import ApiError
-from app.assistant import summary, summary_policy, summary_policy_v1
+from app.assistant import summary, summary_policy, summary_policy_v1, summary_policy_v1_0_1
 from app.model_client.structured import reject_duplicate_keys
 
 RELEASE = "summary-quality-task-1.0.0"
@@ -63,7 +63,7 @@ def policy_for_release(release: dict):
         set(release) == {"workflow", "base_release", "contract_hash"}
         and release["workflow"] == RELEASE
     ):
-        for policy in (summary_policy, summary_policy_v1):
+        for policy in (summary_policy, summary_policy_v1_0_1, summary_policy_v1):
             if release["contract_hash"] == contract_hash(policy):
                 return policy
     raise ApiError(503, "release_unavailable", "The saved summary release is unavailable.")

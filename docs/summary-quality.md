@@ -1,6 +1,7 @@
 # Concise summary correction
 
-Branch `codex/summary-quality`, based on `c190126` (merged PR #15).
+Current candidate: `summary-quality-1.0.2`, branch `codex/summary-grounding-contract`,
+based on `760b0f5` (merged PR #17). Earlier candidate reports are retained below.
 Code and contract replay are implemented. Live Haiku output quality is **not yet
 verified**, and the existing AWS prototype has not been changed by this PR.
 
@@ -45,9 +46,9 @@ and artifact builder. The public artifact schema does not change.
 
 | Field | Behavior |
 |---|---|
-| `overview` | Issue/outcome/blocker first, 1–3 sentences; prompt target 35–65 words, hard limit 80 |
+| `overview` | Issue/outcome/blocker first, 1–3 sentences; no minimum length, hard limit 80 |
 | `decisions` | At most 3 explicit agreements; offers are not decisions |
-| `actions` | At most 3 concrete next steps supported by numbered source references |
+| `actions` | At most 3 explicitly requested or committed, outstanding source actions; no inferred advice |
 | `open_questions` | At most 2 material unanswered source questions, not invented missing-data checklists |
 | All fields | 180 words maximum, each list item at most 35 words, no exact normalized duplicates |
 
@@ -134,7 +135,9 @@ For a small CloudShell download, fetch these three files from the **same reviewe
 commit** into a new directory: `infra/bedrock/cloudshell_flows.py`,
 `infra/bedrock/cloudshell_summary.py`, and `backend/app/assistant/summary_policy.py`.
 Verify the supplied SHA-256 hashes, then run `python3 cloudshell_summary.py`.
-The following command pins the tested implementation commit and verifies all three files. The script prints the new Flow's
+After reviewing the ten-case contract and local evidence, the following command
+prepares the isolated **1.0.2 candidate**. It pins the locally tested implementation
+and verifies all three files; it does not establish live model quality or enable the backend. The script prints the new Flow's
 console URL; testing the old Flow continues to use the old prompt.
 
 ```bash
@@ -142,7 +145,7 @@ console URL; testing the old Flow continues to use the old prompt.
 set -e
 THREADLY_SUMMARY_DIR="$(mktemp -d)"
 cd "$THREADLY_SUMMARY_DIR"
-THREADLY_RELEASE='bb994484df64f3cdf0b27e3c75ef500d9d9d7dd1'
+THREADLY_RELEASE='fa5ad150df228743ea00d1b2c46a268786f48aa5'
 THREADLY_RAW="https://raw.githubusercontent.com/bhowmikdham/Threadly/$THREADLY_RELEASE"
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_flows.py" -o cloudshell_flows.py
 curl -fsSL "$THREADLY_RAW/infra/bedrock/cloudshell_summary.py" -o cloudshell_summary.py
@@ -150,7 +153,7 @@ curl -fsSL "$THREADLY_RAW/backend/app/assistant/summary_policy.py" -o summary_po
 sha256sum -c - <<'SHA256'
 1d2690bc50c9eabda44fc9e09a70189bb5bd9752c2241ef7162bf32b8e514a95  cloudshell_flows.py
 4cfd03f74dff5dda567eefe9f1ed329dcfe36f0cab49f0189b57710c5f2d0fae  cloudshell_summary.py
-fd05fd9ecbcf20d1ff13946c243e58ccdedbca01efd5ee0294134a3216b596d6  summary_policy.py
+6e71ae15aa7f9e3b2f3f2e8e3aeb05cf5ff556f2ba736bddd3523ea4794c6b4b  summary_policy.py
 SHA256
 python3 cloudshell_summary.py
 )
@@ -179,10 +182,12 @@ scoped to the selected inference profile and Australian destination models.
 
 ## Evaluation and frontend handoff
 
-`backend/tests/fixtures/summary_quality_v1.json` has six synthetic cases: forwarded
+`backend/tests/fixtures/summary_quality_v2.json` has ten synthetic cases, extending the preserved v1 suite: forwarded
 invoice blocker, later payment confirmation, FYI without action, one material
 unanswered question, quoted-source instruction injection and conflicting amounts.
-Each includes a human reference and a semantic review rubric. Tests exercise
+The new cases add a passive delivery update, explicit work request, unaccepted offer
+and answered question. Each includes a human reference, case-specific regression
+constraints and a semantic review rubric. Tests exercise
 contracts, source scope, release compatibility and failure publication, not the
 ability of a live model to produce the reference output.
 
@@ -191,13 +196,13 @@ For an explicitly authorized live replay against a **published runtime Flow**:
 ```bash
 PYTHONPATH=backend python -m app.workflows.evaluate_summary \
   --manifest candidate-registry.json \
-  --fixtures backend/tests/fixtures/summary_quality_v1.json \
+  --fixtures backend/tests/fixtures/summary_quality_v2.json \
   --output private-summary-quality-report.json --invoke
 ```
 
-This makes six billed calls for the checked-in fixture set (maximum ten cases).
+This makes ten billed calls for the checked-in fixture set (maximum ten cases).
 It records fixture/contract hashes, model/Flow provenance, observed output, contract
-results and rubrics. Human factual/relevance review always starts `pending`;
+results, regression constraint failures and rubrics. Human factual/relevance review always starts `pending`;
 `production_approved` stays false. Review every case, record pass/fail and the exact
 reason, and retain older results for comparison. Do not present a local fake replay
 as a live quality evaluation, or a successful schema check as factual accuracy.
@@ -227,7 +232,8 @@ human evaluation; the backend does not use unreliable text-similarity heuristics
 
 The original policy is retained in `summary_policy_v1.py`. Saved contract hashes
 select the matching prompt, so queued 1.0.0 jobs keep their original wording; new
-jobs pin 1.0.1. Unknown policy hashes fail closed. The console launcher creates a
+jobs in that release pinned 1.0.1. Current jobs pin 1.0.2; both older policies
+are retained byte-for-byte and their historical contract hashes are regression-tested. Unknown policy hashes fail closed. The console launcher creates a
 new content-addressed Flow and prints its prompt release. Use the new printed URL.
 
 [Manual review record](evaluation/summary-console-review-v1.json): three satisfactory
@@ -236,7 +242,65 @@ outputs; Flow/trace identifiers were not supplied, so deployment identity is not
 independently verified. A separate plan-shaped response remains an unresolved
 configuration anomaly. None of these samples is a live pass for policy 1.0.1.
 
-After launching 1.0.1, rerun the room case first. Expect `actions: []` and
+Historical 1.0.1 test instructions (superseded by the 1.0.2 gate below): rerun the room case first. Expect `actions: []` and
 `open_questions: ["Is Room A or Room B booked?"]`, then rerun all six scenarios on
 that same new Flow. Preserve the Flow name/release with results. No claim that
 this prompt correction has passed a live model test is made before those results.
+
+
+## Grounding correction — candidate 1.0.2
+
+The user-reported 1.0.1 delivery result invented “Confirm whether this revised date
+is acceptable and any downstream impacts” and an acceptance question. That output
+passes the runtime JSON validator. The failure is semantic: a plain delivery
+update does not request new work. The previous “next step that matters” / “clearly
+necessary next step” prompt wording encouraged this behavior.
+
+The new policy removes both instructions and the minimum word target. It defines
+status updates, explicit outstanding work, actual unanswered questions, offers,
+resolved requests and decisions separately. These rules apply to overview as well
+as arrays. Explicit actions remain supported; simply emptying every action array
+would lose legitimate user information. Advice/compound work belongs to the
+[master request workflow](master-workflow.md), not an unsolicited summary step.
+
+The runtime output schema, budgets and evidence builder remain unchanged. This is
+not a universal semantic rejection filter. `workflows/summary_checks.py` adds
+**fixture-specific evaluation checks**, shared by offline and live replay. They
+catch the reported failure, advice hidden only in overview, missed explicit actions,
+and question/action shape expectations. Different hallucinated wording or a false
+claim with valid references can still require human review.
+
+Replay the two actual user-pasted 1.0.1 outputs locally, with no AWS calls:
+
+```bash
+PYTHONPATH=backend python -m app.workflows.evaluate_summary \
+  --fixtures backend/tests/fixtures/summary_quality_v2.json \
+  --observations docs/evaluation/summary-console-observations-v1_0_1.json \
+  --output /tmp/threadly-summary-observed-review.json
+```
+
+Expected: **nonzero exit**, 2 structurally valid cases, 1 regression pass, 1 failure,
+8 cases not run. The eight include four original cases not rerun on 1.0.1 and four
+new boundary cases. The report records the checked contract hash separately from
+unknown offline generation identity. Do not reinterpret these as 1.0.2 results.
+Repeated runs require a fresh output path; reports are never overwritten.
+
+Before another candidate is enabled:
+
+1. Review the ten inputs, expected behavior and rubric together; keep input and
+   output records synthetic. Local tests must reject known bad observations and
+   preserve positive actions. A hand-authored reference passing is not a model pass.
+2. Review the versioned prompt and rendered graph. An isolated console experiment
+   can then collect candidate outputs; keep its prompt/Flow/model identity and
+   every result. Convert fixture bodies to the console `messages[].body` adapter
+   without changing their text. Offline replay accepts objects or raw output strings.
+3. Run all ten cases on the same candidate. Structural checks and fixture constraints
+   must all pass, then a human checks each factual clause, attribution, relevance,
+   unresolved status and absence of unsolicited work. Any prompt change restarts
+   the full candidate run. `production_approved` never becomes true automatically.
+4. Verify the published runtime Flow through the real backend, including its
+   different graph, masking, context binding and frontend rendering, before rollout.
+
+Current candidate 1.0.2 has **no live model results**. The two 1.0.1 observations
+have no independently verified prompt hash/Flow trace. Local regression success
+therefore prepares the next candidate; it does not prove live language quality.

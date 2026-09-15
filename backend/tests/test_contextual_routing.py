@@ -483,3 +483,39 @@ async def test_continuation_never_falls_through_to_fresh_routing(db_sessionmaker
 def test_dispatch_allowlist_never_executes_other_actions_or_operation_subsets(changes, code):
     route = {"decision": summary_decision(**changes)}
     assert routing.dispatch_outcome(route, SNAPSHOT) == ("unsupported", code)
+
+
+@needs_pg
+async def test_summary_schedule_reply_proposal_cannot_execute_only_a_summary(
+    db_sessionmaker, mailbox
+):
+    """Until B10/Calendar are installed, an explicit triple proposal executes no subset."""
+    async with db_sessionmaker.begin() as session:
+        context = await capture_thread(session, mailbox[0], "thread-one")
+        task_id = (
+            await tasks.submit(
+                session,
+                mailbox[0],
+                request(
+                    context.id,
+                    instruction=(
+                        "Summarise this thread, find three slots tomorrow and draft a reply"
+                    ),
+                    intent_hint=None,
+                ),
+            )
+        ).id
+    model = PipelineModel(
+        proposal(
+            intent="plan_schedule",
+            output_kind="draft",
+            operations=["summarise_thread", "suggest_slots", "draft_reply"],
+        )
+    )
+    await run_once(db_sessionmaker, model)
+    assert len(model.calls) == 1 and model.calls[0][1]["small"]
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, task_id)
+        assert task.state == "failed" and task.error_code == "invalid_route_output"
+        assert task.route is None
+    assert (await counts(db_sessionmaker))[-1] == 0

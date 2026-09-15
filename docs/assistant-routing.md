@@ -1,5 +1,8 @@
 # Contextual task routing — T06 implementation slice
 
+For the current coordinator, classifier boundary and planned multi-intent dependency
+graph, see [master workflow](master-workflow.md).
+
 **Historical routing slice:** the guide below describes `contextual-task-1.0.0`.
 The current `contextual-task-1.1.0` release also supports initial reply/compose
 drafts; see [draft inputs and current behavior](assistant-drafts.md).
