@@ -533,7 +533,8 @@
         "backend/app/assistant/worker.py",
         "backend/app/assistant/routing.py",
         "backend/app/api/routes/assistant.py",
-        "backend/tests/test_assistant_migration.py"
+        "backend/tests/test_assistant_migration.py",
+        "docs/master-workflow.md"
       ],
       "proposed_paths": [
         "backend/app/assistant/steps.py"
@@ -544,14 +545,18 @@
         "Migrate artifact identity to explicit streams and a task final-result pointer as DESIGN D5. Preserve all existing UUIDs, draft revision numbers, reviews and action bindings.",
         "Checkpoint successful read/generated steps; retries reuse unaffected outputs and recompute only invalidated dependencies. Keep external approvals/actions outside autonomous step execution.",
         "Map intermediate versus final artifacts/events explicitly; allow lookup \u2192 reply/compose and later availability \u2192 draft without publishing intermediate output as final success.",
-        "Reject unsupported/reversed/cyclic sequences; one task's context does not authorize another's result refs. Bound steps, token/tool calls and total time."
+        "Reject unsupported/reversed/cyclic sequences; one task's context does not authorize another's result refs. Bound steps, token/tool calls and total time.",
+        "Version the compound planner separately from historical routes. Preserve all explicit user clauses, negations and outputs; multi-label classifier scores are advisory and never select arbitrary Flow IDs. Implement the summary + scheduling + reply dependency graph in docs/master-workflow.md only when its whole handler set is installed."
       ],
       "acceptance_tests": [
         "Lookup succeeds then generation fails: retry reuses valid lookup checkpoint and publishes one final result stream.",
         "Old draft history/review/action refs survive migration; latest task points to final artifact rather than largest unrelated revision.",
         "Cancel/lease replacement during any step fences publication; duplicate workers cannot double-publish step outputs.",
         "Changing a selected source invalidates dependent outputs but cannot mutate historical artifacts or approved outgoing payload.",
-        "Every installed compound pair has end-to-end replay; unsupported full plans execute zero partial steps and return clear outcome."
+        "Every installed compound pair has end-to-end replay; unsupported full plans execute zero partial steps and return clear outcome.",
+        "Summary + three meeting slots + reply: preserve all three requested outcomes; reply consumes validated summary/slot refs as requested; incomplete Calendar capability causes zero partial execution before preflight succeeds. Enable this scenario only with B12/B13 gates.",
+        "Multi-label order does not determine step order. Negated reply/send never executes; a request to include the summary in the reply creates the matching dependency; separate summary-for-user output remains separate.",
+        "Summary succeeds but Calendar fails: task remains incomplete, no slot-bearing reply is generated, and retry reuses only still-valid outputs. Stale slots invalidate dependent drafts; no invented free time or automatic send."
       ],
       "external_gate": "This touches shared state and migrations: require a focused human/reviewer pass before merging, after producing the tested implementation.",
       "handoff": "Compound kernel ready for plan/schedule and Flow adapters; no arbitrary autonomous tool loop.",

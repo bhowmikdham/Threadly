@@ -356,6 +356,12 @@ for exact language, limits, source handling and deployment compatibility.
 
 ### Concise summary generation release
 
+The current policy candidate is `summary-quality-1.0.2`: descriptive summaries,
+explicit outstanding source actions only, and no invented advice in overview.
+The JSON/artifact schema is unchanged. Case-specific evaluation checks are not a
+universal runtime grounding validator. See [master workflow](master-workflow.md)
+for supported single operations and the still-planned compound executor.
+
 New requests pin `summary-quality-task-1.0.0` around their native/Flow release (inside
 the UI wrapper when present). The summary artifact shape is unchanged. Generation
 now has hard budgets: overview 80 words, list items 35 words, 3 decisions, 3 actions,

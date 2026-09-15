@@ -1,5 +1,8 @@
 # Bedrock workflow runtime and completion checklist
 
+For the current coordinator, classifier boundary and planned multi-intent dependency
+graph, see [master workflow](master-workflow.md).
+
 This change completes the local backend invocation path for the three existing
 single-operation generation workflows: summarise, reply and compose. It is **not
 completion of the five-intent product or the complete B17 package**. The six Flows

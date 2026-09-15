@@ -235,21 +235,26 @@ async def test_observed_room_failure_does_not_publish_or_retry(db_sessionmaker, 
     assert len(model.calls) == 1
 
 
+@pytest.mark.parametrize("version", ["1.0.0", "1.0.1"])
 @needs_pg
-async def test_pre_question_fix_release_replays_its_original_prompt(db_sessionmaker, mailbox):
-    from app.assistant import summary_policy_v1
+async def test_previous_quality_release_replays_its_original_prompt(
+    db_sessionmaker, mailbox, version
+):
+    from app.assistant import summary_policy_v1, summary_policy_v1_0_1
+
+    policy = summary_policy_v1 if version == "1.0.0" else summary_policy_v1_0_1
 
     task_id, _ = await create_task(db_sessionmaker, mailbox[0])
     async with db_sessionmaker.begin() as session:
         task = await session.get(AssistantTask, task_id)
         task.release = {
             **task.release,
-            "contract_hash": summary_quality.contract_hash(summary_policy_v1),
+            "contract_hash": summary_quality.contract_hash(policy),
         }
     model = FakeModel()
     await run_once(db_sessionmaker, model)
-    assert model.calls[0][0].startswith(summary_policy_v1.PROMPT)
-    assert "Each open_questions element is a JSON STRING" not in model.calls[0][0]
+    assert model.calls[0][0].startswith(policy.PROMPT)
+    assert "CONTENT SELECTION RULES" not in model.calls[0][0]
     async with db_sessionmaker() as session:
         assert (await session.get(AssistantTask, task_id)).state == "succeeded"
 
@@ -257,7 +262,7 @@ async def test_pre_question_fix_release_replays_its_original_prompt(db_sessionma
 def test_question_fix_keeps_the_output_contract_and_changes_prompt_identity():
     from app.assistant import summary_policy_v1
 
-    assert summary_policy.VERSION == "summary-quality-1.0.1"
+    assert summary_policy.VERSION == "summary-quality-1.0.2"
     assert summary_quality.contract_hash() != summary_quality.contract_hash(summary_policy_v1)
     # The actual populated string example is valid, rather than a permissive schema change.
     result = {

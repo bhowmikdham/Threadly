@@ -40,5 +40,6 @@
   "separate_anomaly": "An earlier payment-confirmation output used operation=plan and the old prototype envelope. Suspected Flow/prompt mismatch, not independently resolved; excluded from the six-case candidate review.",
   "conclusion": "Partial user-reported evaluation, not release approval or a measured model success rate.",
   "next_candidate": "summary-quality-1.0.1",
-  "next_candidate_live_evaluation": "not_run; rerun all six cases"
+  "next_candidate_live_evaluation": "not_run; rerun all six cases",
+  "subsequent_review": "summary-console-review-v1_0_1.json records subsequent 1.0.1 outputs; this file preserves the original 1.0.0 review."
 }

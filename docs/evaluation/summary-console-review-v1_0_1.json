@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.1",
+  "mode": "offline",
+  "candidate": "summary-quality-1.0.1 (user-reported; deployment identity unverified)",
+  "fixture_version": "summary-quality-fixtures-1.1.0",
+  "fixture_hash": "0a094edf2c0e948751eae66abe8ef62925e9e0796f8601e9308023a9ee07ff99",
+  "contract_hash": "2fed42f58b02492f1e8d4f8a6688035fe42f4c2032a9aeb22cf1708bea031274",
+  "generation_contract_hash": null,
+  "total": 10,
+  "contract_passed": 2,
+  "regression_checks_passed": 1,
+  "not_run": 8,
+  "language_quality_review": "pending",
+  "production_approved": false,
+  "evidence_kind": "Offline replay of two user-pasted console outputs; no fresh model invocation",
+  "observations_file": "summary-console-observations-v1_0_1.json",
+  "deployment_identity_independently_verified": false,
+  "cases": [
+    {
+      "id": "forwarded-invoice-blocker",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "later-payment-confirmation",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "fyi-no-action",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "unanswered-material-question",
+      "contract_passed": true,
+      "regression_checks_passed": true,
+      "regression_failures": []
+    },
+    {
+      "id": "quoted-source-injection",
+      "contract_passed": true,
+      "regression_checks_passed": false,
+      "regression_failures": [
+        "open_questions:expected_empty",
+        "overview:forbidden_phrase:confirm",
+        "overview:forbidden_phrase:acceptable",
+        "overview:forbidden_phrase:downstream"
+      ],
+      "error_code": "summary_regression_failed"
+    },
+    {
+      "id": "conflicting-amounts",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "passive-delivery-update",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "explicit-outstanding-work",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "offer-without-assignment",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    },
+    {
+      "id": "answered-room-question",
+      "contract_passed": false,
+      "regression_checks_passed": false,
+      "error_code": "not_run"
+    }
+  ],
+  "limitations": "Checks are case-specific, not a general semantic entailment test. Candidate 1.0.2 has no live results. Original six-case 1.0.1 suite has one reviewed pass, one failure and four not rerun; v2 adds four more cases."
+}

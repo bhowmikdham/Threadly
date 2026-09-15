@@ -188,3 +188,9 @@ New tasks pin this wrapper without reinterpreting old queued releases; UI select
 filtering still occurs before generation. Graph completion and schema validity do
 not establish factual quality. [The diagnosis and evaluation guide](summary-quality.md)
 separate offline regression, live Haiku evaluation and frontend presentation.
+
+The [master workflow contract](master-workflow.md) maps the actual API/worker/router/
+registry coordinator and the planned multi-label → validated step graph integration.
+Summary policy 1.0.2 separates descriptive output from requested planning; its
+offline/live evaluation distinguishes JSON validity from known semantic regressions.
+No AWS master orchestrator or compound scheduling executor is added by that fix.
