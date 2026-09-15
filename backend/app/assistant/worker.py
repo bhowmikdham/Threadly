@@ -32,11 +32,13 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
     ui_context = claim.release.get("workflow") == ui_routing.RELEASE
     dispatch_release = claim.release
     concise = False
+    concise_policy = None
     try:
         if ui_context:
             dispatch_release = ui_routing.unwrap_release(claim.release)
         concise = dispatch_release.get("workflow") == summary_quality.RELEASE
         if concise:
+            concise_policy = summary_quality.policy_for_release(dispatch_release)
             dispatch_release = summary_quality.unwrap_release(dispatch_release)
         if dispatch_release.get("workflow") == registry.RELEASE:
             manifest = registry.pinned_manifest(dispatch_release)
@@ -115,6 +117,7 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                             else summary_quality.make_prompt(
                                 snapshot,
                                 ui_routing.SUMMARY_REQUEST if binding else claim.instruction,
+                                policy=concise_policy,
                             )
                             if concise
                             else (routing_v1 if previous else routing).summary_prompt(

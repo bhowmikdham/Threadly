@@ -61,3 +61,28 @@ reported example privately, review factual attribution/relevance/duplication, an
 retain results with the new Flow/prompt release. Then validate through the deployed
 backend and frontend. B08 clarification work is still pending after this correction;
 no broader workflow package is marked complete by this summary fix.
+
+## Follow-up: explicit question strings, policy 1.0.1
+
+Branch `codex/summary-question-contract`, based on merged PR #16 (`160122b`).
+The pasted room output is now an exact regression fixture: it fails the string
+schema at `open_questions[0]`, and a real-PostgreSQL worker test confirms that no
+artifact is published or generation retry scheduled. Prompt 1.0.1 demonstrates
+populated string questions and asks for one representation of each unresolved issue.
+This is a prompt correction, not a semantic-duplication detector in backend code.
+
+Original policy 1.0.0 is retained byte-for-byte in `summary_policy_v1.py`. Saved
+contract hashes choose their original policy; new jobs select 1.0.1. Tests verify
+that old queued jobs still receive the original prompt and unknown versions fail.
+Schema, budgets, artifact output and cloud permissions are unchanged.
+
+Verification: **349 backend tests passed, zero skips**, with required disposable
+PostgreSQL 16; **19 provisioning tests passed**; Ruff, rendered summary template
+cfn-lint, both doc validators and diff checks passed. Hosted CI is recorded in the
+follow-up PR. No AWS resources or live model calls were made by this task.
+
+The partial user-reported v1 review is saved in
+`docs/evaluation/summary-console-review-v1.json`: three satisfactory samples, one
+failure, two untested. Flow IDs/trace IDs were not supplied; identity is unverified.
+The earlier plan-envelope anomaly is separate and unresolved. All six cases must
+be rerun on 1.0.1; previous passes are not carried over to the new policy.

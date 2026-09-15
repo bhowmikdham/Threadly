@@ -214,3 +214,29 @@ instance, Ruff, `python -m unittest discover -s infra/bedrock/tests`, both docum
 validators and cfn-lint on the render-only summary template. See the checkpoint for
 actual results. Outstanding live gates are the new console replay, deployed backend
 runtime verification and frontend rendering/integration.
+
+## Question format correction — policy 1.0.1
+
+A user-reported room test returned an object inside `open_questions` and restated
+that question as an action. The existing backend rejects the object type. Policy
+`summary-quality-1.0.1` now explicitly requires JSON strings, provides a populated
+string example, and prefers one open question for an explicitly unanswered fact or
+choice. Actions should describe distinct work rather than paraphrase that question.
+The schema and budgets stay unchanged. Semantic paraphrase duplication still needs
+human evaluation; the backend does not use unreliable text-similarity heuristics.
+
+The original policy is retained in `summary_policy_v1.py`. Saved contract hashes
+select the matching prompt, so queued 1.0.0 jobs keep their original wording; new
+jobs pin 1.0.1. Unknown policy hashes fail closed. The console launcher creates a
+new content-addressed Flow and prints its prompt release. Use the new printed URL.
+
+[Manual review record](evaluation/summary-console-review-v1.json): three satisfactory
+samples (two with minor wording notes), one failure, two untested. These are pasted
+outputs; Flow/trace identifiers were not supplied, so deployment identity is not
+independently verified. A separate plan-shaped response remains an unresolved
+configuration anomaly. None of these samples is a live pass for policy 1.0.1.
+
+After launching 1.0.1, rerun the room case first. Expect `actions: []` and
+`open_questions: ["Is Room A or Room B booked?"]`, then rerun all six scenarios on
+that same new Flow. Preserve the Flow name/release with results. No claim that
+this prompt correction has passed a live model test is made before those results.

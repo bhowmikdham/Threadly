@@ -100,7 +100,7 @@ def main():
     provision.write_json(directory / "template.json", template)
     provision.write_json(directory / "summary.flow.json", graph)
     (directory / "prompt.txt").write_text(policy.CONSOLE_PROMPT)
-    print(f"Stack: {stack_name}\nAssets: {directory}", flush=True)
+    print(f"Prompt release: {policy.VERSION}\nStack: {stack_name}\nAssets: {directory}", flush=True)
     if args.render_only:
         print("Rendered synthetic assets only. No AWS calls.")
         return

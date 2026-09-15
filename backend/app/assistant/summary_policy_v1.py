@@ -1,6 +1,6 @@
 """Shared, dependency-free summary policy for the backend and CloudShell experiment."""
 
-VERSION = "summary-quality-1.0.1"
+VERSION = "summary-quality-1.0.0"
 OVERVIEW_WORDS = 80
 ITEM_WORDS = 35
 TOTAL_WORDS = 180
@@ -31,11 +31,6 @@ Return exactly one raw JSON object, without Markdown fences, headings or comment
  "open_questions":[]}.
 A decision is {"text":"explicitly agreed decision", "sources":[1]}.
 An action is {"text":"concrete requested or clearly necessary next step", "sources":[1]}.
-Each open_questions element is a JSON STRING, never an object. For example:
-"open_questions":["Which delivery address should be used?"]
-Do not attach text, sources or any other properties to an open question.
-Only decisions and actions use {"text":..., "sources":[...]} objects.
-The example above illustrates field syntax; do not copy its facts into the summary.
 Use 1-based source numbers from the supplied messages, never invented IDs or URLs.
 Maximum 3 decisions, 3 actions and 2 open_questions; each item at most 35 words.
 Maximum 180 words across all fields. Empty arrays are normal, not incomplete output.
@@ -43,15 +38,8 @@ Do not create sections inside overview or repeat the same point across fields.
 Actions may specify the next step briefly mentioned in overview, without repeating
 its explanation. Do not turn available payment terms into an action to pay immediately.
 Open questions are ONLY material questions actually raised and left unanswered in
-these excerpts. Represent each unresolved issue ONCE across actions/open_questions.
-For an explicit unanswered question seeking a fact or choice, prefer open_questions
-and omit an action that merely restates answering it. Use actions for concrete work
-beyond supplying that same answer. A request to confirm a fact may be an action
-when it is not already represented by an open question. Never generate a list of
-questions merely because amounts, history or replies were not supplied.
-Before returning JSON, check: every question is a string; no question repeats an
-action in different words. Empty actions are correct when the only next step is
-answering a question already in open_questions.
+these excerpts; omit ones already represented by an action. Never generate a list
+of questions merely because amounts, history or replies were not supplied.
 Do not add assumptions, coverage claims, evidence_ids or other fields. The backend
 supplies coverage and source metadata separately. All factual output must be supported
 by the supplied excerpts. Do not infer that one outer message means the thread is

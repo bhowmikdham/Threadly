@@ -185,3 +185,85 @@ async def test_evaluation_contract_pass_is_not_marked_quality_pass():
     assert report["language_quality_review"] == "pending"
     assert report["cases"][0]["quality_review"] == "pending"
     assert not report["production_approved"]
+
+
+ROOM_FAILURE = {
+    "overview": (
+        "Workshop date moved to Tuesday; Room A or Room B booking status "
+        "unconfirmed and awaiting reply."
+    ),
+    "decisions": [],
+    "actions": [
+        {
+            "text": "Confirm which room (A or B) is booked for the rescheduled Tuesday workshop.",
+            "sources": [1],
+        }
+    ],
+    "open_questions": [
+        {"text": "Is Room A or Room B booked for the Tuesday workshop?", "sources": [1]}
+    ],
+}
+
+
+def test_observed_room_failure_is_rejected_at_question_type():
+    from pydantic import ValidationError
+
+    case = next(c for c in FIXTURES["cases"] if c["id"] == "unanswered-material-question")
+    with pytest.raises(ValidationError) as error:
+        summary_quality.make_artifact(json.dumps(ROOM_FAILURE), "saved", snapshot(case))
+    assert any(
+        e["loc"] == ("open_questions", 0) and e["type"] == "string_type"
+        for e in error.value.errors()
+    )
+
+
+@needs_pg
+async def test_observed_room_failure_does_not_publish_or_retry(db_sessionmaker, mailbox):
+    task_id, _ = await create_task(db_sessionmaker, mailbox[0])
+    model = FakeModel(output=json.dumps(ROOM_FAILURE))
+    await run_once(db_sessionmaker, model)
+    assert not await run_once(db_sessionmaker, model)
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, task_id)
+        assert task.state == "failed" and task.error_code == "invalid_summary_output"
+        assert (
+            await session.scalar(
+                select(ArtifactRevision).where(ArtifactRevision.task_id == task_id)
+            )
+            is None
+        )
+    assert len(model.calls) == 1
+
+
+@needs_pg
+async def test_pre_question_fix_release_replays_its_original_prompt(db_sessionmaker, mailbox):
+    from app.assistant import summary_policy_v1
+
+    task_id, _ = await create_task(db_sessionmaker, mailbox[0])
+    async with db_sessionmaker.begin() as session:
+        task = await session.get(AssistantTask, task_id)
+        task.release = {
+            **task.release,
+            "contract_hash": summary_quality.contract_hash(summary_policy_v1),
+        }
+    model = FakeModel()
+    await run_once(db_sessionmaker, model)
+    assert model.calls[0][0].startswith(summary_policy_v1.PROMPT)
+    assert "Each open_questions element is a JSON STRING" not in model.calls[0][0]
+    async with db_sessionmaker() as session:
+        assert (await session.get(AssistantTask, task_id)).state == "succeeded"
+
+
+def test_question_fix_keeps_the_output_contract_and_changes_prompt_identity():
+    from app.assistant import summary_policy_v1
+
+    assert summary_policy.VERSION == "summary-quality-1.0.1"
+    assert summary_quality.contract_hash() != summary_quality.contract_hash(summary_policy_v1)
+    # The actual populated string example is valid, rather than a permissive schema change.
+    result = {
+        "overview": "Delivery address is unconfirmed.",
+        "decisions": [],
+        "actions": [],
+        "open_questions": ["Which delivery address should be used?"],
+    }
+    summary_quality.make_artifact(json.dumps(result), "saved", snapshot(FIXTURES["cases"][0]))
