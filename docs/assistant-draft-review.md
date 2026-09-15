@@ -213,3 +213,13 @@ remove user work to force rollback; preserve/export it and fix forward.
 Verification: see [implementation evidence](implementation-playbook/13-implementation-progress.md).
 No prompts or model selection changed, so this slice requires no new model-quality
 claim. Synthetic generation plus real PostgreSQL covers the integration boundary.
+
+
+### Compound stream compatibility
+
+Migration `c8291e4a6f03` supersedes task-wide artifact revision uniqueness with
+`(task_id,stream_key,revision)` and an explicit task final-result pointer. Draft
+editing/history remains confined to the final `result` stream; intermediate
+`summary` artifacts never appear in draft history. Existing UUIDs, review payload
+hashes and revision numbers are preserved. See
+[compound runtime](assistant-compound-workflows.md) for response fields and rollout.

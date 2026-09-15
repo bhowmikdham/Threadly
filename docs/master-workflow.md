@@ -1,7 +1,7 @@
 # Master workflow: current runtime and compound-request implementation contract
 
-Baseline for this update: integration commit `7de38d8` (PR #19 merged), plus
-the B08 continuation slice in this branch. This document distinguishes
+Baseline for this update: integration commit `fa23176` (PR #22 merged), plus
+the B10a explicit compound-template slice in this branch. This document distinguishes
 working code from the next implementation. It does not claim the EC2 deployment
 has this revision, the trained BERT package is wired in, or six prepared AWS Flows
 are six executable application workflows.
@@ -63,8 +63,8 @@ the user's instruction and backend-derived context-availability indicators.
 | Reply | Reply draft using explicitly bound source and recipients | Exact send approval, execution and reconciliation |
 | Compose | New draft with explicit recipients | Exact send approval, execution and reconciliation |
 | Plan/schedule | Intent and selected operation pairs can be proposed | Installed planning/calendar handlers and their dependencies |
-| Other | Bounded mapped-message exact lookup | General grounded Q&A/search/help handlers |
-| Multiple intents | Selected pairs can be represented as proposals | Durable step executor; triple-intent proposal support; full compound execution |
+| Other | Exact mapped-message lookup, help/capture search/rewrite, scoped local-mail search | General natural-language retrieval and entity/commitment extraction |
+| Multiple intents | Explicit summary → reply/compose templates via `/assistant/compound-requests` with checkpointed streams | Natural-language complete-plan planner, lookup steps, Calendar triples and general compound execution |
 
 `GET /assistant/workflows` reports **three installed generation operations**:
 `summarise_thread`, `draft_reply`, `draft_new`, plus the bounded UI handlers. Its
@@ -72,11 +72,11 @@ the user's instruction and backend-derived context-availability indicators.
 AWS readiness or quality check. `POST /assistant/route-preview` is diagnostic;
 the frontend must not execute its returned operations itself.
 
-Today, a recognized but uninstalled pair stops; it does not execute a supported
+On the original natural-language request endpoint, a recognized but uninstalled pair stops; it does not execute a supported
 subset. The exact triple `summarise_thread → suggest_slots → draft_reply` is not
 in the current proposal allowlist and is rejected as `invalid_route_output` if
 returned by the model. That is a safe limitation, not satisfactory final UX.
-This guard verifies the proposed operation list, not whether a model omitted a
+The explicit B10a template endpoint is separate. This guard verifies the proposed operation list, not whether a model omitted a
 clause while classifying. Command-to-plan coverage needs separate evaluation.
 B10 must introduce an explicitly versioned planner and executor before advertising
 this capability. Do not merely add the triple to an enum and call it implemented.
@@ -84,7 +84,8 @@ this capability. Do not merely add the triple to an enum and call it implemented
 New tasks now have [typed durable clarification](assistant-continuation.md):
 POST the current question ID/version and typed answer to the task inputs endpoint.
 The original goal is preserved. Historical tasks and the old request.continuation
-field retain their previous behavior; B10 compound execution is still pending.
+field retain their previous behavior. B10a adds explicit compound execution; general
+plan continuation and automatic command planning remain pending.
 
 ## 3. BERT labels and user intent are different contracts
 
@@ -280,3 +281,18 @@ endpoint with explicit folder/date boundaries, local coverage and sync-version
 pagination. It does not invoke the intent router or a model. Clients can select a
 result and capture its source before submitting a task; automatic retrieval-to-
 generation coordination remains pending with the read planner and compound engine.
+
+
+## B10a implemented compound templates and testing map
+
+[Compound runtime](assistant-compound-workflows.md) defines the implemented
+`summary_then_reply` and `summary_then_compose` templates. These use a backend-owned
+two-step plan, separately checkpointed artifact streams, a task final-result pointer,
+source/lease fences and bounded retry. Frontend selection is required; the old
+classifier/router cannot silently activate them or drop an uninstalled Calendar
+clause. `summary_in_draft` determines the summary data dependency.
+
+The [full workflow/testing map](workflow-testing-map.md) maps all five intents,
+compound paths, provider configuration, exact implementation files and remaining
+gates. [Machine-readable mapping](workflow-runtime-map.json) is the coding-agent
+handoff. B10 remains in progress; this is not the complete master planner.

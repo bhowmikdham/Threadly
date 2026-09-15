@@ -13,6 +13,7 @@ from app.assistant import (
     reads,
     routing,
     routing_v1,
+    steps,
     summary_quality,
     ui_routing,
 )
@@ -34,6 +35,9 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         claim = await claim_next(session)
     if claim is None:
         return False
+    if claim.release.get("workflow") == steps.RELEASE:
+        await steps.run_task(factory, claim, model, flow_invoker)
+        return True
     if claim.release.get("workflow") == reads.RELEASE:
         await reads.run_task(factory, claim, model)
         return True

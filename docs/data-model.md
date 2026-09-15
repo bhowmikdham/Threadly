@@ -35,7 +35,7 @@ of existing messages. Downgrading removes all state in the five new tables.
 | `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, nullable owned context FK, nullable intent hint/route checkpoint, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
 | `assistant_jobs` | One row per task; owned task FK, queued/running/done, due time, attempts 0–3, lease token/deadline. Checks require both lease fields only while running. Claim index supports polling/recovery. |
 | `task_events` | Append-only composite PK `(task_id,sequence)`, owned task FK, task version, kind, redacted JSONB payload and timestamp. Sequence assigned under the task row lock. |
-| `artifact_revisions` | UUID ID, owned task FK, numbered immutable typed JSONB artifact/provenance and nullable revision envelope/edit key. Unique `(task_id,revision)`; initial generation is revision 1. See the revision migration below. |
+| `artifact_revisions` | UUID ID, owned task FK, numbered immutable typed JSONB artifact/provenance and nullable revision envelope/edit key. Unique `(task_id,stream_key,revision)`; initial generation is revision 1 within each stream. See the revision migration below. |
 
 Task-to-context and child-to-task ownership are also enforced by composite foreign
 keys. Source ownership is checked when capturing context. Jobs, events and artifacts
@@ -145,7 +145,7 @@ reviewed. Historical acknowledgement records remain visible after supersession.
 
 The API appends edits and reviews while locking the task, advancing task version
 and redacted event sequence in the same transaction. Generation state stays
-`succeeded`. Readers obtain latest artifact by descending revision. Old readers
+`succeeded`. As of migration `c8291e4a6f03`, readers use the explicit task final-artifact pointer; revision ordering is scoped to one stream. Old readers
 and workers must be stopped during migration. Downgrade refuses with any edited
 revision or review record; no user data is automatically discarded. Details and
 client recovery: [revision/review handoff](assistant-draft-review.md).
@@ -202,3 +202,27 @@ invocation. `GET /assistant/workflows` advertises this capability separately.
 Migration `b7180d3f9e62` adds the owner/effective-date/row-ID search index, preserving
 all data and prior task contracts. [Frontend contract, concurrency, coverage and
 rollout](assistant-mail-search.md) describes the remaining extraction/planning gates.
+
+
+## Compound steps and artifact streams (migration `c8291e4a6f03`)
+
+- `assistant_tasks.compound_input`: nullable JSONB with the immutable explicitly
+  selected template, summary dependency and draft inputs; absent for old tasks.
+- `assistant_tasks.final_artifact_id`: nullable, deferred composite FK to artifact
+  `(id,task_id,user_id)`. Backfilled to each task's highest historical revision;
+  new tasks populate only when final output succeeds, edits move it atomically.
+- `artifact_revisions.stream_key`: non-null varchar(32), default `result`; summary
+  steps use `summary`. Unique `(task_id,stream_key,revision)` replaces task-wide
+  revision uniqueness. UUIDs, payloads, envelopes, edit IDs and reviews are unchanged.
+- `assistant_steps`: PK `(task_id,ordinal)`; owner, operation, state, attempt count,
+  input hash, pinned release, output artifact/hash and sanitized error. Ordinal is
+  bounded to 1–2, attempts to 0–3; states pending/running/succeeded/failed/cancelled.
+  Composite FKs enforce owned task and output in the same task. Succeeded state
+  requires output ID/hash; other states have neither.
+
+Only the final draft stream supports editing. A generated step's output reference
+remains immutable after a user draft edit; the task pointer identifies the edited
+final result. Intermediate artifacts cannot accidentally become the newest draft.
+There is no external-action table/executor in this migration. Downgrade refuses
+while compound tasks/steps/non-result streams exist. See
+[compound runtime](assistant-compound-workflows.md) for recovery and rollout.

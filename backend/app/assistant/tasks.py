@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from app.assistant.ui_routing import wrap_release
 from app.db.models import (
     ArtifactRevision,
     AssistantJob,
+    AssistantStep,
     AssistantTask,
     ContextSnapshot,
     TaskEvent,
@@ -45,7 +46,9 @@ async def owned_task(
     return task
 
 
-async def submit(session: AsyncSession, user_id: int, request: AssistantRequest) -> AssistantTask:
+async def submit(
+    session: AsyncSession, user_id: int, request: AssistantRequest, *, compound=None
+) -> AssistantTask:
     value = request.model_dump()
     if request.draft_options is None:
         value.pop(
@@ -53,6 +56,8 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         )  # Preserve replay hashes for requests accepted before this field.
     if request.read_options is None:
         value.pop("read_options")  # Retain historical request hashes.
+    if compound is not None:
+        value["compound_input"] = compound.model_dump()
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -94,6 +99,11 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
         accepted_release = wrap_release(accepted_release)
     if request.read_options is not None:
         accepted_release = reads.wrap_release(accepted_release)
+    if compound is not None:
+        from app.assistant import steps
+
+        steps.validate_input(compound, context, draft_input)
+        accepted_release = steps.wrap_release(accepted_release)
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -104,8 +114,9 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 request_id=request.request_id,
                 request_hash=request_hash,
                 instruction=request.instruction,
+                compound_input=compound.model_dump() if compound else None,
                 read_input=request.read_options.model_dump() if request.read_options else None,
-                continuation_release=continuation.release_manifest(),
+                continuation_release=None if compound else continuation.release_manifest(),
                 context_snapshot_id=context.id if context else None,
                 intent_hint=request.intent_hint,
                 draft_input=draft_input,
@@ -177,6 +188,15 @@ async def cancel(session: AsyncSession, user_id: int, task_id: str, version: int
     task.state, task.error_code = "cancelled", None
     task.version += 1
     close_job(job)
+    await session.execute(
+        update(AssistantStep)
+        .where(
+            AssistantStep.task_id == task.id,
+            AssistantStep.user_id == user_id,
+            AssistantStep.state.in_(["pending", "running", "failed"]),
+        )
+        .values(state="cancelled", error_code="task_cancelled")
+    )
     add_event(session, task, "task.finished", {"state": "cancelled"})
     await session.flush()
     await session.refresh(task)
@@ -200,6 +220,7 @@ class JobClaim:
     resolved_inputs: dict | None = None
     request_created_at: datetime | None = None
     read_input: dict | None = None
+    compound_input: dict | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -227,6 +248,15 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.state, task.error_code = "failed", "attempts_exhausted"
         task.version += 1
         close_job(job)
+        await session.execute(
+            update(AssistantStep)
+            .where(
+                AssistantStep.task_id == task.id,
+                AssistantStep.user_id == task.user_id,
+                AssistantStep.state.in_(["pending", "running"]),
+            )
+            .values(state="failed", error_code="attempts_exhausted")
+        )
         add_event(
             session, task, "task.finished", {"state": "failed", "error_code": task.error_code}
         )
@@ -272,6 +302,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         effective.effective_fields if effective else {},
         task.created_at,
         task.read_input,
+        task.compound_input,
     )
 
 
@@ -348,6 +379,7 @@ async def finish(
                 draft_envelope=claim.draft_input if payload.get("kind") == "draft" else None,
             )
         )
+        task.final_artifact_id = artifact_id
         task.state, task.error_code = "succeeded", None
         close_job(job)
         add_event(session, task, "artifact.ready", {"artifact_id": artifact_id, "revision": 1})

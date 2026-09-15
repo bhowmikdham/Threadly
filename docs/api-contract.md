@@ -410,3 +410,27 @@ invocation. `GET /assistant/workflows` advertises this capability separately.
 Migration `b7180d3f9e62` adds the owner/effective-date/row-ID search index, preserving
 all data and prior task contracts. [Frontend contract, concurrency, coverage and
 rollout](assistant-mail-search.md) describes the remaining extraction/planning gates.
+
+
+## Explicit compound templates (B10a)
+
+`POST /assistant/compound-requests` (authenticated, 202) accepts strict
+`CompoundRequest` schema 1.0: request ID, owned context snapshot ID, template
+(`summary_then_reply` or `summary_then_compose`), `summary_in_draft` boolean,
+existing `draft_options` and bounded `draft_instruction`. These are explicit user
+selections, not classifier proposals. Unknown operations/keys are rejected before
+execution; missing recipients/target fail preflight. The original request endpoint
+and historical request hashes are unchanged.
+
+Task responses add nullable `compound`, containing both planned steps, attempts,
+state, dependencies, stream/output IDs and completed/total counts. `artifact_id`
+remains the final result only after success. Artifact responses add `stream_key`
+and `is_final_result`; `is_latest` is relative to the artifact's stream. Draft
+history excludes intermediate summaries; edits update the explicit final pointer.
+New SSE events: `step.started`, `step.succeeded`, `step.failed`; final-only
+`artifact.ready` and `task.finished` remain compatible. Review still cannot send.
+
+`GET /assistant/workflows` adds `compound_templates` with installed templates,
+explicit-selection requirement, two-step bound and natural-language planner false.
+Examples and recovery: [compound workflows](assistant-compound-workflows.md).
+Whole implementation/testing map: [workflow testing](workflow-testing-map.md).

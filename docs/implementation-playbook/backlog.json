@@ -211,7 +211,8 @@
       "assignee": null,
       "evidence": [
         "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)",
-        "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)"
+        "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)",
+        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete."
       ]
     },
     {
@@ -350,7 +351,8 @@
       "handoff": "Frontend receives first fully functioning read-only result.",
       "assignee": null,
       "evidence": [
-        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)"
+        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)",
+        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete."
       ]
     },
     {
@@ -484,7 +486,8 @@
       "assignee": null,
       "evidence": [
         "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
-        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
+        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete."
       ]
     },
     {
@@ -571,7 +574,8 @@
       "assignee": null,
       "evidence": [
         "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
-        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)"
+        "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
+        "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete."
       ]
     },
     {
