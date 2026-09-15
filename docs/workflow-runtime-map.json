@@ -1,0 +1,163 @@
+{
+  "schema_version": "1.0",
+  "baseline_commit": "fa23176d45b140aeda2fb0679d3e5bf95dfa71ea",
+  "deployment_evidence": {
+    "commit": "9b3b14e8fa71086224bca585a7566ff29dd3775d",
+    "source": "user-provided EC2 deployment log",
+    "provider_configuration": "pending"
+  },
+  "coordinator": "backend/app/assistant/worker.py",
+  "workflows": [
+    {
+      "id": "summary",
+      "status": "merged",
+      "entry": "POST /assistant/requests",
+      "handlers": [
+        "backend/app/assistant/summary_quality.py"
+      ],
+      "operations": [
+        "summarise_thread"
+      ],
+      "output": "summary",
+      "remaining": [
+        "live_model_quality",
+        "frontend_staging"
+      ]
+    },
+    {
+      "id": "reply",
+      "status": "merged_draft_only",
+      "entry": "POST /assistant/requests",
+      "handlers": [
+        "backend/app/assistant/drafting.py"
+      ],
+      "operations": [
+        "draft_reply"
+      ],
+      "output": "draft",
+      "remaining": [
+        "exact_action_approval",
+        "send_executor",
+        "reconciliation"
+      ]
+    },
+    {
+      "id": "compose",
+      "status": "merged_draft_only",
+      "entry": "POST /assistant/requests",
+      "handlers": [
+        "backend/app/assistant/drafting.py"
+      ],
+      "operations": [
+        "draft_new"
+      ],
+      "output": "draft",
+      "remaining": [
+        "exact_action_approval",
+        "send_executor",
+        "reconciliation"
+      ]
+    },
+    {
+      "id": "other",
+      "status": "partially_implemented",
+      "entry": "POST /assistant/requests with read_options; POST /assistant/mail-search",
+      "handlers": [
+        "backend/app/assistant/reads.py",
+        "backend/app/assistant/mail_search.py"
+      ],
+      "output": "answer_or_search_page",
+      "remaining": [
+        "natural_language_read_planner",
+        "entities_commitments",
+        "live_retrieval_quality"
+      ]
+    },
+    {
+      "id": "compound_templates",
+      "status": "implemented_in_this_branch",
+      "entry": "POST /assistant/compound-requests",
+      "handlers": [
+        "backend/app/assistant/steps.py"
+      ],
+      "schema": "backend/app/schemas/compound.py",
+      "operations": [
+        "summarise_thread",
+        "draft_reply or draft_new"
+      ],
+      "outputs": [
+        "summary",
+        "result"
+      ],
+      "tests": [
+        "backend/tests/test_compound_workflows.py",
+        "backend/tests/test_assistant_migration.py"
+      ],
+      "remaining": [
+        "review_merge_deployment",
+        "live_model_quality",
+        "natural_language_planner",
+        "lookup_steps",
+        "calendar_combinations"
+      ]
+    },
+    {
+      "id": "plan",
+      "status": "not_installed",
+      "entry": null,
+      "handlers": [],
+      "output": "planned_plan_artifact",
+      "remaining": [
+        "B10",
+        "B11"
+      ]
+    },
+    {
+      "id": "schedule",
+      "status": "not_installed",
+      "entry": null,
+      "handlers": [],
+      "output": "planned_slot_set_and_negotiation",
+      "remaining": [
+        "B01",
+        "B10",
+        "B12",
+        "B13",
+        "B14"
+      ]
+    },
+    {
+      "id": "external_actions",
+      "status": "not_installed",
+      "entry": null,
+      "handlers": [],
+      "output": "planned_confirmed_or_unknown_outcome",
+      "remaining": [
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B14",
+        "B15"
+      ]
+    }
+  ],
+  "invariants": [
+    "classifier_labels_are_advisory",
+    "validate_full_plan_before_execution",
+    "no_automatic_external_writes",
+    "explicit_final_artifact_pointer",
+    "preserve_completed_outputs_on_retry",
+    "unknown_external_outcome_requires_reconciliation"
+  ],
+  "next_prs": [
+    "B10 complete command planner and lookup steps",
+    "B01 review capability/auth work",
+    "B12/B13 Calendar read and slots",
+    "B02-B06 exact approval/send/recovery",
+    "B11 plans",
+    "B14/B15 event actions",
+    "B17-B19 joint live gates"
+  ]
+}

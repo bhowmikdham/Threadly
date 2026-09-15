@@ -19,10 +19,22 @@ from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 POLICY = "draft-review-1.0.0"
 
 
-async def latest(session, task):
+async def latest(session, task, stream_key=None):
+    if stream_key is None:
+        return await session.scalar(
+            select(ArtifactRevision).where(
+                ArtifactRevision.id == task.final_artifact_id,
+                ArtifactRevision.task_id == task.id,
+                ArtifactRevision.user_id == task.user_id,
+            )
+        )
     return await session.scalar(
         select(ArtifactRevision)
-        .where(ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == task.user_id)
+        .where(
+            ArtifactRevision.task_id == task.id,
+            ArtifactRevision.user_id == task.user_id,
+            ArtifactRevision.stream_key == stream_key,
+        )
         .order_by(ArtifactRevision.revision.desc())
         .limit(1)
     )
@@ -95,7 +107,7 @@ async def blockers(session, artifact):
 
 
 async def artifact_view(session, task, artifact, current=None):
-    current = current or await latest(session, task)
+    current = current or await latest(session, task, artifact.stream_key)
     is_draft = artifact.payload.get("kind") == "draft"
     review = await session.get(DraftReview, artifact.id) if is_draft else None
     blocked = await blockers(session, artifact) if is_draft else []
@@ -106,6 +118,8 @@ async def artifact_view(session, task, artifact, current=None):
         "artifact_id": artifact.id,
         "task_id": artifact.task_id,
         "revision": artifact.revision,
+        "stream_key": artifact.stream_key,
+        "is_final_result": task.final_artifact_id == artifact.id,
         "artifact": artifact.payload,
         "provenance": artifact.provenance,
         "draft_envelope": artifact.draft_envelope if is_draft else None,
@@ -184,6 +198,7 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
         task_id=task.id,
         user_id=user_id,
         revision=current.revision + 1,
+        stream_key=current.stream_key,
         payload=payload,
         draft_envelope=envelope,
         edit_request_id=request.request_id,
@@ -191,6 +206,7 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
         provenance={"source": "user_edit", "policy": POLICY, "parent_artifact_id": current.id},
     )
     session.add(artifact)
+    task.final_artifact_id = artifact.id
     task.version += 1
     tasks.add_event(
         session,

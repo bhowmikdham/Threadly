@@ -235,3 +235,17 @@ invocation. `GET /assistant/workflows` advertises this capability separately.
 Migration `b7180d3f9e62` adds the owner/effective-date/row-ID search index, preserving
 all data and prior task contracts. [Frontend contract, concurrency, coverage and
 rollout](assistant-mail-search.md) describes the remaining extraction/planning gates.
+
+
+### Explicit compound generation (B10a)
+
+`POST /assistant/compound-requests` saves a fixed, user-selected summary → draft
+plan through the existing task service. `assistant/steps.py` executes the pinned
+template under the existing worker lease, checks local sources before each stage
+and publication, and persists immutable per-step output/checkpoint hashes. The
+summary and draft use separate artifact streams; only the final draft commits task
+success. Failures retry the missing step while reusing valid completed output.
+No transaction spans model/Flow inference. This branch does not add Calendar or
+external-write handlers, or an automatic natural-language compound planner.
+See [whole workflow/testing map](workflow-testing-map.md) and
+[compound contract](assistant-compound-workflows.md).

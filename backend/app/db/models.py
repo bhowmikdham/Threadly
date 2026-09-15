@@ -184,6 +184,14 @@ class AssistantTask(TimestampMixin, Base):
         ),
         CheckConstraint("version >= 1 AND latest_sequence >= 1", name="ck_task_versions"),
         CheckConstraint("input_version >= 0 AND input_version <= 5", name="ck_task_input_version"),
+        ForeignKeyConstraint(
+            ["final_artifact_id", "id", "user_id"],
+            ["artifact_revisions.id", "artifact_revisions.task_id", "artifact_revisions.user_id"],
+            name="fk_task_final_artifact",
+            use_alter=True,
+            deferrable=True,
+            initially="DEFERRED",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -191,6 +199,8 @@ class AssistantTask(TimestampMixin, Base):
     request_id: Mapped[str] = mapped_column(String(128))
     request_hash: Mapped[str] = mapped_column(String(64))
     read_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    compound_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    final_artifact_id: Mapped[str | None] = mapped_column(String(36))
     instruction: Mapped[str] = mapped_column(Text)
     context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
     intent_hint: Mapped[str | None] = mapped_column(String(16))
@@ -266,7 +276,8 @@ class ArtifactRevision(TimestampMixin, Base):
             ondelete="CASCADE",
             name="fk_artifact_owned_task",
         ),
-        UniqueConstraint("task_id", "revision", name="uq_artifact_task_revision"),
+        UniqueConstraint("task_id", "stream_key", "revision", name="uq_artifact_stream_revision"),
+        UniqueConstraint("id", "task_id", "user_id", name="uq_artifact_task_owner"),
         UniqueConstraint("task_id", "edit_request_id", name="uq_artifact_edit_request"),
         UniqueConstraint("id", "user_id", name="uq_artifact_owner"),
         CheckConstraint("revision >= 1", name="ck_artifact_revision"),
@@ -281,6 +292,7 @@ class ArtifactRevision(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     task_id: Mapped[str] = mapped_column(String(36))
     user_id: Mapped[int] = mapped_column(index=True)
+    stream_key: Mapped[str] = mapped_column(String(32), server_default="result")
     revision: Mapped[int] = mapped_column(default=1)
     payload: Mapped[dict] = mapped_column(JSONB)
     provenance: Mapped[dict] = mapped_column(JSONB)
@@ -373,3 +385,45 @@ class TaskInput(Base):
     source_hash: Mapped[str | None] = mapped_column(String(64))
     draft_input: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AssistantStep(Base):
+    """Bounded generated steps; external writes never use this retry lifecycle."""
+
+    __tablename__ = "assistant_steps"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            name="fk_step_owned_task",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["artifact_id", "task_id", "user_id"],
+            ["artifact_revisions.id", "artifact_revisions.task_id", "artifact_revisions.user_id"],
+            name="fk_step_owned_artifact",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint("ordinal IN (1, 2)", name="ck_step_ordinal"),
+        CheckConstraint("attempts BETWEEN 0 AND 3", name="ck_step_attempts"),
+        CheckConstraint(
+            "state IN ('pending','running','succeeded','failed','cancelled')", name="ck_step_state"
+        ),
+        CheckConstraint(
+            "(state = 'succeeded' AND artifact_id IS NOT NULL AND output_hash IS NOT NULL) OR "
+            "(state != 'succeeded' AND artifact_id IS NULL AND output_hash IS NULL)",
+            name="ck_step_output",
+        ),
+    )
+    task_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    ordinal: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column()
+    operation: Mapped[str] = mapped_column(String(32))
+    state: Mapped[str] = mapped_column(String(16), server_default="pending")
+    attempts: Mapped[int] = mapped_column(server_default="0")
+    input_hash: Mapped[str] = mapped_column(String(64))
+    release: Mapped[dict] = mapped_column(JSONB)
+    artifact_id: Mapped[str | None] = mapped_column(String(36))
+    output_hash: Mapped[str | None] = mapped_column(String(64))
+    error_code: Mapped[str | None] = mapped_column(String(64))

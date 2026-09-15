@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import continuation, draft_review, mail_search, reads, tasks
+from app.assistant import continuation, draft_review, mail_search, reads, steps, tasks
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -24,6 +24,7 @@ from app.schemas.assistant import (
     RoutePreview,
     RoutePreviewRequest,
 )
+from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.mail_search import MailSearchRequest
@@ -84,6 +85,16 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "max_answer_rounds": continuation.MAX_INPUTS,
             "question_expiry_hours": continuation.QUESTION_HOURS,
         },
+        "compound_templates": {
+            "installed": True,
+            "release": steps.RELEASE,
+            "templates": ["summary_then_reply", "summary_then_compose"],
+            "entrypoint": "/assistant/compound-requests",
+            "max_steps": 2,
+            "requires_explicit_selection": True,
+            "natural_language_planner": False,
+            "external_actions": False,
+        },
         "remote_resources_verified": False,
         "note": "Configuration only; source and remote prerequisites are checked per request.",
     }
@@ -106,21 +117,17 @@ def context_view(snapshot: ContextSnapshot) -> dict:
 
 async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
     effective_input = await continuation.current_input(session, task)
-    artifact_id = None
-    if task.state == "succeeded":
-        artifact_id = await session.scalar(
-            select(ArtifactRevision.id)
-            .where(ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == task.user_id)
-            .order_by(ArtifactRevision.revision.desc())
-            .limit(1)
-        )
+    artifact_id = task.final_artifact_id if task.state == "succeeded" else None
     return {
         "task_id": task.id,
         "instruction": task.instruction,
         "read_options": task.read_input,
+        "compound": await steps.view(session, task),
         "intent": (
             task.route["decision"]["intent"]
             if task.route
+            else task.intent_hint
+            if task.compound_input
             else "summarise"
             if task.release.get("workflow") == "summary-task-1.0.0"
             else None
@@ -185,6 +192,14 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/compound-requests", status_code=202)
+async def submit_compound(request: CompoundRequest, user_id: CurrentUser, session: DB):
+    task = await tasks.submit(session, user_id, request.as_request(), compound=request)
     result = await task_view(session, task)
     await session.commit()
     return result
@@ -300,7 +315,9 @@ async def draft_history(
     current = await draft_review.latest(session, task)
     draft_review.require_draft(current)
     query = select(ArtifactRevision).where(
-        ArtifactRevision.task_id == task.id, ArtifactRevision.user_id == user_id
+        ArtifactRevision.task_id == task.id,
+        ArtifactRevision.user_id == user_id,
+        ArtifactRevision.stream_key == current.stream_key,
     )
     if before_revision is not None:
         query = query.where(ArtifactRevision.revision < before_revision)

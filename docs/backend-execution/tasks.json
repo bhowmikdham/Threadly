@@ -513,7 +513,7 @@
     {
       "id": "B10",
       "title": "Execute compound steps with explicit artifact streams",
-      "status": "planned",
+      "status": "in_progress",
       "work_packages": [
         "T05",
         "T06",
@@ -537,7 +537,9 @@
         "backend/app/assistant/routing.py",
         "backend/app/api/routes/assistant.py",
         "backend/tests/test_assistant_migration.py",
-        "docs/master-workflow.md"
+        "docs/master-workflow.md",
+        "docs/assistant-compound-workflows.md",
+        "docs/workflow-testing-map.md"
       ],
       "proposed_paths": [
         "backend/app/assistant/steps.py"

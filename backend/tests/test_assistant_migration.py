@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "b7180d3f9e62"
+HEAD = "c8291e4a6f03"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -25,6 +25,7 @@ NEW_TABLES = {
     "draft_reviews",
     "task_questions",
     "task_inputs",
+    "assistant_steps",
 }
 
 
@@ -150,7 +151,7 @@ def test_migration_installs_and_preserves_existing_mailbox():
         )
         asyncio.run(
             execute(
-                "UPDATE assistant_tasks SET read_input='{\"operation\":\"help\"}' "
+                'UPDATE assistant_tasks SET read_input=\'{"operation":"help"}\' '
                 "WHERE id='old-task'",
                 script=True,
             )
@@ -214,6 +215,49 @@ def test_migration_installs_and_preserves_existing_mailbox():
         assert "Keep generated text" in artifact["payload"]
         assert "person@example.test" in artifact["draft_envelope"]
         assert artifact["edit_request_id"] is None
+        assert artifact["stream_key"] == "result"
+        assert (
+            asyncio.run(
+                execute("SELECT final_artifact_id FROM assistant_tasks WHERE id='draft-task'")
+            )[0]["final_artifact_id"]
+            == "old-draft"
+        )
+        # Multi-stream rollback is deliberately refused, preserving both UUIDs.
+        asyncio.run(
+            execute(
+                """
+            UPDATE assistant_tasks SET compound_input='{"template":"summary_then_reply"}'
+              WHERE id='draft-task';
+            INSERT INTO artifact_revisions
+              (id, task_id, user_id, stream_key, revision, payload, provenance)
+              VALUES ('summary-step', 'draft-task', 91, 'summary', 1,
+                '{"kind":"summary"}', '{}');
+            INSERT INTO assistant_steps
+              (task_id, ordinal, user_id, operation, state, input_hash, release,
+               artifact_id, output_hash)
+              VALUES ('draft-task', 1, 91, 'summarise_thread', 'succeeded', repeat('a',64),
+                '{}', 'summary-step', repeat('b',64));
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "b7180d3f9e62", fails=True)
+        assert (
+            len(
+                asyncio.run(execute("SELECT id FROM artifact_revisions WHERE task_id='draft-task'"))
+            )
+            == 2
+        )
+        asyncio.run(
+            execute(
+                """
+            DELETE FROM assistant_steps;
+            DELETE FROM artifact_revisions WHERE id='summary-step';
+            UPDATE assistant_tasks SET compound_input=NULL WHERE id='draft-task';
+        """,
+                script=True,
+            )
+        )
         # Review-only data must also prevent destructive downgrade.
         asyncio.run(
             execute(
