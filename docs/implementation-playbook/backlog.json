@@ -210,7 +210,8 @@
       "handoff": "All workflows can persist progress and pause for users.",
       "assignee": null,
       "evidence": [
-        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)"
+        "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)",
+        "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)"
       ]
     },
     {
@@ -258,7 +259,8 @@
         "13-implementation-progress.md (partial implementation; review and integration gates pending)",
         "13-implementation-progress.md (contextual durable routing slice; UI reference maps, continuation and live evaluation pending)",
         "../assistant-routing.md (worker dispatch, saved clarification, source boundaries and release contract)",
-        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)"
+        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)",
+        "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)"
       ]
     },
     {
@@ -736,7 +738,8 @@
       "handoff": "Joint E2E can exercise every artifact/action in the actual extension.",
       "assignee": null,
       "evidence": [
-        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)"
+        "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)",
+        "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)"
       ]
     },
     {

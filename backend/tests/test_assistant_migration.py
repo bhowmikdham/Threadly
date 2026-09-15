@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "e9b7120c4a63"
+HEAD = "f2b6049c7a81"
 NEW_TABLES = {
     "context_snapshots",
     "assistant_tasks",
@@ -23,6 +23,8 @@ NEW_TABLES = {
     "task_events",
     "artifact_revisions",
     "draft_reviews",
+    "task_questions",
+    "task_inputs",
 }
 
 
@@ -121,6 +123,42 @@ def test_migration_installs_and_preserves_existing_mailbox():
         assert old["context_snapshot_id"] == "old-context" and old["state"] == "queued"
         assert old["route"] is None and old["intent_hint"] is None
         assert old["draft_input"] is None
+        assert old["continuation_release"] is None and old["input_version"] == 0
+        # New continuation state must be preserved, never silently dropped on rollback.
+        asyncio.run(
+            execute(
+                """
+            UPDATE assistant_tasks SET continuation_release = '{"version":"test"}', input_version=1
+              WHERE id='old-task';
+            INSERT INTO task_questions (id, task_id, user_id, task_version, input_version,
+                state, payload, expires_at)
+              VALUES ('question-old', 'old-task', 91, 1, 0, 'answered', '{}', now());
+            INSERT INTO task_inputs (id, task_id, user_id, question_id, request_id,
+                request_hash, input_version, answer, effective_fields,
+                context_snapshot_id, source_hash)
+              VALUES ('input-old', 'old-task', 91, 'question-old', 'answer-old', repeat('a',64),
+                1, '{"timezone":"UTC"}', '{"timezone":"UTC"}', 'old-context', 'old-hash');
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "e9b7120c4a63", fails=True)
+        assert "UTC" in asyncio.run(execute("SELECT answer FROM task_inputs"))[0]["answer"]
+        assert (
+            asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
+            == HEAD
+        )
+        asyncio.run(
+            execute(
+                """
+            DELETE FROM task_inputs;
+            DELETE FROM task_questions;
+            UPDATE assistant_tasks SET continuation_release=NULL, input_version=0
+              WHERE id='old-task';
+        """,
+                script=True,
+            )
+        )
         assert (
             asyncio.run(execute("SELECT body FROM drafts WHERE id=91"))[0]["body"]
             == "Keep the legacy draft"

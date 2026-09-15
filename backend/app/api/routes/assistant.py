@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import draft_review, tasks
+from app.assistant import continuation, draft_review, tasks
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -24,6 +24,7 @@ from app.schemas.assistant import (
     RoutePreview,
     RoutePreviewRequest,
 )
+from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
@@ -52,6 +53,13 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "reference_handlers": ["exact_message_excerpt", "single_message_summary"],
             "external_actions": False,
         },
+        "continuation": {
+            "installed": True,
+            "schema_version": "1.0",
+            "new_requests_only": True,
+            "max_answer_rounds": continuation.MAX_INPUTS,
+            "question_expiry_hours": continuation.QUESTION_HOURS,
+        },
         "remote_resources_verified": False,
         "note": "Configuration only; source and remote prerequisites are checked per request.",
     }
@@ -73,6 +81,7 @@ def context_view(snapshot: ContextSnapshot) -> dict:
 
 
 async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
+    effective_input = await continuation.current_input(session, task)
     artifact_id = None
     if task.state == "succeeded":
         artifact_id = await session.scalar(
@@ -92,6 +101,16 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
             else None
         ),
         "route": task.route,
+        "question": await continuation.question_view(session, task),
+        "continuation_release": task.continuation_release,
+        "input_version": task.input_version,
+        "effective_context_snapshot_id": (
+            effective_input.context_snapshot_id if effective_input else task.context_snapshot_id
+        ),
+        "effective_draft_input": effective_input.draft_input
+        if effective_input
+        else task.draft_input,
+        "resolved_inputs": effective_input.effective_fields if effective_input else {},
         "draft_input": task.draft_input,
         "state": task.state,
         "version": task.version,
@@ -141,6 +160,14 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/tasks/{task_id}/inputs", status_code=202)
+async def submit_input(task_id: str, request: TaskInputRequest, user_id: CurrentUser, session: DB):
+    task = await continuation.accept_input(session, user_id, task_id, request)
     result = await task_view(session, task)
     await session.commit()
     return result

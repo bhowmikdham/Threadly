@@ -191,9 +191,10 @@ async def test_context_free_request_saves_clarification_and_replays_idempotently
     )
     assert not await run_once(db_sessionmaker, model)
     async with db_sessionmaker.begin() as session:
-        with pytest.raises(ApiError) as exc:
-            await tasks.cancel(session, mailbox[0], task_id, view["version"])
-        assert exc.value.code == "task_finished"
+        cancelled = await tasks.cancel(session, mailbox[0], task_id, view["version"])
+        assert cancelled.state == "cancelled"
+        # New continuation-enabled tasks can cancel an unanswered question.
+        assert view["question"]["fields"] == ["context_snapshot_id"]
 
 
 @needs_pg

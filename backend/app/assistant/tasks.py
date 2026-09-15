@@ -5,7 +5,7 @@ transactions. Expired leases may repeat generation, never publish two artifacts.
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import and_, func, or_, select
@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
-from app.assistant import summary_quality
+from app.assistant import continuation, summary_quality
 from app.assistant.drafting import bind_input
 from app.assistant.summary import digest
 from app.assistant.ui_routing import wrap_release
@@ -94,6 +94,7 @@ async def submit(session: AsyncSession, user_id: int, request: AssistantRequest)
                 request_id=request.request_id,
                 request_hash=request_hash,
                 instruction=request.instruction,
+                continuation_release=continuation.release_manifest(),
                 context_snapshot_id=context.id if context else None,
                 intent_hint=request.intent_hint,
                 draft_input=draft_input,
@@ -161,9 +162,11 @@ async def cancel(session: AsyncSession, user_id: int, task_id: str, version: int
         return task
     if task.version != version:
         raise ApiError(409, "version_conflict", "Task changed; reload its current state.")
-    if task.state in TERMINAL_STATES:
+    resumable = task.state == "needs_clarification" and task.continuation_release is not None
+    if task.state in TERMINAL_STATES and not resumable:
         raise ApiError(409, "task_finished", "The task has already finished.")
     job = await session.get(AssistantJob, task.id)
+    await continuation.cancel_question(session, task)
     task.state, task.error_code = "cancelled", None
     task.version += 1
     close_job(job)
@@ -185,6 +188,10 @@ class JobClaim:
     intent_hint: str | None
     route: dict | None
     draft_input: dict | None
+    continuation_release: dict | None = None
+    input_version: int = 0
+    resolved_inputs: dict | None = None
+    request_created_at: datetime | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -216,6 +223,15 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
             session, task, "task.finished", {"state": "failed", "error_code": task.error_code}
         )
         return None
+    try:
+        effective = await continuation.current_input(session, task)
+    except ApiError as exc:
+        task.state, task.error_code = "failed", exc.code
+        task.version += 1
+        close_job(job)
+        add_event(session, task, "task.finished", {"state": "failed", "error_code": exc.code})
+        return None
+    context_id = effective.context_snapshot_id if effective else task.context_snapshot_id
     token = str(uuid4())
     job.state, job.lease_token = "running", token
     job.lease_expires_at = now + timedelta(seconds=LEASE_SECONDS)
@@ -226,7 +242,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
     context = (
         await session.execute(
             select(ContextSnapshot).where(
-                ContextSnapshot.id == task.context_snapshot_id,
+                ContextSnapshot.id == context_id,
                 ContextSnapshot.user_id == task.user_id,
             )
         )
@@ -242,7 +258,11 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.instruction,
         task.intent_hint,
         task.route,
-        task.draft_input,
+        effective.draft_input if effective else task.draft_input,
+        task.continuation_release,
+        task.input_version,
+        effective.effective_fields if effective else {},
+        task.created_at,
     )
 
 
@@ -278,6 +298,16 @@ async def finish(
     if stopped_state:
         if stopped_state not in {"needs_clarification", "unsupported"}:
             raise ValueError("invalid stopped state")
+        if stopped_state == "needs_clarification":
+            question_error = continuation.open_question(
+                session,
+                task,
+                now,
+                context_id=claim.context_id,
+                source_hash=digest(claim.snapshot) if claim.snapshot else None,
+            )
+            if question_error:
+                stopped_state, error_code = "unsupported", question_error
         task.state, task.error_code = stopped_state, error_code
         close_job(job)
         add_event(
@@ -306,7 +336,7 @@ async def finish(
                 revision=1,
                 payload=payload,
                 provenance=provenance,
-                draft_envelope=task.draft_input if payload.get("kind") == "draft" else None,
+                draft_envelope=claim.draft_input if payload.get("kind") == "draft" else None,
             )
         )
         task.state, task.error_code = "succeeded", None
