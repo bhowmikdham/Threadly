@@ -1,4 +1,6 @@
+// tsconfig.json
 {
+  /* Extend standard Plasmo extension TypeScript configuration */
   "extends": "plasmo/templates/tsconfig.base",
   "exclude": [
     "node_modules"
