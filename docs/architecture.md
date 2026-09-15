@@ -145,3 +145,12 @@ inputs and historical artifacts stay immutable. UI task reads resolve the latest
 revision; review validity also checks local reply/source and sender changes.
 A separate action proposal/approval/execution service is still required to send.
 See [editor lifecycle](assistant-draft-review.md) and [backend remaining work](backend-remaining-work.md).
+
+## Bedrock Flow prototype provisioning
+
+[CloudShell Flow launcher](../infra/bedrock/README.md) provisions six isolated,
+proposal-only visual Flow drafts for Haiku 4.5 experiments. It does not change the
+runtime topology or enable Flow invocation in the assistant worker. The B16 registry,
+B17 read bridge/invocation adapter, backend validators and live evaluation gates
+remain required before integration. Prepared AWS resources are not evidence of
+working end-to-end Gmail/Calendar workflows.
