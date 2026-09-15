@@ -427,3 +427,163 @@ class AssistantStep(Base):
     artifact_id: Mapped[str | None] = mapped_column(String(36))
     output_hash: Mapped[str | None] = mapped_column(String(64))
     error_code: Mapped[str | None] = mapped_column(String(64))
+
+
+class AssistantAction(TimestampMixin, Base):
+    """Exact immutable candidate payload; this table does not authorize network dispatch."""
+
+    __tablename__ = "assistant_actions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            name="fk_action_owned_task",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["artifact_id", "task_id", "user_id"],
+            ["artifact_revisions.id", "artifact_revisions.task_id", "artifact_revisions.user_id"],
+            name="fk_action_owned_artifact",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("id", "user_id", name="uq_action_owner"),
+        UniqueConstraint("id", "user_id", "payload_hash", name="uq_action_payload"),
+        UniqueConstraint("user_id", "proposal_request_id", name="uq_action_proposal_request"),
+        CheckConstraint("action_type IN ('send_email','create_event')", name="ck_action_type"),
+        CheckConstraint("version >= 1", name="ck_action_version"),
+        CheckConstraint(
+            "state IN ('proposed','approved','executing','outcome_unknown','succeeded','failed',"
+            "'rejected','cancelled','expired','superseded')",
+            name="ck_action_state",
+        ),
+        CheckConstraint("jsonb_typeof(payload) = 'object'", name="ck_action_payload_object"),
+        Index("ix_action_task", "task_id", "user_id", "state"),
+        Index("ix_action_expiry", "state", "expires_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column()
+    task_id: Mapped[str] = mapped_column(String(36))
+    artifact_id: Mapped[str] = mapped_column(String(36))
+    action_type: Mapped[str] = mapped_column(String(24))
+    proposal_request_id: Mapped[str] = mapped_column(String(128))
+    proposal_hash: Mapped[str] = mapped_column(String(64))
+    payload_schema: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    source_artifact_hash: Mapped[str] = mapped_column(String(64))
+    source_versions: Mapped[dict] = mapped_column(JSONB)
+    version: Mapped[int] = mapped_column(server_default="1")
+    state: Mapped[str] = mapped_column(String(24), server_default="proposed")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+
+
+class ActionApproval(Base):
+    __tablename__ = "action_approvals"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["action_id", "user_id", "payload_hash"],
+            ["assistant_actions.id", "assistant_actions.user_id", "assistant_actions.payload_hash"],
+            name="fk_approval_exact_action",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("id", "action_id", "user_id", name="uq_approval_owned_action"),
+        UniqueConstraint("action_id", "action_version", name="uq_approval_action_version"),
+        UniqueConstraint("user_id", "request_id", name="uq_approval_request"),
+        CheckConstraint("action_version >= 1", name="ck_approval_version"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    action_id: Mapped[str] = mapped_column(String(36))
+    user_id: Mapped[int] = mapped_column()
+    action_version: Mapped[int] = mapped_column()
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ActionJob(TimestampMixin, Base):
+    __tablename__ = "action_jobs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["action_id", "user_id"],
+            ["assistant_actions.id", "assistant_actions.user_id"],
+            name="fk_action_job_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["approval_id", "action_id", "user_id"],
+            ["action_approvals.id", "action_approvals.action_id", "action_approvals.user_id"],
+            name="fk_action_job_approval",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("kind IN ('dispatch','reconcile')", name="ck_action_job_kind"),
+        CheckConstraint("state IN ('held','queued','running','done')", name="ck_action_job_state"),
+        CheckConstraint("attempts BETWEEN 0 AND 3", name="ck_action_job_attempts"),
+        CheckConstraint(
+            "(state = 'running' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) OR "
+            "(state != 'running' AND lease_token IS NULL AND lease_expires_at IS NULL)",
+            name="ck_action_job_lease",
+        ),
+        Index("ix_action_jobs_due", "state", "available_at", "lease_expires_at"),
+    )
+    action_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column()
+    approval_id: Mapped[str] = mapped_column(String(36))
+    kind: Mapped[str] = mapped_column(String(16), server_default="dispatch")
+    state: Mapped[str] = mapped_column(String(16), server_default="held")
+    attempts: Mapped[int] = mapped_column(server_default="0")
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    lease_token: Mapped[str | None] = mapped_column(String(36))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ActionAttempt(Base):
+    __tablename__ = "action_attempts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["action_id", "user_id"],
+            ["assistant_actions.id", "assistant_actions.user_id"],
+            name="fk_attempt_owned_action",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["approval_id", "action_id", "user_id"],
+            ["action_approvals.id", "action_approvals.action_id", "action_approvals.user_id"],
+            name="fk_attempt_owned_approval",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("action_id", "number", name="uq_attempt_number"),
+        CheckConstraint(
+            "number BETWEEN 1 AND 3 AND action_version >= 1", name="ck_attempt_versions"
+        ),
+        CheckConstraint(
+            "state IN ('dispatched','outcome_unknown','succeeded','failed')",
+            name="ck_attempt_state",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(provider_identifiers) = 'object'", name="ck_attempt_identifiers"
+        ),
+        Index(
+            "uq_attempt_unresolved",
+            "action_id",
+            unique=True,
+            postgresql_where=text("state IN ('dispatched','outcome_unknown')"),
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    action_id: Mapped[str] = mapped_column(String(36))
+    user_id: Mapped[int] = mapped_column()
+    approval_id: Mapped[str] = mapped_column(String(36))
+    number: Mapped[int] = mapped_column()
+    action_version: Mapped[int] = mapped_column()
+    lease_token: Mapped[str] = mapped_column(String(36))
+    state: Mapped[str] = mapped_column(String(24))
+    dispatch_intent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider_identifiers: Mapped[dict] = mapped_column(JSONB)
+    evidence: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

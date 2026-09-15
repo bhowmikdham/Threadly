@@ -249,3 +249,13 @@ No transaction spans model/Flow inference. This branch does not add Calendar or
 external-write handlers, or an automatic natural-language compound planner.
 See [whole workflow/testing map](workflow-testing-map.md) and
 [compound contract](assistant-compound-workflows.md).
+
+## Action persistence (B02)
+
+`app/actions/service.py` stores immutable candidates behind owner and task locks,
+separately from generation jobs. Draft edits supersede pending proposals in the
+same transaction; executing/unknown records remain unchanged. PostgreSQL guards
+ownership, legal transitions and preserved unresolved attempts. This is the storage
+foundation only: no action HTTP routes, action worker or Google writes are enabled.
+See [action lifecycle and rollout](assistant-action-storage.md) for the full mapping
+and the source-deletion policy that must be completed before live writes.

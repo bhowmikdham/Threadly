@@ -434,3 +434,18 @@ New SSE events: `step.started`, `step.succeeded`, `step.failed`; final-only
 explicit-selection requirement, two-step bound and natural-language planner false.
 Examples and recovery: [compound workflows](assistant-compound-workflows.md).
 Whole implementation/testing map: [workflow testing](workflow-testing-map.md).
+
+## Action storage integration (B02; internal only)
+
+No action proposal/approval/dispatch HTTP endpoint is added. Existing draft editing
+now supersedes internal `proposed`/`approved` action records for the previous final
+artifact in the same transaction. It does not recall `executing`/`outcome_unknown`
+actions. Draft review remains an acknowledgement with `authorization: none` and
+`sending_available: false`. Legacy `/draft*` routes are not redirected to a sender.
+
+Existing task-event replay can include `action.proposed` with `action_id`,
+`artifact_id`, `action_type`, `state`, and `action.state_changed` with `action_id`,
+`state`, plus `reason: draft_revised` for edit supersession. The normal task-event
+envelope/sequence/version applies; payloads and recipients are excluded. These
+events arise only through internal storage callers until B03/B04 add public APIs.
+See [action storage](assistant-action-storage.md) for errors, schemas and lifecycle.

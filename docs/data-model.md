@@ -1,4 +1,4 @@
-# Data model — postgres (13 tables)
+# Data model — PostgreSQL
 
 Owner: backend. SQLAlchemy models live in `backend/app/db/models.py`; schema
 changes go through alembic (`make db-revision m="..."` then `make db-upgrade`)
@@ -39,7 +39,8 @@ of existing messages. Downgrading removes all state in the five new tables.
 
 Task-to-context and child-to-task ownership are also enforced by composite foreign
 keys. Source ownership is checked when capturing context. Jobs, events and artifacts
-cascade with their task; deleting an account or source thread removes its saved
+cascade with their task when no action history references it. Action history now
+blocks source/account cascades (see B02 below); otherwise deletion removes saved
 assistant work and fences a worker's subsequent completion attempt.
 
 Model calls run outside transactions. Task/job claim, cancellation and completion
@@ -226,3 +227,15 @@ final result. Intermediate artifacts cannot accidentally become the newest draft
 There is no external-action table/executor in this migration. Downgrade refuses
 while compound tasks/steps/non-result streams exist. See
 [compound runtime](assistant-compound-workflows.md) for recovery and rollout.
+
+## Durable action records (migration `d9302f5b7a14`)
+
+Adds `assistant_actions`, `action_approvals`, `action_jobs` and `action_attempts`.
+Composite owner/task/artifact/approval FKs use RESTRICT, so action history survives
+uncoordinated source/account deletion. Exact payload/source identity and approvals
+are immutable; migration-installed triggers guard state changes and dispatch intent.
+Partial uniqueness allows only one unresolved attempt per action.
+
+Parent `c8291e4a6f03`; existing artifacts/reviews are unchanged. Downgrade refuses
+while any action history exists. No new public action API or executor is installed.
+Full fields, lock order, retention gate and tests: [action storage](assistant-action-storage.md).
