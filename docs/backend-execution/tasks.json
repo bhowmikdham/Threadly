@@ -806,7 +806,7 @@
     {
       "id": "B16",
       "title": "Create the versioned native/Flow operation registry",
-      "status": "planned",
+      "status": "in_progress",
       "work_packages": [
         "T03",
         "T04",
@@ -858,7 +858,7 @@
     {
       "id": "B17",
       "title": "Invoke Bedrock Flows through an authorized read bridge",
-      "status": "planned",
+      "status": "in_progress",
       "work_packages": [
         "T03",
         "T07",

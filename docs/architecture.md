@@ -154,3 +154,15 @@ runtime topology or enable Flow invocation in the assistant worker. The B16 regi
 B17 read bridge/invocation adapter, backend validators and live evaluation gates
 remain required before integration. Prepared AWS resources are not evidence of
 working end-to-end Gmail/Calendar workflows.
+
+## Application Flow runtime
+
+The [workflow runtime](workflow-runtime.md) adds a registry and bounded InvokeFlow
+adapter for the existing summary/reply/compose worker paths. The backend supplies
+masked, owner-bound context before invocation and validates the result afterward.
+This restricted release has no Lambda/read callback or write nodes. It preserves
+native admission by default, pins configured targets into new tasks, validates
+published graph/alias identity and uses the existing cancellation/lease fencing.
+The six earlier prototypes use a different output envelope; a compatible, evaluated
+runtime release must be published before activation. Other/planning/Calendar, compound
+steps, durable clarification and approved external actions remain pending.

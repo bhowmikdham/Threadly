@@ -318,3 +318,18 @@ masks PII before any cloud egress.
 - [ ] Does the side panel want thread list deltas pushed (SSE) or is poll-on-open fine?
 - [ ] Draft approval flow: does `send` live in backend (`/draft/{id}/send`) or does the
       extension compose via Gmail UI with the draft text? Changes module 3 scope.
+
+## Workflow implementation configuration
+
+`GET /assistant/workflows` (JWT required) describes the installed generation operations
+`summarise_thread`, `draft_reply`, `draft_new` and their configured `native` or
+`bedrock_flow` implementation. Each reports `installed: true`, `external_actions: false`.
+`remote_resources_verified: false` explicitly limits this to configuration; it is not
+per-user Google capability or live model readiness. AWS identifiers are not returned.
+Invalid registry configuration uses the normal 503 `workflow_configuration_invalid`
+error envelope. `/readyz` also reports a `workflow_configuration` check.
+
+With a configured registry, accepted tasks pin their full workflow release; task and
+artifact formats and source/draft validation are retained. Changed aliases, incomplete
+streams and invalid evidence cannot publish successful artifacts. No send/Calendar
+endpoint is added. See [workflow runtime and remaining gates](workflow-runtime.md).

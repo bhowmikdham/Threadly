@@ -13,12 +13,14 @@ from app.assistant.tasks import claim_next, finish, save_route
 from app.db.engine import get_engine, get_session_factory
 from app.model_client.client import get_model_client
 from app.model_client.providers import ProviderError
+from app.workflows import registry
+from app.workflows.bedrock_flows import FlowError, FlowInvoker
 
 log = logging.getLogger("threadly.assistant.worker")
 GENERATION_TIMEOUT_SECONDS = 120  # shorter than the 180-second fenced lease
 
 
-async def run_once(factory=None, model=None) -> bool:
+async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
     factory = factory or get_session_factory()
     async with factory.begin() as session:
         claim = await claim_next(session)
@@ -26,9 +28,20 @@ async def run_once(factory=None, model=None) -> bool:
         return False
     payload, provenance, error, retryable = None, None, None, False
     stopped_state = None
+    manifest = None
+    try:
+        if claim.release.get("workflow") == registry.RELEASE:
+            manifest = registry.pinned_manifest(claim.release)
+    except ApiError as exc:
+        error = exc.code
     legacy = claim.release == release_manifest()
     previous = claim.release == routing_v1.release_manifest()
-    if not legacy and not previous and claim.release != routing.release_manifest():
+    if error or (
+        not legacy
+        and not previous
+        and manifest is None
+        and claim.release != routing.release_manifest()
+    ):
         error = "release_unavailable"
     else:
         stage = "routing" if not legacy else "summary"
@@ -78,19 +91,30 @@ async def run_once(factory=None, model=None) -> bool:
                                 claim.snapshot, claim.instruction
                             )
                         )
-                    text, info = await (model or get_model_client()).generate(
-                        prompt, max_tokens=2500 if is_draft else 1800
-                    )
+                    operation = "draft_reply" if mode == "reply" else "draft_new"
+                    if not is_draft:
+                        operation = "summarise_thread"
+                    entry = manifest.operations[operation] if manifest else None
+                    if isinstance(entry, registry.FlowEntry):
+                        result = await (flow_invoker or FlowInvoker()).invoke(entry, prompt)
+                        text = result.text
+                        provenance = {**result.provenance, "release": claim.release}
+                    else:
+                        text, info = await (model or get_model_client()).generate(
+                            prompt, max_tokens=2500 if is_draft else 1800
+                        )
+                        provenance = {
+                            "provider": info.provider,
+                            "model": info.model,
+                            "release": claim.release,
+                        }
                     payload = (
                         drafting.make_artifact(text, claim, mode)
                         if is_draft
                         else make_artifact(text, claim.context_id, claim.snapshot)
                     )
-                    provenance = {
-                        "provider": info.provider,
-                        "model": info.model,
-                        "release": claim.release,
-                    }
+        except FlowError as exc:
+            error, retryable = exc.code, exc.retryable
         except ApiError as exc:
             error, retryable = exc.code, exc.code == "upstream_model_unavailable"
         except (ProviderError, TimeoutError):

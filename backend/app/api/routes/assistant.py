@@ -23,9 +23,28 @@ from app.schemas.assistant import (
     RoutePreviewRequest,
 )
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
+from app.workflows import registry
 
 router = APIRouter()
 DB = Annotated[AsyncSession, Depends(get_session)]
+
+
+@router.get("/workflows")
+async def workflow_configuration(user_id: CurrentUser) -> dict:
+    manifest = registry.load_manifest()
+    return {
+        "schema_version": "1.0",
+        "operations": {
+            op: {
+                "implementation": manifest.operations[op].implementation if manifest else "native",
+                "installed": True,
+                "external_actions": False,
+            }
+            for op in registry.OPERATIONS
+        },
+        "remote_resources_verified": False,
+        "note": "Configuration only; source and remote prerequisites are checked per request.",
+    }
 
 
 @router.post("/route-preview", response_model=RoutePreview)
