@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.assistant import drafting, routing, summary
+from app.assistant import drafting, summary_quality
 from app.workflows.bedrock_flows import FlowError, FlowInvoker
 from app.workflows.registry import OPERATIONS, FlowEntry, Manifest
 
@@ -56,7 +56,7 @@ def fixture(operation):
         draft_input=envelope,
     )
     prompt = (
-        routing.summary_prompt(SNAPSHOT, instruction)
+        summary_quality.make_prompt(SNAPSHOT, instruction)
         if operation == "summarise_thread"
         else drafting.make_prompt(instruction, SNAPSHOT, envelope, mode)
     )
@@ -74,13 +74,14 @@ async def evaluate(manifest: Manifest, invoker=None):
         record = {
             "operation": operation,
             "fixture_version": "synthetic-v1",
+            "summary_contract_hash": summary_quality.contract_hash(),
             "definition_hash": entry.definition_hash,
             "passed": False,
         }
         try:
             result = await invoker.invoke(entry, prompt)
             artifact = (
-                summary.make_artifact(result.text, claim.context_id, claim.snapshot)
+                summary_quality.make_artifact(result.text, claim.context_id, claim.snapshot)
                 if operation == "summarise_thread"
                 else drafting.make_artifact(result.text, claim, mode)
             )

@@ -343,7 +343,8 @@ async def test_old_snapshot_and_queued_release_keep_ordinal_clarification(
             request(context.id, instruction="What's in the third message?", intent_hint=None),
         )
         assert context.payload["schema_version"] == "1.0"
-        assert task.release == routing.release_manifest()
+        # Simulate a genuinely queued pre-quality release; new tasks pin the wrapper.
+        task.release = routing.release_manifest()
         task_id = task.id
     model = FakeModel(error=AssertionError("Old release must retain clarification"))
     await run_once(db_sessionmaker, model)

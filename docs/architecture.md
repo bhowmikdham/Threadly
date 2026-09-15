@@ -178,3 +178,13 @@ operation. The worker keeps release compatibility and fenced artifact publicatio
 Legacy captures retain their semantics; UI-aware tasks wrap the pinned native/Flow
 release. [Capture lifecycle and frontend integration](ui-context-mapping.md) covers
 bounds, errors, rollback and the remaining B08/B09/browser gates.
+
+## Summary quality release
+
+`summary_policy.py` supplies the versioned concise policy shared by the runtime and
+a separate console experiment. `summary_quality.py` builds numbered-source prompts
+and applies bounded output checks before the existing artifact/evidence builder.
+New tasks pin this wrapper without reinterpreting old queued releases; UI selection
+filtering still occurs before generation. Graph completion and schema validity do
+not establish factual quality. [The diagnosis and evaluation guide](summary-quality.md)
+separate offline regression, live Haiku evaluation and frontend presentation.
