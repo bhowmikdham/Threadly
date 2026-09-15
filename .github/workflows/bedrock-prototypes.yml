@@ -1,0 +1,31 @@
+name: bedrock-prototypes
+
+on:
+  pull_request:
+    paths: ["infra/bedrock/**", ".github/workflows/bedrock-prototypes.yml"]
+  push:
+    branches: [main, "codex/assistant-intent-routing"]
+    paths: ["infra/bedrock/**", ".github/workflows/bedrock-prototypes.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation tools
+        run: pip install -r infra/bedrock/requirements-validation.txt
+      - name: Validate launcher and mocked AWS lifecycle
+        run: |
+          ruff check infra/bedrock
+          python -m unittest discover -s infra/bedrock/tests -v
+      - name: Render and validate CloudFormation without AWS credentials
+        working-directory: ${{ runner.temp }}
+        run: |
+          python "$GITHUB_WORKSPACE/infra/bedrock/cloudshell_flows.py" --render-only
+          cfn-lint -t threadly-flows-*/template.json

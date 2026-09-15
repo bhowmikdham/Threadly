@@ -1,0 +1,4 @@
+# Development/CI only. CloudShell provisioning uses stdlib + AWS CLI.
+boto3==1.43.93
+cfn-lint==1.56.3
+ruff==0.16.7
