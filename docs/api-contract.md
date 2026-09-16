@@ -533,3 +533,20 @@ Existing proposals expose the same blocker at approval/preflight; historical key
 replay remains available. There is no resend/budget-reset endpoint; failed actions
 require a new preview and independent approval, which remains publicly disabled.
 Recovery events and limits: [email actions](email-actions.md).
+
+## Explicit lookup → draft templates (B10b)
+
+`POST /assistant/compound-requests` additionally accepts `lookup_then_reply` and
+`lookup_then_compose` under a separate strict schema selected by `template`.
+Fields are `schema_version`, `request_id`, `context_snapshot_id`, `template`,
+`query` (literal text, 1–200 characters), `draft_options`, `draft_instruction`.
+Do not supply `summary_in_draft`, cursor, operations or arbitrary source refs.
+Existing summary request/replay contracts are unchanged.
+
+Task `compound` adds `query` for these templates, with requested outputs
+`lookup` and `result`; the final draft depends on step 1. No matches or more than
+ten matched messages stops before generation with `lookup_no_matches` or
+`lookup_scope_too_broad`. The saved lookup remains available as partial output.
+`GET /assistant/workflows` advertises both lookup templates, their separate release,
+saved-capture scope and ten-match bound. It continues to report no natural-language
+planner. Details, source mapping and request example: [lookup/draft](lookup-draft-workflows.md).

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "fd0eaeac94422832d8d644e342edfd36c12945bd",
+  "baseline_commit": "e93541835e4e651a291a4a4d3dbf00839d4ab0c8",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -149,6 +149,27 @@
       "approval_checkpoint": "docs/backend-execution/checkpoints/B04.md",
       "worker_checkpoint": "docs/backend-execution/checkpoints/B05.md",
       "recovery_checkpoint": "docs/backend-execution/checkpoints/B06.md"
+    },
+    {
+      "id": "lookup_draft",
+      "status": "implemented_in_current_pr",
+      "entry": "POST /assistant/compound-requests with lookup_then_reply or lookup_then_compose",
+      "handlers": [
+        "backend/app/assistant/lookup_draft.py",
+        "backend/app/assistant/steps.py"
+      ],
+      "operations": [
+        "search_mail",
+        "draft_reply",
+        "draft_new"
+      ],
+      "output": "lookup stream and final draft",
+      "remaining": [
+        "full_command_planner",
+        "mailbox_lookup_coordination",
+        "live_model_quality",
+        "staging_deployment"
+      ]
     }
   ],
   "invariants": [

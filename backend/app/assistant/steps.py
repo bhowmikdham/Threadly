@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
-from app.assistant import drafting, reads, routing, summary_quality, tasks, ui_routing
+from app.assistant import drafting, lookup_draft, reads, routing, summary_quality, tasks, ui_routing
 from app.assistant.summary import digest
 from app.db.models import (
     ArtifactRevision,
@@ -24,6 +24,7 @@ from app.db.models import (
 from app.model_client.client import get_model_client
 from app.model_client.providers import ProviderError
 from app.schemas.compound import CompoundRequest
+from app.schemas.lookup_draft import LookupDraftRequest
 from app.workflows import registry
 from app.workflows.bedrock_flows import FlowError, FlowInvoker
 
@@ -58,7 +59,9 @@ def wrap_release(base):
 
 
 def pinned_release(release):
-    if release != wrap_release(release.get("base_release")):
+    if release.get("workflow") == lookup_draft.RELEASE:
+        lookup_draft.validate_release(release)
+    elif release != wrap_release(release.get("base_release")):
         raise ApiError(503, "release_unavailable", "Saved compound release is unavailable.")
     base = release["base_release"]
     if base.get("workflow") == ui_routing.RELEASE:
@@ -72,12 +75,25 @@ def pinned_release(release):
     return policy, None
 
 
+def operations(request):
+    lookup = isinstance(request, LookupDraftRequest)
+    reply = request.template in {"summary_then_reply", "lookup_then_reply"}
+    return (
+        "search_mail" if lookup else "summarise_thread",
+        "draft_reply" if reply else "draft_new",
+    )
+
+
+def has_dependency(request):
+    return isinstance(request, LookupDraftRequest) or request.summary_in_draft
+
+
 def validate_input(request, context, envelope):
     if context is None or not context.payload.get("messages"):
         raise ApiError(409, "context_empty", "Capture a nonempty thread before starting the plan.")
     if not envelope or not envelope.get("to"):
         raise ApiError(409, "draft_recipients_missing", "Select draft recipients first.")
-    if (request.template == "summary_then_reply") != bool(envelope.get("reply")):
+    if (operations(request)[1] == "draft_reply") != bool(envelope.get("reply")):
         raise ApiError(409, "draft_options_intent_mismatch", "Select a valid draft target.")
 
 
@@ -121,7 +137,7 @@ def step_hash(claim, request, ordinal, dependency=None):
             "envelope": claim.draft_input,
             "release": claim.release,
             "ordinal": ordinal,
-            "dependency": dependency if ordinal == 2 and request.summary_in_draft else None,
+            "dependency": dependency if ordinal == 2 and has_dependency(request) else None,
         }
     )
 
@@ -135,11 +151,7 @@ async def start_step(factory, claim, request, ordinal, dependency):
         await check_source(session, claim)
         hashed = step_hash(claim, request, ordinal, dependency)
         step = await session.get(AssistantStep, (task.id, ordinal))
-        operation = (
-            "summarise_thread"
-            if ordinal == 1
-            else ("draft_reply" if request.template == "summary_then_reply" else "draft_new")
-        )
+        operation = operations(request)[ordinal - 1]
         if step is None:
             step = AssistantStep(
                 task_id=task.id,
@@ -196,7 +208,9 @@ async def publish_step(factory, claim, ordinal, payload, provenance):
             id=str(uuid4()),
             task_id=task.id,
             user_id=task.user_id,
-            stream_key="summary" if ordinal == 1 else "result",
+            stream_key=("lookup" if step.operation == "search_mail" else "summary")
+            if ordinal == 1
+            else "result",
             revision=1,
             payload=payload,
             provenance=provenance,
@@ -268,13 +282,16 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
     ordinal = 1
     try:
         async with asyncio.timeout(TIMEOUT_SECONDS):
-            request = CompoundRequest.model_validate(claim.compound_input)
+            lookup = claim.release.get("workflow") == lookup_draft.RELEASE
+            request = (LookupDraftRequest if lookup else CompoundRequest).model_validate(
+                claim.compound_input
+            )
             policy, manifest = pinned_release(claim.release)
             if claim.context_id != request.context_snapshot_id or not claim.snapshot:
                 raise ApiError(409, "compound_source_changed", "Select the original saved source.")
             # Entire fixed handler set/configuration is checked before the first inference.
-            mode = "reply" if request.template == "summary_then_reply" else "new"
-            operations = ("summarise_thread", "draft_reply" if mode == "reply" else "draft_new")
+            planned_operations = operations(request)
+            mode = "reply" if planned_operations[1] == "draft_reply" else "new"
             if (
                 not claim.draft_input
                 or not claim.draft_input.get("to")
@@ -282,7 +299,7 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
             ):
                 raise ApiError(409, "compound_input_changed", "Select valid draft inputs.")
             summary = None
-            for ordinal, operation in enumerate(operations, 1):
+            for ordinal, operation in enumerate(planned_operations, 1):
                 dependency = (
                     {"artifact_id": summary.id, "hash": digest(summary.payload)}
                     if summary
@@ -294,32 +311,43 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
                 if saved:
                     summary = saved
                     continue
-                prompt = (
-                    summary_quality.make_prompt(claim.snapshot, SUMMARY_REQUEST, policy=policy)
-                    if ordinal == 1
-                    else draft_prompt(claim, request, summary)
-                )
-                entry = manifest.operations[operation] if manifest else None
-                if isinstance(entry, registry.FlowEntry):
-                    result = await (flow_invoker or FlowInvoker()).invoke(entry, prompt)
-                    text, provenance = result.text, result.provenance
+                if lookup and ordinal == 1:
+                    payload = lookup_draft.lookup(claim, request)
+                    provenance = {"provider": "native", "model": None}
                 else:
-                    text, info = await (model or get_model_client()).generate(
-                        prompt, max_tokens=1800 if ordinal == 1 else 2500
+                    generation = (
+                        lookup_draft.generation_claim(claim, request, summary) if lookup else claim
                     )
-                    provenance = {"provider": info.provider, "model": info.model}
-                payload = (
-                    summary_quality.make_artifact(text, claim.context_id, claim.snapshot)
-                    if ordinal == 1
-                    else drafting.make_artifact(text, claim, mode)
-                )
+                    prompt = (
+                        lookup_draft.draft_prompt(generation, request, mode)
+                        if lookup
+                        else summary_quality.make_prompt(
+                            claim.snapshot, SUMMARY_REQUEST, policy=policy
+                        )
+                        if ordinal == 1
+                        else draft_prompt(claim, request, summary)
+                    )
+                    entry = manifest.operations[operation] if manifest else None
+                    if isinstance(entry, registry.FlowEntry):
+                        result = await (flow_invoker or FlowInvoker()).invoke(entry, prompt)
+                        text, provenance = result.text, result.provenance
+                    else:
+                        text, info = await (model or get_model_client()).generate(
+                            prompt, max_tokens=1800 if ordinal == 1 else 2500
+                        )
+                        provenance = {"provider": info.provider, "model": info.model}
+                    payload = (
+                        summary_quality.make_artifact(text, claim.context_id, claim.snapshot)
+                        if ordinal == 1
+                        else drafting.make_artifact(text, generation, mode)
+                    )
                 provenance = {
                     **provenance,
                     "release": claim.release,
                     "ordinal": ordinal,
                     "operation": operation,
                     "dependency_artifact_ids": [summary.id]
-                    if ordinal == 2 and request.summary_in_draft
+                    if ordinal == 2 and has_dependency(request)
                     else [],
                 }
                 saved = await publish_step(factory, claim, ordinal, payload, provenance)
@@ -358,12 +386,13 @@ async def view(session, task):
         )
     ).all()
     saved = {s.ordinal: s for s in rows}
-    operations = [
-        "summarise_thread",
-        "draft_reply" if task.compound_input["template"] == "summary_then_reply" else "draft_new",
-    ]
+    lookup = task.release.get("workflow") == lookup_draft.RELEASE
+    request = (LookupDraftRequest if lookup else CompoundRequest).model_validate(
+        task.compound_input
+    )
+    planned_operations = operations(request)
     result = []
-    for ordinal, operation in enumerate(operations, 1):
+    for ordinal, operation in enumerate(planned_operations, 1):
         step = saved.get(ordinal)
         result.append(
             {
@@ -376,20 +405,18 @@ async def view(session, task):
                 else "pending",
                 "attempts": step.attempts if step else 0,
                 "artifact_id": step.artifact_id if step else None,
-                "stream_key": "summary" if ordinal == 1 else "result",
+                "stream_key": ("lookup" if lookup else "summary") if ordinal == 1 else "result",
                 "error_code": step.error_code if step else None,
-                "depends_on": [1]
-                if ordinal == 2 and task.compound_input["summary_in_draft"]
-                else [],
+                "depends_on": [1] if ordinal == 2 and has_dependency(request) else [],
                 "execution_after": [1] if ordinal == 2 else [],
             }
         )
     return {
         "template": task.compound_input["template"],
-        "summary_in_draft": task.compound_input["summary_in_draft"],
+        **({"query": request.query} if lookup else {"summary_in_draft": request.summary_in_draft}),
         "completed_steps": sum(s.state == "succeeded" for s in rows),
         "total_steps": 2,
-        "requested_outputs": ["summary", "result"],
+        "requested_outputs": ["lookup" if lookup else "summary", "result"],
         "steps": result,
         "external_actions": False,
     }
