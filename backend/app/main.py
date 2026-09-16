@@ -9,7 +9,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.routes import assistant, auth, draft, entities, health, summary, sync, threads, voice
+from app.api.routes import (
+    assistant,
+    auth,
+    capabilities,
+    draft,
+    entities,
+    health,
+    summary,
+    sync,
+    threads,
+    voice,
+)
 from app.config import get_settings
 
 log = logging.getLogger("threadly")
@@ -54,6 +65,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, tags=["health"])
     app.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
+    app.include_router(capabilities.router, prefix="/assistant", tags=["assistant"])
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(sync.router, prefix="/sync", tags=["sync"])
     app.include_router(threads.router, prefix="/threads", tags=["threads"])

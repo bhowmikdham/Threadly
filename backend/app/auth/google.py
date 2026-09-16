@@ -1,13 +1,5 @@
-"""Google OAuth + userinfo over plain REST (module 2).
+"""Bounded Google OAuth REST adapter. Never surface provider bodies or credentials."""
 
-We deliberately use httpx against Google's token endpoints instead of the
-google-auth SDK stack: two POSTs and a GET, fully testable with a mock
-transport, and it keeps ~100MB of SDK out of the api image.
-
-Flow (extension side): chrome.identity.launchWebAuthFlow -> auth code ->
-POST /auth/google/exchange {code, redirect_uri}. The client secret only ever
-lives here, server-side.
-"""
 from dataclasses import dataclass
 
 import httpx
@@ -16,30 +8,21 @@ from app.config import get_settings
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
-
-# gmail.readonly for sync, gmail.send for approved drafts (W3), openid basics for identity
-SCOPES = [
-    "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-]
+SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/gmail.readonly"]
 
 
 class GoogleAuthError(Exception):
-    def __init__(self, message: str, status: int | None = None):
+    def __init__(self, message: str, status: int | None = None, *, revoked=False):
         super().__init__(message)
-        self.message = message
-        self.status = status
+        self.message, self.status, self.revoked = message, status, revoked
 
 
-@dataclass
+@dataclass(repr=False)
 class GoogleTokens:
     access_token: str
     expires_in: int
-    refresh_token: str | None  # only present on first consent (access_type=offline prompt=consent)
-    id_claims: dict
+    refresh_token: str | None
+    granted_scopes: list[str] | None
 
 
 @dataclass
@@ -47,46 +30,78 @@ class GoogleUser:
     sub: str
     email: str
     name: str | None
+    email_verified: bool
 
 
-def _client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=10, transport=transport)
+def _parse_json(response):
+    try:
+        body = response.json()
+    except ValueError:
+        raise GoogleAuthError("Invalid Google response.") from None
+    if not isinstance(body, dict):
+        raise GoogleAuthError("Invalid Google response.")
+    return body
 
 
-async def exchange_code(
-    code: str, redirect_uri: str, *, transport: httpx.AsyncBaseTransport | None = None
-) -> GoogleTokens:
-    """Auth code -> access/refresh tokens. Raises GoogleAuthError on any non-200."""
-    settings = get_settings()
-    async with _client(transport) as client:
-        r = await client.post(
-            TOKEN_URL,
-            data={
-                "code": code,
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
-            },
+async def _request(method, url, *, transport=None, **kwargs):
+    try:
+        async with httpx.AsyncClient(timeout=10, transport=transport) as client:
+            response = await client.request(method, url, **kwargs)
+    except httpx.HTTPError:
+        raise GoogleAuthError("Google is temporarily unavailable.") from None
+    if response.status_code != 200:
+        # Only invalid_grant establishes refresh-token revocation; a 400 can also
+        # indicate a deployment/client configuration error. Never log the body.
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        revoked = isinstance(body, dict) and body.get("error") == "invalid_grant"
+        raise GoogleAuthError(
+            "Google authorization request failed.", response.status_code, revoked=revoked
         )
-    if r.status_code != 200:
-        raise GoogleAuthError(f"code exchange failed: {r.text[:200]}", r.status_code)
-    body = r.json()
+    return _parse_json(response)
+
+
+def _tokens(body):
+    access, refresh = body.get("access_token"), body.get("refresh_token")
+    expiry, scope = body.get("expires_in"), body.get("scope")
+    if (
+        not isinstance(access, str)
+        or not access
+        or len(access) > 16384
+        or (refresh is not None and (not isinstance(refresh, str) or not refresh))
+        or type(expiry) is not int
+        or not 0 < expiry <= 86400
+        or (scope is not None and not isinstance(scope, str))
+    ):
+        raise GoogleAuthError("Invalid Google token response.")
     return GoogleTokens(
-        access_token=body["access_token"],
-        expires_in=int(body.get("expires_in", 3600)),
-        refresh_token=body.get("refresh_token"),
-        id_claims={},
+        access, expiry, refresh, sorted(set(scope.split())) if scope is not None else None
     )
 
 
-async def refresh_access_token(
-    refresh_token: str, *, transport: httpx.AsyncBaseTransport | None = None
-) -> GoogleTokens:
+async def exchange_code(code, redirect_uri, code_verifier=None, *, transport=None):
     settings = get_settings()
-    async with _client(transport) as client:
-        r = await client.post(
+    data = {
+        "code": code,
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    if code_verifier:
+        data["code_verifier"] = code_verifier
+    return _tokens(await _request("POST", TOKEN_URL, transport=transport, data=data))
+
+
+async def refresh_access_token(refresh_token, *, transport=None):
+    settings = get_settings()
+    return _tokens(
+        await _request(
+            "POST",
             TOKEN_URL,
+            transport=transport,
             data={
                 "refresh_token": refresh_token,
                 "client_id": settings.google_client_id,
@@ -94,24 +109,26 @@ async def refresh_access_token(
                 "grant_type": "refresh_token",
             },
         )
-    if r.status_code != 200:
-        # invalid_grant => user revoked access; caller must force re-auth
-        raise GoogleAuthError(f"refresh failed: {r.text[:200]}", r.status_code)
-    body = r.json()
-    return GoogleTokens(
-        access_token=body["access_token"],
-        expires_in=int(body.get("expires_in", 3600)),
-        refresh_token=body.get("refresh_token"),
-        id_claims={},
     )
 
 
-async def fetch_userinfo(
-    access_token: str, *, transport: httpx.AsyncBaseTransport | None = None
-) -> GoogleUser:
-    async with _client(transport) as client:
-        r = await client.get(USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"})
-    if r.status_code != 200:
-        raise GoogleAuthError(f"userinfo failed: {r.text[:200]}", r.status_code)
-    body = r.json()
-    return GoogleUser(sub=body["sub"], email=body.get("email", ""), name=body.get("name"))
+async def fetch_userinfo(access_token, *, transport=None):
+    body = await _request(
+        "GET",
+        USERINFO_URL,
+        transport=transport,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    sub, email, name = body.get("sub"), body.get("email"), body.get("name")
+    if (
+        not isinstance(sub, str)
+        or not 0 < len(sub) <= 64
+        or not isinstance(email, str)
+        or not 0 < len(email) <= 320
+        or "@" not in email
+        or any(c in email for c in "\r\n\x00")
+        or (name is not None and (not isinstance(name, str) or len(name) > 200))
+        or body.get("email_verified") is not True
+    ):
+        raise GoogleAuthError("Google account identity is not verified.")
+    return GoogleUser(sub, email, name, True)

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = ""
+    google_redirect_uri_allowlist: str = ""
     fernet_key: str = ""  # encrypts refresh tokens at rest (auth/crypto.py)
 
     # Explicit migration switch; Bedrock never falls back to another cloud.
@@ -57,6 +58,12 @@ class Settings(BaseSettings):
     @property
     def is_dev(self) -> bool:
         return self.app_env == "dev"
+
+    @property
+    def google_redirect_uri_allowlist_values(self) -> set[str]:
+        configured = self.google_redirect_uri_allowlist.split(",")
+        configured.append(self.google_redirect_uri)
+        return {uri.strip() for uri in configured if uri.strip()}
 
 
 @lru_cache

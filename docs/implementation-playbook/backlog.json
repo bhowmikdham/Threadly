@@ -123,7 +123,9 @@
       ],
       "handoff": "AI gets verified model/profile choices; tool bridge gets approved connectivity.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../backend-execution/checkpoints/B01.md (actual grants, state/PKCE, refresh isolation; live consent pending)"
+      ]
     },
     {
       "id": "T04",
