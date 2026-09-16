@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "aeefd320051fdeca4c02b8f3c1cacda8f78df8b1",
+  "baseline_commit": "eff310eb814c6e45605831bc9904f24ccb474746",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -119,7 +119,7 @@
         "B01",
         "B10",
         "B12_live_acceptance",
-        "B13",
+        "B13_live_acceptance",
         "B14"
       ]
     },
@@ -196,7 +196,7 @@
     },
     {
       "id": "calendar_reads",
-      "status": "implemented_in_current_pr",
+      "status": "merged_PR32",
       "entry": "GET /calendar/calendars; GET/PUT /calendar/preferences; POST /calendar/freebusy; GET /calendar/freebusy/{evidence_id}",
       "handlers": [
         "backend/app/calendar/service.py",
@@ -205,11 +205,28 @@
       "output": "owned_preferences_and_expiring_busy_unknown_evidence",
       "remaining": [
         "live_calendar_consent_acl_freebusy",
-        "B13",
         "B14",
         "B15"
       ],
       "checkpoint": "docs/backend-execution/checkpoints/B12.md"
+    },
+    {
+      "id": "calendar_slots",
+      "status": "implemented_in_current_pr",
+      "entry": "POST /calendar/slot-requests; GET /calendar/slot-requests/{request_id}",
+      "handlers": [
+        "backend/app/calendar/slots.py",
+        "backend/app/calendar/availability.py",
+        "backend/app/calendar/time_resolution.py"
+      ],
+      "output": "owned_expiring_slot_options_or_clarification_or_unknown",
+      "remaining": [
+        "live_freebusy_comparison",
+        "policy_acceptance",
+        "B14_assistant_negotiation_integration",
+        "B15_approved_booking"
+      ],
+      "checkpoint": "docs/backend-execution/checkpoints/B13.md"
     }
   ],
   "invariants": [
@@ -221,13 +238,12 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "Review/merge B06 bounded read-only Gmail reconciliation; live sends stay disabled",
-    "Controlled email integration and explicit public-approval gate; independent B10 complete planner next",
-    "B10 complete command planner and lookup steps",
-    "B11 plans",
-    "B12/B13 Calendar reads and deterministic slots",
-    "B14/B15 event actions and recovery",
-    "B17/B19 backend live release gates; B18 frontend deferred"
+    "B14 negotiation and slot-grounded replies using the B13 read seam",
+    "B15 exact approved Calendar execution and recovery",
+    "B11 non-calendar plans",
+    "Broader B10 planner/graphs and live semantic validation",
+    "Controlled OAuth, Bedrock and email/Calendar integration gates",
+    "B18/B19 shared quality, retention and backend release gates; frontend deferred"
   ],
   "deployment_target": {
     "commit": "fd0eaeac94422832d8d644e342edfd36c12945bd",

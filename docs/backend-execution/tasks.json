@@ -670,7 +670,7 @@
     {
       "id": "B13",
       "title": "Implement the deterministic timezone and slot engine",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T15"
       ],

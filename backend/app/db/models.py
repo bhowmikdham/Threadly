@@ -713,6 +713,7 @@ class CalendarPreference(TimestampMixin, Base):
 class CalendarEvidence(Base):
     __tablename__ = "calendar_evidence"
     __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_calendar_evidence_owner"),
         CheckConstraint(
             "preferences_version >= 1 AND account_version >= 1 AND expires_at > checked_at",
             name="ck_calendar_evidence_versions",
@@ -728,3 +729,52 @@ class CalendarEvidence(Base):
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     result: Mapped[dict] = mapped_column(JSONB)
+
+
+class CalendarSlotRequest(Base):
+    __tablename__ = "calendar_slot_requests"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id", name="uq_calendar_slot_request_key"),
+        UniqueConstraint("id", "user_id", name="uq_calendar_slot_request_owner"),
+        ForeignKeyConstraint(
+            ["evidence_id", "user_id"],
+            ["calendar_evidence.id", "calendar_evidence.user_id"],
+            ondelete="CASCADE",
+            name="fk_calendar_slot_evidence_owner",
+        ),
+        ForeignKeyConstraint(
+            ["anchor_from_request_id", "user_id"],
+            ["calendar_slot_requests.id", "calendar_slot_requests.user_id"],
+            ondelete="CASCADE",
+            name="fk_calendar_slot_anchor_owner",
+        ),
+        CheckConstraint(
+            "preferences_version >= 1 AND account_version >= 1 AND expires_at > created_at",
+            name="ck_calendar_slot_versions",
+        ),
+        CheckConstraint(
+            "state IN ('processing','needs_clarification','complete','unknown','failed')",
+            name="ck_calendar_slot_state",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_preferences.user_id", ondelete="CASCADE"), index=True
+    )
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    request: Mapped[dict] = mapped_column(JSONB)
+    anchor_from_request_id: Mapped[str | None] = mapped_column(String(36))
+    anchor_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    preferences_version: Mapped[int]
+    account_version: Mapped[int]
+    policy_version: Mapped[str] = mapped_column(String(80))
+    preferences: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(30))
+    resolution: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    evidence_id: Mapped[str | None] = mapped_column(String(36))
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

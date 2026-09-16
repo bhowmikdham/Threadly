@@ -348,3 +348,19 @@ grants. Transactions close before network calls; short final account/preferences
 locks fence publication. Saved evidence has explicit per-calendar unknown coverage,
 version checks and expiry. No calendar write or scheduling handler is registered.
 [Calendar lifecycle, diagram and B13 handoff](calendar-reads.md).
+
+### Deterministic Calendar slots (B13)
+
+`calendar/slots.py` commits an idempotent owned request/anchor before invoking B12's
+read service, then fences publication under fresh account/preferences/receipt locks.
+`time_resolution.py` resolves typed relative dates and genuine clock ambiguity;
+`availability.py` computes UTC intervals, DST-aware working windows, padded busy
+conflicts, notice and up to three options without model arithmetic. Saved explicit
+working hours or caller-supplied local context may resolve AM/PM; unknown busy data
+cannot do so. Immutable receipts retain assumptions, source versions and stable IDs.
+
+These direct read routes are not yet a durable assistant scheduling handler. B14 owns
+negotiation/assistant integration and fresh slot selection; B15 owns exact approved
+booking/recovery. External Calendar changes are not pushed into B12 evidence, so a
+five-minute offer always requires fresh validation before booking. Diagram and full
+contract: [Calendar slots](calendar-slots.md).

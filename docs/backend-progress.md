@@ -1,7 +1,7 @@
 # Whole backend progress — 16 September 2026
 
-Audit baseline: PR #31 merged at `aeefd320051fdeca4c02b8f3c1cacda8f78df8b1`
-on `codex/assistant-intent-routing`. The current PR adds B12 Calendar read foundations.
+Audit baseline: PR #32 merged at `eff310eb814c6e45605831bc9904f24ccb474746`
+on `codex/assistant-intent-routing`. The current PR adds B13 deterministic Calendar slots.
 This report separates implemented code, accepted package scope, and deployed/live
 behavior. Frontend integration remains deferred at the user's request.
 
@@ -10,12 +10,12 @@ behavior. Frontend integration remains deferred at the user's request.
 Initial-release task board, **21 packages (B00–B20)**:
 
 ```text
-[████▒▒▒▒▒▒▒▒▒░░░░░░░░]
- █ Verified package: 4     ▒ Partial / in review: 9     ░ Planned: 8
+[████▒▒▒▒▒▒▒▒▒▒░░░░░░░]
+ █ Verified package: 4     ▒ Partial / in review: 10    ░ Planned: 7
 ```
 
 Source: `docs/backend-execution/tasks.json`, checkpoints and runtime source audit.
-Four packages (19% of the package count) are formally verified; thirteen (62%) have
+Four packages (19% of the package count) are formally verified; fourteen (67%) have
 implementation evidence. **Neither figure is a percentage of engineering effort or
 production readiness.** Packages vary greatly in size. In particular B06 has merged
 recovery code but stays open for the live email gate; B10 has working templates but
@@ -37,7 +37,8 @@ bar. PR counts, prepared AWS Flows and passing tests do not close these packages
 | Compound tasks | Summary → reply/compose with separate streams, reusable checkpoint and final pointer | B10a merged/deployed in PR #23; live provider setup not verified |
 | Lookup → draft | New explicit captured-text lookup → reply/compose; native checkpoint, scoped generation, no/too-many-match stop | B10b merged PR #30; captured-text-only scope |
 | Reviewed command planning | Persisted all-word clause interpretation, prohibitions, dependency compilation and exact review → existing compound task | B10c merged PR #31; four pairs only, live semantic gate and automatic routing pending |
-| Calendar read foundations | Read-only incremental consent, owned versioned preferences, current ACL selection and saved busy/unknown evidence | B12 current PR; live OAuth/Calendar smoke and B13 slots remain |
+| Calendar read foundations | Read-only incremental consent, owned versioned preferences, current ACL selection and saved busy/unknown evidence | B12 merged PR #32; live OAuth/Calendar smoke remains |
+| Deterministic Calendar slots | Typed anchored dates, contextual AM/PM, DST-aware working hours, buffered busy checks and stable expiring options | B13 current PR; live comparison/policy acceptance and assistant negotiation remain |
 | Bedrock execution | Native/Flow registry, pinned manifests, bounded InvokeFlow adapter, versioned prompts | B16/B17 code and synthetic SDK replay; cloud end-to-end gate still open |
 | Email actions | Immutable action/approval records, exact MIME preview, explicit decisions, dedicated sender and read-only uncertain-outcome reconciliation | B02–B05 verified local scope, B06 merged recovery; public approval/sending remains gated |
 
@@ -58,7 +59,7 @@ bar. PR counts, prepared AWS Flows and passing tests do not close these packages
 | B10 multi-step workflows | In progress | Live planner semantic validation, automatic routing, broader lookup coordination, in-place clarification, Calendar combinations once available |
 | B11 non-calendar planning | Planned | Evidence-backed plan revisions, owners/deadlines and explicit commitment selection |
 | B12 Calendar read | In review | Live consent/list/freebusy/ACL smoke; read foundations implemented, slots belong to B13 |
-| B13 time/slots | Planned | Deterministic time resolution, timezone/DST handling, working hours, buffers, conflicts and bounded slot sets |
+| B13 time/slots | In review | Local engine/API/migration implemented; live Google comparison and policy acceptance pending |
 | B14 meeting negotiation | Planned | Slot offers, selection/expiry, negotiation state and refreshed availability |
 | B15 Calendar writes | Planned | Exact event approval, execution, idempotency and uncertain-outcome reconciliation |
 | B16 operation registry | In progress | Extend only when handlers exist; complete target operation/release coverage |
@@ -83,8 +84,8 @@ recipients, Flow ARNs, execution order or permissions.
    Extend typed corrected-plan continuation and broader retrieval/graphs; preserve
    every requested output/negation before enabling automatic routing. The 14-case
    synthetic corpus is a starting contract, not live quality acceptance.
-2. Build B13 deterministic slots on the new B12 evidence/preferences seam. Complete
-   the controlled B12 Google consent/list/freebusy smoke alongside this work.
+2. Review B13 typed deterministic slot queries and run the controlled B12/B13 Google
+   consent/list/freebusy and slot-comparison smoke alongside this work.
    B11 non-calendar plans and explicit commitment acceptance remain open.
 3. Add B14/B15 meeting negotiation and approved event creation/recovery. Only then
    enable summary + slots + reply as a supported complete graph.
@@ -102,8 +103,8 @@ flowchart LR
     B --> P[Merged: reviewed compound-command planner]
     P --> C[Live planner quality, broader graphs and typed plan clarification]
     C --> D[Non-calendar plans]
-    A --> E[Current PR: Calendar grants, preferences and freebusy]
-    E --> F[Deterministic slots]
+    A --> E[Merged: Calendar grants, preferences and freebusy]
+    E --> F[Current PR: deterministic slot read API]
     C --> G[Summary plus slots plus reply]
     F --> G
     F --> H[Negotiation and approved booking/recovery]
@@ -119,14 +120,14 @@ flowchart LR
 Last confirmed host log in this task: PR #23 commit
 `954b4926d5e0c4928ebecde06f2f67e918d5be06`, migration `c8291e4a6f03`, healthy API
 and dependencies, but model/OAuth configuration pending in that log. Later merges
-are not evidence of an EC2 update. Current merged migration head is `b10c026e9a31`; this PR adds `c12026e9a032`.
+are not evidence of an EC2 update. Current merged migration head is `c12026e9a032`; this PR adds `d13026e9a033`.
 The current PR does not deploy or alter any AWS resource, Google grant or write flag.
 
 PR #30's exact implementation commit `1aabbdb` passed backend CI with **710 backend
 tests, 12 offline EC2 checks and 19 summary-console checks**:
 [CI run](https://github.com/bhowmikdham/Threadly/actions/runs/35054635897).
-PR #31 passed 760 backend tests. Current B12 verification is recorded in
-[its checkpoint](backend-execution/checkpoints/B12.md).
+PR #31 passed 760 backend tests; PR #32 passed 823 backend tests. Current B13
+verification is recorded in [its checkpoint](backend-execution/checkpoints/B13.md).
 Synthetic models/transports verify orchestration and failure handling, not live Haiku
 quality or Google provider behavior. Whole-workflow API mappings and staging scenarios:
 [testing map](workflow-testing-map.md); [machine-readable map](workflow-runtime-map.json).
