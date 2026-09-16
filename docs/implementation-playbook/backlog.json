@@ -82,7 +82,8 @@
       "assignee": null,
       "evidence": [
         "13-implementation-progress.md (Gmail fidelity: PostgreSQL and simulated Gmail evidence; live account validation pending)",
-        "../gmail-sync.md (runtime lifecycle, metadata contract and migration rollout)"
+        "../gmail-sync.md (runtime lifecycle, metadata contract and migration rollout)",
+        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)"
       ]
     },
     {
@@ -446,7 +447,8 @@
         "13-implementation-progress.md (initial draft artifacts; revisions, full grounding and live integration pending)",
         "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
         "../assistant-draft-review.md (persistent revisions and exact review acknowledgements; action/send approval remains pending)",
-        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)"
+        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)",
+        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)"
       ]
     },
     {
@@ -536,7 +538,8 @@
       "handoff": "Reply/Compose can complete approved actions with recovery evidence.",
       "assignee": null,
       "evidence": [
-        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)"
+        "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)",
+        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)"
       ]
     },
     {

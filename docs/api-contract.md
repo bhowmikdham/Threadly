@@ -437,7 +437,7 @@ Whole implementation/testing map: [workflow testing](workflow-testing-map.md).
 
 ## Action storage integration (B02; internal only)
 
-No action proposal/approval/dispatch HTTP endpoint is added. Existing draft editing
+B02 itself added no action HTTP endpoint; B03 below now exposes proposal/read. Existing draft editing
 now supersedes internal `proposed`/`approved` action records for the previous final
 artifact in the same transaction. It does not recall `executing`/`outcome_unknown`
 actions. Draft review remains an acknowledgement with `authorization: none` and
@@ -447,7 +447,7 @@ Existing task-event replay can include `action.proposed` with `action_id`,
 `artifact_id`, `action_type`, `state`, and `action.state_changed` with `action_id`,
 `state`, plus `reason: draft_revised` for edit supersession. The normal task-event
 envelope/sequence/version applies; payloads and recipients are excluded. These
-events arise only through internal storage callers until B03/B04 add public APIs.
+events now also arise through the B03 proposal endpoint; no public approval exists.
 See [action storage](assistant-action-storage.md) for errors, schemas and lifecycle.
 
 ## Google auth/capabilities (B01)
@@ -471,3 +471,17 @@ Errors: 400 `invalid_redirect_uri`/`oauth_state_invalid`; 401 `oauth_exchange_fa
 Read the [full handshake, diagrams and compatibility note](google-capabilities.md)
 before implementing a client. Existing Chrome getAuthToken calls do not supply
 backend authorization codes; frontend integration remains deferred.
+
+## Exact email previews (B03)
+
+Authenticated `POST /assistant/artifacts/{artifact_id}/actions` accepts strict
+`{request_id,expected_revision,action_type:"send_email"}` and returns 201
+`EmailActionView`. Authenticated `GET /assistant/actions/{action_id}` returns the
+saved owner-only preview with current blockers. Recipients/body come exclusively
+from the current edited artifact; arbitrary payload overrides are rejected. The
+response exposes From/To/Cc/Bcc, subject/body, threading headers, hashes, versions
+and 30-minute expiry, with `authorization: none`, approval/sending false. No raw
+MIME is returned. Retries reuse the original candidate; edits supersede it. Both
+responses use `Cache-Control: no-store`. No approve/send route exists.
+
+[Full schema, blockers, replay and client contract](email-action-previews.md).

@@ -15,3 +15,42 @@ class ActionCandidate(StrictModel):
     payload: dict[str, JsonValue] = Field(min_length=1)
     source_versions: dict[str, JsonValue]
     expires_at: AwareDatetime
+
+
+class ProposeEmailAction(StrictModel):
+    request_id: str = Field(min_length=1, max_length=128, pattern=r"\S")
+    expected_revision: int = Field(ge=1)
+    action_type: Literal["send_email"]
+
+
+class EmailPreview(StrictModel):
+    from_address: str
+    to: list[str]
+    cc: list[str]
+    bcc: list[str]
+    subject: str
+    body: str
+    message_id: str
+    date: str
+    in_reply_to: str | None
+    references: list[str]
+    gmail_thread_id: str | None
+
+
+class EmailActionView(StrictModel):
+    action_id: str
+    task_id: str
+    artifact_id: str
+    action_type: Literal["send_email"]
+    state: str
+    version: int
+    payload_schema: str
+    payload_hash: str
+    mime_sha256: str
+    expires_at: str
+    preview: EmailPreview
+    account_version: int
+    blockers: list[str]
+    approval_available: Literal[False] = False
+    sending_available: Literal[False] = False
+    authorization: Literal["none"] = "none"

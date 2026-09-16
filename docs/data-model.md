@@ -237,7 +237,7 @@ are immutable; migration-installed triggers guard state changes and dispatch int
 Partial uniqueness allows only one unresolved attempt per action.
 
 Parent `c8291e4a6f03`; existing artifacts/reviews are unchanged. Downgrade refuses
-while any action history exists. No new public action API or executor is installed.
+while any action history exists. This migration installs no executor; B03 adds proposal/read APIs.
 Full fields, lock order, retention gate and tests: [action storage](assistant-action-storage.md).
 
 ## Actual Google grants and OAuth sessions (`f1a2b3c4d5e6`)
@@ -253,3 +253,13 @@ nullable owned user/version pair, expiry and consumption time. Owner deletion
 cascades login state; action retention rules are unchanged. No raw state/code/verifier
 is stored. Downgrade refuses when action history exists and otherwise invalidates
 pending sign-ins while preserving legacy tokens. See [Google lifecycle](google-capabilities.md).
+
+## Email action payload `email-mime-1.0.0` (B03, no DDL)
+
+Existing `assistant_actions.payload` stores `preview`, `mime_base64url` and
+`mime_sha256`. B02 `payload_hash` covers schema + the whole payload, and
+`source_artifact_hash` covers artifact + edited envelope. `source_versions` stores
+proposal request identity, effective context hashes/thread versions, reply metadata
+hash when applicable, Google subject/account version and actual scopes. MIME Date,
+Message-ID and 30-minute expiry are frozen per proposal. Reads never mutate payloads.
+No approval, job or attempt is created. [Contract and retention boundary](email-action-previews.md).
