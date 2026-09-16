@@ -289,6 +289,10 @@ async def run_once(factory=None, *, transport=None, token_loader=None):
     factory = factory or get_session_factory()
     if await recover_one(factory):
         return True
+    from app.actions import reconciliation
+
+    if await reconciliation.run_once(factory, transport=transport, token_loader=token_loader):
+        return True
     claim = await claim_one(factory, transport=transport)
     if claim is None:
         return False

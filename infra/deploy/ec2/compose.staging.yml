@@ -37,6 +37,17 @@ services:
         condition: service_healthy
     networks: [threadly_net]
 
+  action-worker:
+    image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
+    command: python -m app.actions.worker
+    restart: unless-stopped
+    stop_grace_period: 45s
+    env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [threadly_net]
+
   postgres:
     image: postgres:16
     restart: unless-stopped

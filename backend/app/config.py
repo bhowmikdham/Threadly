@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     # Dedicated write worker. B06's code gate also blocks real HTTP in this release.
     email_writes_enabled: bool = False
+    email_reconciliation_enabled: bool = False
     email_action_lease_seconds: int = Field(default=120, ge=60, le=300)
 
     # Legacy rollback path (superseded by ADR 003).

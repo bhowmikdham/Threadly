@@ -146,6 +146,18 @@ async def replay(session, user_id, artifact_id, request):
     return existing
 
 
+async def unresolved_send(session, user_id, task_id, excluding=None):
+    statement = select(AssistantAction.id).where(
+        AssistantAction.user_id == user_id,
+        AssistantAction.task_id == task_id,
+        AssistantAction.action_type == "send_email",
+        AssistantAction.state.in_(["executing", "outcome_unknown"]),
+    )
+    if excluding:
+        statement = statement.where(AssistantAction.id != excluding)
+    return await session.scalar(statement.limit(1))
+
+
 async def propose(session, user_id, artifact_id, request):
     previous = await replay(session, user_id, artifact_id, request)
     if previous:
@@ -157,6 +169,8 @@ async def propose(session, user_id, artifact_id, request):
     if previous:
         return previous
     draft_review.require_draft(artifact)
+    if await unresolved_send(session, user_id, task.id):
+        raise email_payload.blocked("previous_send_unresolved")
     if (
         task.state != "succeeded"
         or task.final_artifact_id != artifact.id
@@ -248,6 +262,8 @@ async def view(session, user_id, action_id):
         is not None
     )
     allowed = []
+    if await unresolved_send(session, user_id, task.id, excluding=action.id):
+        blockers.append("previous_send_unresolved")
     if action.state == "proposed":
         allowed.append("reject")
     if (
@@ -255,6 +271,16 @@ async def view(session, user_id, action_id):
         and not cancellation_requested
     ):
         allowed.append("cancel")
+    from app.actions import reconciliation
+    from app.db.models import ActionAttempt, ActionJob
+
+    attempt = await session.scalar(
+        select(ActionAttempt)
+        .where(ActionAttempt.action_id == action.id)
+        .order_by(ActionAttempt.number.desc())
+        .limit(1)
+    )
+    job = await session.get(ActionJob, action.id)
     return {
         "action_id": action.id,
         "task_id": action.task_id,
@@ -277,4 +303,5 @@ async def view(session, user_id, action_id):
         "allowed_operations": allowed,
         "result": action.result,
         "error_code": action.error_code,
+        "recovery": reconciliation.status(action, job, attempt),
     }

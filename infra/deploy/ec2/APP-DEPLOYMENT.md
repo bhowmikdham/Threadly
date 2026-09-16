@@ -104,3 +104,19 @@ private bucket and test restore separately; no automatic retention job is instal
 for these local dumps. Monitor disk usage. The script does not delete volumes or
 automatically downgrade migrations. After a failed migration or incompatible
 release, inspect schema and backup before selecting a compatible code rollback.
+
+
+## B06 action-worker lifecycle
+
+The B06 staging stack adds `action-worker` using the same release image as the API.
+Deployment stops API, assistant-worker and action-worker before backup/migration,
+then starts matching versions and checks both workers are running. A process-running
+check is not proof of Gmail/Bedrock operation; live tests remain separate. Defaults
+`EMAIL_WRITES_ENABLED=false` and `EMAIL_RECONCILIATION_ENABLED=false` keep provider
+activity off in the action worker. Preflight rejects an attempted write flag while
+the compiled controlled-account gate remains closed. No sends are enabled by deploy.
+
+To roll back to a pre-B06 script, stop the action-worker using the **current**
+release Compose configuration first; older scripts do not stop that service.
+Preserve unknown attempts and all action history. No destructive downgrade or resend
+is part of rollback. [Recovery runbook](../../../docs/email-actions.md).

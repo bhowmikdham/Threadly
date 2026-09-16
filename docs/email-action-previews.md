@@ -141,3 +141,7 @@ B04 adds rejection/cancellation and current decision metadata to this API; see
 B05 adds nullable provider result/error fields and a disabled exact-MIME worker;
 see [dispatch lifecycle](email-actions.md). Current migration head is `a0426e9bc731`
 from B04; B03 itself added no DDL.
+
+B06 rejects a new candidate with `previous_send_unresolved` while the same task
+has an executing/unknown send, including after edits. Historical key replay is
+preserved. Owned action reads add nullable recovery status; see [email actions](email-actions.md).

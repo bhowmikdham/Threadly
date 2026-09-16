@@ -516,3 +516,20 @@ New `action.preflight_blocked`, `action.recovery_required` and `action.late_resp
 events carry action IDs plus sanitized code or attempt ID, not message content.
 New public approvals, `approval_available` and `sending_available` stay disabled;
 legacy send remains 501. [Worker contract and result policy](email-actions.md).
+
+
+## Read-only email recovery (B06)
+
+`EmailActionView.recovery` is null except for `outcome_unknown`. It contains
+`status` (`paused`, `scheduled`, `checking`, `manual_inspection`), integer `rounds`
+and `max_rounds=3`, nullable `next_check_at` and `last_code`, and static `guidance`.
+An empty Sent search or exhausted read budget never changes unknown to failed.
+A unique complete match can set succeeded with Gmail IDs; this is Sent evidence,
+not recipient-delivery confirmation. Account changes/stale leases fence publication.
+
+New proposals on a task with an executing/unknown send return 409
+`email_preview_blocked`, blocker `previous_send_unresolved`, including after edits.
+Existing proposals expose the same blocker at approval/preflight; historical key
+replay remains available. There is no resend/budget-reset endpoint; failed actions
+require a new preview and independent approval, which remains publicly disabled.
+Recovery events and limits: [email actions](email-actions.md).

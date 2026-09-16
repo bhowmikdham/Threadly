@@ -264,7 +264,7 @@
     {
       "id": "B05",
       "title": "Implement the Gmail executor with writes disabled",
-      "status": "in_review",
+      "status": "verified",
       "work_packages": [
         "T12"
       ],
@@ -314,7 +314,7 @@
     {
       "id": "B06",
       "title": "Reconcile uncertain Gmail sends and complete email gate",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T12"
       ],

@@ -542,7 +542,8 @@
         "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)",
         "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)",
         "../backend-execution/checkpoints/B04.md (exact approval/outbox and durable stop decisions; public approval/send disabled until executor and recovery gates)",
-        "../backend-execution/checkpoints/B05.md (isolated exact-MIME worker, durable dispatch intent, fencing and mock HTTP; live sends disabled pending B06)"
+        "../backend-execution/checkpoints/B05.md (isolated exact-MIME worker, durable dispatch intent, fencing and mock HTTP; live sends disabled pending B06)",
+        "../backend-execution/checkpoints/B06.md (bounded read-only uncertain-send recovery, same-task resend protection and deployment lifecycle; controlled Gmail delivery gate pending)"
       ]
     },
     {

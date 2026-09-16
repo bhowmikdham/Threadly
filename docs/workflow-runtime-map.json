@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "84e18daedf3d24fc474dcc776aeafcdb592bcb88",
+  "baseline_commit": "fd0eaeac94422832d8d644e342edfd36c12945bd",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -37,7 +37,6 @@
       "output": "draft",
       "remaining": [
         "public_approval_live_gate",
-        "reconciliation",
         "controlled_send_verification"
       ]
     },
@@ -54,7 +53,6 @@
       "output": "draft",
       "remaining": [
         "public_approval_live_gate",
-        "reconciliation",
         "controlled_send_verification"
       ]
     },
@@ -127,7 +125,7 @@
     },
     {
       "id": "external_actions",
-      "status": "worker_implemented_pending_review_live_disabled",
+      "status": "recovery_implemented_pending_review_live_disabled",
       "entry": "POST /assistant/artifacts/{artifact_id}/actions; GET /assistant/actions/{action_id}; POST /assistant/actions/{id}/reject or /cancel; approve disabled",
       "handlers": [
         "backend/app/actions/service.py",
@@ -135,11 +133,13 @@
         "backend/app/actions/email_payload.py",
         "backend/app/actions/approval.py",
         "backend/app/actions/worker.py",
-        "backend/app/actions/gmail_sender.py"
+        "backend/app/actions/gmail_sender.py",
+        "backend/app/actions/reconciliation.py",
+        "backend/app/actions/gmail_reconciliation.py"
       ],
       "output": "immutable_preview_and_action_status_live_dispatch_disabled",
       "remaining": [
-        "B06",
+        "B06_live_acceptance",
         "controlled_email_integration",
         "B14",
         "B15"
@@ -147,7 +147,8 @@
       "storage_checkpoint": "docs/backend-execution/checkpoints/B02.md",
       "preview_checkpoint": "docs/backend-execution/checkpoints/B03.md",
       "approval_checkpoint": "docs/backend-execution/checkpoints/B04.md",
-      "worker_checkpoint": "docs/backend-execution/checkpoints/B05.md"
+      "worker_checkpoint": "docs/backend-execution/checkpoints/B05.md",
+      "recovery_checkpoint": "docs/backend-execution/checkpoints/B06.md"
     }
   ],
   "invariants": [
@@ -159,8 +160,8 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "Review/merge B05 dedicated email worker on merged PR27; live writes disabled",
-    "B06 read-only uncertain-send reconciliation and controlled email gate",
+    "Review/merge B06 bounded read-only Gmail reconciliation; live sends stay disabled",
+    "Controlled email integration and explicit public-approval gate; independent B10 complete planner next",
     "B10 complete command planner and lookup steps",
     "B11 plans",
     "B12/B13 Calendar reads and deterministic slots",
@@ -168,7 +169,7 @@
     "B17/B19 backend live release gates; B18 frontend deferred"
   ],
   "deployment_target": {
-    "commit": "84e18daedf3d24fc474dcc776aeafcdb592bcb88",
+    "commit": "fd0eaeac94422832d8d644e342edfd36c12945bd",
     "status": "command_prepared",
     "frontend_integration": "deferred_by_user"
   },
