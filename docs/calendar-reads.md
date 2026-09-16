@@ -145,6 +145,14 @@ A Google event or ACL can change immediately after a read; five-minute freshness
 is evidence age, not a reservation or a guarantee of continuing remote access.
 Slot selection/booking must perform a fresh check later.
 
+B13 must query a **padded evidence window**: extend the desired search start by the
+saved after-event buffer and the search end by the before-event buffer. Busy events
+just outside the desired slot window can still block it after applying buffers.
+This API clips only to its actual query window; it must not be asked to guess busy
+periods outside that window. The bounded 245-minute lookback allows the maximum
+240-minute buffer plus five minutes of clock/request margin for near-term slots.
+Keep the padded window within the 31-day query/90-day horizon bounds.
+
 Fixed release bounds (constants in `schemas/calendar.py`, `calendar/client.py` and
 `calendar/service.py`; no new environment switches):
 
@@ -153,7 +161,7 @@ Fixed release bounds (constants in `schemas/calendar.py`, `calendar/client.py` a
 | Selected calendars | 1–10 distinct IDs, max 1,024 characters each |
 | Calendar list | 10 pages × 100 entries; repeated tokens/duplicate IDs rejected |
 | Query duration | Positive, at most 31 days |
-| Query horizon | Start no earlier than server time minus 5 minutes; end within 90 days |
+| Query horizon | Start no earlier than server time minus 245 minutes; end within 90 days |
 | Intervals | At most 2,000 across requested calendars before clipping/merging |
 | Provider response | 2 MB decoded per call; fixed Google URLs, no redirects/retries |
 | Network | 10-second HTTP timeout; list total 30 seconds; freebusy total 15 seconds |

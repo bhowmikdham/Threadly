@@ -128,10 +128,8 @@ async def query_freebusy(user_id, body):
         check_pref(row, body.expected_preferences_version, version)
         ids = list(row.preferences["calendar_ids"])
         checked = await session.scalar(select(func.clock_timestamp()))
-        if body.start < checked - timedelta(minutes=5) or body.end > checked + timedelta(days=90):
-            raise ApiError(
-                422, "calendar_window_invalid", "Choose a window within the next 90 days."
-            )
+        if body.start < checked - timedelta(minutes=245) or body.end > checked + timedelta(days=90):
+            raise ApiError(422, "calendar_window_invalid", "Window exceeds Calendar read bounds.")
     # Re-read current ACLs. A disappeared calendar is unknown, never silently omitted.
     calendars = await client.list_calendars(token)
     accessible = {item["id"] for item in calendars if item["can_read_busy"]}

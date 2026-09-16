@@ -377,3 +377,24 @@ def test_token_refresh_grant_change_stops_before_calendar_network(
     with pytest.raises(ApiError) as error:
         asyncio.run(service.list_calendars(1))
     assert error.value.code == "calendar_context_changed" and setup.calls == []
+
+
+@pytest.mark.parametrize("lookback_minutes,status", [(120, 201), (300, 422)])
+def test_bounded_lookback_supports_recent_event_buffers(
+    db_client, auth_headers, setup, lookback_minutes, status
+):
+    h = auth_headers(1)
+    assert db_client.put("/calendar/preferences", headers=h, json=save_body()).status_code == 200
+    start = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
+    result = db_client.post(
+        "/calendar/freebusy",
+        headers=h,
+        json={
+            "expected_preferences_version": 1,
+            "start": start.isoformat(),
+            "end": (start + timedelta(hours=8)).isoformat(),
+        },
+    )
+    assert result.status_code == status, result.text
+    if status == 201:
+        assert datetime.fromisoformat(result.json()["start"]) == start
