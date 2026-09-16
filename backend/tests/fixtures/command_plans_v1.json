@@ -1,0 +1,435 @@
+{
+  "release": "reviewed-compound-command-1.0.0",
+  "contract_hash": "7b96f6e1d09efed636b50f371eb947db5e22daab1b6327e32de16ea1637e6548",
+  "live_model_evaluated": false,
+  "cases": [
+    {
+      "id": "included-compose",
+      "segments": [
+        {
+          "text": "Summarise this thread.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Draft an email including that summary.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "include",
+      "state": "proposed",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "separate-reply",
+      "segments": [
+        {
+          "text": "Summarise for me.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Draft a separate reply.",
+          "kind": "requested",
+          "operations": [
+            "reply"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "separate",
+      "state": "proposed",
+      "template": "summary_then_reply",
+      "reply": true
+    },
+    {
+      "id": "reverse-mention",
+      "segments": [
+        {
+          "text": "Draft a reply after summarising this thread.",
+          "kind": "requested",
+          "operations": [
+            "reply",
+            "summary"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "include",
+      "state": "proposed",
+      "template": "summary_then_reply",
+      "reply": true
+    },
+    {
+      "id": "lookup-compose",
+      "segments": [
+        {
+          "text": "Find \"Friday\" in this capture.",
+          "kind": "requested",
+          "operations": [
+            "search_capture"
+          ]
+        },
+        {
+          "text": "Draft an update using the matches.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "not_applicable",
+      "state": "proposed",
+      "template": "lookup_then_compose",
+      "reply": false,
+      "lookup_query": {
+        "start": 2,
+        "end": 2
+      }
+    },
+    {
+      "id": "lookup-reply",
+      "segments": [
+        {
+          "text": "Find \"Friday\" in this capture.",
+          "kind": "requested",
+          "operations": [
+            "search_capture"
+          ]
+        },
+        {
+          "text": "Draft a reply using the matches.",
+          "kind": "requested",
+          "operations": [
+            "reply"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "not_applicable",
+      "state": "proposed",
+      "template": "lookup_then_reply",
+      "reply": true,
+      "lookup_query": {
+        "start": 2,
+        "end": 2
+      }
+    },
+    {
+      "id": "calendar-triple",
+      "segments": [
+        {
+          "text": "Summarise this thread.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Find three slots tomorrow.",
+          "kind": "requested",
+          "operations": [
+            "schedule"
+          ]
+        },
+        {
+          "text": "Draft an email with both.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "include",
+      "state": "unsupported",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "positive-send",
+      "segments": [
+        {
+          "text": "Summarise and draft an email.",
+          "kind": "requested",
+          "operations": [
+            "summary",
+            "compose"
+          ]
+        },
+        {
+          "text": "Send it.",
+          "kind": "requested",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "include",
+      "state": "unsupported",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "negated-reply",
+      "segments": [
+        {
+          "text": "Summarise this thread.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Do not reply.",
+          "kind": "prohibited",
+          "operations": [
+            "reply"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "not_applicable",
+      "state": "unsupported",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "contradiction",
+      "segments": [
+        {
+          "text": "Summarise and reply.",
+          "kind": "requested",
+          "operations": [
+            "summary",
+            "reply"
+          ]
+        },
+        {
+          "text": "Do not reply.",
+          "kind": "prohibited",
+          "operations": [
+            "reply"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "separate",
+      "state": "needs_clarification",
+      "template": "summary_then_compose",
+      "reply": true
+    },
+    {
+      "id": "unknown-dependency",
+      "segments": [
+        {
+          "text": "Summarise this and compose an update.",
+          "kind": "requested",
+          "operations": [
+            "summary",
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "unclear",
+      "state": "needs_clarification",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "mailbox-lookup",
+      "segments": [
+        {
+          "text": "Search my inbox for invoices.",
+          "kind": "requested",
+          "operations": [
+            "search_mailbox"
+          ]
+        },
+        {
+          "text": "Compose an update.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "not_applicable",
+      "state": "unsupported",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "repeat-output",
+      "segments": [
+        {
+          "text": "Summarise this thread.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Summarise that other thread.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Draft an email.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "separate",
+      "state": "unsupported",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "missing-literal",
+      "segments": [
+        {
+          "text": "Search this capture.",
+          "kind": "requested",
+          "operations": [
+            "search_capture"
+          ]
+        },
+        {
+          "text": "Draft an email.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "not_applicable",
+      "state": "needs_clarification",
+      "template": "summary_then_compose",
+      "reply": false
+    },
+    {
+      "id": "ambiguous-reference",
+      "segments": [
+        {
+          "text": "Summarise the third one.",
+          "kind": "requested",
+          "operations": [
+            "summary"
+          ]
+        },
+        {
+          "text": "Draft an email.",
+          "kind": "requested",
+          "operations": [
+            "compose"
+          ]
+        },
+        {
+          "text": "Do not send.",
+          "kind": "prohibited",
+          "operations": [
+            "send"
+          ]
+        }
+      ],
+      "summary_usage": "separate",
+      "state": "needs_clarification",
+      "template": "summary_then_compose",
+      "reply": false,
+      "ambiguities": [
+        "Which selected thread does the third one mean?"
+      ]
+    }
+  ]
+}

@@ -312,3 +312,16 @@ Its immutable intermediate artifact uses stream `lookup`; final draft uses `resu
 The existing two-step/attempt bounds, owner FKs, dependency hashes, immutable
 revision identity and final pointer apply unchanged. Migration head remains
 `a0426e9bc731`; rollback requires compatible readers for stored lookup tasks.
+
+## Reviewed command plans (migration `b10c026e9a31`)
+
+Parent `a0426e9bc731`. New `command_plans` stores UUID/user, request ID/hash and typed
+JSONB input, nullable owned context/digest, release manifest, state, nullable result
+and review hash, expiry/creation times and nullable owned task ID. Unique
+`(user_id,request_id)` reserves inference once; composite context/task FKs prevent
+cross-owner references. States are planning/proposed/needs_clarification/unsupported/
+failed/expired/consumed. Only consumed rows carry task IDs. Database triggers freeze
+input/release/expiry and published result/hash and constrain state transitions.
+Confirmation and existing task/job creation share one caller transaction. Old task,
+artifact and action records are untouched. Source/task deletion cascades its plan;
+downgrade refuses while any command-plan history exists.

@@ -325,3 +325,15 @@ enter draft generation; no/too-many matches stop first. The saved runtime regist
 still controls the generation Flow. No master AWS Flow, free-text full-command
 planner, mailbox-wide automatic retrieval or Calendar executor is introduced.
 See [runtime](lookup-draft-workflows.md) and [whole-backend progress](backend-progress.md).
+
+### Reviewed compound-command planning (B10c)
+
+`planner/command.py` interprets numbered user-command words into a strict span/operation
+proposal and deterministically compiles one of four installed compound pairs.
+`assistant/command_plans.py` persists a reservation before bounded model inference,
+then saves the reviewable interpretation. No source email or typed provider IDs enter
+the planner. Explicit whole-command confirmation rechecks ownership/source/release
+and atomically links one existing compound task. No separate step executor or AWS
+master Flow is introduced. Structural coverage cannot prove semantic correctness;
+automatic dispatch remains disabled pending live quality evidence. Unsupported
+operations block the whole proposal. [Runtime contract](command-planner.md).

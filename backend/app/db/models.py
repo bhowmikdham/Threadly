@@ -643,3 +643,54 @@ class ActionDecision(Base):
     expected_version: Mapped[int] = mapped_column()
     decision: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommandPlan(Base):
+    """Immutable command proposal, explicitly confirmed into one existing compound task."""
+
+    __tablename__ = "command_plans"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id", name="uq_command_plan_request"),
+        ForeignKeyConstraint(
+            ["context_snapshot_id", "user_id"],
+            ["context_snapshots.id", "context_snapshots.user_id"],
+            ondelete="CASCADE",
+            name="fk_command_plan_context",
+        ),
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            ondelete="CASCADE",
+            name="fk_command_plan_task",
+        ),
+        CheckConstraint(
+            "state IN ('planning','proposed','needs_clarification','unsupported',"
+            "'failed','expired','consumed')",
+            name="ck_command_plan_state",
+        ),
+        CheckConstraint(
+            "(state = 'consumed') = (task_id IS NOT NULL)",
+            name="ck_command_plan_consumed",
+        ),
+        CheckConstraint(
+            "state NOT IN ('proposed','consumed') OR "
+            "(result IS NOT NULL AND plan_hash IS NOT NULL)",
+            name="ck_command_plan_result",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    request: Mapped[dict] = mapped_column(JSONB)
+    context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    release: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(24))
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    plan_hash: Mapped[str | None] = mapped_column(String(64))
+    task_id: Mapped[str | None] = mapped_column(String(36))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
