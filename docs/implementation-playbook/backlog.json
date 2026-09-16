@@ -89,7 +89,7 @@
     {
       "id": "T03",
       "title": "Google capabilities and AWS connectivity foundation",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -125,7 +125,8 @@
       "handoff": "AI gets verified model/profile choices; tool bridge gets approved connectivity.",
       "assignee": null,
       "evidence": [
-        "../backend-execution/checkpoints/B01.md (actual grants, state/PKCE, refresh isolation; live consent pending)"
+        "../backend-execution/checkpoints/B01.md (actual grants, state/PKCE, refresh isolation; live consent pending)",
+        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)"
       ]
     },
     {
@@ -644,7 +645,7 @@
     {
       "id": "T15",
       "title": "Calendar preferences and deterministic availability",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -680,7 +681,9 @@
       ],
       "handoff": "Scheduling flow gets verified slot IDs and availability evidence.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)"
+      ]
     },
     {
       "id": "T16",

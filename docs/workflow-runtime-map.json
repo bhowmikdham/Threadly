@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "8cfd020de17b1b5c33d978db8e5e19cda4899279",
+  "baseline_commit": "aeefd320051fdeca4c02b8f3c1cacda8f78df8b1",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -118,7 +118,7 @@
       "remaining": [
         "B01",
         "B10",
-        "B12",
+        "B12_live_acceptance",
         "B13",
         "B14"
       ]
@@ -173,7 +173,7 @@
     },
     {
       "id": "reviewed_command_planner",
-      "status": "implemented_in_current_pr",
+      "status": "merged",
       "entry": "POST /assistant/command-plans then explicit /confirm",
       "handlers": [
         "backend/app/planner/command.py",
@@ -193,6 +193,23 @@
         "broader_graphs",
         "calendar_handlers"
       ]
+    },
+    {
+      "id": "calendar_reads",
+      "status": "implemented_in_current_pr",
+      "entry": "GET /calendar/calendars; GET/PUT /calendar/preferences; POST /calendar/freebusy; GET /calendar/freebusy/{evidence_id}",
+      "handlers": [
+        "backend/app/calendar/service.py",
+        "backend/app/calendar/client.py"
+      ],
+      "output": "owned_preferences_and_expiring_busy_unknown_evidence",
+      "remaining": [
+        "live_calendar_consent_acl_freebusy",
+        "B13",
+        "B14",
+        "B15"
+      ],
+      "checkpoint": "docs/backend-execution/checkpoints/B12.md"
     }
   ],
   "invariants": [

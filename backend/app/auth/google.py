@@ -10,6 +10,11 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/gmail.readonly"]
 
+CALENDAR_SCOPES = [
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+    "https://www.googleapis.com/auth/calendar.events.freebusy",
+]
+
 
 class GoogleAuthError(Exception):
     def __init__(self, message: str, status: int | None = None, *, revoked=False):

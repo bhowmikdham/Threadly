@@ -61,7 +61,7 @@ Context and sender services can rely on stable source identifiers.
 
 ## T03 · Google capabilities and AWS connectivity foundation
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T01
 
@@ -415,7 +415,7 @@ Plan/schedule category supports actual work planning independently of Calendar.
 
 ## T15 · Calendar preferences and deterministic availability
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T03, T05
 

@@ -2,7 +2,7 @@
 
 The backend now stores actual grants and verified Google identity, provides an
 owned capability snapshot, and handles refresh/disconnect without committing a
-caller's pending action transaction. Send and Calendar handlers remain unavailable.
+caller's pending action transaction. Send and Calendar writes remain unavailable; B12 installs scoped Calendar reads.
 This contract is ready for backend tests; frontend integration is deferred.
 
 ## Existing frontend boundary
@@ -24,7 +24,7 @@ Google OAuth is not configured on the last confirmed staging deployment.
 | Endpoint | Authentication and request | Result |
 |---|---|---|
 | `POST /auth/google/begin` | No JWT; `redirect_uri`, S256 `code_challenge` | One-use `state`, `authorization_url`, `expires_at` |
-| `POST /auth/google/reconnect` | Existing JWT; same request | Same result, bound to the current user and account version |
+| `POST /auth/google/reconnect` | Existing JWT; same request plus optional `capabilities` | Same result, bound to the current user and account version |
 | `POST /auth/google/exchange` | `code`, `redirect_uri`, returned `state`, original `code_verifier` | Existing `{jwt,user:{id,email,name}}` response |
 | `POST /auth/google/disconnect` | Existing JWT; no body | `{connected:false,provider_revocation:"not_requested"}` |
 | `GET /assistant/capabilities` | Existing JWT; no user ID input | Owned account, capability list and reconnect contract |
@@ -68,8 +68,8 @@ and scheduled retention remain B19 release work before broad public exposure.
 
 Login requests only OpenID identity and Gmail read access. The URL supports
 incremental consent (`include_granted_scopes=true`), but arbitrary scope input is
-not accepted. Calendar/send consent will be added deliberately with installed
-capabilities. Requested scopes are never persisted as granted scopes.
+not accepted. Authenticated reconnect may add `capabilities: ["calendar_read"]`
+for the B12 narrow read scopes; send/Calendar-write consent remains unavailable. Requested scopes are never persisted as granted scopes.
 
 ## Capability response
 
@@ -81,7 +81,8 @@ has `id`, `implemented`, `enabled`, `scope_status`, `status`, `ready`, `source` 
 |---|---|---|
 | `gmail_read` | Yes | Gmail readonly, modify or full mail access |
 | `gmail_send` | No | Grants may be known, but readiness is always false |
-| `calendar_read` | No | Recognizes freebusy/read grants; actual per-calendar reads still need B12 |
+| `calendar_read` | Yes | Freebusy/read grants; service also requires calendar_list |
+| `calendar_list` | Yes | CalendarList readonly/list or broader Calendar read/full grant |
 | `calendar_write` | No | Events/calendar grants do not install a booking executor |
 
 `scope_status` is `unknown`, `missing` or `granted`. `ready` additionally needs a
@@ -161,3 +162,5 @@ Implementation checked against Google's [server-side OAuth lifecycle](https://de
 and Chrome's [identity API](https://developer.chrome.com/docs/extensions/reference/api/identity).
 The configured client's live compatibility is still an external gate.
 Tests and remaining boundaries: [B01 checkpoint](backend-execution/checkpoints/B01.md).
+
+Calendar API, narrow scope pair and ACL limitations: [Calendar reads](calendar-reads.md).

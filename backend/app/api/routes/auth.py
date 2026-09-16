@@ -1,6 +1,6 @@
 """OAuth state/PKCE handshake, account-bound reconnect, and Threadly JWT renewal."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,6 +24,12 @@ class BeginIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     redirect_uri: str = Field(min_length=1, max_length=2048)
     code_challenge: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+
+
+class ReconnectIn(BeginIn):
+    capabilities: list[Literal["gmail_read", "calendar_read"]] = Field(
+        default_factory=list, max_length=2
+    )
 
 
 class BeginOut(BaseModel):
@@ -64,8 +70,11 @@ async def google_begin(body: BeginIn, session: DB):
 
 
 @router.post("/google/reconnect", response_model=BeginOut)
-async def google_reconnect(body: BeginIn, user_id: CurrentUser, session: DB):
-    result = await flow.begin(session, body.redirect_uri, body.code_challenge, user_id=user_id)
+async def google_reconnect(body: ReconnectIn, user_id: CurrentUser, session: DB):
+    result = await flow.begin(
+        session, body.redirect_uri, body.code_challenge, user_id=user_id,
+        calendar_read="calendar_read" in body.capabilities,
+    )
     await session.commit()
     return result
 

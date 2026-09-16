@@ -454,7 +454,8 @@ See [action storage](assistant-action-storage.md) for errors, schemas and lifecy
 
 The old stateless exchange input is superseded: missing state/verifier returns 422.
 `POST /auth/google/begin` accepts strict `{redirect_uri,code_challenge}`; authenticated
-`POST /auth/google/reconnect` accepts the same body and binds the current account.
+`POST /auth/google/reconnect` accepts that body plus optional named
+`capabilities: ["calendar_read"]` and binds the current account.
 Both return `{state,authorization_url,expires_at}`. State is one-use, expires after
 ten minutes and is consumed before network exchange. `POST /auth/google/exchange`
 checks the original verifier, callback and state; the JWT/profile response is unchanged.
@@ -462,7 +463,8 @@ Authenticated `POST /auth/google/disconnect` clears local Google credentials onl
 
 `GET /assistant/capabilities` returns typed account/capability/reconnect metadata
 from stored actual grants. No user ID or scope authority is accepted from the caller.
-Gmail send and Calendar remain unimplemented/disabled, irrespective of grants.
+Gmail send and Calendar writes remain disabled. B12 installs Calendar list/freebusy
+reads; both `calendar_list` and `calendar_read` grants must be ready.
 `ready` is stored readiness, not a live provider probe.
 
 Errors: 400 `invalid_redirect_uri`/`oauth_state_invalid`; 401 `oauth_exchange_failed`/
@@ -570,3 +572,15 @@ plan editor is added. Old `/requests` behavior and task formats are unchanged.
 
 [Full examples, states, limits and confirmation semantics](command-planner.md).
 This confirmation authorizes read/generation work only, never Gmail/Calendar writes.
+
+## Calendar read foundations (B12)
+
+Authenticated `GET /calendar/calendars`, `GET/PUT /calendar/preferences`,
+`POST /calendar/freebusy` (201) and `GET /calendar/freebusy/{evidence_id}` expose
+Calendar selection, versioned explicit preferences and short-lived owned busy
+coverage. Save requires expected_version (0 initially); query requires
+expected_preferences_version and aware start/end, not arbitrary calendar IDs.
+Read-only incremental consent is opt-in on authenticated Google reconnect.
+Partial/omitted/invalid per-calendar results mean unknown; no slot/free/booking
+claim is made. Account/preference changes during network reads prevent publication.
+Full schemas, examples, limits, errors and live gate: [Calendar reads](calendar-reads.md).
