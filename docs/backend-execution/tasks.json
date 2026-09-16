@@ -163,7 +163,7 @@
     {
       "id": "B03",
       "title": "Build immutable MIME payloads and send previews",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T02",
         "T10",

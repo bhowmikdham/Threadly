@@ -256,7 +256,7 @@ See [whole workflow/testing map](workflow-testing-map.md) and
 separately from generation jobs. Draft edits supersede pending proposals in the
 same transaction; executing/unknown records remain unchanged. PostgreSQL guards
 ownership, legal transitions and preserved unresolved attempts. This is the storage
-foundation only: no action HTTP routes, action worker or Google writes are enabled.
+foundation; B03 below adds proposal/read HTTP routes. No action worker or Google writes are enabled.
 See [action lifecycle and rollout](assistant-action-storage.md) for the full mapping
 and the source-deletion policy that must be completed before live writes.
 
@@ -269,3 +269,13 @@ results. `capabilities/service.py` combines actual grants, verified identity and
 credential availability with installed handlers. No send/Calendar executor is
 enabled. The [Google lifecycle](google-capabilities.md) records the existing frontend
 getAuthToken mismatch, typed API contract and live consent gate.
+
+## Exact email proposals (B03)
+
+`actions/email_preview.py` validates the current edited artifact, effective context
+and verified Google account before `actions/email_payload.py` builds immutable
+plain-text MIME. Public proposal/read routes expose the saved envelope and hashes
+with current blockers. B02 supplies transaction ownership, task-first locking,
+immutable storage and edit supersession. No model or provider call occurs here;
+source/account revalidation remains mandatory at future approval and dispatch.
+[Preview lifecycle and B04 handoff](email-action-previews.md).

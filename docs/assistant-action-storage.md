@@ -15,7 +15,7 @@ The implementation checkpoint is [B02](backend-execution/checkpoints/B02.md).
 | Durable records and ownership | `backend/app/db/models.py` | Four action tables; composite owned references and restricted deletion |
 | Database transition/immutability guards | Migration `d9302f5b7a14` | Frozen PostgreSQL triggers in addition to model constraints |
 | Draft supersession | `backend/app/assistant/draft_review.py` | Same task lock and transaction as the appended draft revision |
-| Exact Gmail payload builder | B03, pending | Must derive recipients/body/headers from current artifact, not model-supplied authority |
+| Exact Gmail payload builder | B03, implemented for review | [Owned MIME preview](email-action-previews.md) from current edited artifact; no approval or send |
 | Approval and dispatch/recovery | B04–B06, pending | Must recheck source/capability/expiry and persist dispatch intent before network call |
 
 `propose` accepts an internal backend-built candidate for a current, completed final

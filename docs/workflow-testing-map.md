@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #24 merge `9664874` adds action storage; deployment command prepared, host result pending |
-| Current feature branch | B01 state/PKCE, reconnect, actual grants and token-refresh isolation; no frontend changes or live consent |
+| Merged source / deployment target | PR #25 merge `bc5ef10` adds auth/capabilities on action storage; deployment command prepared, host result pending |
+| Current feature branch | B03 immutable MIME and owned email preview; approval/send remain pending |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 ## Whole target lifecycle and ownership
@@ -32,7 +32,8 @@ flowchart LR
     VALIDATE --> ART[Separate artifact streams and partial progress]
     ART --> REVIEW[Frontend: inspect, edit, copy or review]
     REVIEW --> STORE[B02: immutable action storage and edit supersession]
-    STORE --> APPROVE[Pending B03/B04: exact preview and approval]
+    STORE --> PREVIEW[B03: exact MIME preview implemented for review]
+    PREVIEW --> APPROVE[Pending B04: exact payload approval]
     APPROVE --> WRITE[Pending: dedicated send / booking executor]
     WRITE --> RECON[Pending: reconcile uncertain provider outcome]
 ```
@@ -55,7 +56,7 @@ Calendar reads, send approvals or the recovery worker.
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Schedule/check time/slots | Existing router can propose operations | Calendar handler pending B12–B14 | Target: authoritative slots and negotiation | Actual scopes, preferences, freebusy, deterministic time calculations |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
-| Email send / event creation | Future explicit action APIs | B02 storage implemented; pending B03–B06 / B14–B15 | Confirmed or unknown provider outcome | Exact payload approval + rechecks + reconciliation |
+| Email send / event creation | Email proposal/read APIs; Calendar pending | B02 storage and B03 email preview; pending B04–B06 / B14–B15 | Email preview only; target: confirmed or unknown provider outcome | Exact payload approval + rechecks + reconciliation |
 
 ## Fastest route to useful testing
 
@@ -93,12 +94,12 @@ A healthy API alone does not establish Google login or Bedrock generation readin
 
 | Order / dependency | Work | Concrete completion evidence |
 |---|---|---|
-| B01 / current auth branch | Review actual-scope persistence, OAuth ownership and capability state | Revoked/missing scopes and account changes tested; controlled OAuth smoke |
+| B01 / merged PR25 | Live-check actual-scope persistence, OAuth ownership and capability state | Revoked/missing scopes and account changes tested; controlled OAuth smoke |
 | B10b after this slice | Complete command planner, all-clause/negation coverage, lookup steps, plan clarification | Fixed versioned corpus, zero partial execution for unsupported plans; source invalidation and recovery |
 | BERT adapter after AI handoff | Verify label map/domain/activation/thresholds; separate email metadata from command routing | Multi-label and low-confidence fixtures; no dynamic Flow/permission authority |
 | B11 after required B10 contracts | Non-calendar plans and explicit commitment selection | Evidence-backed owner/deadline ambiguity, revisions and selected-only draft content |
 | B12/B13 after actual Calendar capability | Preferences, timezone anchors, freebusy and deterministic slot sets | DST gaps/folds, busy/unknown calendars, buffers, conflicts, insufficient slots |
-| B02 storage review; B03–B06 after capability contract | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
+| B03 preview review; B04–B06 next | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
 | B14/B15 after slots/action contracts | Negotiation and approved Calendar writes/recovery | Expired offer, changed availability and uncertain event creation tests |
 | B16/B17 throughout | Versioned Flow manifests, bounded read adapters where needed, live evaluations | Same replay cases locally and through recorded AWS release; semantic review |
 | B18/B19 release gate | Frontend/API contract tests, retention/recovery, full staging scenario matrix | All five intents, compound task, approved writes and failure recovery verified together |
@@ -133,7 +134,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 - Backend owns auth, context IDs, recipients, availability, persistence, retries
   and approvals. Preserve immutable historical evidence across edits and retries.
 - Each PR records tested/untested gates and the next dependency in its checkpoint.
-  The [B01 checkpoint](backend-execution/checkpoints/B01.md) is the current resume
+  The [B03 checkpoint](backend-execution/checkpoints/B03.md) is the current resume
   point; [B10](backend-execution/checkpoints/B10.md) records the compound foundation; do not infer completion from the presence of diagrams or prepared Flows.
 
 ## Critical path before enabling complete workflows
@@ -146,8 +147,8 @@ flowchart TD
     MERGED[PR23 merged: generation, search, explicit compound templates] --> DEPLOY[Deploy pinned release; confirm host health]
     DEPLOY --> CONFIG[Configure actual Bedrock release and Google OAuth]
     CONFIG --> READTEST[API-level live generation and read tests]
-    B01[B01: auth/capabilities implemented for review] --> B03[B03: exact email payload]
-    B02[B02: storage ready for review] --> B03
+    B01[B01: auth/capabilities merged; live consent pending] --> B03[B03: exact email preview for review]
+    B02[B02: storage merged] --> B03
     B03 --> B04[B04: exact approval]
     B04 --> B05[B05: send worker]
     B05 --> B06[B06: reconcile uncertain sends]
@@ -168,12 +169,14 @@ flowchart TD
     GATE --> FRONT[B18: frontend integration later]
 ```
 
-B02 is merged. B01 has been integrated and tested on its own review branch with
-migration parent d9302f5b7a14; its original dirty checkout is preserved. B03 depends
-on B01 review/merge. Avoid concurrent migration heads.
+B01 and B02 are merged at PR25; migration head f1a2b3c4d5e6. B03 is implemented
+for review with no new migration. After merge, B04 exact approval is the next slice.
+The original dirty auth/classifier checkout remains preserved.
 B02 supplies a deletion guard; the final retention/recovery/purge policy remains
 a release prerequisite. Classifier labels remain advisory: complete-plan validation
 must reject unsupported clauses before executing any part of a request.
 
 Deployment instructions and confirmation criteria: [current EC2 release](deployment-current-release.md).
 Detailed storage lifecycle: [action storage](assistant-action-storage.md).
+
+Exact payload/API contract: [email action previews](email-action-previews.md).
