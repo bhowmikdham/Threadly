@@ -16,7 +16,8 @@ The implementation checkpoint is [B02](backend-execution/checkpoints/B02.md).
 | Database transition/immutability guards | Migration `d9302f5b7a14` | Frozen PostgreSQL triggers in addition to model constraints |
 | Draft supersession | `backend/app/assistant/draft_review.py` | Same task lock and transaction as the appended draft revision |
 | Exact Gmail payload builder | B03, implemented for review | [Owned MIME preview](email-action-previews.md) from current edited artifact; no approval or send |
-| Approval and dispatch/recovery | B04–B06, pending | Must recheck source/capability/expiry and persist dispatch intent before network call |
+| Approval and stop decisions | B04, implemented for review | [Exact approval](action-approval.md); new public approval disabled |
+| Dispatch/recovery | B05/B06, pending | Recheck before dispatch intent; reconcile uncertain outcomes |
 
 `propose` accepts an internal backend-built candidate for a current, completed final
 artifact. It validates the expected revision, owner, artifact kind and future expiry

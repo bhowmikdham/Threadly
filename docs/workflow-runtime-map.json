@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "bc5ef103c4a0907bb6a3522138bd7bc550e368dd",
+  "baseline_commit": "68e7b5e04a9913ed2ec3b39400d6e3d10aba904f",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -127,23 +127,24 @@
     },
     {
       "id": "external_actions",
-      "status": "email_preview_implemented_pending_review",
-      "entry": "POST /assistant/artifacts/{artifact_id}/actions; GET /assistant/actions/{action_id}",
+      "status": "approval_stop_implemented_pending_review",
+      "entry": "POST /assistant/artifacts/{artifact_id}/actions; GET /assistant/actions/{action_id}; POST /assistant/actions/{id}/reject or /cancel; approve disabled",
       "handlers": [
         "backend/app/actions/service.py",
         "backend/app/actions/email_preview.py",
-        "backend/app/actions/email_payload.py"
+        "backend/app/actions/email_payload.py",
+        "backend/app/actions/approval.py"
       ],
       "output": "immutable_email_preview_no_authorization",
       "remaining": [
-        "B04",
         "B05",
         "B06",
         "B14",
         "B15"
       ],
       "storage_checkpoint": "docs/backend-execution/checkpoints/B02.md",
-      "preview_checkpoint": "docs/backend-execution/checkpoints/B03.md"
+      "preview_checkpoint": "docs/backend-execution/checkpoints/B03.md",
+      "approval_checkpoint": "docs/backend-execution/checkpoints/B04.md"
     }
   ],
   "invariants": [
@@ -155,8 +156,8 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "Review/merge B03 exact email previews on merged B01/B02",
-    "B04-B06 exact approval, dispatch and recovery",
+    "Review/merge B04 exact approval and cancellation on merged B03",
+    "B05/B06 dedicated email dispatch and recovery; keep writes disabled",
     "B10 complete command planner and lookup steps",
     "B11 plans",
     "B12/B13 Calendar reads and deterministic slots",
@@ -164,7 +165,7 @@
     "B17/B19 backend live release gates; B18 frontend deferred"
   ],
   "deployment_target": {
-    "commit": "bc5ef103c4a0907bb6a3522138bd7bc550e368dd",
+    "commit": "68e7b5e04a9913ed2ec3b39400d6e3d10aba904f",
     "status": "command_prepared",
     "frontend_integration": "deferred_by_user"
   },

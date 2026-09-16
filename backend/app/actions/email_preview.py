@@ -10,7 +10,15 @@ from app.api.errors import ApiError
 from app.assistant import draft_review, tasks
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
-from app.db.models import AssistantAction, ContextSnapshot, Message, Thread, User
+from app.db.models import (
+    ActionApproval,
+    ActionDecision,
+    AssistantAction,
+    ContextSnapshot,
+    Message,
+    Thread,
+    User,
+)
 
 
 async def account(session, user_id):
@@ -47,7 +55,9 @@ async def sources(session, task, artifact):
         if snapshot is None:
             raise email_payload.blocked("source_changed")
         thread = await session.scalar(
-            select(Thread).where(Thread.id == snapshot.thread_id, Thread.user_id == task.user_id)
+            select(Thread)
+            .where(Thread.id == snapshot.thread_id, Thread.user_id == task.user_id)
+            .execution_options(populate_existing=True)
         )
         if thread is None or thread.version != snapshot.payload.get("thread_version"):
             raise email_payload.blocked("source_changed")
@@ -83,6 +93,7 @@ async def sources(session, task, artifact):
                 Message.gmail_msg_id == reply["gmail_message_id"],
                 Thread.gmail_thread_id == reply["gmail_thread_id"],
             )
+            .execution_options(populate_existing=True)
         )
     ).one_or_none()
     if row is None or row.Thread.version != reply["thread_version"]:
@@ -206,6 +217,7 @@ async def view(session, user_id, action_id):
         if (
             user.google_account_version != action.source_versions["google_account_version"]
             or user.google_sub != action.source_versions["google_subject"]
+            or user.google_scopes != action.source_versions["google_scopes"]
         ):
             blockers.append("google_account_changed")
         caps = {c["id"]: c for c in build_capabilities(user)["capabilities"]}
@@ -218,6 +230,31 @@ async def view(session, user_id, action_id):
         if error.code != "email_preview_blocked":
             raise
         blockers.extend(error.detail["blockers"])
+    approval_id = await session.scalar(
+        select(ActionApproval.id).where(
+            ActionApproval.action_id == action.id, ActionApproval.user_id == user_id
+        )
+    )
+    cancellation_requested = (
+        await session.scalar(
+            select(ActionDecision.id)
+            .where(
+                ActionDecision.action_id == action.id,
+                ActionDecision.user_id == user_id,
+                ActionDecision.decision == "cancellation_requested",
+            )
+            .limit(1)
+        )
+        is not None
+    )
+    allowed = []
+    if action.state == "proposed":
+        allowed.append("reject")
+    if (
+        action.state in {"proposed", "approved", "executing", "outcome_unknown"}
+        and not cancellation_requested
+    ):
+        allowed.append("cancel")
     return {
         "action_id": action.id,
         "task_id": action.task_id,
@@ -234,5 +271,8 @@ async def view(session, user_id, action_id):
         "blockers": list(dict.fromkeys(blockers)),
         "approval_available": False,
         "sending_available": False,
-        "authorization": "none",
+        "authorization": "exact_payload_approval" if approval_id else "none",
+        "approval_id": approval_id,
+        "cancellation_requested": cancellation_requested,
+        "allowed_operations": allowed,
     }

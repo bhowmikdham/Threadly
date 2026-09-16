@@ -123,9 +123,13 @@ async def test_edited_preview_round_trip_api_and_no_executor(
         db_client.post(
             f"/assistant/actions/{view['action_id']}/approve",
             headers=auth_headers(mailbox[0]),
-            json={},
+            json={
+                "request_id": "approval-disabled",
+                "expected_version": 1,
+                "payload_hash": view["payload_hash"],
+            },
         ).status_code
-        == 404
+        == 409
     )
 
 

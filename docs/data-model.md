@@ -263,3 +263,15 @@ proposal request identity, effective context hashes/thread versions, reply metad
 hash when applicable, Google subject/account version and actual scopes. MIME Date,
 Message-ID and 30-minute expiry are frozen per proposal. Reads never mutate payloads.
 No approval, job or attempt is created. [Contract and retention boundary](email-action-previews.md).
+
+## Action decision receipts (`a0426e9bc731`, B04)
+
+Parent `f1a2b3c4d5e6`; adds `action_decisions` with UUID, owned action FK, operation,
+request key/hash, expected version, decision and creation time. Unique
+`(user_id,operation,request_id)`, valid operation/decision constraint and indexed
+action/decision support replay and read status. Update/delete trigger preserves
+receipts; downgrade refuses if any exist. No existing action bytes/history change.
+
+Approval continues to use `action_approvals` and one `action_jobs` row per action,
+committed together. Late cancellation adds a receipt/event without modifying
+action state/version, dispatch attempts or recovery job. [Decision contract](action-approval.md).
