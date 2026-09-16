@@ -215,7 +215,7 @@
     {
       "id": "B04",
       "title": "Implement explicit approval, rejection and cancellation",
-      "status": "in_review",
+      "status": "verified",
       "work_packages": [
         "T05",
         "T12"
@@ -264,7 +264,7 @@
     {
       "id": "B05",
       "title": "Implement the Gmail executor with writes disabled",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T12"
       ],

@@ -275,4 +275,6 @@ async def view(session, user_id, action_id):
         "approval_id": approval_id,
         "cancellation_requested": cancellation_requested,
         "allowed_operations": allowed,
+        "result": action.result,
+        "error_code": action.error_code,
     }

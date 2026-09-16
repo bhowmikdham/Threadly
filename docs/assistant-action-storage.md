@@ -133,3 +133,6 @@ separately installs actual Alembic migrations and exercises immutable payloads,
 approval/attempt guards, legal transitions, preserved edited drafts/reviews and
 rollback refusal. Test approvals and provider evidence are synthetic fixtures.
 No actual email, invitation, approval HTTP request or live AWS invocation is performed.
+
+B05 now consumes these records through a separate disabled action worker, preserving
+unknown writes for B06. See [dispatch and recovery handoff](email-actions.md).

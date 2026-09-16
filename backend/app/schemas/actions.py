@@ -57,6 +57,8 @@ class EmailActionView(StrictModel):
     approval_id: str | None = None
     cancellation_requested: bool = False
     allowed_operations: list[Literal["reject", "cancel"]] = Field(default_factory=list)
+    result: dict[str, str] | None = None
+    error_code: str | None = None
 
 
 class ActionDecisionRequest(StrictModel):

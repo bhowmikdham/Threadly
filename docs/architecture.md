@@ -133,7 +133,8 @@ validates model text/source numbers and produces a reviewable draft artifact.
 compound scheduling requests remain unavailable. `routing_v1.py` retains the prior
 contextual release for already-queued work. All generation/publication uses the
 existing lease/cancellation protocol. Drafts are stored in Threadly only; no Gmail
-write client or approval executor is installed. See [draft lifecycle](assistant-drafts.md).
+writes occur during draft generation. The disabled B05 action worker is described
+below. See [draft lifecycle](assistant-drafts.md).
 
 ## Draft editing and review (T10 partial)
 
@@ -289,3 +290,15 @@ exercised with fake dispatch only; public approval cannot enable it. Stop decisi
 use immutable receipts and the same task/action lock order. Post-cutoff cancellation
 records intent while preserving the running/unknown action and recovery job. No
 transaction spans a provider call. [Full lifecycle](action-approval.md).
+
+
+## Isolated Gmail action worker (B05)
+
+`actions/worker.py` owns leased action jobs, preflight, committed dispatch intent,
+result fencing and expiry recovery. `actions/gmail_sender.py` performs one bounded
+POST with exact saved MIME. Credentials and provider HTTP run outside task/action
+transactions. Crashes after intent become held reconciliation work, never a second
+send. Root Compose offers an optional `actions` profile; staging deployment does
+not start it yet. Environment and compiled recovery gates keep live writes disabled;
+public approval remains unavailable. B06 is the next enabling dependency.
+[Lifecycle, failure policy and rollout](email-actions.md).

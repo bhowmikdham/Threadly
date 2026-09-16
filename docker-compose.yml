@@ -46,6 +46,17 @@ services:
         condition: service_healthy
     networks: [threadly_net]
 
+  action-worker:
+    build: ./backend
+    command: python -m app.actions.worker
+    profiles: ["actions"]
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [threadly_net]
+
   postgres:
     image: postgres:16
     restart: unless-stopped
