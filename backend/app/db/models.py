@@ -614,3 +614,32 @@ class GoogleOAuthSession(Base):
     account_version: Mapped[int | None] = mapped_column()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ActionDecision(Base):
+    """Immutable reject/cancel request receipt, including requests after dispatch cutoff."""
+
+    __tablename__ = "action_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["action_id", "user_id"], ["assistant_actions.id", "assistant_actions.user_id"],
+            name="fk_decision_owned_action", ondelete="RESTRICT",
+        ),
+        UniqueConstraint("user_id", "operation", "request_id", name="uq_action_decision_request"),
+        CheckConstraint("expected_version >= 1", name="ck_decision_version"),
+        CheckConstraint(
+            "(operation='reject' AND decision='rejected') OR "
+            "(operation='cancel' AND decision IN ('cancelled','cancellation_requested'))",
+            name="ck_decision_operation",
+        ),
+        Index("ix_action_decisions_action", "action_id", "decision"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    action_id: Mapped[str] = mapped_column(String(36))
+    user_id: Mapped[int] = mapped_column()
+    operation: Mapped[str] = mapped_column(String(16))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    expected_version: Mapped[int] = mapped_column()
+    decision: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

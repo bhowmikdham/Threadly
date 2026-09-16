@@ -279,3 +279,13 @@ with current blockers. B02 supplies transaction ownership, task-first locking,
 immutable storage and edit supersession. No model or provider call occurs here;
 source/account revalidation remains mandatory at future approval and dispatch.
 [Preview lifecycle and B04 handoff](email-action-previews.md).
+
+## Approval and cancellation (B04)
+
+`actions/approval.py` binds request identity to the saved action hash/version, locks
+task → action → account before source/grant revalidation, then atomically stores
+approval, approved state, dispatch job and event. The internal enabled seam is
+exercised with fake dispatch only; public approval cannot enable it. Stop decisions
+use immutable receipts and the same task/action lock order. Post-cutoff cancellation
+records intent while preserving the running/unknown action and recovery job. No
+transaction spans a provider call. [Full lifecycle](action-approval.md).

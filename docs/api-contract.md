@@ -447,7 +447,7 @@ Existing task-event replay can include `action.proposed` with `action_id`,
 `artifact_id`, `action_type`, `state`, and `action.state_changed` with `action_id`,
 `state`, plus `reason: draft_revised` for edit supersession. The normal task-event
 envelope/sequence/version applies; payloads and recipients are excluded. These
-events now also arise through the B03 proposal endpoint; no public approval exists.
+events now also arise through B03 proposals and B04 stop decisions; new public approval is disabled.
 See [action storage](assistant-action-storage.md) for errors, schemas and lifecycle.
 
 ## Google auth/capabilities (B01)
@@ -482,6 +482,25 @@ from the current edited artifact; arbitrary payload overrides are rejected. The
 response exposes From/To/Cc/Bcc, subject/body, threading headers, hashes, versions
 and 30-minute expiry, with `authorization: none`, approval/sending false. No raw
 MIME is returned. Retries reuse the original candidate; edits supersede it. Both
-responses use `Cache-Control: no-store`. No approve/send route exists.
+responses use `Cache-Control: no-store`. B04 adds decision routes below; no send route exists.
 
 [Full schema, blockers, replay and client contract](email-action-previews.md).
+
+## Exact approval and stop decisions (B04)
+
+Authenticated `POST /assistant/actions/{id}/approve` accepts strict
+`{request_id,expected_version,payload_hash}`; new public approvals return 409 while
+no executor is installed. Internal exact approval/outbox is transactional; matching
+existing requests may replay with 202 without requeueing. `/reject` and `/cancel`
+accept strict `{request_id,expected_version}` and return 200. Rejection closes a
+proposal; cancellation closes pre-dispatch work or records a request after cutoff.
+No replacement recipients, body or execution switch is accepted.
+
+Responses contain `{request_id,operation,decision,action}`: the decision is the
+original receipt; nested action is current. GET adds `approval_id`, historical
+`authorization` (`none` or `exact_payload_approval`), `cancellation_requested` and
+`allowed_operations`. Both availability booleans remain false. A late cancellation
+never reports not-sent, changes action state or suppresses recovery. New SSE event
+`action.cancellation_requested` contains only `action_id`.
+
+[Full contracts, errors, replay, locking and migration](action-approval.md).

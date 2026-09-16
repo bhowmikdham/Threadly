@@ -53,4 +53,23 @@ class EmailActionView(StrictModel):
     blockers: list[str]
     approval_available: Literal[False] = False
     sending_available: Literal[False] = False
-    authorization: Literal["none"] = "none"
+    authorization: Literal["none", "exact_payload_approval"] = "none"
+    approval_id: str | None = None
+    cancellation_requested: bool = False
+    allowed_operations: list[Literal["reject", "cancel"]] = Field(default_factory=list)
+
+
+class ActionDecisionRequest(StrictModel):
+    request_id: str = Field(min_length=1, max_length=128, pattern=r"\S")
+    expected_version: int = Field(ge=1)
+
+
+class ApproveActionRequest(ActionDecisionRequest):
+    payload_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class ActionDecisionView(StrictModel):
+    request_id: str
+    operation: Literal["approve", "reject", "cancel"]
+    decision: Literal["approved", "rejected", "cancelled", "cancellation_requested"]
+    action: EmailActionView

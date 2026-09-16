@@ -3,7 +3,8 @@
 The backend now turns the current completed reply/compose draft into an immutable
 `send_email` proposal. It stores the exact MIME bytes and shows their envelope and
 body to the owning user. Creating or reviewing this proposal does not approve or
-send it. Approval (B04), dispatch (B05) and uncertain-send recovery (B06) remain pending.
+send it. [B04 approval/stop services](action-approval.md) are implemented for review;
+new public approval, dispatch (B05) and uncertain-send recovery (B06) remain disabled.
 
 ## API and frontend handoff
 
@@ -34,7 +35,7 @@ blockers. Both responses have `Cache-Control: no-store`. The typed contract is
 | `preview` | From, To, Cc, Bcc, subject, canonical body, Date, Message-ID, In-Reply-To, References and Gmail thread ID |
 | `account_version` | Captured Google permission/account version |
 | `blockers` | Current eligibility failures, including `send_executor_unavailable` in this release |
-| `approval_available`, `sending_available`, `authorization` | Always false, false, `none` |
+| `approval_available`, `sending_available`, `authorization` | False, false; authorization is `none` until a historical exact approval exists (B04) |
 
 Bcc is deliberately visible in the owner's preview; clients must display it before
 any future approval. Raw `mime_base64url` is private backend storage, not returned
@@ -123,7 +124,7 @@ Alembic head remains `f1a2b3c4d5e6`; deploy matching merged code with the existi
 backup/migrate/restart procedure. No automatic Git-to-EC2 synchronization is added.
 This feature branch is not the pinned deployment target until reviewed and merged.
 
-B04 consumes these exact saved hashes/versions and creates explicit approval with
+B04 consumes these exact saved hashes/versions internally and creates explicit approval with
 revalidation; it must not rebuild bytes or confuse DraftReview with authorization.
 B05 sends only approved persisted MIME; B06 must reconcile lost responses before
 retry. Keep writes disabled until controlled Gmail tests verify actual threading,
@@ -133,3 +134,6 @@ not Google's delivery or deduplication behavior.
 Provider contracts: [Gmail sending](https://developers.google.com/workspace/gmail/api/guides/sending)
 and [thread requirements](https://developers.google.com/workspace/gmail/api/guides/threads).
 Tests/checkpoint: [B03 evidence](backend-execution/checkpoints/B03.md).
+
+B04 adds rejection/cancellation and current decision metadata to this API; see
+[the approval contract](action-approval.md) for historical approval versus current state.
