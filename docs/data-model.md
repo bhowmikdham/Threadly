@@ -275,3 +275,17 @@ receipts; downgrade refuses if any exist. No existing action bytes/history chang
 Approval continues to use `action_approvals` and one `action_jobs` row per action,
 committed together. Late cancellation adds a receipt/event without modifying
 action state/version, dispatch attempts or recovery job. [Decision contract](action-approval.md).
+
+
+## Dispatch lifecycle (B05, no DDL)
+
+Reuses action tables at head `a0426e9bc731`. A running dispatch job has a lease and
+up to three **preflight** claims. Before any POST, one transaction inserts an
+immutable dispatched attempt then moves the action to executing. Attempt identifiers
+store frozen RFC Message-ID, Gmail thread ID and payload hash. Attempts are never
+reused to resend. Valid completion stores sanitized attempt evidence and the action
+result (`gmail_message_id`, `gmail_thread_id`) or error code in the same transaction.
+Expired committed intent becomes `outcome_unknown`; its job becomes held/reconcile.
+One late nonterminal observation can be stored under `evidence.late_response` without
+changing action state or overwriting terminal evidence. No new tables or migration.
+[Full worker contract](email-actions.md).

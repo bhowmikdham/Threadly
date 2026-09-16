@@ -99,7 +99,7 @@ A healthy API alone does not establish Google login or Bedrock generation readin
 | BERT adapter after AI handoff | Verify label map/domain/activation/thresholds; separate email metadata from command routing | Multi-label and low-confidence fixtures; no dynamic Flow/permission authority |
 | B11 after required B10 contracts | Non-calendar plans and explicit commitment selection | Evidence-backed owner/deadline ambiguity, revisions and selected-only draft content |
 | B12/B13 after actual Calendar capability | Preferences, timezone anchors, freebusy and deterministic slot sets | DST gaps/folds, busy/unknown calendars, buffers, conflicts, insufficient slots |
-| B04 decision review; B05/B06 next | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
+| B04 merged; B05 worker review; B06 next | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
 | B14/B15 after slots/action contracts | Negotiation and approved Calendar writes/recovery | Expired offer, changed availability and uncertain event creation tests |
 | B16/B17 throughout | Versioned Flow manifests, bounded read adapters where needed, live evaluations | Same replay cases locally and through recorded AWS release; semantic review |
 | B18/B19 release gate | Frontend/API contract tests, retention/recovery, full staging scenario matrix | All five intents, compound task, approved writes and failure recovery verified together |
@@ -121,7 +121,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 | “Summarise, don't reply, check tomorrow” | Preserve negation and all clauses; no partial execution | Full planner + Calendar pending |
 | “Tomorrow at 4” in context | Resolve from sufficient context; clarify genuine ambiguity | Continuation foundation exists; Calendar time engine pending |
 | Three requested slots, only one free | Return one grounded option, no invented slots | B12/B13 pending |
-| Edit after action approval | Old approval cannot authorize changed payload | B02 supersession and immutable history tested; public approval/execution still pending |
+| Edit after action approval | Old approval cannot authorize changed payload | B04 approval/edit races and B05 mock dispatch tested; public live approval still gated |
 | Provider accepts send but response times out | Unknown outcome; reconcile before any retry | B06 live gate pending |
 
 ## Human/AI handoff rules
@@ -134,7 +134,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 - Backend owns auth, context IDs, recipients, availability, persistence, retries
   and approvals. Preserve immutable historical evidence across edits and retries.
 - Each PR records tested/untested gates and the next dependency in its checkpoint.
-  The [B04 checkpoint](backend-execution/checkpoints/B04.md) is the current resume
+  The [B05 checkpoint](backend-execution/checkpoints/B05.md) is the current resume
   point; [B10](backend-execution/checkpoints/B10.md) records the compound foundation; do not infer completion from the presence of diagrams or prepared Flows.
 
 ## Critical path before enabling complete workflows
@@ -149,8 +149,8 @@ flowchart TD
     CONFIG --> READTEST[API-level live generation and read tests]
     B01[B01: auth/capabilities merged; live consent pending] --> B03[B03: exact email preview merged]
     B02[B02: storage merged] --> B03
-    B03 --> B04[B04: exact approval and stop decisions for review]
-    B04 --> B05[B05: send worker]
+    B03 --> B04[B04: exact approval and stop decisions merged]
+    B04 --> B05[B05: disabled send worker for review]
     B05 --> B06[B06: reconcile uncertain sends]
     B01 --> B12[B12: Calendar read and preferences]
     B12 --> B13[B13: deterministic slots]
@@ -169,9 +169,9 @@ flowchart TD
     GATE --> FRONT[B18: frontend integration later]
 ```
 
-B01–B03 are merged at PR26; merged-branch migration head f1a2b3c4d5e6.
-B04 adds migration a0426e9bc731 for durable stop receipts and is ready for review.
-After merge, B05 dedicated sending is the next slice; live sending waits for B06.
+B01–B04 are merged at PR27; merged-branch migration head a0426e9bc731.
+B05 adds the dedicated disabled worker without DDL and is ready for review.
+After merge, B06 reconciliation is next; live sending also requires controlled-account evidence.
 The original dirty auth/classifier checkout remains preserved.
 B02 supplies a deletion guard; the final retention/recovery/purge policy remains
 a release prerequisite. Classifier labels remain advisory: complete-plan validation
@@ -183,3 +183,5 @@ Detailed storage lifecycle: [action storage](assistant-action-storage.md).
 Exact payload/API contract: [email action previews](email-action-previews.md).
 
 Decision API and cutoff: [exact approval and stopping actions](action-approval.md).
+
+Worker code map, failure matrix and no-resend policy: [email actions](email-actions.md).

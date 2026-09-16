@@ -137,3 +137,7 @@ Tests/checkpoint: [B03 evidence](backend-execution/checkpoints/B03.md).
 
 B04 adds rejection/cancellation and current decision metadata to this API; see
 [the approval contract](action-approval.md) for historical approval versus current state.
+
+B05 adds nullable provider result/error fields and a disabled exact-MIME worker;
+see [dispatch lifecycle](email-actions.md). Current migration head is `a0426e9bc731`
+from B04; B03 itself added no DDL.

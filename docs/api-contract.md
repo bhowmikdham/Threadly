@@ -490,7 +490,7 @@ responses use `Cache-Control: no-store`. B04 adds decision routes below; no send
 
 Authenticated `POST /assistant/actions/{id}/approve` accepts strict
 `{request_id,expected_version,payload_hash}`; new public approvals return 409 while
-no executor is installed. Internal exact approval/outbox is transactional; matching
+live execution/recovery gates are closed. Internal exact approval/outbox is transactional; matching
 existing requests may replay with 202 without requeueing. `/reject` and `/cancel`
 accept strict `{request_id,expected_version}` and return 200. Rejection closes a
 proposal; cancellation closes pre-dispatch work or records a request after cutoff.
@@ -504,3 +504,15 @@ never reports not-sent, changes action state or suppresses recovery. New SSE eve
 `action.cancellation_requested` contains only `action_id`.
 
 [Full contracts, errors, replay, locking and migration](action-approval.md).
+
+## Disabled email action worker (B05)
+
+No new route. `EmailActionView` now includes nullable `result` and `error_code`.
+On confirmed Gmail API acceptance, `result` contains `gmail_message_id` and
+`gmail_thread_id`; acceptance is not a recipient-delivery receipt. Unknown outcomes
+have no success result and must not be described as unsent or automatically retried.
+The existing `action.state_changed` event covers executing/terminal/unknown states.
+New `action.preflight_blocked`, `action.recovery_required` and `action.late_response`
+events carry action IDs plus sanitized code or attempt ID, not message content.
+New public approvals, `approval_available` and `sending_available` stay disabled;
+legacy send remains 501. [Worker contract and result policy](email-actions.md).

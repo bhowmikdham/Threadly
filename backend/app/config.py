@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
     assistant_workflow_manifest: str = ""
 
+    # Dedicated write worker. B06's code gate also blocks real HTTP in this release.
+    email_writes_enabled: bool = False
+    email_action_lease_seconds: int = Field(default=120, ge=60, le=300)
+
     # Legacy rollback path (superseded by ADR 003).
     ollama_base_url: str = "http://localhost:11434"
     model_main: str = "qwen3.5:4b-threadly"

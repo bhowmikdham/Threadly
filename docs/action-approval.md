@@ -1,8 +1,8 @@
 # Exact approval and stopping actions — B04
 
 B04 implements atomic exact-payload approval/outbox persistence and public rejection
-and cancellation. **New public approval remains disabled** because the sender and
-uncertain-write recovery are not installed. Internal tests enable the service with
+and cancellation. **New public approval remains disabled**: B05 adds a gated sender,
+but B06 uncertain-write recovery is still pending. Internal tests enable the service with
 a simulated dispatcher; no request field, environment flag or model output can
 enable public approval in this release. Draft review remains independent.
 
@@ -154,11 +154,11 @@ policy remains a live-write release gate.
 
 Deploy only the reviewed merged release, with backup and matching API/worker code.
 No new settings, secrets, model/Flow changes or Google calls. The pinned deployment
-command targets merged PR26; B04 is not deployed by that command. Old code can run
+command now targets merged PR27 including B04; host deployment is unconfirmed. Old code can run
 against additive columns/tables but must not be allowed to dispatch around the
-new cutoff/approval contract. No dispatcher exists in either deployed slice today.
+new cutoff/approval contract. The last confirmed host remains PR23; B05 is not deployed.
 
-B05 implements the dedicated sender and its capability/rollout checks. B06 provides
+[B05](email-actions.md) implements the disabled dedicated sender and its dispatch checks. B06 provides
 unknown-outcome reconciliation; keep live sending disabled until both and controlled
 Gmail delivery/threading/Bcc/recovery tests pass. B18 later adds the explicit approval
 UI. B04's internal `execution_enabled` argument is a trusted testing/future integration
