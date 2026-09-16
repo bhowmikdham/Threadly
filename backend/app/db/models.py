@@ -36,6 +36,10 @@ class TimestampMixin:
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("google_account_version >= 1 AND google_token_version >= 1",
+                        name="ck_google_versions"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     google_sub: Mapped[str] = mapped_column(String(64), unique=True)
@@ -45,6 +49,13 @@ class User(TimestampMixin, Base):
     access_token_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # Fernet; short-lived
     access_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     gmail_history_id: Mapped[str | None] = mapped_column(String(32))  # incremental sync cursor
+    google_scopes: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
+    google_identity: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    google_email_verified: Mapped[bool | None]
+    google_connected: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    google_account_version: Mapped[int] = mapped_column(server_default="1")
+    google_token_version: Mapped[int] = mapped_column(server_default="1")
+    google_connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sync_version: Mapped[int] = mapped_column(server_default="0")
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -587,3 +598,19 @@ class ActionAttempt(Base):
     provider_identifiers: Mapped[dict] = mapped_column(JSONB)
     evidence: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class GoogleOAuthSession(Base):
+    __tablename__ = "google_oauth_sessions"
+    __table_args__ = (
+        CheckConstraint("(user_id IS NULL) = (account_version IS NULL)",
+                        name="ck_oauth_owner_version"),
+        Index("ix_oauth_expiry", "expires_at"),
+    )
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    code_challenge: Mapped[str] = mapped_column(String(43))
+    redirect_uri: Mapped[str] = mapped_column(String(2048))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    account_version: Mapped[int | None] = mapped_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

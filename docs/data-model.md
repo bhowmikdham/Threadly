@@ -239,3 +239,17 @@ Partial uniqueness allows only one unresolved attempt per action.
 Parent `c8291e4a6f03`; existing artifacts/reviews are unchanged. Downgrade refuses
 while any action history exists. No new public action API or executor is installed.
 Full fields, lock order, retention gate and tests: [action storage](assistant-action-storage.md).
+
+## Actual Google grants and OAuth sessions (`f1a2b3c4d5e6`)
+
+Parent `d9302f5b7a14`. Users gain nullable JSONB `google_scopes`/`google_identity`,
+nullable `google_email_verified`/`google_connected_at`, connected flag, positive
+`google_account_version` and `google_token_version`. Existing token bytes remain
+unchanged; legacy grants/verification stay unknown. Token renewal and permission
+versioning are separate.
+
+`google_oauth_sessions` stores state hash (PK), PKCE S256 challenge, exact callback,
+nullable owned user/version pair, expiry and consumption time. Owner deletion
+cascades login state; action retention rules are unchanged. No raw state/code/verifier
+is stored. Downgrade refuses when action history exists and otherwise invalidates
+pending sign-ins while preserving legacy tokens. See [Google lifecycle](google-capabilities.md).

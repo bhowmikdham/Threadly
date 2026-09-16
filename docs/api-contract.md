@@ -18,7 +18,7 @@ cached results may still come from legacy inference.
 ## Conventions
 
 - Base URL: `https://<DOMAIN>` (dev: `http://localhost:8000`)
-- Auth: `Authorization: Bearer <session JWT>` on everything except `/healthz` and `/auth/*`
+- Auth: `Authorization: Bearer <session JWT>` on protected routes. Auth begin/exchange are public; reconnect, disconnect and session refresh require JWT.
 - Content type: JSON unless stated
 - IDs: Gmail thread/message ids are passed as opaque strings
 
@@ -201,7 +201,7 @@ invocation or frontend integration. See the
 ### Auth
 | Method | Path                    | Body                    | Returns |
 |--------|-------------------------|-------------------------|---------|
-| POST   | `/auth/google/exchange` | `{"code": "...", "redirect_uri": "..."}` — auth code from `chrome.identity.launchWebAuthFlow`, plus the redirect URI used | `{"jwt": "...", "user": {"id", "email", "name"}}` |
+| POST   | `/auth/google/exchange` | `code`, exact `redirect_uri`, one-use `state`, original `code_verifier` from the B01 handshake below | `{"jwt": "...", "user": {"id", "email", "name"}}` |
 | POST   | `/auth/refresh`         | — (valid JWT)           | `{"jwt": "..."}` |
 
 ### Health
@@ -449,3 +449,25 @@ Existing task-event replay can include `action.proposed` with `action_id`,
 envelope/sequence/version applies; payloads and recipients are excluded. These
 events arise only through internal storage callers until B03/B04 add public APIs.
 See [action storage](assistant-action-storage.md) for errors, schemas and lifecycle.
+
+## Google auth/capabilities (B01)
+
+The old stateless exchange input is superseded: missing state/verifier returns 422.
+`POST /auth/google/begin` accepts strict `{redirect_uri,code_challenge}`; authenticated
+`POST /auth/google/reconnect` accepts the same body and binds the current account.
+Both return `{state,authorization_url,expires_at}`. State is one-use, expires after
+ten minutes and is consumed before network exchange. `POST /auth/google/exchange`
+checks the original verifier, callback and state; the JWT/profile response is unchanged.
+Authenticated `POST /auth/google/disconnect` clears local Google credentials only.
+
+`GET /assistant/capabilities` returns typed account/capability/reconnect metadata
+from stored actual grants. No user ID or scope authority is accepted from the caller.
+Gmail send and Calendar remain unimplemented/disabled, irrespective of grants.
+`ready` is stored readiness, not a live provider probe.
+
+Errors: 400 `invalid_redirect_uri`/`oauth_state_invalid`; 401 `oauth_exchange_failed`/
+`reauth_required`; 409 `google_account_mismatch`/`google_connection_changed`;
+503 `google_not_configured`/`google_token_unavailable`. Errors omit provider bodies.
+Read the [full handshake, diagrams and compatibility note](google-capabilities.md)
+before implementing a client. Existing Chrome getAuthToken calls do not supply
+backend authorization codes; frontend integration remains deferred.

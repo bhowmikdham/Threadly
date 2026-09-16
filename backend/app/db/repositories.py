@@ -1,7 +1,7 @@
 """Data-layer repositories (W1). All writes are UPSERTS against the uniqueness
 rules in docs/data-model.md — sync must be safely re-runnable at any time."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import String, all_, any_, cast, delete, func, select, update
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -26,30 +26,53 @@ async def upsert_user(
     access_token_enc: bytes,
     access_token_expires_at: datetime,
     refresh_token_enc: bytes | None,
+    google_scopes: list[str] | None = None,
+    google_identity: dict | None = None,
+    email_verified: bool | None = None,
+    google_connected: bool | None = None,
+    now: datetime | None = None,
 ) -> User:
     """Insert on first login; on later logins update identity + access token,
     and only touch refresh_token when Google actually returned a new one."""
+    now = now or datetime.now(UTC)
+    if google_connected is None:
+        google_connected = bool(access_token_enc or refresh_token_enc)
     existing = (
-        await session.execute(select(User).where(User.google_sub == google_sub))
+        await session.execute(
+            select(User).where(User.google_sub == google_sub).with_for_update()
+            .execution_options(populate_existing=True)
+        )
     ).scalar_one_or_none()
     if existing is None:
-        user = User(
-            google_sub=google_sub,
-            email=email,
-            display_name=display_name,
-            access_token_enc=access_token_enc,
-            access_token_expires_at=access_token_expires_at,
-            refresh_token_enc=refresh_token_enc,
+        inserted = await session.scalar(
+            pg_insert(User).values(
+                google_sub=google_sub, email=email, display_name=display_name,
+                access_token_enc=access_token_enc,
+                access_token_expires_at=access_token_expires_at,
+                refresh_token_enc=refresh_token_enc, google_scopes=google_scopes,
+                google_identity=google_identity, google_email_verified=email_verified,
+                google_connected=google_connected, google_connected_at=now,
+            ).on_conflict_do_nothing(index_elements=[User.google_sub]).returning(User.id)
         )
-        session.add(user)
-        await session.flush()
-        return user
+        if inserted is not None:
+            return await session.get(User, inserted)
+        existing = await session.scalar(
+            select(User).where(User.google_sub == google_sub).with_for_update()
+            .execution_options(populate_existing=True)
+        )
     existing.email = email
     existing.display_name = display_name
     existing.access_token_enc = access_token_enc
     existing.access_token_expires_at = access_token_expires_at
     if refresh_token_enc is not None:
         existing.refresh_token_enc = refresh_token_enc
+    existing.google_scopes = google_scopes
+    existing.google_identity = google_identity
+    existing.google_email_verified = email_verified
+    existing.google_connected = google_connected
+    existing.google_connected_at = now
+    existing.google_account_version += 1
+    existing.google_token_version += 1
     await session.flush()
     return existing
 

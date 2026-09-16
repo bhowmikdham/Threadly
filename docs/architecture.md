@@ -259,3 +259,13 @@ ownership, legal transitions and preserved unresolved attempts. This is the stor
 foundation only: no action HTTP routes, action worker or Google writes are enabled.
 See [action lifecycle and rollout](assistant-action-storage.md) for the full mapping
 and the source-deletion policy that must be completed before live writes.
+
+## Google auth and capability boundary (B01)
+
+`auth/flow.py` owns one-use state/PKCE and account-bound reconnect.
+`auth/google.py` handles sanitized fixed-endpoint HTTP calls; `auth/service.py`
+separates credential refresh transactions from caller work and fences late refresh
+results. `capabilities/service.py` combines actual grants, verified identity and
+credential availability with installed handlers. No send/Calendar executor is
+enabled. The [Google lifecycle](google-capabilities.md) records the existing frontend
+getAuthToken mismatch, typed API contract and live consent gate.

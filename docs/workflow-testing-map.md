@@ -1,6 +1,6 @@
 # Backend and AI workflow map: what to test next
 
-Updated 15 September 2026. This is a shared engineering handoff, not a claim that
+Updated 16 September 2026. This is a shared engineering handoff, not a claim that
 all target workflows are installed. Machine-readable companion:
 [workflow-runtime-map.json](workflow-runtime-map.json).
 
@@ -8,11 +8,11 @@ all target workflows are installed. Machine-readable companion:
 
 | Layer | Evidence / status |
 |---|---|
-| EC2 host, API, DB and worker | User-supplied deployment output confirms PR #21 / `9b3b14e`, migration `a6417c29d805`, API and dependency checks passed |
+| EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #23 merge `954b492` includes search and explicit compound templates; pinned EC2 command provided, host result pending |
-| Current feature branch | B02 action/approval/job/attempt storage and draft supersession; local validation, review/merge gate; no sender or booking worker |
-| Trained BERT / auth work in another checkout | Not part of this branch; preserve it and review/integrate separately |
+| Merged source / deployment target | PR #24 merge `9664874` adds action storage; deployment command prepared, host result pending |
+| Current feature branch | B01 state/PKCE, reconnect, actual grants and token-refresh isolation; no frontend changes or live consent |
+| Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 ## Whole target lifecycle and ownership
 
@@ -51,7 +51,7 @@ Calendar reads, send approvals or the recovery worker.
 | Other: help/capture search/rewrite | Same + `read_options` | `reads.py`; backend reads / bounded rewrite | Answer, exact quotes or suggested text | General natural-language retrieval and extraction incomplete |
 | Other: mailbox search | `/assistant/mail-search` | `mail_search.py`, owned local DB query | Scoped page and stable cursor | PR #22 deployment; automatic query planning pending |
 | Contextual clarification | `/assistant/tasks/{id}/inputs` | `continuation.py` | Requeued original task with typed inputs | Frontend/staging exercise; not a compound-plan editor |
-| Summary + reply/compose | `/assistant/compound-requests` | `steps.py`; explicit two-step templates | Summary stream + final editable draft | PR #23 merged; deployment/live gate pending |
+| Summary + reply/compose | `/assistant/compound-requests` | `steps.py`; explicit two-step templates | Summary stream + final editable draft | PR #23 deployed; provider configuration/live gate pending |
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Schedule/check time/slots | Existing router can propose operations | Calendar handler pending B12–B14 | Target: authoritative slots and negotiation | Actual scopes, preferences, freebusy, deterministic time calculations |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
@@ -112,7 +112,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 | Scenario | Required observable result | Gate today |
 |---|---|---|
 | Paid invoice thread summary | Resolved issue, no invented follow-up work | Offline summary cases exist; current live run pending |
-| Explicit summary + reply | Both artifacts, bound recipients, final draft editable | This branch's local fixtures; live pending |
+| Explicit summary + reply | Both artifacts, bound recipients, final draft editable | PR #23 deployed, offline fixtures pass; provider setup/live pending |
 | Draft failure after summary | Partial summary, incomplete task, retry only draft | Local compound regression |
 | Cancellation / replaced lease | Late model result does not publish | Local compound regression |
 | Changed thread during generation | Source error; historical output unchanged | Local compound regression |
@@ -133,7 +133,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 - Backend owns auth, context IDs, recipients, availability, persistence, retries
   and approvals. Preserve immutable historical evidence across edits and retries.
 - Each PR records tested/untested gates and the next dependency in its checkpoint.
-  The [B02 checkpoint](backend-execution/checkpoints/B02.md) is the current resume
+  The [B01 checkpoint](backend-execution/checkpoints/B01.md) is the current resume
   point; [B10](backend-execution/checkpoints/B10.md) records the compound foundation; do not infer completion from the presence of diagrams or prepared Flows.
 
 ## Critical path before enabling complete workflows
@@ -146,7 +146,7 @@ flowchart TD
     MERGED[PR23 merged: generation, search, explicit compound templates] --> DEPLOY[Deploy pinned release; confirm host health]
     DEPLOY --> CONFIG[Configure actual Bedrock release and Google OAuth]
     CONFIG --> READTEST[API-level live generation and read tests]
-    B01[B01: review actual scopes and auth] --> B03[B03: exact email payload]
+    B01[B01: auth/capabilities implemented for review] --> B03[B03: exact email payload]
     B02[B02: storage ready for review] --> B03
     B03 --> B04[B04: exact approval]
     B04 --> B05[B05: send worker]
@@ -168,8 +168,9 @@ flowchart TD
     GATE --> FRONT[B18: frontend integration later]
 ```
 
-B02 is a bounded reviewable PR; B01 work in the other checkout must be inspected,
-tested and integrated before B03 can rely on it. Avoid concurrent migration heads.
+B02 is merged. B01 has been integrated and tested on its own review branch with
+migration parent d9302f5b7a14; its original dirty checkout is preserved. B03 depends
+on B01 review/merge. Avoid concurrent migration heads.
 B02 supplies a deletion guard; the final retention/recovery/purge policy remains
 a release prerequisite. Classifier labels remain advisory: complete-plan validation
 must reject unsupported clauses before executing any part of a request.

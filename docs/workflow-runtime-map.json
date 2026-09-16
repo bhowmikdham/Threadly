@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
+  "baseline_commit": "96648749c75f9f7c6445e175345b2b997e7201eb",
   "deployment_evidence": {
-    "commit": "9b3b14e8fa71086224bca585a7566ff29dd3775d",
-    "source": "user-provided EC2 deployment log",
-    "provider_configuration": "pending"
+    "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
+    "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
+    "provider_configuration": "Bedrock model selection and Google OAuth pending"
   },
   "coordinator": "backend/app/assistant/worker.py",
   "workflows": [
@@ -94,7 +94,6 @@
         "backend/tests/test_assistant_migration.py"
       ],
       "remaining": [
-        "deployment_confirmation",
         "live_model_quality",
         "natural_language_planner",
         "lookup_steps",
@@ -128,14 +127,13 @@
     },
     {
       "id": "external_actions",
-      "status": "storage_implemented_pending_review",
+      "status": "storage_merged",
       "entry": null,
       "handlers": [
         "backend/app/actions/service.py"
       ],
       "output": "planned_confirmed_or_unknown_outcome",
       "remaining": [
-        "B02_review_merge",
         "B03",
         "B04",
         "B05",
@@ -155,8 +153,7 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "B02 review/merge action storage",
-    "B01 review capability/auth work before B03",
+    "B01 review/merge auth and actual capabilities; then B03 exact email payload",
     "B03-B06 exact email payload, approval, dispatch and recovery",
     "B10 complete command planner and lookup steps",
     "B11 plans",
@@ -165,8 +162,14 @@
     "B17/B19 backend live release gates; B18 frontend deferred"
   ],
   "deployment_target": {
-    "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
-    "status": "command_provided_awaiting_host_output",
+    "commit": "96648749c75f9f7c6445e175345b2b997e7201eb",
+    "status": "command_prepared",
     "frontend_integration": "deferred_by_user"
+  },
+  "google_connection": {
+    "status": "B01_implemented_pending_review",
+    "checkpoint": "docs/backend-execution/checkpoints/B01.md",
+    "live_consent": "pending",
+    "frontend_integration": "deferred"
   }
 }
