@@ -550,3 +550,23 @@ ten matched messages stops before generation with `lookup_no_matches` or
 `GET /assistant/workflows` advertises both lookup templates, their separate release,
 saved-capture scope and ten-match bound. It continues to report no natural-language
 planner. Details, source mapping and request example: [lookup/draft](lookup-draft-workflows.md).
+
+## Reviewed compound-command plans (B10c)
+
+| Method | Route | Behavior |
+|---|---|---|
+| POST | `/assistant/command-plans` | 202; idempotently reserve and interpret a complete command into a saved reviewable plan, no task execution |
+| GET | `/assistant/command-plans/{plan_id}` | Owned immutable input/result, state/hash/expiry and optional confirmed task ID |
+| POST | `/assistant/command-plans/{plan_id}/confirm` | 202 existing task response; strict `plan_hash` + `confirm_complete_command: true`; recheck and atomically consume into one compound task |
+
+New request schema: `schema_version: "1.0"`, `request_id`, `instruction` (1–4,000
+characters), optional `context_snapshot_id` and `draft_options`. The planner supports
+only the four installed summary/lookup + draft pairs in this slice. It preserves
+clause spans, prohibitions and dependency intent; unsupported whole plans create
+no generation jobs. Explicit review is mandatory. Clarification requires a new
+proposal with corrected full input; no automatic single-intent fallback or in-place
+plan editor is added. Old `/requests` behavior and task formats are unchanged.
+`GET /assistant/workflows` adds `command_planner`; automatic dispatch remains false.
+
+[Full examples, states, limits and confirmation semantics](command-planner.md).
+This confirmation authorizes read/generation work only, never Gmail/Calendar writes.

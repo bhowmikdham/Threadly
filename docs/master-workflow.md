@@ -1,14 +1,17 @@
 # Master workflow: current runtime and compound-request implementation contract
 
-Baseline for this update: integration commit `fa23176` (PR #22 merged), plus
-the B10a summary and B10b captured-lookup compound templates. This document distinguishes
+Baseline for this update: integration commit `8cfd020d` (PR #30 merged), plus
+the B10c reviewed compound-command planner in this PR. This document distinguishes
 working code from the next implementation. It does not claim the EC2 deployment
 has this revision, the trained BERT package is wired in, or six prepared AWS Flows
 are six executable application workflows.
 
-## 1. One entry point; the backend is the coordinator
+## 1. The backend coordinates requests and reviewed plans
 
-The frontend submits the user's complete request to `POST /assistant/requests`.
+The existing request path is `POST /assistant/requests`. Reviewed compound commands
+now use `POST /assistant/command-plans` followed by exact `/confirm`, as described
+in [the B10c contract](command-planner.md). The legacy request router is unchanged.
+For the existing request path:
 The API authenticates, checks ownership and saves a durable job. The separate
 worker classifies, validates, dispatches and saves a result. There is no deployed
 AWS “master Flow” that currently owns this lifecycle.
@@ -64,7 +67,7 @@ the user's instruction and backend-derived context-availability indicators.
 | Compose | New draft with explicit recipients | Exact send approval, execution and reconciliation |
 | Plan/schedule | Intent and selected operation pairs can be proposed | Installed planning/calendar handlers and their dependencies |
 | Other | Exact mapped-message lookup, help/capture search/rewrite, scoped local-mail search | General natural-language retrieval and entity/commitment extraction |
-| Multiple intents | Explicit summary or captured-text lookup → reply/compose templates via `/assistant/compound-requests` with checkpointed streams | Natural-language complete-plan planner, mailbox lookup coordination, Calendar triples and general compound execution |
+| Multiple intents | Explicit summary or captured-text lookup → reply/compose templates via `/assistant/compound-requests` with checkpointed streams | Reviewed compound planner now available via its separate API; automatic routing, mailbox coordination, Calendar triples and broader graphs remain pending |
 
 `GET /assistant/workflows` reports **three installed generation operations**:
 `summarise_thread`, `draft_reply`, `draft_new`, plus the bounded UI handlers. Its
@@ -306,3 +309,12 @@ No match/too-many matches stop before generation. This is not classifier-driven
 selection or a full-command planner. The next planner must account for all clauses
 and negations before selecting any installed kernel. See the
 [full progress report](backend-progress.md) for remaining packages and live gates.
+
+## B10c reviewed command planning
+
+[Command planner](command-planner.md) now saves a span-grounded interpretation of a
+whole user command and compiles the four installed compound pairs. Exact complete-
+command review is required before task creation. Unsupported combinations run zero
+steps; source/recipient selection remains backend-owned. This opt-in API leaves the
+legacy router unchanged. BERT integration, automatic dispatch, in-place clarification,
+larger graphs and Calendar remain pending, as does live semantic evaluation.

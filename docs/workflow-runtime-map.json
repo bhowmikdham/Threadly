@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "e93541835e4e651a291a4a4d3dbf00839d4ab0c8",
+  "baseline_commit": "8cfd020de17b1b5c33d978db8e5e19cda4899279",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -152,7 +152,7 @@
     },
     {
       "id": "lookup_draft",
-      "status": "implemented_in_current_pr",
+      "status": "merged",
       "entry": "POST /assistant/compound-requests with lookup_then_reply or lookup_then_compose",
       "handlers": [
         "backend/app/assistant/lookup_draft.py",
@@ -169,6 +169,29 @@
         "mailbox_lookup_coordination",
         "live_model_quality",
         "staging_deployment"
+      ]
+    },
+    {
+      "id": "reviewed_command_planner",
+      "status": "implemented_in_current_pr",
+      "entry": "POST /assistant/command-plans then explicit /confirm",
+      "handlers": [
+        "backend/app/planner/command.py",
+        "backend/app/assistant/command_plans.py"
+      ],
+      "operations": [
+        "summarise_thread",
+        "search_mail",
+        "draft_reply",
+        "draft_new"
+      ],
+      "output": "saved reviewed plan; confirmed existing compound task",
+      "remaining": [
+        "live_command_quality",
+        "automatic_dispatch",
+        "in_place_plan_clarification",
+        "broader_graphs",
+        "calendar_handlers"
       ]
     }
   ],

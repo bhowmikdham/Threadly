@@ -11,7 +11,16 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import continuation, draft_review, lookup_draft, mail_search, reads, steps, tasks
+from app.assistant import (
+    command_plans,
+    continuation,
+    draft_review,
+    lookup_draft,
+    mail_search,
+    reads,
+    steps,
+    tasks,
+)
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -24,6 +33,7 @@ from app.schemas.assistant import (
     RoutePreview,
     RoutePreviewRequest,
 )
+from app.schemas.command_plan import CommandPlanRequest, ConfirmCommandPlan
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
@@ -85,6 +95,15 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "new_requests_only": True,
             "max_answer_rounds": continuation.MAX_INPUTS,
             "question_expiry_hours": continuation.QUESTION_HOURS,
+        },
+        "command_planner": {
+            "installed": True,
+            "release": command_plans.command.RELEASE,
+            "entrypoint": "/assistant/command-plans",
+            "requires_complete_command_review": True,
+            "automatic_dispatch": False,
+            "max_execution_steps": 2,
+            "external_actions": False,
         },
         "compound_templates": {
             "installed": True,
@@ -201,6 +220,33 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/command-plans", status_code=202)
+async def propose_command_plan(request: CommandPlanRequest, user_id: CurrentUser, session: DB):
+    plan, created = await command_plans.reserve(session, user_id, request)
+    await session.commit()  # No database transaction spans planner inference.
+    if created:
+        state, result = await command_plans.interpret(plan)
+        plan = await command_plans.complete(session, user_id, plan.id, state, result)
+    result = await command_plans.view(session, plan)
+    await session.commit()
+    return result
+
+
+@router.get("/command-plans/{plan_id}")
+async def get_command_plan(plan_id: str, user_id: CurrentUser, session: DB):
+    return await command_plans.view(session, await command_plans.owned(session, user_id, plan_id))
+
+
+@router.post("/command-plans/{plan_id}/confirm", status_code=202)
+async def confirm_command_plan(
+    plan_id: str, request: ConfirmCommandPlan, user_id: CurrentUser, session: DB
+):
+    task = await command_plans.confirm(session, user_id, plan_id, request)
     result = await task_view(session, task)
     await session.commit()
     return result

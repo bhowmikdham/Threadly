@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #29 merge `e9354183` includes bounded Gmail reconciliation; current EC2 revision not reverified |
-| Current feature branch | B10b explicit captured-text lookup → draft; live approval/sending still gated |
+| Merged source / deployment target | PR #30 merge `8cfd020d` includes captured lookup/draft; current EC2 revision not reverified |
+| Current feature branch | B10c reviewed complete-command proposals and confirmation; automatic dispatch/live writes gated |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 Current package status and remaining delivery order: [backend-progress.md](backend-progress.md).
@@ -55,7 +55,8 @@ Calendar reads, send approvals or the recovery worker.
 | Other: mailbox search | `/assistant/mail-search` | `mail_search.py`, owned local DB query | Scoped page and stable cursor | PR #22 deployment; automatic query planning pending |
 | Contextual clarification | `/assistant/tasks/{id}/inputs` | `continuation.py` | Requeued original task with typed inputs | Frontend/staging exercise; not a compound-plan editor |
 | Summary + reply/compose | `/assistant/compound-requests` | `steps.py`; explicit two-step templates | Summary stream + final editable draft | PR #23 deployed; provider configuration/live gate pending |
-| Lookup + reply/compose | `/assistant/compound-requests` | `lookup_draft.py` + shared `steps.py` | Lookup stream + final editable draft | Current B10b PR; captured-text-only scope, live/model gate pending |
+| Lookup + reply/compose | `/assistant/compound-requests` | `lookup_draft.py` + shared `steps.py` | Lookup stream + final editable draft | PR #30 merged; captured-text-only scope, live/model gate pending |
+| Reviewed compound command | `/assistant/command-plans` then exact `/confirm` | `planner/command.py` + `command_plans.py` → existing task worker | Saved complete-command proposal, then one confirmed compound task | Current B10c PR; four pairs only, live semantic quality/automatic dispatch pending |
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Schedule/check time/slots | Existing router can propose operations | Calendar handler pending B12–B14 | Target: authoritative slots and negotiation | Actual scopes, preferences, freebusy, deterministic time calculations |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
@@ -98,7 +99,7 @@ A healthy API alone does not establish Google login or Bedrock generation readin
 | Order / dependency | Work | Concrete completion evidence |
 |---|---|---|
 | B01 / merged PR25 | Live-check actual-scope persistence, OAuth ownership and capability state | Revoked/missing scopes and account changes tested; controlled OAuth smoke |
-| B10 after lookup slice | Complete command planner, all-clause/negation coverage, broader lookup coordination, plan clarification | Fixed versioned corpus, zero partial execution for unsupported plans; source invalidation and recovery |
+| B10 after lookup slice | Live semantic validation of reviewed planner, corrected-plan continuation, broader lookup coordination/graphs | Fixed versioned corpus, zero partial execution for unsupported plans; source invalidation and recovery |
 | BERT adapter after AI handoff | Verify label map/domain/activation/thresholds; separate email metadata from command routing | Multi-label and low-confidence fixtures; no dynamic Flow/permission authority |
 | B11 after required B10 contracts | Non-calendar plans and explicit commitment selection | Evidence-backed owner/deadline ambiguity, revisions and selected-only draft content |
 | B12/B13 after actual Calendar capability | Preferences, timezone anchors, freebusy and deterministic slot sets | DST gaps/folds, busy/unknown calendars, buffers, conflicts, insufficient slots |

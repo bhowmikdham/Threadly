@@ -1,7 +1,7 @@
 # Whole backend progress — 16 September 2026
 
-Audit baseline: PR #29 merged at `e93541835e4e651a291a4a4d3dbf00839d4ab0c8`
-on `codex/assistant-intent-routing`. The current PR adds B10b lookup → draft.
+Audit baseline: PR #30 merged at `8cfd020de17b1b5c33d978db8e5e19cda4899279`
+on `codex/assistant-intent-routing`. The current PR adds B10c reviewed compound-command planning.
 This report separates implemented code, accepted package scope, and deployed/live
 behavior. Frontend integration remains deferred at the user's request.
 
@@ -35,7 +35,8 @@ bar. PR counts, prepared AWS Flows and passing tests do not close these packages
 | Context and follow-up | Saved UI ordering/reference mapping, durable typed answers, contextual time clarification | B07/B08 local cases; actual frontend/live interaction remains |
 | Bounded Other / retrieval | Captured-text lookup, selected rewrite, explicit local-mailbox search with scope/cursors | B09 tests; general semantic lookup/extraction not complete |
 | Compound tasks | Summary → reply/compose with separate streams, reusable checkpoint and final pointer | B10a merged/deployed in PR #23; live provider setup not verified |
-| Lookup → draft | New explicit captured-text lookup → reply/compose; native checkpoint, scoped generation, no/too-many-match stop | B10b current PR; no automatic natural-language plan selection |
+| Lookup → draft | New explicit captured-text lookup → reply/compose; native checkpoint, scoped generation, no/too-many-match stop | B10b merged PR #30; captured-text-only scope |
+| Reviewed command planning | Persisted all-word clause interpretation, prohibitions, dependency compilation and exact review → existing compound task | B10c current PR; four pairs only, live semantic gate and automatic routing pending |
 | Bedrock execution | Native/Flow registry, pinned manifests, bounded InvokeFlow adapter, versioned prompts | B16/B17 code and synthetic SDK replay; cloud end-to-end gate still open |
 | Email actions | Immutable action/approval records, exact MIME preview, explicit decisions, dedicated sender and read-only uncertain-outcome reconciliation | B02–B05 verified local scope, B06 merged recovery; public approval/sending remains gated |
 
@@ -53,7 +54,7 @@ bar. PR counts, prepared AWS Flows and passing tests do not close these packages
 | B07 UI references | In review | Actual client capture/ordering integration acceptance |
 | B08 clarification | In review | Staging/client follow-up paths; broader plan clarification not installed |
 | B09 bounded Other | In progress | Broader retrieval/extraction and natural-language query coordination |
-| B10 multi-step workflows | In progress | Full-command clause/negation coverage, broader lookup coordination, plan clarification, Calendar combinations once available |
+| B10 multi-step workflows | In progress | Live planner semantic validation, automatic routing, broader lookup coordination, in-place clarification, Calendar combinations once available |
 | B11 non-calendar planning | Planned | Evidence-backed plan revisions, owners/deadlines and explicit commitment selection |
 | B12 Calendar reads | Planned | Actual Calendar grants, preferences, owned calendars, freebusy and freshness |
 | B13 time/slots | Planned | Deterministic time resolution, timezone/DST handling, working hours, buffers, conflicts and bounded slot sets |
@@ -77,10 +78,10 @@ recipients, Flow ARNs, execution order or permissions.
 
 ## What to implement next
 
-1. Finish B10 command planning against the installed kernels: account for every
-   requested output and negation, distinguish execution order from data dependency,
-   reject unsupported whole plans before partial generation, and persist typed
-   plan clarification. Start with an agreed versioned example/evaluation corpus.
+1. Evaluate the reviewed B10c command planner against a live command-domain holdout.
+   Extend typed corrected-plan continuation and broader retrieval/graphs; preserve
+   every requested output/negation before enabling automatic routing. The 14-case
+   synthetic corpus is a starting contract, not live quality acceptance.
 2. Build B11 non-calendar plans with explicit commitment acceptance. Build B12/B13
    Calendar read/slot foundations against the established auth contracts; do not
    generate available times from model text.
@@ -92,12 +93,13 @@ recipients, Flow ARNs, execution order or permissions.
 Live OAuth, Bedrock and Gmail verification can proceed alongside implementation
 without waiting for every Calendar feature. Backend API-level tests can start now;
 the complete five-intent release cannot pass acceptance while scheduling handlers
-and the full-command planner are absent.
+remain absent and broader planner/quality gates are incomplete.
 
 ```mermaid
 flowchart LR
-    A[Current: durable summaries, drafts, reads and email recovery code] --> B[Current PR: lookup plus draft]
-    B --> C[Complete-command planner and typed plan clarification]
+    A[Current: durable summaries, drafts, reads and email recovery code] --> B[Merged: lookup plus draft]
+    B --> P[Current PR: reviewed compound-command planner]
+    P --> C[Live planner quality, broader graphs and typed plan clarification]
     C --> D[Non-calendar plans]
     A --> E[Calendar grants, preferences and freebusy]
     E --> F[Deterministic slots]
@@ -116,13 +118,13 @@ flowchart LR
 Last confirmed host log in this task: PR #23 commit
 `954b4926d5e0c4928ebecde06f2f67e918d5be06`, migration `c8291e4a6f03`, healthy API
 and dependencies, but model/OAuth configuration pending in that log. Later merges
-are not evidence of an EC2 update. Current merged migration head is `a0426e9bc731`.
+are not evidence of an EC2 update. Current merged migration head is `a0426e9bc731`; this PR adds `b10c026e9a31`.
 The current PR does not deploy or alter any AWS resource, Google grant or write flag.
 
-PR #29's exact implementation commit `d3f7267` passed backend CI with **692 backend
+PR #30's exact implementation commit `1aabbdb` passed backend CI with **710 backend
 tests, 12 offline EC2 checks and 19 summary-console checks**:
-[CI run](https://github.com/bhowmikdham/Threadly/actions/runs/35052751285).
-Current B10b verification is recorded in [its checkpoint](backend-execution/checkpoints/B10b.md).
+[CI run](https://github.com/bhowmikdham/Threadly/actions/runs/35054635897).
+Current B10c verification is recorded in [its checkpoint](backend-execution/checkpoints/B10c.md).
 Synthetic models/transports verify orchestration and failure handling, not live Haiku
 quality or Google provider behavior. Whole-workflow API mappings and staging scenarios:
 [testing map](workflow-testing-map.md); [machine-readable map](workflow-runtime-map.json).
