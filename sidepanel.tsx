@@ -33,12 +33,23 @@ interface SummaryOutput {
   coverage: "complete" | "partial"
 }
 
+interface DraftReply {
+  to: string
+  subject: string
+  body: string
+  status: "draft" | "sending" | "sent" | "failed"
+  threadId?: string
+  inReplyTo?: string
+  errorMessage?: string
+}
+
 interface ChatMessage {
   id: string
   sender: "user" | "ai"
   text?: string
   threadsList?: ThreadOption[]
   summary?: SummaryOutput
+  draft?: DraftReply
   taskId?: string
 }
 
@@ -49,10 +60,29 @@ interface ChatSession {
   createdAt: Date
 }
 
-// STEP 2: Helper function to query the active Gmail DOM via the content script
-const fetchActiveEmailFromDOM = async (): Promise<EvidenceItem[] | null> => {
+// Helper to validate Gmail API's strict 16-character hex thread ID requirement
+const isValidHexThreadId = (id: string | null | undefined): boolean => {
+  return !!id && /^[0-9a-fA-F]{16}$/.test(id)
+}
+
+// Helper function to extract a clean email address from "Name <email@domain.com>" or text
+const extractEmailAddress = (str: string): string => {
+  if (!str) return ""
+  const match = str.match(/<([^>]+)>/) || str.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
+  return match ? match[1].trim() : ""
+}
+
+interface DomEmailData {
+  evidence: EvidenceItem[]
+  authorEmail: string | null
+  legacyThreadId: string | null
+  subject: string | null
+  activeMessageId: string | null
+}
+
+// Helper function to query the active Gmail DOM via the content script
+const fetchActiveEmailFromDOM = async (): Promise<DomEmailData | null> => {
   return new Promise((resolve) => {
-    // lastFocusedWindow prevents the side panel focus from breaking target tab selection
     chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
       const activeTab = tabs[0]
 
@@ -67,12 +97,70 @@ const fetchActiveEmailFromDOM = async (): Promise<EvidenceItem[] | null> => {
           if (chrome.runtime.lastError || !response?.evidence) {
             return resolve(null)
           }
-          resolve(response.evidence)
+          resolve({
+            evidence: response.evidence,
+            authorEmail: response.authorEmail || null,
+            legacyThreadId: response.legacyThreadId || null,
+            subject: response.subject || null,
+            activeMessageId: response.activeMessageId || null
+          })
         }
       )
     })
   })
 }
+
+// Extracts the Gmail thread ID from the active tab's URL hash.
+const getActiveThreadIdFromUrl = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      const url = tabs[0]?.url || ""
+      const hashPart = url.split("#")[1] || ""
+      const segments = hashPart.split("/").filter(Boolean)
+      const lastSegment = segments[segments.length - 1] || ""
+      resolve(isValidHexThreadId(lastSegment) ? lastSegment : null)
+    })
+  })
+}
+
+// Gets the message's Message-ID and From headers, plus the canonical Gmail API thread id.
+const fetchSpecificMessageHeaderId = async (
+  token: string,
+  threadId: string,
+  targetMessageId?: string | null
+): Promise<{ inReplyTo: string | null; canonicalThreadId: string | null; fromAddress: string | null }> => {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=From`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  const data = await res.json()
+
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Gmail rejected thread id "${threadId}"`)
+  }
+
+  const messages = data.messages || []
+  
+  // Find the targeted active message or fallback to the last message in thread
+  let targetMsg = messages[messages.length - 1]
+  if (targetMessageId) {
+    const found = messages.find((m: any) => m.id === targetMessageId)
+    if (found) targetMsg = found
+  }
+
+  const headers = targetMsg?.payload?.headers || []
+  const messageIdHeader = headers.find((h: any) => h.name.toLowerCase() === "message-id")
+  const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")
+
+  return {
+    inReplyTo: messageIdHeader?.value || null,
+    canonicalThreadId: data.id || null,
+    fromAddress: fromHeader?.value ? extractEmailAddress(fromHeader.value) : null
+  }
+}
+
+// Sanitizes header values to prevent "Invalid header" errors
+const sanitizeHeaderValue = (value: string) => value.replace(/[\r\n]+/g, " ").trim()
 
 function SidePanel() {
   const [theme, setTheme] = useState<"dark" | "light">("light")
@@ -148,7 +236,6 @@ function SidePanel() {
     })
   }
 
-  // Voice & TTS Logic
   const speakText = (text: string, onComplete?: () => void) => {
     if (!("speechSynthesis" in window)) {
       if (onComplete) onComplete()
@@ -210,23 +297,7 @@ function SidePanel() {
     }
 
     if (transcribedText.trim()) {
-      setChatHistory((prev) => [
-        ...prev,
-        { id: Date.now().toString(), sender: "user", text: transcribedText }
-      ])
-
-      const isSummarizeIntent = /summarise|summarize/i.test(transcribedText)
-
-      if (isSummarizeIntent) {
-        handleSmartSummarize(true)
-      } else {
-        const responseMessage = `I heard: "${transcribedText}". Try saying "Summarise" to process your email.`
-        setChatHistory((prev) => [
-          ...prev,
-          { id: (Date.now() + 1).toString(), sender: "ai", text: responseMessage }
-        ])
-        speakText(responseMessage)
-      }
+      handleUserInstruction(transcribedText, true)
     } else {
       setVoiceStatus("Could not hear audio.")
       setTimeout(() => setVoiceStatus("Listening..."), 2000)
@@ -322,7 +393,7 @@ function SidePanel() {
   }
 
   const getHeader = (headers: any[], name: string) =>
-    headers.find((h) => h.name === name)?.value || ""
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ""
 
   const fetchRecentThreads = async (token: string): Promise<ThreadOption[]> => {
     const listRes = await fetch(
@@ -408,16 +479,256 @@ ${evidenceBlock}`
     return JSON.parse(rawText)
   }
 
-  // STEP 3: Smart Summarize routing - checks DOM scrape first, falls back to API thread list
+  const generateDraftReply = async (
+    evidence: EvidenceItem[],
+    userInstruction: string,
+    authoritativeEmail: string | null = null
+  ): Promise<{ to: string; subject: string; body: string }> => {
+    let fallbackEmail = authoritativeEmail || ""
+    if (!fallbackEmail) {
+      for (const item of [...evidence].reverse()) {
+        const extracted = extractEmailAddress(item.author) || extractEmailAddress(item.snippet)
+        if (extracted) {
+          fallbackEmail = extracted
+          break
+        }
+      }
+    }
+
+    const prompt = `You are an AI assistant drafting an email response on behalf of the user.
+Context Email Thread:
+${evidence.map((e) => `From: ${e.author}\nDate: ${e.date}\nContent: ${e.snippet}`).join("\n---\n")}
+
+User Directive: "${userInstruction}"
+
+Draft a polite, context-aware reply body executing the user directive.
+IMPORTANT FOR "to": Scan the email content/headers above to extract ONLY the clean email address (e.g. 'user@domain.com'). Do NOT output thread labels like "Message 1". If no clean email is found, return "${fallbackEmail}".
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "to": "string (Valid recipient email address)",
+  "subject": "string (Re: subject line based on thread content)",
+  "body": "string (the plain text email body content)"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      }
+    )
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error?.message || "Failed to generate reply draft.")
+    }
+
+    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}"
+    rawText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim()
+
+    const parsed = JSON.parse(rawText)
+    const extractedTo = extractEmailAddress(parsed.to)
+
+    return {
+      to: authoritativeEmail || extractedTo || fallbackEmail,
+      subject: parsed.subject || "Re: Your message",
+      body: parsed.body || ""
+    }
+  }
+
+  // Handle drafting routine when requested
+  const handleReplyDraft = async (instruction: string, reciteVoice: boolean = false) => {
+    setSummarizing(true)
+
+    try {
+      const domData = await fetchActiveEmailFromDOM()
+
+      if (!domData || domData.evidence.length === 0) {
+        const errorText = "No open email tab detected. Open an email thread in Gmail to draft a reply."
+        setChatHistory((prev) => [
+          ...prev,
+          { id: Date.now().toString(), sender: "ai", text: errorText }
+        ])
+        if (reciteVoice) speakText(errorText)
+        setSummarizing(false)
+        return
+      }
+
+      const scrapedThreadId = domData.legacyThreadId || (await getActiveThreadIdFromUrl())
+
+      let inReplyTo: string | null = null
+      let canonicalThreadId: string | null = null
+      let apiFromAddress: string | null = null
+      let threadResolved = false
+
+      if (scrapedThreadId && isValidHexThreadId(scrapedThreadId)) {
+        await new Promise<void>((resolve) => {
+          chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+            if (token) {
+              try {
+                const result = await fetchSpecificMessageHeaderId(token, scrapedThreadId, domData.activeMessageId)
+                inReplyTo = result.inReplyTo
+                apiFromAddress = result.fromAddress
+                if (result.canonicalThreadId && isValidHexThreadId(result.canonicalThreadId)) {
+                  canonicalThreadId = result.canonicalThreadId
+                  threadResolved = true
+                }
+              } catch (err) {
+                console.error("Thread id could not be validated against the Gmail API:", err)
+              }
+            }
+            resolve()
+          })
+        })
+      }
+
+      const authoritativeEmail = domData.authorEmail || apiFromAddress
+      const generatedDraft = await generateDraftReply(domData.evidence, instruction, authoritativeEmail)
+
+      const realSubject = domData.subject
+        ? domData.subject.trim().toLowerCase().startsWith("re:")
+          ? domData.subject.trim()
+          : `Re: ${domData.subject.trim()}`
+        : null
+
+      const validThreadId = isValidHexThreadId(canonicalThreadId) ? canonicalThreadId! : undefined
+
+      const draftMessage: ChatMessage = {
+        id: Date.now().toString(),
+        sender: "ai",
+        text: validThreadId
+          ? "I've drafted a reply for you. It'll be added to the same email thread — review and click send when ready:"
+          : "I've drafted a reply, but I couldn't confirm which thread this belongs to, so sending it will create a new email rather than replying in-thread. Review and click send when ready:",
+        draft: {
+          to: generatedDraft.to,
+          subject: realSubject || generatedDraft.subject || "Re: Your message",
+          body: generatedDraft.body,
+          status: "draft",
+          threadId: validThreadId,
+          inReplyTo: inReplyTo || undefined
+        }
+      }
+
+      setChatHistory((prev) => [...prev, draftMessage])
+
+      if (reciteVoice) {
+        speakText("I generated a draft reply for you. Review it in the side panel.")
+      }
+    } catch (err: any) {
+      setChatHistory((prev) => [
+        ...prev,
+        { id: Date.now().toString(), sender: "ai", text: `Draft error: ${err.message}` }
+      ])
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
+  // Sends the email using Gmail REST API with proper reply headers and thread ID
+  const executeSendEmail = async (messageId: string, draft: DraftReply) => {
+    setChatHistory((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId && msg.draft
+          ? { ...msg, draft: { ...msg.draft, status: "sending" } }
+          : msg
+      )
+    )
+
+    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+      if (chrome.runtime.lastError || !token) {
+        setChatHistory((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId && msg.draft
+              ? { ...msg, draft: { ...msg.draft, status: "failed", errorMessage: "Authentication failed" } }
+              : msg
+          )
+        )
+        return
+      }
+
+      try {
+        const to = extractEmailAddress(sanitizeHeaderValue(draft.to))
+        const subject = sanitizeHeaderValue(draft.subject)
+
+        if (!to || !/[^\s@]+@[^\s@]+\.[^\s@]+/.test(to)) {
+          throw new Error(`"${draft.to}" is not a valid email address. Edit the To field and try again.`)
+        }
+
+        const headerLines = [
+          `To: ${to}`,
+          `Subject: ${subject}`,
+          'Content-Type: text/plain; charset="UTF-8"',
+          'MIME-Version: 1.0'
+        ]
+
+        if (draft.inReplyTo) {
+          const cleanInReplyTo = sanitizeHeaderValue(draft.inReplyTo)
+          headerLines.push(`In-Reply-To: ${cleanInReplyTo}`)
+          headerLines.push(`References: ${cleanInReplyTo}`)
+        }
+
+        const rawEmail = [...headerLines, '', draft.body].join('\r\n')
+
+        const encodedMessage = btoa(unescape(encodeURIComponent(rawEmail)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+
+        const requestBody: { raw: string; threadId?: string } = { raw: encodedMessage }
+
+        // Strictly check thread ID format before appending to payload
+        if (isValidHexThreadId(draft.threadId)) {
+          requestBody.threadId = draft.threadId
+        }
+
+        const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(requestBody)
+        })
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => null)
+          throw new Error(errBody?.error?.message || "API dispatch failed")
+        }
+
+        setChatHistory((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId && msg.draft
+              ? { ...msg, draft: { ...msg.draft, status: "sent" } }
+              : msg
+          )
+        )
+      } catch (err) {
+        console.error("Email send failed:", err)
+        const errMessage = err instanceof Error ? err.message : "Unknown error"
+        setChatHistory((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId && msg.draft
+              ? { ...msg, draft: { ...msg.draft, status: "failed", errorMessage: errMessage } }
+              : msg
+          )
+        )
+      }
+    })
+  }
+
   const handleSmartSummarize = async (reciteVoice: boolean = false) => {
     setSummarizing(true)
 
     try {
-      // 1. Attempt DOM extraction directly from active tab
-      const domEvidence = await fetchActiveEmailFromDOM()
+      const domData = await fetchActiveEmailFromDOM()
 
-      if (domEvidence && domEvidence.length > 0) {
-        const result = await generateSummary(domEvidence)
+      if (domData && domData.evidence.length > 0) {
+        const result = await generateSummary(domData.evidence)
 
         setChatHistory((prev) => [
           ...prev,
@@ -431,7 +742,6 @@ ${evidenceBlock}`
         return
       }
 
-      // 2. Fallback: Prompt user with thread list via Google Auth
       chrome.identity.getAuthToken({ interactive: true }, async (token) => {
         if (chrome.runtime.lastError || !token) {
           const errText = "Auth error. Please sign in to access recent threads."
@@ -484,6 +794,32 @@ ${evidenceBlock}`
     }
   }
 
+  const handleUserInstruction = (input: string, reciteVoice: boolean = false) => {
+    const userText = input.trim()
+    if (!userText) return
+
+    setChatHistory((prev) => [
+      ...prev,
+      { id: Date.now().toString(), sender: "user", text: userText }
+    ])
+
+    const isReplyIntent = /^reply\b/i.test(userText)
+    const isSummarizeIntent = /summarise|summarize/i.test(userText)
+
+    if (isReplyIntent) {
+      handleReplyDraft(userText, reciteVoice)
+    } else if (isSummarizeIntent) {
+      handleSmartSummarize(reciteVoice)
+    } else {
+      const resp = "I can help summarize emails or draft replies. Try saying 'reply saying yes' or 'Summarise'."
+      setChatHistory((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), sender: "ai", text: resp }
+      ])
+      if (reciteVoice) speakText(resp)
+    }
+  }
+
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!message.trim()) return
@@ -491,34 +827,11 @@ ${evidenceBlock}`
     const userText = message.trim()
     setMessage("")
     setShowAppsMenu(false)
-
-    setChatHistory((prev) => [
-      ...prev,
-      { id: Date.now().toString(), sender: "user", text: userText }
-    ])
-
-    const isSummarizeIntent = /summarise|summarize/i.test(userText)
-
-    if (isSummarizeIntent) {
-      handleSmartSummarize(false)
-    } else {
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: "ai",
-          text: "I can help summarize your inbox or process requests. Try typing 'Summarise'."
-        }
-      ])
-    }
+    handleUserInstruction(userText, false)
   }
 
   const handleQuickSummarize = () => {
-    setChatHistory((prev) => [
-      ...prev,
-      { id: Date.now().toString(), sender: "user", text: "Summarise my open email" }
-    ])
-    handleSmartSummarize(false)
+    handleUserInstruction("Summarise my open email", false)
   }
 
   const handleSelectThread = (threadId: string, snippet: string) => {
@@ -868,6 +1181,106 @@ ${evidenceBlock}`
                       </ul>
                     </>
                   )}
+                </div>
+              )}
+
+              {/* Draft card preview with send functionality */}
+              {item.draft && (
+                <div style={{ marginTop: 10, padding: 10, backgroundColor: themeStyles.cardBg, borderRadius: 8, border: `1px solid ${themeStyles.border}` }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                    <label style={{ fontSize: 11, color: themeStyles.textMuted }}>
+                      To:
+                      <input
+                        type="text"
+                        value={item.draft.to}
+                        onChange={(e) => {
+                          const updatedTo = e.target.value
+                          setChatHistory((prev) =>
+                            prev.map((msg) =>
+                              msg.id === item.id && msg.draft
+                                ? { ...msg, draft: { ...msg.draft, to: updatedTo } }
+                                : msg
+                            )
+                          )
+                        }}
+                        disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                        style={{ width: "100%", marginTop: 2, padding: 6, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 12, boxSizing: "border-box" }}
+                      />
+                    </label>
+                    <label style={{ fontSize: 11, color: themeStyles.textMuted }}>
+                      Subject:
+                      <input
+                        type="text"
+                        value={item.draft.subject}
+                        onChange={(e) => {
+                          const updatedSubject = e.target.value
+                          setChatHistory((prev) =>
+                            prev.map((msg) =>
+                              msg.id === item.id && msg.draft
+                                ? { ...msg, draft: { ...msg.draft, subject: updatedSubject } }
+                                : msg
+                            )
+                          )
+                        }}
+                        disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                        style={{ width: "100%", marginTop: 2, padding: 6, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 12, boxSizing: "border-box" }}
+                      />
+                    </label>
+                  </div>
+                  <textarea
+                    value={item.draft.body}
+                    onChange={(e) => {
+                      const updatedBody = e.target.value
+                      setChatHistory((prev) =>
+                        prev.map((msg) =>
+                          msg.id === item.id && msg.draft
+                            ? { ...msg, draft: { ...msg.draft, body: updatedBody } }
+                            : msg
+                        )
+                      )
+                    }}
+                    disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                    style={{
+                      width: "100%",
+                      height: 100,
+                      borderRadius: 6,
+                      border: `1px solid ${themeStyles.border}`,
+                      backgroundColor: themeStyles.inputBg,
+                      color: themeStyles.text,
+                      padding: 8,
+                      fontSize: 12,
+                      resize: "vertical",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                  <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+                    {item.draft.status === "sent" ? (
+                      <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>✓ Sent successfully</span>
+                    ) : item.draft.status === "sending" ? (
+                      <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Sending...</span>
+                    ) : item.draft.status === "failed" ? (
+                      <>
+                        {item.draft.errorMessage && (
+                          <span style={{ fontSize: 11, color: "#ef4444", marginRight: "auto" }}>
+                            {item.draft.errorMessage}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => executeSendEmail(item.id, item.draft!)}
+                          style={{ padding: "6px 12px", borderRadius: 6, backgroundColor: "#ef4444", color: "#fff", border: "none", cursor: "pointer", fontSize: 12 }}
+                        >
+                          Retry Send
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => executeSendEmail(item.id, item.draft!)}
+                        style={{ padding: "6px 14px", borderRadius: 6, backgroundColor: themeStyles.accent, color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                      >
+                        Send Email
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
