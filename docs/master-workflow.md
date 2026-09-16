@@ -1,7 +1,7 @@
 # Master workflow: current runtime and compound-request implementation contract
 
 Baseline for this update: integration commit `fa23176` (PR #22 merged), plus
-the B10a explicit compound-template slice in this branch. This document distinguishes
+the B10a summary and B10b captured-lookup compound templates. This document distinguishes
 working code from the next implementation. It does not claim the EC2 deployment
 has this revision, the trained BERT package is wired in, or six prepared AWS Flows
 are six executable application workflows.
@@ -64,7 +64,7 @@ the user's instruction and backend-derived context-availability indicators.
 | Compose | New draft with explicit recipients | Exact send approval, execution and reconciliation |
 | Plan/schedule | Intent and selected operation pairs can be proposed | Installed planning/calendar handlers and their dependencies |
 | Other | Exact mapped-message lookup, help/capture search/rewrite, scoped local-mail search | General natural-language retrieval and entity/commitment extraction |
-| Multiple intents | Explicit summary → reply/compose templates via `/assistant/compound-requests` with checkpointed streams | Natural-language complete-plan planner, lookup steps, Calendar triples and general compound execution |
+| Multiple intents | Explicit summary or captured-text lookup → reply/compose templates via `/assistant/compound-requests` with checkpointed streams | Natural-language complete-plan planner, mailbox lookup coordination, Calendar triples and general compound execution |
 
 `GET /assistant/workflows` reports **three installed generation operations**:
 `summarise_thread`, `draft_reply`, `draft_new`, plus the bounded UI handlers. Its
@@ -296,3 +296,13 @@ The [full workflow/testing map](workflow-testing-map.md) maps all five intents,
 compound paths, provider configuration, exact implementation files and remaining
 gates. [Machine-readable mapping](workflow-runtime-map.json) is the coding-agent
 handoff. B10 remains in progress; this is not the complete master planner.
+
+## B10b captured-lookup continuation
+
+[Lookup → draft](lookup-draft-workflows.md) adds explicit captured-text search before
+reply/compose through the same task/step lifecycle. Native lookup checkpoints its
+result; only matching messages plus the selected reply target enter generation.
+No match/too-many matches stop before generation. This is not classifier-driven
+selection or a full-command planner. The next planner must account for all clauses
+and negations before selecting any installed kernel. See the
+[full progress report](backend-progress.md) for remaining packages and live gates.

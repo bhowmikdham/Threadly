@@ -3,7 +3,7 @@
 import json
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Body, Depends, Header, Query
 from pydantic import Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
-from app.assistant import continuation, draft_review, mail_search, reads, steps, tasks
+from app.assistant import continuation, draft_review, lookup_draft, mail_search, reads, steps, tasks
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
 from app.db.engine import get_session
@@ -27,6 +27,7 @@ from app.schemas.assistant import (
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
+from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.mail_search import MailSearchRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
@@ -88,7 +89,15 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
         "compound_templates": {
             "installed": True,
             "release": steps.RELEASE,
-            "templates": ["summary_then_reply", "summary_then_compose"],
+            "templates": [
+                "summary_then_reply",
+                "summary_then_compose",
+                "lookup_then_reply",
+                "lookup_then_compose",
+            ],
+            "lookup_release": lookup_draft.RELEASE,
+            "lookup_scope": "saved_capture",
+            "lookup_max_matches": reads.PAGE_SIZE,
             "entrypoint": "/assistant/compound-requests",
             "max_steps": 2,
             "requires_explicit_selection": True,
@@ -198,7 +207,11 @@ async def submit_request(request: AssistantRequest, user_id: CurrentUser, sessio
 
 
 @router.post("/compound-requests", status_code=202)
-async def submit_compound(request: CompoundRequest, user_id: CurrentUser, session: DB):
+async def submit_compound(
+    request: Annotated[CompoundRequest | LookupDraftRequest, Body(discriminator="template")],
+    user_id: CurrentUser,
+    session: DB,
+):
     task = await tasks.submit(session, user_id, request.as_request(), compound=request)
     result = await task_view(session, task)
     await session.commit()

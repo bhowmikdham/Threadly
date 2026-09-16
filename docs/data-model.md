@@ -301,3 +301,14 @@ within budget, and exhausted jobs are held. The B05 job attempt counter is uncha
 Success merges `resolution` evidence, preserves prior/late observations, updates
 attempt before action and closes the job in one transaction under existing guards.
 Read observations do not rewrite the immutable action payload or approval.
+
+## Lookup/draft streams (B10b; no migration)
+
+`assistant_tasks.compound_input` can also hold the strict `LookupDraftRequest`
+selected by its `lookup_then_reply`/`lookup_then_compose` template. New tasks pin
+`lookup-draft-template-1.0.0`. Existing summary requests/releases are unchanged.
+`assistant_steps` ordinal 1 uses native `search_mail`; ordinal 2 remains a draft.
+Its immutable intermediate artifact uses stream `lookup`; final draft uses `result`.
+The existing two-step/attempt bounds, owner FKs, dependency hashes, immutable
+revision identity and final pointer apply unchanged. Migration head remains
+`a0426e9bc731`; rollback requires compatible readers for stored lookup tasks.

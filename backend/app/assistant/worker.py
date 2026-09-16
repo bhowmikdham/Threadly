@@ -10,6 +10,7 @@ from app.api.errors import ApiError
 from app.assistant import (
     continuation,
     drafting,
+    lookup_draft,
     reads,
     routing,
     routing_v1,
@@ -35,7 +36,7 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         claim = await claim_next(session)
     if claim is None:
         return False
-    if claim.release.get("workflow") == steps.RELEASE:
+    if claim.release.get("workflow") in {steps.RELEASE, lookup_draft.RELEASE}:
         await steps.run_task(factory, claim, model, flow_invoker)
         return True
     if claim.release.get("workflow") == reads.RELEASE:

@@ -313,3 +313,15 @@ New sends from the same task are blocked while an earlier result is uncertain.
 `EMAIL_RECONCILIATION_ENABLED` independently gates provider reads; live sends/public
 approval remain disabled. Staging now wires the same-image action worker into
 stop/migrate/restart, but this branch has not been deployed. [Contract](email-actions.md).
+
+### Captured-text lookup plus draft (B10b)
+
+The explicit compound endpoint now accepts lookup → reply/compose as a separate
+pinned contract. `assistant/lookup_draft.py` defines native source selection and
+its prompt policy; the existing `steps.py` worker owns checkpointing, leases,
+publication and retries for both summary and lookup pairs. Native lookup performs
+no external call. Only matched captured messages plus an explicit reply target
+enter draft generation; no/too-many matches stop first. The saved runtime registry
+still controls the generation Flow. No master AWS Flow, free-text full-command
+planner, mailbox-wide automatic retrieval or Calendar executor is introduced.
+See [runtime](lookup-draft-workflows.md) and [whole-backend progress](backend-progress.md).

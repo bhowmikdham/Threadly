@@ -1,8 +1,9 @@
 # Compound workflow runtime and testing handoff
 
-Status: **B10a implemented in this branch; not deployed or live-model validated.**
-Baseline: `fa23176d45b140aeda2fb0679d3e5bf95dfa71ea` (PR #22 merged).
-This is the first executable compound slice, not completion of B10 or the five-intent roadmap.
+Status: B10a summary templates are merged (PR #23). B10b adds separate
+[lookup → draft templates](lookup-draft-workflows.md) in the current PR. Live-model
+and frontend integration gates remain open. This section describes the unchanged
+summary contract; the linked document describes lookup inputs and source mapping.
 
 ## What runs
 

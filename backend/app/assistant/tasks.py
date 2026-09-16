@@ -100,10 +100,13 @@ async def submit(
     if request.read_options is not None:
         accepted_release = reads.wrap_release(accepted_release)
     if compound is not None:
-        from app.assistant import steps
+        from app.assistant import lookup_draft, steps
+        from app.schemas.lookup_draft import LookupDraftRequest
 
         steps.validate_input(compound, context, draft_input)
-        accepted_release = steps.wrap_release(accepted_release)
+        accepted_release = (
+            lookup_draft if isinstance(compound, LookupDraftRequest) else steps
+        ).wrap_release(accepted_release)
     task_id = str(uuid4())
     inserted = (
         await session.execute(
