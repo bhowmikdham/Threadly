@@ -57,6 +57,7 @@ class PreflightTests(unittest.TestCase):
             {"FERNET_KEY": "invalid"},
             {"DATABASE_URL": "postgresql+asyncpg://threadly:private-test-password@other-host/db"},
             {"INFERENCE_PROVIDER": "legacy"},
+            {"EMAIL_WRITES_ENABLED": "true"},
         ]:
             with self.subTest(override=override):
                 self.assertNotEqual(self.run_preflight(**override).returncode, 0)

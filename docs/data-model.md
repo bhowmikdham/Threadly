@@ -289,3 +289,15 @@ Expired committed intent becomes `outcome_unknown`; its job becomes held/reconci
 One late nonterminal observation can be stored under `evidence.late_response` without
 changing action state or overwriting terminal evidence. No new tables or migration.
 [Full worker contract](email-actions.md).
+
+
+## Recovery observations (B06, no DDL)
+
+Unknown email attempts add `evidence.reconciliation` with a durable round count
+(0–3) and at most three sanitized observations (`round`, `code`, UTC `at`). Each
+read lease claim consumes a round before network work. Jobs retain `kind=reconcile`;
+queued `available_at` schedules reads, expired running leases may reclaim only
+within budget, and exhausted jobs are held. The B05 job attempt counter is unchanged.
+Success merges `resolution` evidence, preserves prior/late observations, updates
+attempt before action and closes the job in one transaction under existing guards.
+Read observations do not rewrite the immutable action payload or approval.

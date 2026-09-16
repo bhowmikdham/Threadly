@@ -2,8 +2,8 @@
 
 B04 implements atomic exact-payload approval/outbox persistence and public rejection
 and cancellation. **New public approval remains disabled**: B05 adds a gated sender,
-but B06 uncertain-write recovery is still pending. Internal tests enable the service with
-a simulated dispatcher; no request field, environment flag or model output can
+and B06 adds read-only recovery; controlled live verification is still pending.
+Internal tests enable the service with a simulated dispatcher; no request field, environment flag or model output can
 enable public approval in this release. Draft review remains independent.
 
 ## Runtime mapping
@@ -154,9 +154,9 @@ policy remains a live-write release gate.
 
 Deploy only the reviewed merged release, with backup and matching API/worker code.
 No new settings, secrets, model/Flow changes or Google calls. The pinned deployment
-command now targets merged PR27 including B04; host deployment is unconfirmed. Old code can run
+command now targets merged PR28 including B05; host deployment is unconfirmed. Old code can run
 against additive columns/tables but must not be allowed to dispatch around the
-new cutoff/approval contract. The last confirmed host remains PR23; B05 is not deployed.
+new cutoff/approval contract. The last confirmed host remains PR23; B05/B06 deployment is unconfirmed.
 
 [B05](email-actions.md) implements the disabled dedicated sender and its dispatch checks. B06 provides
 unknown-outcome reconciliation; keep live sending disabled until both and controlled
@@ -166,3 +166,6 @@ seam, never HTTP authority or an existing production switch.
 
 Evidence and resume: [B04 checkpoint](backend-execution/checkpoints/B04.md).
 Prior exact-payload contract: [email previews](email-action-previews.md).
+
+B06 blocks a new send from a task while its earlier send is executing/unknown,
+including on preexisting previews. See [recovery and controlled-account gate](email-actions.md).

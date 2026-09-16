@@ -2,10 +2,10 @@ name: backend-ci
 
 on:
   pull_request:
-    paths: ["backend/**", "infra/bedrock/**", ".github/workflows/backend-ci.yml"]
+    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**", ".github/workflows/backend-ci.yml"]
   push:
     branches: [main]
-    paths: ["backend/**", "infra/bedrock/**"]
+    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**"]
 
 jobs:
   lint-test:
@@ -38,6 +38,10 @@ jobs:
           THREADLY_TEST_DB: postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test
           THREADLY_REQUIRE_TEST_DB: "1"
         run: python -m pytest -q
+      - name: Validate EC2 deployment controls offline
+        run: |
+          bash -n ../infra/deploy/ec2/deploy-app.sh
+          python -m unittest discover -s ../infra/deploy/ec2/tests -q
       - name: Validate application Flow template offline
         run: |
           pip install cfn-lint==1.56.3

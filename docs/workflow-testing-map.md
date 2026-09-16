@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #26 merge `68e7b5e` adds exact email previews; deployment command prepared, host result pending |
-| Current feature branch | B04 exact approval/outbox and durable stop decisions; new public approval and sending disabled |
+| Merged source / deployment target | PR #28 merge `fd0eaeac` includes the disabled Gmail worker; deployment command prepared, host result pending |
+| Current feature branch | B06 bounded read-only reconciliation and staging worker wiring; live approval/sending still gated |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 ## Whole target lifecycle and ownership
@@ -33,9 +33,9 @@ flowchart LR
     ART --> REVIEW[Frontend: inspect, edit, copy or review]
     REVIEW --> STORE[B02: immutable action storage and edit supersession]
     STORE --> PREVIEW[B03: exact MIME preview merged]
-    PREVIEW --> APPROVE[B04: approval and stop decisions for review; public approval disabled]
-    APPROVE --> WRITE[Pending: dedicated send / booking executor]
-    WRITE --> RECON[Pending: reconcile uncertain provider outcome]
+    PREVIEW --> APPROVE[B04: merged decisions; public approval disabled]
+    APPROVE --> WRITE[B05: disabled email worker; booking pending]
+    WRITE --> RECON[B06: email recovery in review; event recovery pending]
 ```
 
 The backend coordinates; no cloud master Flow currently orchestrates all these
@@ -47,8 +47,8 @@ Calendar reads, send approvals or the recovery worker.
 | Intent / path | Current entry | Code / dispatch | Output | Remaining gate |
 |---|---|---|---|---|
 | Summarise | `/assistant/requests` + owned capture | `tasks.py → worker.py → summary_quality.py`; registry `summarise_thread` | Source-linked summary | Current live model quality, frontend display |
-| Reply | Same + selected target/recipients | `routing.py → drafting.py`; `draft_reply` | Threadly draft | Send approval/execution/reconciliation absent |
-| Compose | Same + explicit recipients | `routing.py → drafting.py`; `draft_new` | Threadly draft | Send approval/execution/reconciliation absent |
+| Reply | Same + selected target/recipients | `routing.py → drafting.py`; `draft_reply` | Threadly draft | Live approval/send verification pending; B05/B06 code exists |
+| Compose | Same + explicit recipients | `routing.py → drafting.py`; `draft_new` | Threadly draft | Live approval/send verification pending; B05/B06 code exists |
 | Other: help/capture search/rewrite | Same + `read_options` | `reads.py`; backend reads / bounded rewrite | Answer, exact quotes or suggested text | General natural-language retrieval and extraction incomplete |
 | Other: mailbox search | `/assistant/mail-search` | `mail_search.py`, owned local DB query | Scoped page and stable cursor | PR #22 deployment; automatic query planning pending |
 | Contextual clarification | `/assistant/tasks/{id}/inputs` | `continuation.py` | Requeued original task with typed inputs | Frontend/staging exercise; not a compound-plan editor |
@@ -56,7 +56,7 @@ Calendar reads, send approvals or the recovery worker.
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Schedule/check time/slots | Existing router can propose operations | Calendar handler pending B12–B14 | Target: authoritative slots and negotiation | Actual scopes, preferences, freebusy, deterministic time calculations |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
-| Email send / event creation | Email proposal/read APIs; Calendar pending | B02/B03 preview and B04 decision services; pending B05/B06 / B14/B15 | Email preview only; target: confirmed or unknown provider outcome | Exact payload approval + rechecks + reconciliation |
+| Email send / event creation | Email proposal/read APIs; Calendar pending | B02–B06 email action services; Calendar B14/B15 pending | Email preview and action/recovery status; live writes gated | Exact payload approval + rechecks + reconciliation |
 
 ## Fastest route to useful testing
 
@@ -99,7 +99,7 @@ A healthy API alone does not establish Google login or Bedrock generation readin
 | BERT adapter after AI handoff | Verify label map/domain/activation/thresholds; separate email metadata from command routing | Multi-label and low-confidence fixtures; no dynamic Flow/permission authority |
 | B11 after required B10 contracts | Non-calendar plans and explicit commitment selection | Evidence-backed owner/deadline ambiguity, revisions and selected-only draft content |
 | B12/B13 after actual Calendar capability | Preferences, timezone anchors, freebusy and deterministic slot sets | DST gaps/folds, busy/unknown calendars, buffers, conflicts, insufficient slots |
-| B04 merged; B05 worker review; B06 next | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
+| B05 merged; B06 recovery review; live email gate pending | Exact email action payload, approval, dedicated executor, reconciliation | Stale edit/approval races; timeout-after-send remains unknown until reconciled; no blind resend |
 | B14/B15 after slots/action contracts | Negotiation and approved Calendar writes/recovery | Expired offer, changed availability and uncertain event creation tests |
 | B16/B17 throughout | Versioned Flow manifests, bounded read adapters where needed, live evaluations | Same replay cases locally and through recorded AWS release; semantic review |
 | B18/B19 release gate | Frontend/API contract tests, retention/recovery, full staging scenario matrix | All five intents, compound task, approved writes and failure recovery verified together |
@@ -134,7 +134,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 - Backend owns auth, context IDs, recipients, availability, persistence, retries
   and approvals. Preserve immutable historical evidence across edits and retries.
 - Each PR records tested/untested gates and the next dependency in its checkpoint.
-  The [B05 checkpoint](backend-execution/checkpoints/B05.md) is the current resume
+  The [B06 checkpoint](backend-execution/checkpoints/B06.md) is the current resume
   point; [B10](backend-execution/checkpoints/B10.md) records the compound foundation; do not infer completion from the presence of diagrams or prepared Flows.
 
 ## Critical path before enabling complete workflows
@@ -150,8 +150,8 @@ flowchart TD
     B01[B01: auth/capabilities merged; live consent pending] --> B03[B03: exact email preview merged]
     B02[B02: storage merged] --> B03
     B03 --> B04[B04: exact approval and stop decisions merged]
-    B04 --> B05[B05: disabled send worker for review]
-    B05 --> B06[B06: reconcile uncertain sends]
+    B04 --> B05[B05: disabled send worker merged]
+    B05 --> B06[B06: read-only reconciliation for review; live gate pending]
     B01 --> B12[B12: Calendar read and preferences]
     B12 --> B13[B13: deterministic slots]
     B13 --> B14[B14: negotiation and event proposals]
@@ -169,9 +169,11 @@ flowchart TD
     GATE --> FRONT[B18: frontend integration later]
 ```
 
-B01–B04 are merged at PR27; merged-branch migration head a0426e9bc731.
-B05 adds the dedicated disabled worker without DDL and is ready for review.
-After merge, B06 reconciliation is next; live sending also requires controlled-account evidence.
+B01–B05 are merged at PR28; migration head remains a0426e9bc731.
+B06 adds bounded recovery, same-task resend protection and deployment worker wiring
+without DDL. Local checks support implementation review; B06-A5 live verification
+and the public-approval gate remain pending. B10 complete planner is the next
+independent code slice; controlled email validation can proceed once configured.
 The original dirty auth/classifier checkout remains preserved.
 B02 supplies a deletion guard; the final retention/recovery/purge policy remains
 a release prerequisite. Classifier labels remain advisory: complete-plan validation

@@ -298,7 +298,18 @@ transaction spans a provider call. [Full lifecycle](action-approval.md).
 result fencing and expiry recovery. `actions/gmail_sender.py` performs one bounded
 POST with exact saved MIME. Credentials and provider HTTP run outside task/action
 transactions. Crashes after intent become held reconciliation work, never a second
-send. Root Compose offers an optional `actions` profile; staging deployment does
-not start it yet. Environment and compiled recovery gates keep live writes disabled;
-public approval remains unavailable. B06 is the next enabling dependency.
+send. Root Compose offers an optional `actions` profile. B05 staging did not start
+this worker; B06 below adds deployment wiring and bounded recovery. Environment and
+compiled live-verification gates keep writes disabled; public approval remains unavailable.
 [Lifecycle, failure policy and rollout](email-actions.md).
+
+
+## Read-only send reconciliation (B06)
+
+`actions/reconciliation.py` owns bounded read leases/observations and fenced result
+publication. `actions/gmail_reconciliation.py` scopes GETs to the original mailbox
+and compares one complete Sent candidate against saved plain-text MIME semantics.
+New sends from the same task are blocked while an earlier result is uncertain.
+`EMAIL_RECONCILIATION_ENABLED` independently gates provider reads; live sends/public
+approval remain disabled. Staging now wires the same-image action worker into
+stop/migrate/restart, but this branch has not been deployed. [Contract](email-actions.md).

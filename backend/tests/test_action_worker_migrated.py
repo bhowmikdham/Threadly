@@ -14,13 +14,14 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.actions import approval, gmail_sender, worker
+from app.actions import approval, gmail_sender, reconciliation, worker
 from app.config import get_settings
 from app.db.models import ActionAttempt, ActionJob, ArtifactRevision, AssistantAction, User
 from tests.conftest import needs_pg
 from tests.test_action_approval import approve_request, candidate
 from tests.test_email_previews import accept
 from tests.test_email_previews import request as preview_request
+from tests.test_gmail_reconciliation import Sent
 
 
 @needs_pg
@@ -98,7 +99,9 @@ def test_worker_on_migrated_guards(monkeypatch):
                 ) - timedelta(seconds=1)
             assert await worker.recover_one(factory)
             assert not await worker.finish(
-                factory, dispatch, gmail_sender.Outcome("succeeded", "gmail_accepted", "late", "t")
+                factory,
+                dispatch,
+                gmail_sender.Outcome("succeeded", "gmail_accepted", "sent-one", "thread-one"),
             )
             async with factory() as session:
                 action = await session.get(AssistantAction, second.id)
@@ -106,9 +109,26 @@ def test_worker_on_migrated_guards(monkeypatch):
                     select(ActionAttempt).where(ActionAttempt.action_id == second.id)
                 )
                 assert action.state == "outcome_unknown" and action.result is None
-                assert attempt.evidence["late_response"]["message_id"] == "late"
+                assert attempt.evidence["late_response"]["message_id"] == "sent-one"
                 assert (await session.get(ActionJob, second.id)).kind == "reconcile"
             assert not await worker.run_once(factory, transport=transport, token_loader=token)
+            monkeypatch.setattr(get_settings(), "email_reconciliation_enabled", True)
+            monkeypatch.setattr(get_settings(), "email_writes_enabled", False)
+            sent = Sent(action.payload, attempt.dispatch_intent_at)
+            assert await reconciliation.run_once(
+                factory, transport=httpx.MockTransport(sent), token_loader=token
+            )
+            async with factory() as session:
+                action = await session.get(AssistantAction, second.id)
+                recovered = await session.get(ActionAttempt, attempt.id)
+                assert action.state == recovered.state == "succeeded"
+                assert action.result["gmail_message_id"] == "sent-one"
+                assert recovered.evidence["late_response"]["message_id"] == "sent-one"
+                assert recovered.evidence["reconciliation"]["rounds"] == 1
+            assert not await reconciliation.run_once(
+                factory, transport=httpx.MockTransport(sent), token_loader=token
+            )
+            assert len(sent.calls) == 3
         finally:
             await engine.dispose()
 

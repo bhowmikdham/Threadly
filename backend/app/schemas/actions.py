@@ -37,6 +37,15 @@ class EmailPreview(StrictModel):
     gmail_thread_id: str | None
 
 
+class EmailRecoveryView(StrictModel):
+    status: Literal["manual_inspection", "paused", "checking", "scheduled"]
+    rounds: int = Field(ge=0, le=3)
+    max_rounds: Literal[3] = 3
+    next_check_at: str | None
+    last_code: str | None
+    guidance: str
+
+
 class EmailActionView(StrictModel):
     action_id: str
     task_id: str
@@ -59,6 +68,7 @@ class EmailActionView(StrictModel):
     allowed_operations: list[Literal["reject", "cancel"]] = Field(default_factory=list)
     result: dict[str, str] | None = None
     error_code: str | None = None
+    recovery: EmailRecoveryView | None = None
 
 
 class ActionDecisionRequest(StrictModel):

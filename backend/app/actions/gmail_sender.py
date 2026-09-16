@@ -14,7 +14,7 @@ from app.config import get_settings
 from app.model_client.structured import reject_duplicate_keys
 
 SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
-# Deliberate code gate. B06 plus authorized integration evidence must replace it.
+# Deliberate code gate. Controlled-account integration evidence is still required.
 RECOVERY_READY = False
 ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 

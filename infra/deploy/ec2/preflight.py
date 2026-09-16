@@ -20,6 +20,10 @@ def main():
         raise SystemExit("DATABASE_URL must target this stack's postgres service via asyncpg.")
     if settings.inference_provider != "bedrock":
         raise SystemExit("This staging deployment requires INFERENCE_PROVIDER=bedrock.")
+    from app.actions.gmail_sender import RECOVERY_READY
+    if settings.email_writes_enabled and not RECOVERY_READY:
+        raise SystemExit("Email writes remain gated pending controlled-account verification; keep EMAIL_WRITES_ENABLED=false.")
+    print("Action worker configured; writes remain gated. Recovery reads require EMAIL_RECONCILIATION_ENABLED=true.")
     if settings.bedrock_model_id:
         print("Bedrock model configured; access and generation still require a separate smoke test.")
     else:
