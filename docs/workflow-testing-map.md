@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #30 merge `8cfd020d` includes captured lookup/draft; current EC2 revision not reverified |
-| Current feature branch | B10c reviewed complete-command proposals and confirmation; automatic dispatch/live writes gated |
+| Merged source / deployment target | PR #31 merge `aeefd320` includes reviewed compound-command plans; current EC2 revision not reverified |
+| Current feature branch | B12 Calendar read preferences/evidence; scheduling and live writes remain gated |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 Current package status and remaining delivery order: [backend-progress.md](backend-progress.md).
@@ -56,9 +56,10 @@ Calendar reads, send approvals or the recovery worker.
 | Contextual clarification | `/assistant/tasks/{id}/inputs` | `continuation.py` | Requeued original task with typed inputs | Frontend/staging exercise; not a compound-plan editor |
 | Summary + reply/compose | `/assistant/compound-requests` | `steps.py`; explicit two-step templates | Summary stream + final editable draft | PR #23 deployed; provider configuration/live gate pending |
 | Lookup + reply/compose | `/assistant/compound-requests` | `lookup_draft.py` + shared `steps.py` | Lookup stream + final editable draft | PR #30 merged; captured-text-only scope, live/model gate pending |
-| Reviewed compound command | `/assistant/command-plans` then exact `/confirm` | `planner/command.py` + `command_plans.py` → existing task worker | Saved complete-command proposal, then one confirmed compound task | Current B10c PR; four pairs only, live semantic quality/automatic dispatch pending |
+| Reviewed compound command | `/assistant/command-plans` then exact `/confirm` | `planner/command.py` + `command_plans.py` → existing task worker | Saved complete-command proposal, then one confirmed compound task | B10c merged PR #31; four pairs only, live semantic quality/automatic dispatch pending |
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
-| Schedule/check time/slots | Existing router can propose operations | Calendar handler pending B12–B14 | Target: authoritative slots and negotiation | Actual scopes, preferences, freebusy, deterministic time calculations |
+| Calendar reads | `/calendar/calendars`, `/calendar/preferences`, `/calendar/freebusy` | `calendar/service.py` → fixed Google httpx reads | Owned versioned preferences and busy/unknown evidence | B12 live Google smoke; [contract](calendar-reads.md) |
+| Schedule/check time/slots | Existing router can propose operations | B12 read API installed; scheduling handler pending B13/B14 | Target: authoritative slots and negotiation | Live Calendar smoke, deterministic time calculations and negotiation |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
 | Email send / event creation | Email proposal/read APIs; Calendar pending | B02–B06 email action services; Calendar B14/B15 pending | Email preview and action/recovery status; live writes gated | Exact payload approval + rechecks + reconciliation |
 
@@ -124,7 +125,7 @@ checkout blindly or enable a sender before its recovery implementation exists.
 | Cross-user capture/task/step/artifact | No data exposure or cross-owner references | Local ownership / DB constraints |
 | “Summarise, don't reply, check tomorrow” | Preserve negation and all clauses; no partial execution | Full planner + Calendar pending |
 | “Tomorrow at 4” in context | Resolve from sufficient context; clarify genuine ambiguity | Continuation foundation exists; Calendar time engine pending |
-| Three requested slots, only one free | Return one grounded option, no invented slots | B12/B13 pending |
+| Three requested slots, only one free | Return one grounded option, no invented slots | B12 reads implemented; B13 pending |
 | Edit after action approval | Old approval cannot authorize changed payload | B04 approval/edit races and B05 mock dispatch tested; public live approval still gated |
 | Provider accepts send but response times out | Unknown outcome; reconcile before any retry | B06 live gate pending |
 

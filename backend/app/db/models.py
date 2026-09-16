@@ -694,3 +694,37 @@ class CommandPlan(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class CalendarPreference(TimestampMixin, Base):
+    __tablename__ = "calendar_preferences"
+    __table_args__ = (
+        CheckConstraint("version >= 1 AND account_version >= 1", name="ck_calendar_pref_versions"),
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int]
+    account_version: Mapped[int]
+    policy_version: Mapped[str] = mapped_column(String(80))
+    preferences: Mapped[dict] = mapped_column(JSONB)
+
+
+class CalendarEvidence(Base):
+    __tablename__ = "calendar_evidence"
+    __table_args__ = (
+        CheckConstraint(
+            "preferences_version >= 1 AND account_version >= 1 AND expires_at > checked_at",
+            name="ck_calendar_evidence_versions",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_preferences.user_id", ondelete="CASCADE"), index=True
+    )
+    preferences_version: Mapped[int]
+    account_version: Mapped[int]
+    policy_version: Mapped[str] = mapped_column(String(80))
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    result: Mapped[dict] = mapped_column(JSONB)

@@ -9,7 +9,7 @@ from urllib.parse import urlencode, urlsplit
 from sqlalchemy import delete, func, select
 
 from app.api.errors import ApiError
-from app.auth.google import SCOPES
+from app.auth.google import CALENDAR_SCOPES, SCOPES
 from app.config import get_settings
 from app.db.engine import get_session_factory
 from app.db.models import GoogleOAuthSession, User
@@ -39,7 +39,9 @@ def validate_redirect(uri):
         raise ApiError(400, "invalid_redirect_uri", "The OAuth redirect URI is not allowed.")
 
 
-async def begin(session, redirect_uri, code_challenge, *, user_id=None):
+async def begin(session, redirect_uri, code_challenge, *, user_id=None, calendar_read=False):
+    if calendar_read and user_id is None:
+        raise ApiError(400, "calendar_login_required", "Sign in before connecting Calendar.")
     validate_redirect(redirect_uri)
     settings = get_settings()
     if not settings.google_client_id or not settings.google_client_secret:
@@ -73,7 +75,7 @@ async def begin(session, redirect_uri, code_challenge, *, user_id=None):
         "client_id": settings.google_client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": " ".join(SCOPES),
+        "scope": " ".join(SCOPES + (CALENDAR_SCOPES if calendar_read else [])),
         "state": state,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",

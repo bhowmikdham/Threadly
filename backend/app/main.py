@@ -13,6 +13,7 @@ from app.api.routes import (
     actions,
     assistant,
     auth,
+    calendar,
     capabilities,
     draft,
     entities,
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
     app.include_router(actions.router, prefix="/assistant", tags=["assistant"])
     app.include_router(capabilities.router, prefix="/assistant", tags=["assistant"])
+    app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(sync.router, prefix="/sync", tags=["sync"])
     app.include_router(threads.router, prefix="/threads", tags=["threads"])

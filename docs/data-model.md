@@ -325,3 +325,18 @@ input/release/expiry and published result/hash and constrain state transitions.
 Confirmation and existing task/job creation share one caller transaction. Old task,
 artifact and action records are untouched. Source/task deletion cascades its plan;
 downgrade refuses while any command-plan history exists.
+
+## Calendar read storage (migration `c12026e9a032`, B12)
+
+Parent `b10c026e9a31`. `calendar_preferences` has one user-owned row (user_id PK/FK),
+positive version/account_version, policy_version, typed JSONB preferences and
+created/updated times. A trigger prevents ownership/creation-time changes and
+requires version +1 on every update. API updates serialize on user then preferences.
+
+`calendar_evidence` has UUID ID, user_id FK to the owner's preference row, positive
+preference/account versions, policy version, checked_at/expires_at and minimal typed
+JSONB result. Owner/expiry indexes support reads and future retention. Evidence is
+immutable under UPDATE; the API exposes no deletion. Deleting the user/preferences
+cascades owned evidence. A query never references another user's preference ID.
+Expiry invalidates reuse but does not delete rows. Downgrade refuses with either
+table populated; old tasks/releases/history are preserved. [Runtime](calendar-reads.md).

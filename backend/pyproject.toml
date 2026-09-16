@@ -15,6 +15,7 @@ dependencies = [
     "pyjwt>=2.9",
     "cryptography>=43",
     "pyyaml>=6.0",
+    "tzdata>=2025.2",  # IANA fallback when a host/container has no system zone database
     "boto3>=1.35",  # lazy-loaded Bedrock Runtime adapter; AWS credential chain
     # Google OAuth + Gmail are called over plain REST with httpx (app/auth/google.py,
     # app/sync/gmail.py) — no google SDKs in the image, fully mockable in tests.

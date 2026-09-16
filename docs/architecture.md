@@ -337,3 +337,14 @@ and atomically links one existing compound task. No separate step executor or AW
 master Flow is introduced. Structural coverage cannot prove semantic correctness;
 automatic dispatch remains disabled pending live quality evidence. Unsupported
 operations block the whole proposal. [Runtime contract](command-planner.md).
+
+### Calendar read foundations (B12)
+
+`calendar/service.py` coordinates JWT-owned account/preferences around bounded
+`calendar/client.py` httpx reads. API calls are direct reads, not assistant generation
+jobs or model-selected tools. It reuses B01 token refresh, requests narrow Calendar
+read scopes only through authenticated reconnect, and requires actual list + freebusy
+grants. Transactions close before network calls; short final account/preferences
+locks fence publication. Saved evidence has explicit per-calendar unknown coverage,
+version checks and expiry. No calendar write or scheduling handler is registered.
+[Calendar lifecycle, diagram and B13 handoff](calendar-reads.md).

@@ -621,7 +621,7 @@
     {
       "id": "B12",
       "title": "Add Calendar preferences, capabilities and freebusy reads",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T03",
         "T15"
