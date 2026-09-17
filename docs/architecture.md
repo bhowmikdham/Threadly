@@ -412,3 +412,19 @@ binding. Existing B14b1/B13 clarification, Google reads and publication fences r
 in force. Account/preferences/source locks precede proposal/task locks. This is a
 backend preparation step, not a newly provisioned AWS master Flow. Workflow/state
 charts, unsupported combinations and live-quality gate: [contract](scheduling-extraction.md).
+
+
+## Combined MVP orchestration (17 September 2026)
+
+See [the complete runtime workflow map](mvp-workflow-map.md) and
+[ADR 004](decisions/004-mvp-backend-owned-orchestration.md). The reviewed master
+coordinator validates the whole command before selecting installed templates;
+backend workers own context reads, deterministic Calendar logic, human waits and
+external actions. New `workflow_input` tasks support up to three checkpointed steps.
+Non-calendar plans, selected commitments, later-email choices and bounded facts
+share existing owner-bound artifacts. Separate Calendar approvals and a stable-ID
+executor join the existing Gmail lifecycle. Optional auxiliary generation-only
+Flows do not contain Google or Lambda tools. Background sync stages paged reads
+before one version-fenced atomic publication. API and all three workers share a
+pinned release. Historical partial-feature descriptions above are superseded only
+for the bounded paths listed in the linked map; live acceptance remains pending.

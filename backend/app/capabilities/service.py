@@ -37,6 +37,10 @@ CALENDAR_WRITE_SCOPES = {
 
 def build_capabilities(user: User) -> dict[str, Any]:
     """Return readiness based on implementation state and persisted OAuth evidence."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    pilot = str(user.id) in settings.write_pilot_user_ids_values
     expiry = user.access_token_expires_at
     if expiry is not None and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=UTC)
@@ -70,8 +74,8 @@ def build_capabilities(user: User) -> dict[str, Any]:
             ),
             _capability(
                 "gmail_send",
-                implemented=False,
-                enabled=False,
+                implemented=True,
+                enabled=settings.email_writes_enabled and pilot,
                 connected=verified_connection,
                 scopes=scopes,
                 required_scopes=GMAIL_SEND_SCOPES,
@@ -94,8 +98,8 @@ def build_capabilities(user: User) -> dict[str, Any]:
             ),
             _capability(
                 "calendar_write",
-                implemented=False,
-                enabled=False,
+                implemented=True,
+                enabled=settings.calendar_writes_enabled and pilot,
                 connected=verified_connection,
                 scopes=scopes,
                 required_scopes=CALENDAR_WRITE_SCOPES,
@@ -104,7 +108,8 @@ def build_capabilities(user: User) -> dict[str, Any]:
         "reconnect": {
             "available": True,
             "method": "POST /auth/google/reconnect",
-            "requestable_capabilities": ["gmail_read", "calendar_read"],
+            "requestable_capabilities": ["gmail_read", "calendar_read"]
+            + (["gmail_send", "calendar_write"] if pilot else []),
             "state_pkce_required": True,
         },
     }

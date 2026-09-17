@@ -238,3 +238,14 @@ Evidence: [B06 checkpoint](backend-execution/checkpoints/B06.md),
 [B05 checkpoint](backend-execution/checkpoints/B05.md). Prior contracts:
 [approval](action-approval.md), [preview](email-action-previews.md),
 [storage](assistant-action-storage.md).
+
+
+## MVP pilot update
+
+The combined MVP adds `WRITE_PILOT_USER_IDS`. `RECOVERY_READY=False` still blocks
+general rollout, but explicitly enrolled users can exercise the exact-approval path
+when `EMAIL_WRITES_ENABLED=true`; all other users remain disabled. Production preflight
+requires the allowlist and `EMAIL_RECONCILIATION_ENABLED=true` for that pilot. This
+supersedes the historical no-real-dispatch description above only for enrolled accounts.
+No user is enrolled and no flag is enabled by deploying the code. See
+[the rollout procedure](../infra/deploy/ec2/MVP-ROLLOUT.md).

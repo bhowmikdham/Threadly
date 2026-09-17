@@ -54,6 +54,7 @@ async def submit(
     compound=None,
     schedule=None,
     schedule_binding=None,
+    workflow=None,
 ) -> AssistantTask:
     value = request.model_dump()
     if request.draft_options is None:
@@ -70,6 +71,8 @@ async def submit(
         if schedule is None or schedule_binding["request"] != schedule.model_dump():
             raise ValueError("Scheduling binding does not match the request")
         value["schedule_binding"] = schedule_binding
+    if workflow is not None:
+        value["workflow_input"] = workflow.model_dump()
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -132,6 +135,14 @@ async def submit(
         accepted_release = (
             lookup_draft if isinstance(compound, LookupDraftRequest) else steps
         ).wrap_release(accepted_release)
+    workflow_input = None
+    if workflow is not None:
+        from app.assistant import workflows
+
+        workflow_input = await workflows.bind_input(
+            session, user_id, workflow, context, draft_input
+        )
+        accepted_release = workflows.release_manifest()
     task_id = str(uuid4())
     inserted = (
         await session.execute(
@@ -144,12 +155,13 @@ async def submit(
                 instruction=request.instruction,
                 compound_input=compound.model_dump() if compound else None,
                 scheduling_input=scheduling_input,
+                workflow_input=workflow_input,
                 read_input=request.read_options.model_dump() if request.read_options else None,
                 continuation_release=(
                     scheduling.continuation_manifest()
                     if schedule
                     else None
-                    if compound
+                    if compound is not None or workflow is not None
                     else continuation.release_manifest()
                 ),
                 context_snapshot_id=context.id if context else None,
@@ -257,6 +269,7 @@ class JobClaim:
     read_input: dict | None = None
     compound_input: dict | None = None
     scheduling_input: dict | None = None
+    workflow_input: dict | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -340,6 +353,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.read_input,
         task.compound_input,
         task.scheduling_input,
+        task.workflow_input,
     )
 
 

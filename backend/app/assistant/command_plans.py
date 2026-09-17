@@ -42,7 +42,7 @@ def execution_release(context, template):
 async def owned(session, owner, plan_id, *, lock=False):
     q = select(CommandPlan).where(CommandPlan.id == plan_id, CommandPlan.user_id == owner)
     if lock:
-        q = q.with_for_update()
+        q = q.with_for_update().execution_options(populate_existing=True)
     plan = await session.scalar(q)
     if plan is None:
         raise ApiError(404, "not_found", "Unknown command plan.")

@@ -27,6 +27,12 @@ services:
   assistant-worker:
     image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
     command: python -m app.assistant.worker
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operations.health", "assistant"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     stop_grace_period: 130s
     env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
@@ -40,12 +46,35 @@ services:
   action-worker:
     image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
     command: python -m app.actions.worker
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operations.health", "actions"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     stop_grace_period: 45s
     env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
     depends_on:
       postgres:
         condition: service_healthy
+    networks: [threadly_net]
+
+  sync-worker:
+    image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
+    command: python -m app.sync.jobs
+    restart: unless-stopped
+    stop_grace_period: 150s
+    env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operations.health", "sync"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks: [threadly_net]
 
   postgres:

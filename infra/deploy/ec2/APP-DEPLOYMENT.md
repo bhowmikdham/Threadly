@@ -106,7 +106,7 @@ automatically downgrade migrations. After a failed migration or incompatible
 release, inspect schema and backup before selecting a compatible code rollback.
 
 
-## B06 action-worker lifecycle
+## B06 action-worker lifecycle (historical; superseded for the MVP)
 
 The B06 staging stack adds `action-worker` using the same release image as the API.
 Deployment stops API, assistant-worker and action-worker before backup/migration,
@@ -120,3 +120,7 @@ To roll back to a pre-B06 script, stop the action-worker using the **current**
 release Compose configuration first; older scripts do not stop that service.
 Preserve unknown attempts and all action history. No destructive downgrade or resend
 is part of rollback. [Recovery runbook](../../../docs/email-actions.md).
+
+For the combined MVP, use [MVP-ROLLOUT.md](MVP-ROLLOUT.md). It adds the sync worker,
+worker heartbeat checks and explicit per-user pilot gates; the historical B06
+compiled-gate description above no longer describes current pilot enablement.

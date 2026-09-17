@@ -40,7 +40,8 @@
       "handoff": "AI and frontend receive versioned schemas and fixture inputs.",
       "assignee": null,
       "evidence": [
-        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -83,7 +84,8 @@
       "evidence": [
         "13-implementation-progress.md (Gmail fidelity: PostgreSQL and simulated Gmail evidence; live account validation pending)",
         "../gmail-sync.md (runtime lifecycle, metadata contract and migration rollout)",
-        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)"
+        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -126,7 +128,8 @@
       "assignee": null,
       "evidence": [
         "../backend-execution/checkpoints/B01.md (actual grants, state/PKCE, refresh isolation; live consent pending)",
-        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)"
+        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -169,7 +172,8 @@
       "handoff": "Router and workflow teams receive a tested inference interface.",
       "assignee": null,
       "evidence": [
-        "13-implementation-progress.md (partial implementation; review and integration gates pending)"
+        "13-implementation-progress.md (partial implementation; review and integration gates pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -219,7 +223,8 @@
         "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete.",
         "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)",
         "../backend-execution/checkpoints/B04.md (exact approval/outbox and durable stop decisions; public approval/send disabled until executor and recovery gates)",
-        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)"
+        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -271,7 +276,8 @@
         "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)",
         "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
         "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)",
-        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)"
+        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -316,7 +322,8 @@
       "handoff": "AI can author tested flow graphs against stable tool contracts.",
       "assignee": null,
       "evidence": [
-        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)"
+        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -364,7 +371,8 @@
         "13-implementation-progress.md (durable summary slice tested; full task scope and live integration still pending)",
         "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete.",
         "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)",
-        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)"
+        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -410,7 +418,8 @@
       "evidence": [
         "docs/assistant-bounded-reads.md",
         "docs/assistant-mail-search.md",
-        "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)"
+        "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -457,7 +466,8 @@
         "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
         "../assistant-draft-review.md (persistent revisions and exact review acknowledgements; action/send approval remains pending)",
         "../backend-execution/checkpoints/B02.md (durable action storage; approval/execution/reconciliation remain pending)",
-        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)"
+        "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -506,7 +516,8 @@
         "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)",
         "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
         "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)",
-        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)"
+        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -555,7 +566,8 @@
         "../backend-execution/checkpoints/B03.md (exact edited-draft MIME previews; approval, dispatch and live Gmail gates pending)",
         "../backend-execution/checkpoints/B04.md (exact approval/outbox and durable stop decisions; public approval/send disabled until executor and recovery gates)",
         "../backend-execution/checkpoints/B05.md (isolated exact-MIME worker, durable dispatch intent, fencing and mock HTTP; live sends disabled pending B06)",
-        "../backend-execution/checkpoints/B06.md (bounded read-only uncertain-send recovery, same-task resend protection and deployment lifecycle; controlled Gmail delivery gate pending)"
+        "../backend-execution/checkpoints/B06.md (bounded read-only uncertain-send recovery, same-task resend protection and deployment lifecycle; controlled Gmail delivery gate pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -602,7 +614,8 @@
         "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
         "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete.",
         "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)",
-        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)"
+        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -644,7 +657,9 @@
       ],
       "handoff": "Plan/schedule category supports actual work planning independently of Calendar.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
+      ]
     },
     {
       "id": "T15",
@@ -687,7 +702,8 @@
       "assignee": null,
       "evidence": [
         "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)",
-        "../backend-execution/checkpoints/B13.md (typed deterministic slot queries, saved anchors, DST/context resolution, stable IDs and version/expiry fences; live Google seam and policy acceptance pending)"
+        "../backend-execution/checkpoints/B13.md (typed deterministic slot queries, saved anchors, DST/context resolution, stable IDs and version/expiry fences; live Google seam and policy acceptance pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -735,7 +751,8 @@
       "assignee": null,
       "evidence": [
         "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)",
-        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)"
+        "../backend-execution/checkpoints/B14.md (B14b1 explicit durable scheduling tasks, saved request/message anchors, typed clarification, B13 artifacts and B14a query adoption; extraction/replies/later-email proposals and live gates remain)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -827,7 +844,8 @@
       "handoff": "Release owner gets complete evidence package and known limitations.",
       "assignee": null,
       "evidence": [
-        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)"
+        "../summary-quality.md (concise summary correction and synthetic replay; live semantic evaluation pending)",
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
       ]
     },
     {
@@ -867,7 +885,9 @@
       ],
       "handoff": "Initial five-intent product can be enabled for the agreed audience.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../mvp-integration-checkpoint.md (bounded MVP integration; live/model/client gates remain open)"
+      ]
     },
     {
       "id": "T20",

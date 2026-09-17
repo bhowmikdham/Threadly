@@ -20,6 +20,9 @@ async def readyz() -> dict:
         from app.workflows.registry import load_manifest
 
         load_manifest()
+        from app.workflows.auxiliary import load_manifest as auxiliary_manifest
+
+        auxiliary_manifest()
         checks["workflow_configuration"] = True
     except ApiError:
         pass

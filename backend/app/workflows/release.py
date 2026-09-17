@@ -21,7 +21,7 @@ def cfn_keys(value):
     return value
 
 
-def template(profile_arn: str) -> dict:
+def template(profile_arn: str, *, operations=OPERATIONS) -> dict:
     parts = profile_arn.split(":", 5)
     if (
         len(parts) != 6
@@ -88,7 +88,7 @@ def template(profile_arn: str) -> dict:
         }
     }
     outputs = {"RoleArn": {"Value": {"Fn::GetAtt": ["RuntimeFlowRole", "Arn"]}}}
-    for op in OPERATIONS:
+    for op in operations:
         logical = "".join(word.title() for word in op.split("_")) + "Flow"
         resources[logical] = {
             "Type": "AWS::Bedrock::Flow",
@@ -155,17 +155,27 @@ def main():
     source.add_argument("--profile-arn")
     source.add_argument("--targets", type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--auxiliary", action="store_true")
     args = parser.parse_args()
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    from app.workflows import auxiliary
+
     if args.profile_arn:
-        result = template(args.profile_arn)
+        result = template(
+            args.profile_arn, operations=auxiliary.OPERATIONS if args.auxiliary else OPERATIONS
+        )
         (args.output / "stack.json").write_text(json.dumps(result, indent=2) + "\n")
         (args.output / "flow.json").write_text(
             json.dumps(flow_definition(args.profile_arn), indent=2) + "\n"
         )
         print("Rendered only. Deploy and evaluate before configuring the backend.")
     else:
-        result = assemble(json.loads(args.targets.read_text()))
+        targets = json.loads(args.targets.read_text())
+        result = (
+            auxiliary.Manifest(schema_version="1.0", operations=targets)
+            if args.auxiliary
+            else assemble(targets)
+        )
         (args.output / "candidate-registry.json").write_text(
             result.model_dump_json(indent=2) + "\n"
         )

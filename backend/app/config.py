@@ -3,10 +3,11 @@
 Values come from the environment (compose injects repo-root .env via env_file).
 Defaults are dev-safe placeholders; prod MUST override the obvious ones.
 """
+
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,25 @@ class Settings(BaseSettings):
     secret_key: str = "dev-insecure-change-me-needs-32-bytes!"  # override in prod (.env)
     jwt_ttl_minutes: int = 1440
     jwt_algorithm: str = "HS256"
+
+    mailbox_background_sync_enabled: bool = True
+    mailbox_sync_max_messages: int = Field(default=5000, ge=100, le=100000)
+
+    assistant_disabled_intents: str = ""
+
+    @property
+    def assistant_disabled_intents_values(self) -> set[str]:
+        return {
+            value.strip() for value in self.assistant_disabled_intents.split(",") if value.strip()
+        }
+
+    @field_validator("assistant_disabled_intents")
+    @classmethod
+    def known_disabled_intents(cls, value):
+        labels = {v.strip() for v in value.split(",") if v.strip()}
+        if labels - {"summarise", "plan_schedule", "reply", "compose", "other"}:
+            raise ValueError("Unknown disabled intent")
+        return value
 
     # data stores
     database_url: str = "postgresql+asyncpg://threadly:change-me@postgres:5432/threadly"
@@ -40,8 +60,32 @@ class Settings(BaseSettings):
 
     # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
     assistant_workflow_manifest: str = ""
+    assistant_auxiliary_workflow_manifest: str = ""
 
-    # Dedicated write worker. B06's code gate also blocks real HTTP in this release.
+    # Separate exact-approval workers; real writes require explicit pilot membership.
+    calendar_writes_enabled: bool = False
+    calendar_reconciliation_enabled: bool = False
+    write_pilot_user_ids: str = ""
+
+    @property
+    def write_pilot_user_ids_values(self) -> set[str]:
+        return {
+            value.strip()
+            for value in self.write_pilot_user_ids.split(",")
+            if value.strip().isdigit()
+        }
+
+    @field_validator("write_pilot_user_ids")
+    @classmethod
+    def valid_pilot_ids(cls, value):
+        if any(
+            not part.strip().isdigit() or int(part.strip()) < 1
+            for part in value.split(",")
+            if part.strip()
+        ):
+            raise ValueError("Pilot identifiers must be positive local user IDs")
+        return value
+
     email_writes_enabled: bool = False
     email_reconciliation_enabled: bool = False
     email_action_lease_seconds: int = Field(default=120, ge=60, le=300)

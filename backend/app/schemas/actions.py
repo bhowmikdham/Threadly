@@ -60,8 +60,8 @@ class EmailActionView(StrictModel):
     preview: EmailPreview
     account_version: int
     blockers: list[str]
-    approval_available: Literal[False] = False
-    sending_available: Literal[False] = False
+    approval_available: bool = False
+    sending_available: bool = False
     authorization: Literal["none", "exact_payload_approval"] = "none"
     approval_id: str | None = None
     cancellation_requested: bool = False

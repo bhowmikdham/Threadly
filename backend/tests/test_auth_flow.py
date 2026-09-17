@@ -108,9 +108,9 @@ async def test_capabilities_use_actual_grants_without_enabling_writes(
     capabilities = {item["id"]: item for item in response.json()["capabilities"]}
     assert capabilities["gmail_read"]["status"] == "ready"
     assert capabilities["gmail_send"]["ready"] is False
-    assert capabilities["gmail_send"]["status"] == "not_implemented"
+    assert capabilities["gmail_send"]["status"] == "disabled"
     assert capabilities["calendar_write"]["ready"] is False
-    assert capabilities["calendar_write"]["status"] == "not_implemented"
+    assert capabilities["calendar_write"]["status"] == "disabled"
 
 
 @pytest.mark.asyncio

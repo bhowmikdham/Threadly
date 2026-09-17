@@ -1,11 +1,11 @@
-"""Owned previews and stop decisions; new public approval remains disabled."""
+"""Owned exact previews, pilot-gated approvals and explicit stop decisions."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.actions import approval, email_preview
+from app.actions import approval, calendar_preview, email_preview, gmail_sender
 from app.api.deps import CurrentUser
 from app.db.engine import get_session
 from app.schemas.actions import (
@@ -15,6 +15,7 @@ from app.schemas.actions import (
     EmailActionView,
     ProposeEmailAction,
 )
+from app.schemas.calendar_action import ProposeCalendarAction
 
 router = APIRouter()
 DB = Annotated[AsyncSession, Depends(get_session)]
@@ -57,9 +58,10 @@ async def approve_action(
     session: DB,
     response: Response,
 ):
-    # No request/configuration flag can install a missing executor. B05/B06 must
-    # explicitly wire capability + rollout checks before enabling this boundary.
-    result = await approval.approve(session, user_id, action_id, body)
+    # Client input cannot enable dispatch; server configuration and pilot enrollment do.
+    result = await approval.approve(
+        session, user_id, action_id, body, execution_enabled=gmail_sender.enabled(user_id=user_id)
+    )
     return await decision_response(session, user_id, action_id, result, response)
 
 
@@ -85,3 +87,61 @@ async def cancel_action(
 ):
     result = await approval.stop(session, user_id, action_id, "cancel", body)
     return await decision_response(session, user_id, action_id, result, response)
+
+
+@router.post("/artifacts/{artifact_id}/calendar-actions", status_code=201)
+async def propose_calendar(
+    artifact_id: str,
+    body: ProposeCalendarAction,
+    user_id: CurrentUser,
+    session: DB,
+    response: Response,
+):
+    action = await calendar_preview.propose(session, user_id, artifact_id, body)
+    result = await calendar_preview.view(session, user_id, action.id)
+    await session.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/calendar-actions/{action_id}")
+async def get_calendar_action(
+    action_id: str, user_id: CurrentUser, session: DB, response: Response
+):
+    result = await calendar_preview.view(session, user_id, action_id)
+    await session.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/calendar-actions/{action_id}/approve", status_code=202)
+async def approve_calendar(
+    action_id: str,
+    body: ApproveActionRequest,
+    user_id: CurrentUser,
+    session: DB,
+    response: Response,
+):
+    await calendar_preview.approve(session, user_id, action_id, body)
+    result = await calendar_preview.view(session, user_id, action_id)
+    await session.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/calendar-actions/{action_id}/{operation}")
+async def stop_calendar(
+    action_id: str,
+    operation: Literal["reject", "cancel"],
+    body: ActionDecisionRequest,
+    user_id: CurrentUser,
+    session: DB,
+    response: Response,
+):
+    await calendar_preview.view(session, user_id, action_id)  # Type/ownership gate before mutation.
+    await session.rollback()  # Release read locks before task-first action mutation.
+    result = await approval.stop(session, user_id, action_id, operation, body)
+    result["action"] = await calendar_preview.view(session, user_id, action_id)
+    await session.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return result

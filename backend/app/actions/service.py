@@ -133,14 +133,30 @@ async def propose(
                 409, "idempotency_conflict", "Proposal key was used for different input."
             )
         return previous
+    calendar_intermediate = False
+    if action_type == "create_event" and task.release.get("workflow") == "mvp-workflow-1.0.0":
+        from app.db.models import AssistantStep
+
+        calendar_intermediate = (
+            await session.scalar(
+                select(AssistantStep.artifact_id).where(
+                    AssistantStep.task_id == task.id,
+                    AssistantStep.user_id == user_id,
+                    AssistantStep.operation == "schedule",
+                    AssistantStep.state == "succeeded",
+                    AssistantStep.artifact_id == artifact.id,
+                )
+            )
+            is not None
+        )
     if (
         task.state != "succeeded"
-        or task.final_artifact_id != artifact.id
+        or (task.final_artifact_id != artifact.id and not calendar_intermediate)
         or artifact.revision != expected_revision
     ):
         raise ApiError(409, "revision_conflict", "Use the current completed artifact.")
-    kind = "draft" if action_type == "send_email" else "schedule_options"
-    if artifact.payload.get("kind") != kind:
+    kinds = {"draft"} if action_type == "send_email" else {"schedule_options", "availability"}
+    if artifact.payload.get("kind") not in kinds:
         raise ApiError(409, "action_artifact_mismatch", "Artifact cannot support this action type.")
     now = await session.scalar(select(func.clock_timestamp()))
     if not now < expires_at <= now + timedelta(hours=24):

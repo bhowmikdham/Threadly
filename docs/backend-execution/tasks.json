@@ -575,7 +575,7 @@
     {
       "id": "B11",
       "title": "Add non-calendar plans and explicit commitment acceptance",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T14"
       ],
@@ -767,7 +767,7 @@
     {
       "id": "B15",
       "title": "Create approved Calendar events and reconcile outcomes",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T12",
         "T16"
@@ -925,7 +925,7 @@
     {
       "id": "B18",
       "title": "Run all-intent UI, model-quality and recovery gates",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T08",
         "T09",
@@ -989,7 +989,7 @@
     {
       "id": "B19",
       "title": "Add operational controls, retention and background reliability",
-      "status": "planned",
+      "status": "in_review",
       "work_packages": [
         "T02",
         "T03",

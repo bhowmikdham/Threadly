@@ -35,7 +35,9 @@ class GoogleCapability(StrictModel):
 class ReconnectCapability(StrictModel):
     available: bool
     method: Literal["POST /auth/google/reconnect"]
-    requestable_capabilities: list[Literal["gmail_read", "calendar_read"]]
+    requestable_capabilities: list[
+        Literal["gmail_read", "calendar_read", "gmail_send", "calendar_write"]
+    ]
     state_pkce_required: bool
 
 

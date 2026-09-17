@@ -31,7 +31,13 @@ class GmailClient:
 
     async def _get(self, client: httpx.AsyncClient, url: str, params: dict) -> dict:
         try:
-            r = await client.get(url, params=params)
+            async with client.stream("GET", url, params=params) as response:
+                content = bytearray()
+                async for chunk in response.aiter_bytes(chunk_size=65536):
+                    content.extend(chunk)
+                    if len(content) > 8_000_000:
+                        raise GmailError("gmail response exceeds supported size")
+                r = httpx.Response(response.status_code, content=bytes(content))
         except httpx.HTTPError as exc:
             raise GmailError("gmail request failed") from exc
         if r.status_code == 401:

@@ -27,8 +27,8 @@ class BeginIn(BaseModel):
 
 
 class ReconnectIn(BeginIn):
-    capabilities: list[Literal["gmail_read", "calendar_read"]] = Field(
-        default_factory=list, max_length=2
+    capabilities: list[Literal["gmail_read", "calendar_read", "gmail_send", "calendar_write"]] = (
+        Field(default_factory=list, max_length=4)
     )
 
 
@@ -72,8 +72,13 @@ async def google_begin(body: BeginIn, session: DB):
 @router.post("/google/reconnect", response_model=BeginOut)
 async def google_reconnect(body: ReconnectIn, user_id: CurrentUser, session: DB):
     result = await flow.begin(
-        session, body.redirect_uri, body.code_challenge, user_id=user_id,
+        session,
+        body.redirect_uri,
+        body.code_challenge,
+        user_id=user_id,
         calendar_read="calendar_read" in body.capabilities,
+        gmail_send="gmail_send" in body.capabilities,
+        calendar_write="calendar_write" in body.capabilities,
     )
     await session.commit()
     return result

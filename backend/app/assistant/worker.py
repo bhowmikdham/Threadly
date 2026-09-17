@@ -18,6 +18,7 @@ from app.assistant import (
     steps,
     summary_quality,
     ui_routing,
+    workflows,
 )
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
@@ -37,6 +38,15 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         claim = await claim_next(session)
     if claim is None:
         return False
+    from app.operations.status import blocked_intents
+
+    if blocked_intents(claim):
+        async with factory.begin() as session:
+            await finish(session, claim, error_code="intent_disabled", retryable=False)
+        return True
+    if claim.release.get("workflow") == workflows.RELEASE:
+        await workflows.run_task(factory, claim, model, flow_invoker)
+        return True
     if claim.release.get("workflow") == scheduling.RELEASE:
         await scheduling.run_task(factory, claim)
         return True
@@ -109,6 +119,13 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
                         async with factory.begin() as session:
                             if not await save_route(session, claim, route):
                                 return True  # cancelled, deleted or replaced during classification
+                    from app.config import get_settings
+
+                    if (
+                        route["decision"]["intent"]
+                        in get_settings().assistant_disabled_intents_values
+                    ):
+                        raise ApiError(503, "intent_disabled", "This intent is temporarily paused.")
                     if ui_context:
                         binding = ui_routing.validate_binding(
                             route, claim.instruction, claim.context_id, snapshot
@@ -219,8 +236,11 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
 
 
 async def serve(once: bool = False):
+    from app.operations.health import pulse
+
     try:
         while True:
+            pulse("assistant")
             try:
                 worked = await run_once()
             except Exception as exc:

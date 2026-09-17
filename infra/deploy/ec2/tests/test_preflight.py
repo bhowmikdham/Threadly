@@ -50,6 +50,15 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("PENDING: Bedrock", result.stdout)
         self.assertIn("PENDING: Google", result.stdout)
 
+    def test_pilot_requires_allowlist_and_matching_reconciliation(self):
+        self.assertNotEqual(self.run_preflight(CALENDAR_WRITES_ENABLED="true").returncode, 0)
+        self.assertNotEqual(self.run_preflight(CALENDAR_WRITES_ENABLED="true",
+            WRITE_PILOT_USER_IDS="1").returncode, 0)
+        result = self.run_preflight(CALENDAR_WRITES_ENABLED="true",
+            WRITE_PILOT_USER_IDS="1", CALENDAR_RECONCILIATION_ENABLED="true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Pilot-only", result.stdout)
+
     def test_rejects_dev_auth_weak_keys_and_wrong_database(self):
         for override in [
             {"APP_ENV": "dev"},

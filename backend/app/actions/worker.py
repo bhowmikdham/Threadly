@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from uuid import uuid4
 
+import httpx
 from sqlalchemy import and_, func, or_, select
 
 from app.actions import email_preview, gmail_sender, service
@@ -39,7 +40,7 @@ class Dispatch:
     request: dict
 
 
-async def candidate(session, *, recovering=False):
+async def candidate(session, *, recovering=False, action_type="send_email", eligible_owners=None):
     now = func.clock_timestamp()
     expired = and_(ActionJob.state == "running", ActionJob.lease_expires_at <= now)
     predicate = (
@@ -55,7 +56,12 @@ async def candidate(session, *, recovering=False):
         select(AssistantAction)
         .join(AssistantTask, AssistantTask.id == AssistantAction.task_id)
         .join(ActionJob, ActionJob.action_id == AssistantAction.id)
-        .where(ActionJob.kind == "dispatch", predicate)
+        .where(
+            ActionJob.kind == "dispatch",
+            AssistantAction.action_type == action_type,
+            predicate,
+            True if eligible_owners is None else AssistantAction.user_id.in_(eligible_owners),
+        )
         .order_by(ActionJob.available_at, AssistantAction.id)
         .with_for_update(of=AssistantTask, skip_locked=True)
         .limit(1)
@@ -80,9 +86,9 @@ def close_job(job, state="done", kind="dispatch"):
     job.lease_token, job.lease_expires_at = None, None
 
 
-async def recover_one(factory):
+async def recover_one(factory, *, action_type="send_email"):
     async with factory.begin() as session:
-        candidate_action = await candidate(session, recovering=True)
+        candidate_action = await candidate(session, recovering=True, action_type=action_type)
         if candidate_action is None:
             return False
         identity = Claim(candidate_action.id, candidate_action.user_id, "")
@@ -116,11 +122,16 @@ async def recover_one(factory):
 
 
 async def claim_one(factory, *, transport=None):
-    if not gmail_sender.enabled(transport):
+    if not get_settings().email_writes_enabled:
         return None
     async with factory.begin() as session:
-        action = await candidate(session)
-        if action is None:
+        action = await candidate(
+            session,
+            eligible_owners=None
+            if isinstance(transport, httpx.MockTransport)
+            else [int(v) for v in get_settings().write_pilot_user_ids_values],
+        )
+        if action is None or not gmail_sender.enabled(transport, user_id=action.user_id):
             return None
         identity = Claim(action.id, action.user_id, str(uuid4()))
         task, action, job = await locked(session, identity)
@@ -161,7 +172,7 @@ async def prepare(factory, claim, *, transport=None):
             or job.lease_expires_at <= now
         ):
             return None
-        if not gmail_sender.enabled(transport):
+        if not gmail_sender.enabled(transport, user_id=claim.user_id):
             close_job(job, "queued")
             return None
         view = await email_preview.view(session, claim.user_id, action.id)
@@ -317,7 +328,9 @@ async def run_once(factory=None, *, transport=None, token_loader=None):
     if dispatch is None:
         return True
     try:
-        outcome = await gmail_sender.send(token, dispatch.request, transport=transport)
+        outcome = await gmail_sender.send(
+            token, dispatch.request, transport=transport, user_id=claim.user_id
+        )
     except Exception:
         # Never expose exception/provider text or retry a possibly dispatched call.
         outcome = gmail_sender.Outcome("outcome_unknown", "dispatch_interrupted")
@@ -326,9 +339,16 @@ async def run_once(factory=None, *, transport=None, token_loader=None):
 
 
 async def main():
+    from app.operations.health import pulse
+
     while True:
+        pulse("actions")
         try:
+            from app.actions import calendar_worker
+
             worked = await run_once()
+            calendar_worked = await calendar_worker.run_once()
+            worked = worked or calendar_worked
         except Exception:
             # Failed database result persistence leaves intent/lease for recovery.
             logging.getLogger(__name__).warning(

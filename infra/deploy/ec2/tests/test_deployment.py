@@ -55,7 +55,7 @@ class DeploymentTests(unittest.TestCase):
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             return result, calls
 
-    def test_stops_both_workers_before_migration_and_starts_matching_release(self):
+    def test_stops_all_workers_before_migration_and_starts_matching_release(self):
         result, calls = self.run_deploy()
         self.assertEqual(result.returncode, 0, result.stderr)
         stop = next(i for i, c in enumerate(calls) if c[:2] == ['docker', 'compose'] and 'stop' in c)
@@ -65,6 +65,9 @@ class DeploymentTests(unittest.TestCase):
         self.assertLess(migrate, start)
         self.assertIn('assistant-worker', calls[stop])
         self.assertIn('action-worker', calls[stop])
+        self.assertIn('sync-worker', calls[stop])
+        self.assertIn('sync-worker', calls[start])
+        self.assertTrue(any('ps' in c and '-q' in c and 'sync-worker' in c for c in calls))
         self.assertTrue(any('ps' in c and '-q' in c and 'action-worker' in c for c in calls))
         self.assertIn('DEPLOYMENT_READY commit=' + RELEASE, result.stdout)
 

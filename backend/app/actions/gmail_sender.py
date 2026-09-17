@@ -14,14 +14,16 @@ from app.config import get_settings
 from app.model_client.structured import reject_duplicate_keys
 
 SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
-# Deliberate code gate. Controlled-account integration evidence is still required.
+# General rollout remains closed; explicit pilot enrollment is checked separately.
 RECOVERY_READY = False
 ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
-def enabled(transport=None):
+def enabled(transport=None, *, user_id=None):
     return get_settings().email_writes_enabled and (
-        RECOVERY_READY or isinstance(transport, httpx.MockTransport)
+        RECOVERY_READY
+        or isinstance(transport, httpx.MockTransport)
+        or str(user_id) in get_settings().write_pilot_user_ids_values
     )
 
 
@@ -70,8 +72,8 @@ def frozen_request(action):
         raise ValueError("Invalid saved email payload") from None
 
 
-async def send(token, request, *, transport=None):
-    if not enabled(transport):
+async def send(token, request, *, transport=None, user_id=None):
+    if not enabled(transport, user_id=user_id):
         return Outcome("failed", "writes_disabled_before_http")
     try:
         async with asyncio.timeout(35):

@@ -38,6 +38,8 @@ jobs:
           THREADLY_TEST_DB: postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test
           THREADLY_REQUIRE_TEST_DB: "1"
         run: python -m pytest -q
+      - name: Verify versioned MVP prompt assets
+        run: python -m app.workflows.mvp_assets --check --output fixtures/mvp/prompts-v1.json
       - name: Validate EC2 deployment controls offline
         run: |
           bash -n ../infra/deploy/ec2/deploy-app.sh
@@ -47,6 +49,8 @@ jobs:
           pip install cfn-lint==1.56.3
           python -m app.workflows.release --profile-arn 'arn:aws:bedrock:ap-southeast-2:123456789012:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0' --output "$RUNNER_TEMP/threadly-runtime-flow"
           cfn-lint -t "$RUNNER_TEMP/threadly-runtime-flow/stack.json"
+          python -m app.workflows.release --auxiliary --profile-arn 'arn:aws:bedrock:ap-southeast-2:123456789012:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0' --output "$RUNNER_TEMP/threadly-auxiliary-flow"
+          cfn-lint -t "$RUNNER_TEMP/threadly-auxiliary-flow/stack.json"
       - name: Validate summary console experiment offline
         run: |
           python -m unittest discover -s ../infra/bedrock/tests -q
