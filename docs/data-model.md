@@ -358,3 +358,23 @@ expiry shortening; inputs, anchors, resolution and published results cannot be u
 Account → preference → receipt lock ordering serializes idempotency and publication.
 Downgrade refuses with receipts present and preserves existing B12 data when empty.
 Expiry is a use restriction, not retention cleanup. [Lifecycle](calendar-slots.md).
+
+## Meeting negotiations (migration `e14026e9a034`, B14a)
+
+Parent `d13026e9a033`. `meeting_negotiations` stores owner/thread, immutable creation
+key/hash/policy, current version/state, owned current offer/selection pointers,
+close receipt and creation time. `meeting_offers` stores immutable offer revision,
+creation version, thread version and owned B13 slot query (which preserves exact
+options/assumptions), request key/hash and creation/expiry. `meeting_selections`
+stores offer/slot identity, request key/hash, reserved negotiation version,
+checking/terminal state, optional owned fresh B13 query, error and creation/expiry.
+
+Named composite FKs protect thread and current-pointer ownership, same-negotiation
+offer linkage, source query ownership and check ownership. B13 nested slot identity
+and exact recheck payload are validated by service code. Uniqueness serializes
+request keys and offer revisions. Triggers freeze offers and completed selections,
+allow receipt expiry only to shorten, and require exactly advancing negotiation
+versions with immutable identity; closed rows cannot reopen. No event IDs, actions,
+approvals or worker jobs are created. Thread sync now uses actual update-clock time
+for new-source vs older-query checks. Downgrade refuses with negotiation records;
+existing slot queries survive legal empty rollback. [Lifecycle](meeting-negotiations.md).

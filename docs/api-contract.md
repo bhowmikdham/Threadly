@@ -598,3 +598,18 @@ account/preferences/policy versions and padded evidence coverage are checked.
 No reservation or event write occurs. Participant zones are display-only. This is
 not yet the assistant scheduling/negotiation handler. Full inputs, clarification and
 error semantics: [Calendar slots](calendar-slots.md).
+
+## Meeting negotiation state (B14a)
+
+Authenticated `/calendar/negotiations` creation (201), owned GET, immutable offer
+POST/GET, explicit selection POST (202)/GET and close POST persist thread-bound
+meeting state. Requests use expected versions and idempotency keys; selections
+reference stored offer/slot UUIDs, never caller-supplied times. Choosing a time
+performs a fresh exact-time B13 check outside database transactions, then fences
+publication against source/account/preferences/negotiation changes.
+
+Historical offers/selection receipts expose `usable` and `blockers`; stored
+`selected` is never a booking approval. New replies invalidate old choices and
+require fresh slot queries before reoffering. Complete routes/examples/status and
+recovery contract: [meeting negotiations](meeting-negotiations.md). B14b assistant
+extraction/continuation/artifacts/replies and B15 event execution remain uninstalled.

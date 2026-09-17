@@ -169,6 +169,9 @@ async def apply_mailbox_changes(
                 last_msg_at=(latest.received_at or latest.sent_at) if latest else None,
                 subject=latest.subject if latest else None,
                 version=Thread.version + 1,
+                # Slot adoption compares actual source update time. Transaction-start
+                # now() can predate a query while sync waits for the account lock.
+                updated_at=func.clock_timestamp(),
                 needs_reply=None,
             )
         )

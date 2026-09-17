@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "eff310eb814c6e45605831bc9904f24ccb474746",
+  "baseline_commit": "7a59e31baf0c8c2a27b2219f15bcde3ba730dfcf",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -120,7 +120,7 @@
         "B10",
         "B12_live_acceptance",
         "B13_live_acceptance",
-        "B14"
+        "B14b_assistant_scheduling"
       ]
     },
     {
@@ -212,7 +212,7 @@
     },
     {
       "id": "calendar_slots",
-      "status": "implemented_in_current_pr",
+      "status": "merged_PR33",
       "entry": "POST /calendar/slot-requests; GET /calendar/slot-requests/{request_id}",
       "handlers": [
         "backend/app/calendar/slots.py",
@@ -227,6 +227,21 @@
         "B15_approved_booking"
       ],
       "checkpoint": "docs/backend-execution/checkpoints/B13.md"
+    },
+    {
+      "id": "meeting_negotiation_state",
+      "status": "B14a_implemented_in_current_pr",
+      "entry": "POST/GET /calendar/negotiations; POST/GET owned offers/selections; POST close",
+      "handlers": [
+        "backend/app/calendar/negotiations.py"
+      ],
+      "output": "immutable_thread_bound_offers_and_explicit_rechecked_selection_receipts_never_booking_approval",
+      "remaining": [
+        "B14b_extraction_continuation_artifacts_replies_and_email_proposals",
+        "live_calendar_seam",
+        "B15_approved_event_execution"
+      ],
+      "checkpoint": "docs/backend-execution/checkpoints/B14.md"
     }
   ],
   "invariants": [
@@ -238,7 +253,7 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "B14 negotiation and slot-grounded replies using the B13 read seam",
+    "B14b assistant scheduling extraction/continuation, grounded artifacts/replies and delayed-email proposals",
     "B15 exact approved Calendar execution and recovery",
     "B11 non-calendar plans",
     "Broader B10 planner/graphs and live semantic validation",

@@ -269,7 +269,8 @@
         "../assistant-routing.md (worker dispatch, saved clarification, source boundaries and release contract)",
         "../ui-context-mapping.md (B07 message-map backend slice; browser integration and broader reference workflows pending)",
         "../assistant-continuation.md (B08 typed durable question/input backend; frontend and staging verification pending)",
-        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)"
+        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
+        "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)"
       ]
     },
     {
@@ -502,7 +503,8 @@
         "../assistant-drafts.md (explicit recipients, reply binding, immutable artifact and migration contract)",
         "B10a explicit summary/draft templates and immutable streams: docs/backend-execution/checkpoints/B10.md. General compound planning, Calendar and live gates remain incomplete.",
         "../backend-execution/checkpoints/B10b.md (explicit captured-text lookup to reply/compose with reusable native checkpoint; full-command planner, mailbox coordination and live model gates pending)",
-        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)"
+        "../backend-execution/checkpoints/B10c.md (reviewed complete-command compilation into four installed compound kernels; automatic routing, in-place plan clarification, Calendar and live semantic evaluation remain pending)",
+        "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)"
       ]
     },
     {
@@ -689,7 +691,7 @@
     {
       "id": "T16",
       "title": "Scheduling negotiation and approved booking",
-      "status": "planned",
+      "status": "in_progress",
       "release": "initial",
       "owner": "Backend",
       "reviewers": [
@@ -729,7 +731,9 @@
       ],
       "handoff": "All planning/scheduling milestones ready for complete UI acceptance.",
       "assignee": null,
-      "evidence": []
+      "evidence": [
+        "../backend-execution/checkpoints/B14.md (B14a owned immutable meeting offers, explicit exact-slot rechecks, source/version/expiry fences; scheduling extraction, assistant continuation/artifacts/replies, delayed-email proposals and booking remain pending)"
+      ]
     },
     {
       "id": "T17",

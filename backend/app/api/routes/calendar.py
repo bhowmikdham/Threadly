@@ -6,13 +6,22 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser
 from app.api.routes.auth import no_store
-from app.calendar import service, slots
+from app.calendar import negotiations, service, slots
 from app.schemas.calendar import (
     CalendarListOut,
     FreeBusyOut,
     FreeBusyRequest,
     PreferencesOut,
     SavePreferences,
+)
+from app.schemas.negotiations import (
+    CloseNegotiation,
+    CreateNegotiation,
+    NegotiationOut,
+    OfferOut,
+    OfferRequest,
+    SelectionOut,
+    SelectOffer,
 )
 from app.schemas.slots import SlotRequest, SlotRequestOut
 
@@ -52,3 +61,40 @@ async def request_slots(body: SlotRequest, user_id: CurrentUser):
 @router.get("/slot-requests/{request_id}", response_model=SlotRequestOut)
 async def get_slots(request_id: UUID, user_id: CurrentUser):
     return await slots.get_request(user_id, str(request_id))
+
+
+@router.post("/negotiations", response_model=NegotiationOut, status_code=201)
+async def create_negotiation(body: CreateNegotiation, user_id: CurrentUser):
+    return await negotiations.create(user_id, body)
+
+
+@router.get("/negotiations/{negotiation_id}", response_model=NegotiationOut)
+async def get_negotiation(negotiation_id: UUID, user_id: CurrentUser):
+    return await negotiations.get(user_id, str(negotiation_id))
+
+
+@router.post("/negotiations/{negotiation_id}/offers", response_model=OfferOut, status_code=201)
+async def create_offer(negotiation_id: UUID, body: OfferRequest, user_id: CurrentUser):
+    return await negotiations.offer(user_id, str(negotiation_id), body)
+
+
+@router.get("/negotiations/{negotiation_id}/offers/{offer_id}", response_model=OfferOut)
+async def get_offer(negotiation_id: UUID, offer_id: UUID, user_id: CurrentUser):
+    return await negotiations.get(user_id, str(negotiation_id), offer_id=str(offer_id))
+
+
+@router.post(
+    "/negotiations/{negotiation_id}/selections", response_model=SelectionOut, status_code=202
+)
+async def select_offer(negotiation_id: UUID, body: SelectOffer, user_id: CurrentUser):
+    return await negotiations.select_slot(user_id, str(negotiation_id), body)
+
+
+@router.get("/negotiations/{negotiation_id}/selections/{selection_id}", response_model=SelectionOut)
+async def get_selection(negotiation_id: UUID, selection_id: UUID, user_id: CurrentUser):
+    return await negotiations.get(user_id, str(negotiation_id), selection_id=str(selection_id))
+
+
+@router.post("/negotiations/{negotiation_id}/close", response_model=NegotiationOut)
+async def close_negotiation(negotiation_id: UUID, body: CloseNegotiation, user_id: CurrentUser):
+    return await negotiations.close(user_id, str(negotiation_id), body)

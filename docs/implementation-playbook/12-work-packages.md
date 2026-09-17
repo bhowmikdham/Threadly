@@ -445,7 +445,7 @@ Scheduling flow gets verified slot IDs and availability evidence.
 
 ## T16 · Scheduling negotiation and approved booking
 
-**Owner:** Backend · **Status:** planned · **Release:** Initial release
+**Owner:** Backend · **Status:** in_progress · **Release:** Initial release
 
 **Depends on:** T06, T07, T12, T15
 
