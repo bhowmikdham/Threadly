@@ -6,6 +6,7 @@ import pytest
 
 def _user(*, scopes, connected=True, email_verified=True):
     return SimpleNamespace(
+        id=1,
         google_scopes=scopes,
         google_connected=connected,
         google_email_verified=email_verified,

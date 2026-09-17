@@ -20,10 +20,19 @@ def main():
         raise SystemExit("DATABASE_URL must target this stack's postgres service via asyncpg.")
     if settings.inference_provider != "bedrock":
         raise SystemExit("This staging deployment requires INFERENCE_PROVIDER=bedrock.")
-    from app.actions.gmail_sender import RECOVERY_READY
-    if settings.email_writes_enabled and not RECOVERY_READY:
-        raise SystemExit("Email writes remain gated pending controlled-account verification; keep EMAIL_WRITES_ENABLED=false.")
-    print("Action worker configured; writes remain gated. Recovery reads require EMAIL_RECONCILIATION_ENABLED=true.")
+    from app.workflows import auxiliary, registry
+    registry.load_manifest()
+    auxiliary.load_manifest()
+    if settings.email_writes_enabled or settings.calendar_writes_enabled:
+        if not settings.write_pilot_user_ids_values:
+            raise SystemExit("Writes require an explicit WRITE_PILOT_USER_IDS allowlist.")
+        if (settings.email_writes_enabled and not settings.email_reconciliation_enabled) or (
+            settings.calendar_writes_enabled and not settings.calendar_reconciliation_enabled
+        ):
+            raise SystemExit("Enable the matching read reconciliation control before pilot writes.")
+        print("Pilot-only writes configured; each action still requires exact user approval.")
+    else:
+        print("External writes disabled; previews and reviewed workflows remain available.")
     if settings.bedrock_model_id:
         print("Bedrock model configured; access and generation still require a separate smoke test.")
     else:

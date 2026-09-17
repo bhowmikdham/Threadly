@@ -15,8 +15,10 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "f14026e9a036"
+HEAD = "b17026e9a038"
 NEW_TABLES = {
+    "mail_sync_jobs",
+    "mail_sync_stage",
     "scheduling_proposals",
     "meeting_negotiations",
     "meeting_offers",
@@ -117,6 +119,46 @@ def test_migration_installs_and_preserves_existing_mailbox():
             asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
             == HEAD
         )
+        # Exercise new contracts against Alembic-installed tables, not create_all.
+        asyncio.run(
+            execute(
+                """
+          INSERT INTO assistant_tasks (id,user_id,request_id,request_hash,instruction,
+            state,version,latest_sequence,release,workflow_input)
+          VALUES ('mvp',91,'mvp','hash','Plan this','queued',1,1,
+            '{"workflow":"mvp-workflow-1.0.0"}','{"request":{}}');
+          INSERT INTO assistant_steps (task_id,user_id,ordinal,operation,input_hash,release)
+          VALUES ('mvp',91,3,'draft_new','hash','{"workflow":"mvp-workflow-1.0.0"}');
+          INSERT INTO artifact_revisions (id,task_id,user_id,stream_key,revision,payload,
+            provenance,edit_request_id,edit_request_hash)
+          VALUES ('plan-edit', 'mvp',91,'result',2,'{"kind":"plan"}',
+            '{"policy":"action-plan-1.0.0"}','edit','hash');
+        """,
+                script=True,
+            )
+        )
+        import pytest
+
+        with pytest.raises(asyncpg.CheckViolationError):
+            asyncio.run(
+                execute(
+                    "UPDATE assistant_tasks SET workflow_input='{}' WHERE id='mvp'", script=True
+                )
+            )
+        migrate("downgrade", "f14026e9a036", fails=True)
+        asyncio.run(execute("DELETE FROM assistant_tasks WHERE id='mvp'", script=True))
+        asyncio.run(
+            execute(
+                """
+          INSERT INTO mail_sync_jobs (id,user_id,request_id,account_version,sync_version,
+            "full",state,phase,cursor,attempts,resets)
+          VALUES ('sync',91,'sync',0,0,true,'queued','start','{}',0,0);
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "a17026e9a037", fails=True)
+        asyncio.run(execute("DELETE FROM mail_sync_jobs WHERE id='sync'", script=True))
         # The immediately previous release can have queued summary tasks at upgrade.
         migrate("downgrade", "3c6e9a1207bd")
         asyncio.run(

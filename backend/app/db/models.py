@@ -37,8 +37,9 @@ class TimestampMixin:
 class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint("google_account_version >= 1 AND google_token_version >= 1",
-                        name="ck_google_versions"),
+        CheckConstraint(
+            "google_account_version >= 1 AND google_token_version >= 1", name="ck_google_versions"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -85,7 +86,7 @@ class Message(TimestampMixin, Base):
             "ix_messages_owner_search_time",
             "user_id",
             text("coalesce(received_at, sent_at) DESC"),
-            text('id DESC'),
+            text("id DESC"),
         ),
     )
 
@@ -199,6 +200,12 @@ class AssistantTask(TimestampMixin, Base):
         CheckConstraint("version >= 1 AND latest_sequence >= 1", name="ck_task_versions"),
         CheckConstraint("input_version >= 0 AND input_version <= 5", name="ck_task_input_version"),
         CheckConstraint(
+            "workflow_input IS NULL OR (scheduling_input IS NULL AND read_input IS NULL "
+            "AND compound_input IS NULL "
+            "AND COALESCE(release->>'workflow','') = 'mvp-workflow-1.0.0')",
+            name="ck_task_workflow_input",
+        ),
+        CheckConstraint(
             "scheduling_input IS NULL OR (read_input IS NULL AND compound_input IS NULL "
             "AND COALESCE(draft_input, 'null'::jsonb) = 'null'::jsonb "
             "AND COALESCE(intent_hint, '') = 'plan_schedule' "
@@ -222,6 +229,7 @@ class AssistantTask(TimestampMixin, Base):
     read_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     compound_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     scheduling_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    workflow_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     final_artifact_id: Mapped[str | None] = mapped_column(String(36))
     instruction: Mapped[str] = mapped_column(Text)
     context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
@@ -306,7 +314,9 @@ class ArtifactRevision(TimestampMixin, Base):
         CheckConstraint(
             "(revision = 1 AND edit_request_id IS NULL AND edit_request_hash IS NULL) OR "
             "(revision > 1 AND edit_request_id IS NOT NULL AND edit_request_hash IS NOT NULL "
-            "AND draft_envelope IS NOT NULL AND COALESCE(payload->>'kind', '') = 'draft')",
+            "AND ((draft_envelope IS NOT NULL AND COALESCE(payload->>'kind', '') = 'draft') "
+            "OR (COALESCE(payload->>'kind', '') = 'plan' AND "
+            "COALESCE(provenance->>'policy', '') = 'action-plan-1.0.0')))",
             name="ck_artifact_edit",
         ),
     )
@@ -427,7 +437,11 @@ class AssistantStep(Base):
             deferrable=True,
             initially="DEFERRED",
         ),
-        CheckConstraint("ordinal IN (1, 2)", name="ck_step_ordinal"),
+        CheckConstraint(
+            "ordinal IN (1, 2) OR (ordinal = 3 AND "
+            "COALESCE(release->>'workflow','') = 'mvp-workflow-1.0.0')",
+            name="ck_step_ordinal",
+        ),
         CheckConstraint("attempts BETWEEN 0 AND 3", name="ck_step_attempts"),
         CheckConstraint(
             "state IN ('pending','running','succeeded','failed','cancelled')", name="ck_step_state"
@@ -614,8 +628,9 @@ class ActionAttempt(Base):
 class GoogleOAuthSession(Base):
     __tablename__ = "google_oauth_sessions"
     __table_args__ = (
-        CheckConstraint("(user_id IS NULL) = (account_version IS NULL)",
-                        name="ck_oauth_owner_version"),
+        CheckConstraint(
+            "(user_id IS NULL) = (account_version IS NULL)", name="ck_oauth_owner_version"
+        ),
         Index("ix_oauth_expiry", "expires_at"),
     )
     state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -633,8 +648,10 @@ class ActionDecision(Base):
     __tablename__ = "action_decisions"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["action_id", "user_id"], ["assistant_actions.id", "assistant_actions.user_id"],
-            name="fk_decision_owned_action", ondelete="RESTRICT",
+            ["action_id", "user_id"],
+            ["assistant_actions.id", "assistant_actions.user_id"],
+            name="fk_decision_owned_action",
+            ondelete="RESTRICT",
         ),
         UniqueConstraint("user_id", "operation", "request_id", name="uq_action_decision_request"),
         CheckConstraint("expected_version >= 1", name="ck_decision_version"),
@@ -702,9 +719,7 @@ class CommandPlan(Base):
     plan_hash: Mapped[str | None] = mapped_column(String(64))
     task_id: Mapped[str | None] = mapped_column(String(36))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class SchedulingProposal(Base):
@@ -872,7 +887,8 @@ class MeetingNegotiation(Base):
         CheckConstraint(
             "(state='open' AND current_offer_id IS NULL AND current_selection_id IS NULL) OR "
             "(state IN ('offered','checking','selected') AND current_offer_id IS NOT NULL) OR "
-            "state='closed'", name="ck_meeting_offer_pointer",
+            "state='closed'",
+            name="ck_meeting_offer_pointer",
         ),
         CheckConstraint(
             "state NOT IN ('checking','selected') OR current_selection_id IS NOT NULL",
@@ -980,3 +996,66 @@ class MeetingSelection(Base):
     error_code: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MailSyncJob(Base):
+    __tablename__ = "mail_sync_jobs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id", name="uq_mail_sync_request"),
+        UniqueConstraint("id", "user_id", name="uq_mail_sync_owner"),
+        Index(
+            "uq_mail_sync_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("state IN ('queued','running')"),
+        ),
+        CheckConstraint(
+            "state IN ('queued','running','succeeded','failed')", name="ck_mail_sync_state"
+        ),
+        CheckConstraint(
+            "phase IN ('start','listing','history','publish')", name="ck_mail_sync_phase"
+        ),
+        CheckConstraint(
+            "(state = 'running' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) OR "
+            "(state <> 'running' AND lease_token IS NULL AND lease_expires_at IS NULL)",
+            name="ck_mail_sync_lease",
+        ),
+        CheckConstraint(
+            "attempts BETWEEN 0 AND 5 AND resets BETWEEN 0 AND 2", name="ck_mail_sync_attempts"
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    request_id: Mapped[str] = mapped_column(String(128))
+    account_version: Mapped[int]
+    sync_version: Mapped[int]
+    full: Mapped[bool]
+    state: Mapped[str] = mapped_column(String(16))
+    phase: Mapped[str] = mapped_column(String(16))
+    cursor: Mapped[dict] = mapped_column(JSONB)
+    attempts: Mapped[int] = mapped_column(default=0)
+    resets: Mapped[int] = mapped_column(default=0)
+    lease_token: Mapped[str | None] = mapped_column(String(36))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+
+
+class MailSyncStage(Base):
+    __tablename__ = "mail_sync_stage"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["job_id", "user_id"],
+            ["mail_sync_jobs.id", "mail_sync_jobs.user_id"],
+            ondelete="CASCADE",
+            name="fk_mail_sync_stage_owner",
+        ),
+    )
+    job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[int]
+    payload: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))

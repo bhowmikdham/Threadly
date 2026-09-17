@@ -653,3 +653,42 @@ constraints, lifecycle, retry/error semantics and safety boundary:
 separate `extraction` release/entrypoint/review/live-evaluation metadata. The typed
 scheduling endpoint still requires explicit constraints; automatic `/requests`
 scheduling dispatch and mixed-intent Calendar graphs remain unavailable.
+
+
+## Combined MVP API additions (17 September 2026)
+
+The [MVP workflow map](mvp-workflow-map.md) is the integration sequence and state
+handoff. New routes use existing authenticated ownership, error envelopes and
+idempotency rules; typed schemas live under `backend/app/schemas/`.
+
+| Method and route | Request / result |
+|---|---|
+| POST `/assistant/workflow-proposals` | `CoordinatorRequest`; saved complete interpretation or explicit clarification/unsupported result |
+| GET `/assistant/workflow-proposals/{id}` | Owned proposal with exact review hash |
+| POST `/assistant/workflow-proposals/{id}/confirm` | `ConfirmCommandPlan`; atomically consume proposal and queue one task |
+| POST `/assistant/workflow-requests` | `WorkflowRequest`; explicitly selected supported graph; 202 task |
+| POST `/assistant/tasks/{id}/plan-review` | `ReviewPlan`; edit current items or select commitment IDs; new immutable revision |
+| POST/GET `/assistant/meeting-response-proposals[/{id}]` | `MeetingResponseRequest`; owned later-message/historical-offer interpretation |
+| POST `/assistant/meeting-response-proposals/{id}/confirm` | Exact reviewed proposal; queues fresh exact-time read only |
+| POST `/assistant/artifacts/{id}/calendar-actions` | `ProposeCalendarAction`; immutable exact event preview; 201 |
+| GET `/assistant/calendar-actions/{id}` | Preview, state, blockers, result and approval availability |
+| POST `/assistant/calendar-actions/{id}/approve` | Exact hash/version/request ID; 202 queued action, pilot gate |
+| POST `/assistant/calendar-actions/{id}/reject` or `/cancel` | Versioned decision; cancellation after dispatch is a request, not proof of no event |
+| GET `/entities?context_snapshot_id=...&type=...` | Owned literal candidates in fresh capture, partial coverage |
+| GET `/commitments?context_snapshot_id=...` | Current explicitly selected plan items for captured thread |
+| POST `/sync/jobs` | `{ "request_id": "unique-key" }`; 202 durable sync receipt |
+| GET `/sync/jobs/{id}` | Owned phase/state/pages, sanitized error and final result |
+| GET `/assistant/operational-status` | Owner-only state counts, queue age and rollout controls |
+
+`GET /assistant/tasks/{id}` now includes nullable `workflow` progress/step artifacts.
+`GET /assistant/workflows` describes the reviewed coordinator, installed finite graphs,
+auxiliary generation adapters and separately approved booking. Configuration discovery
+is not proof that remote providers passed acceptance. Existing routes remain compatible;
+new clients should use background sync jobs instead of inline `/sync`.
+
+Write capabilities are installed but disabled by default. Reconnect accepts explicit
+`gmail_send` and `calendar_write` only for enrolled pilot users. Real execution requires
+both the corresponding environment flag and local user allowlist membership; scope and
+exact approval checks still apply. The historical always-disabled write-capability
+statements above are superseded by this explicit pilot behavior. No frontend origin,
+public port, domain or automatic send is enabled by this change.

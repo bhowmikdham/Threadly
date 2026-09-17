@@ -1,5 +1,9 @@
 # Copy-paste launch prompt for Codex 5.3 Spark
 
+Current integration: read [the MVP workflow map](../mvp-workflow-map.md) and
+[progress](../backend-progress.md) first. The user explicitly authorized the combined
+MVP PR; the historical one-package prompt below does not override that scope.
+
 Use this prompt in a coding task with this repository available. Selecting Spark
 is a user/app setting; these instructions do not change Threadly's Bedrock model.
 Merge this handoff documentation into the integration branch before starting a

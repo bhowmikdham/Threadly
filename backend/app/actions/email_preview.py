@@ -42,6 +42,22 @@ async def sources(session, task, artifact):
     if not isinstance(envelope, dict):
         raise email_payload.blocked("draft_envelope_unavailable")
     versions = {}
+    if artifact.payload.get("plan_grounding") is not None:
+        from app.assistant.grounding import check_plan
+
+        try:
+            versions["plan_grounding"] = await check_plan(session, task.user_id, artifact.payload)
+        except ApiError as error:
+            raise email_payload.blocked(error.code) from None
+    if artifact.payload.get("calendar_grounding") is not None:
+        from app.assistant.grounding import check_calendar
+
+        try:
+            versions["calendar_grounding"] = await check_calendar(
+                session, task.user_id, artifact.payload
+            )
+        except ApiError as error:
+            raise email_payload.blocked(error.code) from None
     # The published artifact binds the effective context (including continuation).
     # User edits retain this field; the task's original context may be superseded.
     context_id = artifact.payload.get("context_snapshot_id")
@@ -214,7 +230,9 @@ async def view(session, user_id, action_id):
         raise ApiError(
             409, "action_preview_unavailable", "This action has no supported email preview."
         )
-    blockers = ["send_executor_unavailable"]
+    from app.actions.gmail_sender import enabled
+
+    blockers = [] if enabled(user_id=user_id) else ["send_executor_unavailable"]
     if action.state != "proposed":
         blockers.append("action_" + action.state)
     if action.expires_at <= await session.scalar(select(func.clock_timestamp())):
@@ -295,8 +313,8 @@ async def view(session, user_id, action_id):
         "preview": action.payload["preview"],
         "account_version": action.source_versions["google_account_version"],
         "blockers": list(dict.fromkeys(blockers)),
-        "approval_available": False,
-        "sending_available": False,
+        "approval_available": not blockers,
+        "sending_available": enabled(user_id=user_id),
         "authorization": "exact_payload_approval" if approval_id else "none",
         "approval_id": approval_id,
         "cancellation_requested": cancellation_requested,

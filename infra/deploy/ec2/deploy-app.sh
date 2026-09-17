@@ -44,7 +44,7 @@ for IMAGE in postgres:16 chromadb/chroma:latest; do
 done
 printf '[2/5] Starting PostgreSQL and saving a backup before schema changes.\n'
 "${COMPOSE[@]}" up -d --wait --wait-timeout 120 postgres
-"${COMPOSE[@]}" stop -t 130 api assistant-worker action-worker
+"${COMPOSE[@]}" stop -t 150 api assistant-worker action-worker sync-worker
 BACKUP="/srv/threadly-data/backups/predeploy-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE.sql.gz"
 "${COMPOSE[@]}" exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$BACKUP.partial"
 gzip -t "$BACKUP.partial"
@@ -54,11 +54,11 @@ printf '[3/5] Applying database migrations before starting application processes
 "${COMPOSE[@]}" run --rm --no-deps -T api alembic upgrade head
 "${COMPOSE[@]}" run --rm --no-deps -T api alembic current
 
-printf '[4/5] Starting API, Chroma, assistant worker and gated action worker.\n'
-"${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 240 api assistant-worker action-worker
+printf '[4/5] Starting API, Chroma, assistant, action and mailbox sync workers.\n'
+"${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 240 api assistant-worker action-worker sync-worker
 curl --fail --silent --show-error http://127.0.0.1:8000/healthz
 curl --fail --silent --show-error http://127.0.0.1:8000/readyz
-for WORKER_SERVICE in assistant-worker action-worker; do
+for WORKER_SERVICE in assistant-worker action-worker sync-worker; do
     WORKER_ID=$("${COMPOSE[@]}" ps -q "$WORKER_SERVICE")
     [[ -n "$WORKER_ID" ]] || die "$WORKER_SERVICE container is missing."
     [[ "$(docker inspect --format '{{.State.Running}}' "$WORKER_ID")" == true ]] || die "$WORKER_SERVICE is not running."

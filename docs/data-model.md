@@ -410,3 +410,27 @@ ownership. Input and completed result immutability and legal transitions are gua
 by PostgreSQL trigger. Exact confirmation and task insertion commit together.
 Downgrade refuses while proposals exist; historical typed scheduling tasks survive
 an otherwise empty rollback. See [contract and state diagram](scheduling-extraction.md).
+
+
+## MVP integration migrations
+
+`a17026e9a037` (parent `f14026e9a036`) adds nullable immutable
+`assistant_tasks.workflow_input`; only `mvp-workflow-1.0.0` tasks can use it, mutually
+exclusive with old scheduling/read/compound input. Step ordinal 3 requires this
+release; old tasks keep the two-step bound. Plan artifact revisions reuse edit
+request/hash columns and require `action-plan-1.0.0` provenance. Draft edit rules
+remain unchanged. Downgrade refuses retained MVP workflow/plan data.
+
+`b17026e9a038` adds `mail_sync_jobs` (owned idempotent request, one active job/user,
+account/sync versions, phase/cursor, retry budget, lease and sanitized outcome) and
+`mail_sync_stage` (owned composite FK, one cleaned payload/deletion per job/message).
+Running jobs require a lease; other states have none. Cursor/staging checkpoints
+commit together; mailbox publication and history advancement are atomic. Active
+sync jobs block downgrade. Terminal staging can be conservatively cleaned; jobs
+and action audit records are retained.
+
+Master and meeting-response proposals reuse `command_plans` with distinct pinned
+release identifiers. Calendar event actions use existing action/approval/attempt/job
+tables with `create_event` + `calendar-event-1.0.0`; email approvals cannot authorize
+that schema. New records do not reinterpret historical queued releases. See
+[mappings and lifecycle](mvp-workflow-map.md).

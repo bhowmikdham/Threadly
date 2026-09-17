@@ -315,6 +315,7 @@ def test_calendar_incremental_consent_only_on_authenticated_reconnect(
         lambda: SimpleNamespace(
             google_client_id="client",
             google_client_secret="fixture",
+            write_pilot_user_ids_values=set(),
             google_redirect_uri_allowlist_values={"https://ext.chromiumapp.org/"},
         ),
     )
@@ -333,7 +334,7 @@ def test_calendar_incremental_consent_only_on_authenticated_reconnect(
     body["capabilities"] = ["calendar_write"]
     assert (
         db_client.post("/auth/google/reconnect", json=body, headers=auth_headers(1)).status_code
-        == 422
+        == 409
     )
     capability = db_client.get("/assistant/capabilities", headers=auth_headers(1)).json()
     by_id = {item["id"]: item for item in capability["capabilities"]}

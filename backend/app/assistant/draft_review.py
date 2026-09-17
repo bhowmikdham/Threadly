@@ -77,6 +77,20 @@ async def blockers(session, artifact):
         return ["draft_envelope_unavailable"]
     content = artifact.payload["content"]
     result = []
+    if artifact.payload.get("calendar_grounding") is not None:
+        from app.assistant.grounding import check_calendar
+
+        try:
+            await check_calendar(session, artifact.user_id, artifact.payload)
+        except ApiError as exc:
+            result.append(exc.code)
+    if artifact.payload.get("plan_grounding") is not None:
+        from app.assistant.grounding import check_plan
+
+        try:
+            await check_plan(session, artifact.user_id, artifact.payload)
+        except ApiError as exc:
+            result.append(exc.code)
     if not envelope.get("to"):
         result.append("recipients_required")
     if content["unresolved_fields"] or re.search(
@@ -192,7 +206,7 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
     payload["assumptions"] = [
         "User-edited text; facts have not been revalidated by a model or live source.",
         "Stored in Threadly only; review does not authorize sending or editor insertion.",
-        "No live availability check or attachment support.",
+        "Original plan/Calendar source bindings are retained; user edits require review.",
     ]
     artifact = ArtifactRevision(
         id=artifact_id,

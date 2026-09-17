@@ -14,14 +14,18 @@ from app.api.errors import ApiError
 from app.assistant import (
     command_plans,
     continuation,
+    coordinator,
     draft_review,
     lookup_draft,
     mail_search,
+    meeting_responses,
+    planning,
     reads,
     scheduling,
     scheduling_proposals,
     steps,
     tasks,
+    workflows,
 )
 from app.assistant.context import capture_thread
 from app.assistant.ui_context import capture_view
@@ -38,13 +42,17 @@ from app.schemas.assistant import (
 from app.schemas.command_plan import CommandPlanRequest, ConfirmCommandPlan
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
+from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.mail_search import MailSearchRequest
+from app.schemas.meeting_response import MeetingResponseRequest
+from app.schemas.plan_review import ReviewPlan
 from app.schemas.scheduling import SchedulingInputRequest, SchedulingRequest
 from app.schemas.scheduling_proposal import ConfirmSchedulingProposal, SchedulingProposalRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
-from app.workflows import registry
+from app.schemas.workflow import WorkflowRequest
+from app.workflows import auxiliary, registry
 
 router = APIRouter()
 DB = Annotated[AsyncSession, Depends(get_session)]
@@ -127,6 +135,46 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "natural_language_planner": False,
             "external_actions": False,
         },
+        "master_coordinator": {
+            "installed": True,
+            "entrypoint": "/assistant/workflow-proposals",
+            "requires_complete_command_review": True,
+            "automatic_dispatch": False,
+            "max_steps": 3,
+            "external_actions": False,
+        },
+        "mvp_workflows": {
+            "entrypoint": "/assistant/workflow-requests",
+            "singles": [
+                "summary",
+                "schedule",
+                "plan",
+                "draft_reply",
+                "draft_new",
+                "lookup_entity",
+                "lookup_commitments",
+            ],
+            "compound": [
+                ["schedule", "draft_reply"],
+                ["schedule", "draft_new"],
+                ["summary", "schedule", "draft_reply"],
+                ["summary", "schedule", "draft_new"],
+            ],
+            "selected_plan_drafts": True,
+            "meeting_response_entrypoint": "/assistant/meeting-response-proposals",
+            "external_actions": False,
+        },
+        "auxiliary_generation": {
+            op: {"implementation": entry.implementation, "external_actions": False}
+            for op, entry in auxiliary.load_manifest().operations.items()
+        },
+        "calendar_booking": {
+            "installed": True,
+            "preview_entrypoint": "/assistant/artifacts/{id}/calendar-actions",
+            "requires_separate_exact_approval": True,
+            "scope": "single_event_in_owned_selected_calendar",
+            "pilot_gated": True,
+        },
         "remote_resources_verified": False,
         "scheduling": {
             "installed": True,
@@ -173,11 +221,12 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
         "read_options": task.read_input,
         "scheduling": task.scheduling_input,
         "compound": await steps.view(session, task),
+        "workflow": await workflows.view(session, task),
         "intent": (
             task.route["decision"]["intent"]
             if task.route
             else task.intent_hint
-            if task.compound_input or task.scheduling_input
+            if task.compound_input or task.scheduling_input or task.workflow_input
             else "summarise"
             if task.release.get("workflow") == "summary-task-1.0.0"
             else None
@@ -242,6 +291,14 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/workflow-requests", status_code=202)
+async def submit_workflow(request: WorkflowRequest, user_id: CurrentUser, session: DB):
+    task = await tasks.submit(session, user_id, request.as_request(), workflow=request)
     result = await task_view(session, task)
     await session.commit()
     return result
@@ -546,3 +603,76 @@ async def task_events(
             yield event
 
     return EventSourceResponse(replay())
+
+
+@router.post("/tasks/{task_id}/plan-review")
+async def review_plan(task_id: str, request: ReviewPlan, user_id: CurrentUser, session: DB):
+    task, artifact = await planning.review(session, user_id, task_id, request)
+    result = await draft_review.artifact_view(session, task, artifact)
+    await session.commit()
+    return result
+
+
+@router.post("/workflow-proposals", status_code=202)
+async def propose_workflow(request: CoordinatorRequest, user_id: CurrentUser, session: DB):
+    row, created = await coordinator.reserve(session, user_id, request)
+    await session.commit()
+    if created:
+        state, result = await coordinator.interpret(row)
+        row = await command_plans.complete(session, user_id, row.id, state, result)
+    result = await command_plans.view(session, row)
+    await session.commit()
+    return result
+
+
+@router.get("/workflow-proposals/{proposal_id}")
+async def get_workflow_proposal(proposal_id: str, user_id: CurrentUser, session: DB):
+    return await command_plans.view(session, await coordinator.owned(session, user_id, proposal_id))
+
+
+@router.post("/workflow-proposals/{proposal_id}/confirm", status_code=202)
+async def confirm_workflow_proposal(
+    proposal_id: str, request: ConfirmCommandPlan, user_id: CurrentUser, session: DB
+):
+    task = await coordinator.confirm(session, user_id, proposal_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/meeting-response-proposals", status_code=202)
+async def propose_meeting_response(
+    request: MeetingResponseRequest, user_id: CurrentUser, session: DB
+):
+    row, created = await meeting_responses.reserve(session, user_id, request)
+    await session.commit()
+    if created:
+        state, result = await meeting_responses.interpret(row)
+        row = await command_plans.complete(session, user_id, row.id, state, result)
+    result = await command_plans.view(session, row)
+    await session.commit()
+    return result
+
+
+@router.get("/meeting-response-proposals/{proposal_id}")
+async def get_meeting_response(proposal_id: str, user_id: CurrentUser, session: DB):
+    return await command_plans.view(
+        session, await meeting_responses.owned(session, user_id, proposal_id)
+    )
+
+
+@router.post("/meeting-response-proposals/{proposal_id}/confirm", status_code=202)
+async def confirm_meeting_response(
+    proposal_id: str, request: ConfirmCommandPlan, user_id: CurrentUser, session: DB
+):
+    task = await meeting_responses.confirm(session, user_id, proposal_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.get("/operational-status")
+async def operational_status(user_id: CurrentUser, session: DB):
+    from app.operations.status import snapshot
+
+    return await snapshot(session, user_id)

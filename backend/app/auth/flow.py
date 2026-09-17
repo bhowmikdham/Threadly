@@ -39,11 +39,29 @@ def validate_redirect(uri):
         raise ApiError(400, "invalid_redirect_uri", "The OAuth redirect URI is not allowed.")
 
 
-async def begin(session, redirect_uri, code_challenge, *, user_id=None, calendar_read=False):
+async def begin(
+    session,
+    redirect_uri,
+    code_challenge,
+    *,
+    user_id=None,
+    calendar_read=False,
+    gmail_send=False,
+    calendar_write=False,
+):
     if calendar_read and user_id is None:
         raise ApiError(400, "calendar_login_required", "Sign in before connecting Calendar.")
     validate_redirect(redirect_uri)
     settings = get_settings()
+    if (gmail_send or calendar_write) and str(user_id) not in settings.write_pilot_user_ids_values:
+        raise ApiError(
+            409, "write_pilot_unavailable", "Write access is limited to configured test accounts."
+        )
+    scopes = SCOPES + (CALENDAR_SCOPES if calendar_read or calendar_write else [])
+    if gmail_send:
+        scopes = scopes + ["https://www.googleapis.com/auth/gmail.send"]
+    if calendar_write:
+        scopes = scopes + ["https://www.googleapis.com/auth/calendar.events"]
     if not settings.google_client_id or not settings.google_client_secret:
         raise ApiError(503, "google_not_configured", "Google login is not configured.")
     user = await session.get(User, user_id) if user_id is not None else None
@@ -75,7 +93,7 @@ async def begin(session, redirect_uri, code_challenge, *, user_id=None, calendar
         "client_id": settings.google_client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": " ".join(SCOPES + (CALENDAR_SCOPES if calendar_read else [])),
+        "scope": " ".join(scopes),
         "state": state,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
