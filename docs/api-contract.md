@@ -612,7 +612,7 @@ Historical offers/selection receipts expose `usable` and `blockers`; stored
 `selected` is never a booking approval. New replies invalidate old choices and
 require fresh slot queries before reoffering. Complete routes/examples/status and
 recovery contract: [meeting negotiations](meeting-negotiations.md). B14b1 adds typed
-assistant continuation/artifacts below; extraction, generated replies, later-email
+assistant continuation/artifacts below; B14b2a adds reviewed command extraction. Generated replies, later-email
 proposals and B15 event execution remain uninstalled.
 
 ## Typed assistant scheduling (B14b1)
@@ -633,6 +633,23 @@ with owned B13 query/slot IDs, uncertainty, assumptions and expiry. Their GET ad
 historical content alone is not current availability. A fresh nonempty query can be
 explicitly adopted into a B14a offer through the existing negotiation endpoint.
 
-`GET /assistant/workflows` advertises the explicit handler. No prose extraction,
-automatic router/compound dispatch, draft, send, approval or booking is added.
+`GET /assistant/workflows` advertises the explicit handler. The separate B14b2a proposal API adds reviewed prose extraction. No automatic
+router/compound dispatch, draft, send, approval or booking is added.
 [Complete schemas, examples, errors, flow and recovery](assistant-scheduling.md).
+
+## Reviewed scheduling extraction (B14b2a)
+
+`POST /assistant/scheduling-proposals` accepts a self-contained user instruction,
+request ID, expected preferences version and optional owned context/message anchor.
+It returns a persisted, expiring interpretation without queuing Calendar work.
+`GET /assistant/scheduling-proposals/{id}` reads that historical proposal.
+`POST /assistant/scheduling-proposals/{id}/confirm` requires its exact
+`proposal_hash` and strict boolean `confirm_complete_request: true`; it atomically
+returns one existing typed scheduling task and consumes the proposal. Full examples,
+constraints, lifecycle, retry/error semantics and safety boundary:
+[scheduling extraction](scheduling-extraction.md).
+
+`/assistant/workflows.scheduling.natural_language_extraction` is now `true`, with
+separate `extraction` release/entrypoint/review/live-evaluation metadata. The typed
+scheduling endpoint still requires explicit constraints; automatic `/requests`
+scheduling dispatch and mixed-intent Calendar graphs remain unavailable.

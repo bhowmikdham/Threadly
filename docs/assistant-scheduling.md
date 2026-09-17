@@ -7,7 +7,8 @@ artifact. This is a backend API contract, not a new natural-language router or U
 
 **The caller supplies typed constraints.** No model extracts fields in this slice.
 Do not pass BERT labels, unreviewed model fields or an arbitrary email body directly
-to this API. Natural-language extraction/review, slot-grounded generated replies,
+to this API. Reviewed command extraction is available through the separate
+[B14b2a preparation API](scheduling-extraction.md). Slot-grounded generated replies,
 later-email selection proposals and complete Calendar compound graphs remain open.
 The current `/assistant/requests` router behavior and Bedrock generation registry
 are unchanged. B15 owns eventual exact event approval and execution.
@@ -195,7 +196,15 @@ Offline regression evidence is in [B14 checkpoint](backend-execution/checkpoints
 Live Google/staging and frontend acceptance are still required; mock transport
 success is not live provider verification. This slice has no model/prompt/Flow changes.
 
-Next B14 work should add a pinned, evaluated scheduling extraction proposal plus
-explicit constraint review before invoking this typed handler; then grounded reply
-generation and later-email option proposals. Add those operations to complete
+B14b2a now adds a pinned scheduling extraction proposal with explicit review before
+this typed handler. Live extraction evaluation, grounded reply generation and
+later-email option proposals remain. Add those operations to complete
 multi-intent graphs only once every handler and its validation are installed.
+
+## Optional natural-language preparation
+
+The typed API above remains unchanged. B14b2a adds a separate
+[scheduling proposal and review API](scheduling-extraction.md) that compiles a
+self-contained user command into this handler only after exact explicit confirmation.
+The resulting task retains the original proposal/message anchor. This does not
+install automatic email extraction, generated scheduling replies or booking.

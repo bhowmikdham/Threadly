@@ -1,7 +1,7 @@
 # Whole backend progress — 17 September 2026
 
-Audit baseline: PR #34 merged at `8712a92c76527852aede9a6d6f4c498e5d663e02`
-on `codex/assistant-intent-routing`. The current PR adds B14b1 typed assistant scheduling tasks, clarification and artifacts.
+Audit baseline: PR #35 merged at `4782ab04b8f47ffbb47354ca4cb29a2635dbb5bc`
+on `codex/assistant-intent-routing`. The current PR adds B14b2a reviewed natural-language scheduling proposals into the existing typed tasks.
 This report separates implemented code, accepted package scope, and deployed/live
 behavior. Frontend integration remains deferred at the user's request.
 
@@ -32,7 +32,7 @@ counts, not 17 equally sized new implementations or a time estimate.
 
 | Remaining workstream | Concrete work left |
 |---|---|
-| Scheduling conversation | B14b2 evaluated natural-language constraint extraction/review, slot-grounded drafts, explicit later-email choice proposals; typed tasks/continuation/artifacts now implemented |
+| Scheduling conversation | Live extraction evaluation, slot-grounded drafts and explicit later-email choice proposals; bounded extraction/review and typed tasks/continuation/artifacts now implemented |
 | Booking | B15 exact event preview/approval, fresh dispatch checks, stable provider IDs and uncertain-result reconciliation |
 | Planning and multi-intent | B11 non-calendar plans; broader B10 ordered graphs/clarification, full-command coverage, Calendar combinations and live classifier/planner evaluation |
 | Retrieval and AI execution | Broader B09 retrieval/extraction; B16 operation coverage and B17 authorized Flow read bridge/full execution integration |
@@ -60,8 +60,8 @@ not yet ready for end-to-end acceptance. Later B21–B25 features are additional
 | Reviewed command planning | Persisted all-word clause interpretation, prohibitions, dependency compilation and exact review → existing compound task | B10c merged PR #31; four pairs only, live semantic gate and automatic routing pending |
 | Calendar read foundations | Read-only incremental consent, owned versioned preferences, current ACL selection and saved busy/unknown evidence | B12 merged PR #32; live OAuth/Calendar smoke remains |
 | Deterministic Calendar slots | Typed anchored dates, contextual AM/PM, DST-aware working hours, buffered busy checks and stable expiring options | B13 merged PR #33; live comparison/policy acceptance remains |
-| Meeting offers and choices | Immutable thread-bound offer revisions, explicit slot selection with fresh exact-time check, source/race/expiry fences | B14a merged PR #34; assistant scheduling extraction, drafts and email-response mapping remain |
-| Assistant scheduling | Explicit durable check_time/suggest_slots tasks, saved request/message anchors, typed questions, availability/options artifacts and current usability | B14b1 current PR; natural-language extraction, generated replies and live validation remain |
+| Meeting offers and choices | Immutable thread-bound offer revisions, explicit slot selection with fresh exact-time check, source/race/expiry fences | B14a merged PR #34; typed tasks and reviewed command extraction added; drafts and email-response mapping remain |
+| Assistant scheduling | Explicit durable check_time/suggest_slots tasks, saved request/message anchors, typed questions, availability/options artifacts and current usability | PR #35 merged; B14b2a adds reviewed command extraction; generated replies and live validation remain |
 | Bedrock execution | Native/Flow registry, pinned manifests, bounded InvokeFlow adapter, versioned prompts | B16/B17 code and synthetic SDK replay; cloud end-to-end gate still open |
 | Email actions | Immutable action/approval records, exact MIME preview, explicit decisions, dedicated sender and read-only uncertain-outcome reconciliation | B02–B05 verified local scope, B06 merged recovery; public approval/sending remains gated |
 
@@ -83,7 +83,7 @@ not yet ready for end-to-end acceptance. Later B21–B25 features are additional
 | B11 non-calendar planning | Planned | Evidence-backed plan revisions, owners/deadlines and explicit commitment selection |
 | B12 Calendar read | In review | Live consent/list/freebusy/ACL smoke; read foundations implemented, slots belong to B13 |
 | B13 time/slots | In review | Local engine/API/migration implemented; live Google comparison and policy acceptance pending |
-| B14 meeting negotiation | In progress | B14a offers/selection and B14b1 typed tasks/clarification/artifacts implemented; B14b2 extraction/review, generated replies and later-email proposals remain |
+| B14 meeting negotiation | In progress | B14a offers/selection and B14b1 typed tasks/clarification/artifacts implemented; B14b2a reviewed extraction added; live extraction evaluation, generated replies and later-email proposals remain |
 | B15 Calendar writes | Planned | Exact event approval, execution, idempotency and uncertain-outcome reconciliation |
 | B16 operation registry | In progress | Extend only when handlers exist; complete target operation/release coverage |
 | B17 Flow read bridge | In progress | Current generation Flow adapter exists; authorized bounded read callbacks/full target integration remain |
@@ -107,7 +107,7 @@ recipients, Flow ARNs, execution order or permissions.
    Extend typed corrected-plan continuation and broader retrieval/graphs; preserve
    every requested output/negation before enabling automatic routing. The 14-case
    synthetic corpus is a starting contract, not live quality acceptance.
-2. Review B14b1 typed scheduling tasks; implement B14b2 evaluated extraction/review,
+2. Review B14b2a command extraction and run labelled live extraction evaluation; implement
    grounded generated replies and later-email proposals. Run controlled
    B12/B13 Google consent/list/freebusy and slot-comparison smoke alongside this work.
    B11 non-calendar plans and explicit commitment acceptance remain open.
@@ -158,7 +158,10 @@ PR #31 passed 760 backend tests; PR #32 passed 823; PR #33 exact-head CI passed
 Flow template validations: [CI run](https://github.com/bhowmikdham/Threadly/actions/runs/35077521850).
 PR #34 passed **908 backend tests**, 12 EC2 checks and 19 summary-console checks,
 plus lint and both Flow validations: [CI run](https://github.com/bhowmikdham/Threadly/actions/runs/35181338415).
-Current B14b1 verification is recorded in [its checkpoint](backend-execution/checkpoints/B14.md).
+Current B14b2a verification is recorded in [its checkpoint](backend-execution/checkpoints/B14.md).
 Synthetic models/transports verify orchestration and failure handling, not live Haiku
 quality or Google provider behavior. Whole-workflow API mappings and staging scenarios:
 [testing map](workflow-testing-map.md); [machine-readable map](workflow-runtime-map.json).
+
+Natural-language scheduling preparation now has a [dedicated contract and diagrams](scheduling-extraction.md).
+The package bar is unchanged: bounded implementation progress does not close the full B14 acceptance scope.
