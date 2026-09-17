@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import "./style.css"
 
 // API configuration constants
@@ -141,7 +141,6 @@ const fetchSpecificMessageHeaderId = async (
 
   const messages = data.messages || []
   
-  // Find the targeted active message or fallback to the last message in thread
   let targetMsg = messages[messages.length - 1]
   if (targetMessageId) {
     const found = messages.find((m: any) => m.id === targetMessageId)
@@ -159,21 +158,22 @@ const fetchSpecificMessageHeaderId = async (
   }
 }
 
-// Sanitizes header values to prevent "Invalid header" errors
 const sanitizeHeaderValue = (value: string) => value.replace(/[\r\n]+/g, " ").trim()
 
 function SidePanel() {
   const [theme, setTheme] = useState<"dark" | "light">("light")
   const [signedIn, setSignedIn] = useState<boolean>(false)
-  const [email, setEmail] = useState<string>("")
+  const [userName, setUserName] = useState<string>("")
+  const [userEmail, setUserEmail] = useState<string>("")
+  const [userAvatar, setUserAvatar] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(false)
 
   const [message, setMessage] = useState<string>("")
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
-  const [showAppsMenu, setShowAppsMenu] = useState<boolean>(false)
 
   const [savedSessions, setSavedSessions] = useState<ChatSession[]>([])
   const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false)
+  const [showOptionsMenu, setShowOptionsMenu] = useState<boolean>(false)
 
   // Recording & Voice Bubble States
   const [recording, setRecording] = useState<boolean>(false)
@@ -190,24 +190,38 @@ function SidePanel() {
   const [summarizing, setSummarizing] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [emailOpen, setEmailOpen] = useState<boolean>(false)
+
   const isDark = theme === "dark"
   const themeStyles = {
-    bg: isDark ? "#121212" : "#FAF9F6",
-    headerBg: isDark ? "#1e1e1e" : "#F4F3EF",
+    bg: isDark ? "#121212" : "#FFFFFF",
+    headerBg: isDark ? "#121212" : "#FFFFFF",
     drawerBg: isDark ? "#181818" : "#F4F3EF",
-    cardBg: isDark ? "#222222" : "#FFFFFF",
+    cardBg: isDark ? "#1e1e1e" : "#FFFFFF",
     aiBubbleBg: isDark ? "#1e1e1e" : "#F4F3EF",
-    inputBg: isDark ? "#1e1e1e" : "#FFFFFF",
+    inputBg: isDark ? "#121212" : "#FFFFFF",
+    inputBorder: isDark ? "#333333" : "#d0d0d0",
     border: isDark ? "#2a2a2a" : "#E8E6E1",
-    text: isDark ? "#e0e0e0" : "#2c2b28",
-    textMuted: isDark ? "#aaaaaa" : "#787670",
-    textHeading: isDark ? "#ffffff" : "#2c2b28",
-    buttonBg: isDark ? "#2a2a2a" : "#E8E6E1",
-    menuHoverBg: isDark ? "#2a2a2a" : "#F0EFEA",
-    accent: "#e8590c"
+    text: isDark ? "#e0e0e0" : "#000000",
+    textMuted: isDark ? "#aaaaaa" : "#808080",
+    textHeading: isDark ? "#ffffff" : "#000000",
+    buttonBg: isDark ? "#2a2a2a" : "#F2F1ED",
+    accent: isDark ? "#ffffff" : "#000000",
+    popoverBg: isDark ? "#222222" : "#FFFFFF",
+    popoverBorder: isDark ? "#333333" : "#E0E0E0"
   }
 
-  const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"))
+  const checkEmailOpen = async () => {
+    const domData = await fetchActiveEmailFromDOM()
+    setEmailOpen(!!domData && domData.evidence.length > 0)
+  }
+
+  useEffect(() => {
+    if (!signedIn) return
+    checkEmailOpen()
+    const interval = setInterval(checkEmailOpen, 2000)
+    return () => clearInterval(interval)
+  }, [signedIn])
 
   const signIn = () => {
     setLoading(true)
@@ -225,7 +239,9 @@ function SidePanel() {
           headers: { Authorization: `Bearer ${token}` }
         })
         const profile = await res.json()
-        setEmail(profile.email)
+        setUserEmail(profile.email || "")
+        setUserName(profile.name || profile.email || "")
+        if (profile.picture) setUserAvatar(profile.picture)
         setSignedIn(true)
       } catch (err) {
         console.error("Userinfo fetch error:", err)
@@ -233,6 +249,21 @@ function SidePanel() {
       } finally {
         setLoading(false)
       }
+    })
+  }
+
+  const signOut = () => {
+    chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      if (token) {
+        fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`).catch(() => {})
+        chrome.identity.removeCachedAuthToken({ token }, () => {})
+      }
+      setSignedIn(false)
+      setUserName("")
+      setUserEmail("")
+      setUserAvatar("")
+      setChatHistory([])
+      setShowOptionsMenu(false)
     })
   }
 
@@ -541,7 +572,6 @@ Respond ONLY with valid JSON matching this schema:
     }
   }
 
-  // Generates a brand-new email (not a reply) from a recipient address and a topic/instruction.
   const generateComposeEmail = async (
     toEmail: string,
     topic: string
@@ -586,17 +616,10 @@ Respond ONLY with valid JSON matching this schema:
     }
   }
 
-  // Handle a "compose a new email" instruction, e.g.
-  // "Compose an email to: jane@example.com, talking about the Q3 roadmap."
-  // Produces a standalone draft with no threadId/inReplyTo — sending it creates a brand
-  // new email rather than replying in any existing thread.
   const handleComposeEmail = async (instruction: string, reciteVoice: boolean = false) => {
     setSummarizing(true)
 
     try {
-      // Look for an address right after "to" (with or without a colon) first, since that's
-      // the expected phrasing; fall back to scanning the whole instruction for anything
-      // email-shaped if that doesn't match.
       const toMatch = instruction.match(/\bto:?\s*([^\s,]+@[^\s,;]+)/i)
       const toEmail = extractEmailAddress(toMatch?.[1] || instruction)
 
@@ -612,8 +635,6 @@ Respond ONLY with valid JSON matching this schema:
         return
       }
 
-      // The topic is everything after "about"/"talking about"/"regarding"; fall back to the
-      // full instruction if none of those keywords are present.
       const topicMatch = instruction.match(/(?:talking about|about|regarding)\s*[:\-]?\s*(.+)$/i)
       const topic = (topicMatch?.[1] || instruction).trim()
 
@@ -628,7 +649,6 @@ Respond ONLY with valid JSON matching this schema:
           subject: generated.subject,
           body: generated.body,
           status: "draft"
-          // no threadId / inReplyTo — this is intentionally a brand new email
         }
       }
 
@@ -648,7 +668,6 @@ Respond ONLY with valid JSON matching this schema:
     }
   }
 
-  // Handle drafting routine when requested
   const handleReplyDraft = async (instruction: string, reciteVoice: boolean = false) => {
     setSummarizing(true)
 
@@ -671,7 +690,6 @@ Respond ONLY with valid JSON matching this schema:
       let inReplyTo: string | null = null
       let canonicalThreadId: string | null = null
       let apiFromAddress: string | null = null
-      let threadResolved = false
 
       if (scrapedThreadId && isValidHexThreadId(scrapedThreadId)) {
         await new Promise<void>((resolve) => {
@@ -683,7 +701,6 @@ Respond ONLY with valid JSON matching this schema:
                 apiFromAddress = result.fromAddress
                 if (result.canonicalThreadId && isValidHexThreadId(result.canonicalThreadId)) {
                   canonicalThreadId = result.canonicalThreadId
-                  threadResolved = true
                 }
               } catch (err) {
                 console.error("Thread id could not be validated against the Gmail API:", err)
@@ -736,7 +753,6 @@ Respond ONLY with valid JSON matching this schema:
     }
   }
 
-  // Sends the email using Gmail REST API with proper reply headers and thread ID
   const executeSendEmail = async (messageId: string, draft: DraftReply) => {
     setChatHistory((prev) =>
       prev.map((msg) =>
@@ -788,7 +804,6 @@ Respond ONLY with valid JSON matching this schema:
 
         const requestBody: { raw: string; threadId?: string } = { raw: encodedMessage }
 
-        // Strictly check thread ID format before appending to payload
         if (isValidHexThreadId(draft.threadId)) {
           requestBody.threadId = draft.threadId
         }
@@ -911,7 +926,7 @@ Respond ONLY with valid JSON matching this schema:
     ])
 
     const isComposeIntent = /^compose\b/i.test(userText) || /\bcompose\s+(an\s+)?email\b/i.test(userText)
-    const isReplyIntent = /^reply\b/i.test(userText)
+    const isReplyIntent = /^reply\b/i.test(userText) || /draft a reply/i.test(userText)
     const isSummarizeIntent = /summarise|summarize/i.test(userText)
 
     if (isComposeIntent) {
@@ -921,7 +936,7 @@ Respond ONLY with valid JSON matching this schema:
     } else if (isSummarizeIntent) {
       handleSmartSummarize(reciteVoice)
     } else {
-      const resp = "I can help summarize emails, draft replies, or compose new emails. Try 'Summarise', 'reply saying yes', or 'Compose an email to: name@example.com, talking about the project update.'"
+      const resp = "I can help summarize emails, draft replies, or search your mail. Try asking 'Summarise this thread'."
       setChatHistory((prev) => [
         ...prev,
         { id: (Date.now() + 1).toString(), sender: "ai", text: resp }
@@ -936,12 +951,7 @@ Respond ONLY with valid JSON matching this schema:
 
     const userText = message.trim()
     setMessage("")
-    setShowAppsMenu(false)
     handleUserInstruction(userText, false)
-  }
-
-  const handleQuickSummarize = () => {
-    handleUserInstruction("Summarise my open email", false)
   }
 
   const handleSelectThread = (threadId: string, snippet: string) => {
@@ -985,7 +995,6 @@ Respond ONLY with valid JSON matching this schema:
     }
     setChatHistory([])
     setShowHistoryDrawer(false)
-    setShowAppsMenu(false)
   }
 
   const handleLoadSession = (session: ChatSession) => {
@@ -993,55 +1002,94 @@ Respond ONLY with valid JSON matching this schema:
     setShowHistoryDrawer(false)
   }
 
-  const googleAppsList = [
-    {
-      name: "Google Calendar",
-      desc: "Schedule & events",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M19 4H5C3.89 4 3 4.9 3 6V20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4Z" fill="#4285F4"/>
-          <path d="M19 4H5C3.89 4 3 4.9 3 6V9H21V6C21 4.9 20.1 4 19 4Z" fill="#EA4335"/>
-          <path d="M3 9H21V20C21 21.1 20.1 22 19 22H5C3.89 22 3 21.1 3 20V9Z" fill="#FFFFFF"/>
-          <text x="12" y="18" fill="#4285F4" fontSize="9" fontWeight="bold" textAnchor="middle">31</text>
-        </svg>
-      )
-    },
-    {
-      name: "Gmail",
-      desc: "Emails & messages",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <path fill="#EA4335" d="M20 18h-2V9.25L12 13 6 9.25V18H4V6h1.75l6.25 4 6.25-4H20v12z"/>
-        </svg>
-      )
-    },
-    {
-      name: "Google Drive",
-      desc: "Cloud storage",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <path fill="#FFBA00" d="M7.71 3.5L1.14 14.86l3.43 5.95 6.57-11.36z"/>
-          <path fill="#00AC47" d="M16.29 3.5H7.71l6.57 11.36h8.58z"/>
-          <path fill="#0066DA" d="M4.57 20.81h17.14l-3.43-5.95H7.71z"/>
-        </svg>
-      )
-    },
-    {
-      name: "Google Docs",
-      desc: "Documents & notes",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <path fill="#4285F4" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-        </svg>
-      )
-    }
-  ]
-
   const isVoiceActive = recording || transcribing || speaking
 
+  const getInitials = (name: string) => {
+    if (!name) return "U"
+    const parts = name.trim().split(" ")
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    return name.slice(0, 2).toUpperCase()
+  }
+
   return (
-    <div className="container" style={{ position: "relative", display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", backgroundColor: themeStyles.bg, color: themeStyles.text, transition: "background-color 0.2s, color 0.2s" }}>
-      
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        overflow: "hidden",
+        backgroundColor: themeStyles.bg,
+        color: themeStyles.text,
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+      }}
+    >
+
+      {/* ----------------- ADD HEADER HERE ----------------- */}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 14px",
+        borderBottom: `1px solid ${themeStyles.border}`,
+        backgroundColor: themeStyles.cardBg
+      }}
+    >
+      {/* Left Title */}
+      <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: themeStyles.textHeading }}>
+        Threadly
+      </h1>
+
+      {/* Right Actions (New Chat & Sidepanel History Toggle) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+        <button
+          onClick={handleStartNewChat}
+          aria-label="New Chat"
+          title="New Chat"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: themeStyles.textHeading,
+            borderRadius: 6
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+
+        <button
+          onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
+          aria-label="Toggle Sidepanel"
+          title="Sidepanel"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: themeStyles.textHeading,
+            borderRadius: 6
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    {/* ---------------------------------------------------- */}
+    
       {/* Voice Bubble Overlay */}
       {isVoiceActive && (
         <div
@@ -1062,24 +1110,23 @@ Respond ONLY with valid JSON matching this schema:
             <div
               style={{
                 position: "absolute",
-                width: 140,
-                height: 140,
+                width: 120,
+                height: 120,
                 borderRadius: "50%",
-                background: `radial-gradient(circle, ${themeStyles.accent} 0%, rgba(232, 89, 12, 0) 70%)`,
+                background: isDark
+                  ? "radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%)"
+                  : "radial-gradient(circle, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0) 70%)",
                 transform: `scale(${audioScale * 1.3})`,
                 opacity: 0.6,
                 transition: "transform 0.08s ease-out"
               }}
             />
-            
             <div
               style={{
-                width: 100,
-                height: 100,
+                width: 84,
+                height: 84,
                 borderRadius: "50%",
-                background: speaking
-                  ? "linear-gradient(135deg, #4285F4, #9b51e0)"
-                  : `linear-gradient(135deg, ${themeStyles.accent}, #ff8c00)`,
+                background: isDark ? "#ffffff" : "#000000",
                 transform: `scale(${audioScale})`,
                 boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
                 transition: "transform 0.08s ease-out, background 0.3s ease",
@@ -1088,7 +1135,7 @@ Respond ONLY with valid JSON matching this schema:
                 justifyContent: "center"
               }}
             >
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={isDark ? "#000000" : "#ffffff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 {speaking ? (
                   <>
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -1105,20 +1152,20 @@ Respond ONLY with valid JSON matching this schema:
             </div>
           </div>
 
-          <p style={{ marginTop: 28, color: "#ffffff", fontSize: 16, fontWeight: 500 }}>
+          <p style={{ marginTop: 24, color: "#ffffff", fontSize: 14, fontWeight: 500 }}>
             {transcribing ? "Transcribing speech..." : voiceStatus}
           </p>
 
           <button
             onClick={toggleMic}
             style={{
-              marginTop: 16,
-              padding: "8px 20px",
+              marginTop: 14,
+              padding: "6px 16px",
               borderRadius: 20,
               border: "1px solid rgba(255, 255, 255, 0.3)",
               backgroundColor: "rgba(255, 255, 255, 0.1)",
               color: "#ffffff",
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 500,
               cursor: "pointer"
             }}
@@ -1128,50 +1175,18 @@ Respond ONLY with valid JSON matching this schema:
         </div>
       )}
 
-      {/* Header section */}
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.headerBg, zIndex: 1 }}>
-        {signedIn ? (
-          <button
-            onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
-            title="Chat History"
-            aria-label="Toggle chat history"
-            style={{ backgroundColor: "transparent", border: "none", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={themeStyles.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-            </svg>
-          </button>
-        ) : (
-          <div style={{ width: 20 }} />
-        )}
-
-        <span style={{ fontSize: "14px", fontWeight: 600, color: themeStyles.accent }}>Threadly</span>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            style={{ width: 36, height: 20, borderRadius: 10, backgroundColor: isDark ? "#333" : "#e0e0e0", border: `1px solid ${themeStyles.border}`, padding: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: isDark ? "flex-end" : "flex-start", transition: "all 0.2s", outline: "none" }}
-          >
-            <div style={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: isDark ? themeStyles.accent : "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
-          </button>
-        </div>
-      </header>
-
       {/* History Drawer */}
       {signedIn && (
         <div
           style={{
             position: "absolute",
-            top: 45,
+            top: 0,
             left: 0,
-            width: "50%",
+            width: "60%",
             bottom: 0,
             backgroundColor: themeStyles.drawerBg,
-            zIndex: 50,
-            padding: 16,
+            zIndex: 150,
+            padding: 14,
             overflowY: "auto",
             borderRight: `1px solid ${themeStyles.border}`,
             boxShadow: "4px 0 12px rgba(0,0,0,0.1)",
@@ -1179,23 +1194,23 @@ Respond ONLY with valid JSON matching this schema:
             transition: "transform 0.3s ease-in-out"
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 14, color: themeStyles.textHeading }}>History</h3>
-            <button onClick={() => setShowHistoryDrawer(false)} style={{ backgroundColor: "transparent", border: "none", color: themeStyles.textMuted, fontSize: 16, cursor: "pointer" }}>✕</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 13, color: themeStyles.textHeading }}>History</h3>
+            <button onClick={() => setShowHistoryDrawer(false)} style={{ backgroundColor: "transparent", border: "none", color: themeStyles.textMuted, fontSize: 14, cursor: "pointer" }}>✕</button>
           </div>
 
-          <button onClick={handleStartNewChat} style={{ width: "100%", padding: "8px", borderRadius: 8, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.cardBg, color: themeStyles.textHeading, cursor: "pointer", marginBottom: 16, textAlign: "left", fontSize: 12 }}>
+          <button onClick={handleStartNewChat} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.cardBg, color: themeStyles.textHeading, cursor: "pointer", marginBottom: 14, textAlign: "left", fontSize: 11 }}>
             + New Chat
           </button>
 
           {savedSessions.length === 0 ? (
-            <p style={{ color: themeStyles.textMuted, fontSize: 12 }}>No chat history.</p>
+            <p style={{ color: themeStyles.textMuted, fontSize: 11 }}>No chat history.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {savedSessions.map((session) => (
-                <div key={session.id} onClick={() => handleLoadSession(session)} style={{ padding: "8px 10px", borderRadius: 6, backgroundColor: themeStyles.cardBg, border: `1px solid ${themeStyles.border}`, cursor: "pointer" }}>
-                  <div style={{ fontSize: 12, color: themeStyles.textHeading, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.title}</div>
-                  <div style={{ fontSize: 10, color: themeStyles.textMuted, marginTop: 2 }}>
+                <div key={session.id} onClick={() => handleLoadSession(session)} style={{ padding: "6px 8px", borderRadius: 6, backgroundColor: themeStyles.cardBg, border: `1px solid ${themeStyles.border}`, cursor: "pointer" }}>
+                  <div style={{ fontSize: 11, color: themeStyles.textHeading, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.title}</div>
+                  <div style={{ fontSize: 9, color: themeStyles.textMuted, marginTop: 2 }}>
                     {new Date(session.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -1205,361 +1220,650 @@ Respond ONLY with valid JSON matching this schema:
         </div>
       )}
 
-      {/* Unauthenticated Screen */}
-      {!signedIn && (
-        <main className="content" style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "40px 20px", gap: 4 }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📥✨</div>
-            <h2 style={{ margin: 0, fontSize: 22, color: themeStyles.textHeading }}>Sign in to Threadly</h2>
-            <p style={{ color: themeStyles.textMuted, margin: "12px 0", fontSize: 14 }}>Get AI assistance with your emails and tasks.</p>
-            <button
-              onClick={signIn}
-              disabled={loading}
-              style={{ width: "100%", padding: "14px", borderRadius: "10px", border: "none", backgroundColor: themeStyles.accent, color: "#fff", fontWeight: 600, fontSize: 16, cursor: "pointer" }}
-            >
-              {loading ? "Signing in..." : "Sign in with Google"}
-            </button>
-            {error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 10 }}>{error}</p>}
+      {/* Unauthenticated View */}
+      {!signedIn ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
+          {/* Scrollable Area */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 12px 16px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <h1 style={{ margin: "0 0 8px 0", fontSize: 24, fontWeight: 700, color: themeStyles.textHeading, letterSpacing: "-0.3px" }}>
+                Welcome to Threadly
+              </h1>
+              
+              <p style={{ margin: "0 0 20px 0", fontSize: 14, lineHeight: "1.4", color: themeStyles.text }}>
+                Sign in with Google to search your mail, summarise threads, and draft quick replies.
+              </p>
+            </div>
           </div>
-        </main>
-      )}
 
-      {/* Main Chat / Output View */}
-      {signedIn && (
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-          {chatHistory.length === 0 && (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: themeStyles.textHeading }}>
-                Welcome to Threadly ✨
-              </h3>
-            </div>
-          )}
-
-          {chatHistory.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
-                maxWidth: "85%",
-                backgroundColor: item.sender === "user" ? themeStyles.accent : themeStyles.aiBubbleBg,
-                color: item.sender === "user" ? "#ffffff" : themeStyles.text,
-                padding: "10px 14px",
-                borderRadius: 14,
-                border: item.sender === "ai" ? `1px solid ${themeStyles.border}` : "none",
-                fontSize: 14
-              }}
-            >
-              {item.text && <p style={{ margin: 0 }}>{item.text}</p>}
-
-              {item.threadsList && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-                  {item.threadsList.map((t, idx) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleSelectThread(t.id, t.snippet)}
-                      style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.cardBg, cursor: "pointer", fontSize: 12, color: themeStyles.text }}
-                    >
-                      <strong style={{ color: themeStyles.accent }}>Email #{idx + 1}:</strong> {t.snippet.slice(0, 80)}...
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {item.summary && (
-                <div>
-                  <h4 style={{ marginTop: 0, marginBottom: 6, color: themeStyles.accent }}>Summary Overview</h4>
-                  <p style={{ margin: 0, fontSize: 13, color: themeStyles.textMuted }}>{item.summary.overview}</p>
-
-                  {item.summary.decisions.length > 0 && (
-                    <>
-                      <h5 style={{ margin: "8px 0 2px", color: themeStyles.textHeading }}>Decisions</h5>
-                      <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0, color: themeStyles.textMuted }}>
-                        {item.summary.decisions.map((d, i) => (
-                          <li key={i}>{d.text} <em>({d.status})</em></li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-
-                  {item.summary.actions.length > 0 && (
-                    <>
-                      <h5 style={{ margin: "8px 0 2px", color: themeStyles.textHeading }}>Actions</h5>
-                      <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0, color: themeStyles.textMuted }}>
-                        {item.summary.actions.map((a, i) => (
-                          <li key={i}>{a.text} {a.owner && `— ${a.owner}`}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Draft card preview with send functionality */}
-              {item.draft && (
-                <div style={{ marginTop: 10, padding: 10, backgroundColor: themeStyles.cardBg, borderRadius: 8, border: `1px solid ${themeStyles.border}` }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-                    <label style={{ fontSize: 11, color: themeStyles.textMuted }}>
-                      To:
-                      <input
-                        type="text"
-                        value={item.draft.to}
-                        onChange={(e) => {
-                          const updatedTo = e.target.value
-                          setChatHistory((prev) =>
-                            prev.map((msg) =>
-                              msg.id === item.id && msg.draft
-                                ? { ...msg, draft: { ...msg.draft, to: updatedTo } }
-                                : msg
-                            )
-                          )
-                        }}
-                        disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
-                        style={{ width: "100%", marginTop: 2, padding: 6, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 12, boxSizing: "border-box" }}
-                      />
-                    </label>
-                    <label style={{ fontSize: 11, color: themeStyles.textMuted }}>
-                      Subject:
-                      <input
-                        type="text"
-                        value={item.draft.subject}
-                        onChange={(e) => {
-                          const updatedSubject = e.target.value
-                          setChatHistory((prev) =>
-                            prev.map((msg) =>
-                              msg.id === item.id && msg.draft
-                                ? { ...msg, draft: { ...msg.draft, subject: updatedSubject } }
-                                : msg
-                            )
-                          )
-                        }}
-                        disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
-                        style={{ width: "100%", marginTop: 2, padding: 6, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 12, boxSizing: "border-box" }}
-                      />
-                    </label>
-                  </div>
-                  <textarea
-                    value={item.draft.body}
-                    onChange={(e) => {
-                      const updatedBody = e.target.value
-                      setChatHistory((prev) =>
-                        prev.map((msg) =>
-                          msg.id === item.id && msg.draft
-                            ? { ...msg, draft: { ...msg.draft, body: updatedBody } }
-                            : msg
-                        )
-                      )
-                    }}
-                    disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
-                    style={{
-                      width: "100%",
-                      height: 100,
-                      borderRadius: 6,
-                      border: `1px solid ${themeStyles.border}`,
-                      backgroundColor: themeStyles.inputBg,
-                      color: themeStyles.text,
-                      padding: 8,
-                      fontSize: 12,
-                      resize: "vertical",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                  <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
-                    {item.draft.status === "sent" ? (
-                      <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>✓ Sent successfully</span>
-                    ) : item.draft.status === "sending" ? (
-                      <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Sending...</span>
-                    ) : item.draft.status === "failed" ? (
-                      <>
-                        {item.draft.errorMessage && (
-                          <span style={{ fontSize: 11, color: "#ef4444", marginRight: "auto" }}>
-                            {item.draft.errorMessage}
-                          </span>
-                        )}
-                        <button
-                          onClick={() => executeSendEmail(item.id, item.draft!)}
-                          style={{ padding: "6px 12px", borderRadius: 6, backgroundColor: "#ef4444", color: "#fff", border: "none", cursor: "pointer", fontSize: 12 }}
-                        >
-                          Retry Send
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => executeSendEmail(item.id, item.draft!)}
-                        style={{ padding: "6px 14px", borderRadius: 6, backgroundColor: themeStyles.accent, color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                      >
-                        Send Email
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {summarizing && (
-            <div style={{ alignSelf: "flex-start", color: themeStyles.textMuted, fontSize: 13, fontStyle: "italic" }}>
-              Processing request...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Input controls */}
-      {signedIn && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "0 16px 16px", position: "relative" }}>
-          
-          {chatHistory.length === 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4 }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: themeStyles.textHeading }}>
-                What's the plan?
-              </h2>
-              <button
-                onClick={handleQuickSummarize}
+          {/* Bottom Card & Controls Section */}
+          <div style={{ padding: "0 14px 10px 14px", display: "flex", flexDirection: "column", gap: 10, position: "relative" }}>
+            
+            {/* Options Menu Popover for Guest */}
+            {showOptionsMenu && (
+              <div
                 style={{
-                  alignSelf: "flex-start",
-                  padding: "6px 14px",
-                  borderRadius: 16,
-                  border: `1px solid ${themeStyles.border}`,
-                  backgroundColor: themeStyles.cardBg,
-                  color: themeStyles.textHeading,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+                  position: "absolute",
+                  bottom: 50,
+                  right: 14,
+                  width: 160,
+                  backgroundColor: themeStyles.popoverBg,
+                  border: `1px solid ${themeStyles.popoverBorder}`,
+                  borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  padding: "6px 0",
+                  zIndex: 100,
+                  display: "flex",
+                  flexDirection: "column"
                 }}
               >
-                <span style={{ color: themeStyles.accent }}>📄</span> Summarise
-              </button>
-            </div>
-          )}
+                <button
+                  onClick={() => setTheme(isDark ? "light" : "dark")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    color: themeStyles.textHeading,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  <span>Dark Mode</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: themeStyles.textMuted }}>
+                    {isDark ? "ON" : "OFF"}
+                  </span>
+                </button>
+              </div>
+            )}
 
-          <form
-            onSubmit={handleSendMessage}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", backgroundColor: themeStyles.inputBg, border: `1px solid ${themeStyles.border}`, borderRadius: 20, position: "relative" }}
-          >
-            <div style={{ position: "relative", display: "inline-block" }}>
+            {/* Input Card Container for Sign In */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                border: `1px solid ${themeStyles.inputBorder}`,
+                borderRadius: 14,
+                backgroundColor: themeStyles.cardBg,
+                padding: "12px 14px",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
+              }}
+            >
+              <div style={{ fontSize: 14, color: themeStyles.textMuted, marginBottom: 12 }}>
+                Authentication required
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 400 }}>
+                  Google Account
+                </span>
+
+                <button
+                  onClick={signIn}
+                  disabled={loading}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 18,
+                    border: `1px solid ${themeStyles.inputBorder}`,
+                    backgroundColor: themeStyles.cardBg,
+                    color: themeStyles.textHeading,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: loading ? "default" : "pointer",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 18 18">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.617z"/>
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+                  </svg>
+                  {loading ? "Signing in..." : "Sign in"}
+                </button>
+              </div>
+            </div>
+
+            {error && <p style={{ color: "#ea4335", fontSize: 11, margin: "2px 0 0 4px" }}>{error}</p>}
+
+            {/* Profile Footer Bar (Guest Mode) */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingTop: 6,
+                borderTop: `1px solid ${themeStyles.border}`
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: "50%",
+                    backgroundColor: isDark ? "#333333" : "#e8e3d9",
+                    color: themeStyles.textHeading,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600
+                  }}
+                >
+                  G
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 500, color: themeStyles.textHeading }}>
+                  Guest
+                </span>
+              </div>
+
               <button
-                type="button"
-                onClick={() => setShowAppsMenu((prev) => !prev)}
-                title="Google Apps menu"
-                aria-label="Google Apps menu"
+                onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+                title="Options"
                 style={{
-                  flexShrink: 0,
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
+                  background: "none",
                   border: "none",
-                  backgroundColor: showAppsMenu ? themeStyles.accent : themeStyles.buttonBg,
                   cursor: "pointer",
+                  padding: 3,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: 0,
-                  transition: "background-color 0.2s"
+                  color: themeStyles.textHeading
                 }}
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={showAppsMenu ? "#ffffff" : themeStyles.textHeading}
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{
-                    transform: showAppsMenu ? "rotate(45deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease-in-out"
-                  }}
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
                 </svg>
               </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Authenticated Main Container */
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
+          
+          {/* Scrollable Content Body */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 12px 16px", display: "flex", flexDirection: "column", justifyContent: chatHistory.length === 0 ? "flex-end" : "flex-start" }}>
+            
+            {/* Initial Screen state pushed to bottom when chat history is empty */}
+            {chatHistory.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
+                <h1 style={{ margin: "0 0 8px 0", fontSize: 24, fontWeight: 700, color: themeStyles.textHeading, letterSpacing: "-0.3px" }}>
+                  Welcome to Threadly
+                </h1>
+                
+                <p style={{ margin: "0 0 20px 0", fontSize: 14, lineHeight: "1.4", color: themeStyles.text }}>
+                  Ask anything and Threadly will search your mail. Open a thread to summarise or draft a reply.
+                </p>
 
-              {showAppsMenu && (
-                <div
+                {/* Prompt List Options */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  
+                  {/* Summarise this thread */}
+                  <button
+                    onClick={() => handleUserInstruction("Summarise this thread")}
+                    disabled={!emailOpen}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: emailOpen ? "pointer" : "default",
+                      opacity: emailOpen ? 1 : 0.45,
+                      textAlign: "left"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={themeStyles.textHeading} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="21" y1="6" x2="3" y2="6"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                        <line x1="17" y1="18" x2="3" y2="18"/>
+                      </svg>
+                      <span style={{ fontSize: 14, color: themeStyles.textHeading, fontWeight: 400 }}>Summarise this thread</span>
+                    </div>
+                    {!emailOpen && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Open an email</span>}
+                  </button>
+
+                  {/* Draft a reply to this thread */}
+                  <button
+                    onClick={() => handleUserInstruction("Draft a reply to this thread")}
+                    disabled={!emailOpen}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: emailOpen ? "pointer" : "default",
+                      opacity: emailOpen ? 1 : 0.45,
+                      textAlign: "left"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={themeStyles.textHeading} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
+                      <span style={{ fontSize: 14, color: themeStyles.textHeading, fontWeight: 400 }}>Draft a reply to this thread</span>
+                    </div>
+                    {!emailOpen && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Open an email</span>}
+                  </button>
+
+                </div>
+              </div>
+            ) : (
+              /* Chat Message Feed */
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {chatHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
+                      maxWidth: "88%",
+                      backgroundColor: item.sender === "user" ? themeStyles.accent : themeStyles.aiBubbleBg,
+                      color: item.sender === "user" ? (isDark ? "#000000" : "#ffffff") : themeStyles.text,
+                      padding: "8px 12px",
+                      borderRadius: 12,
+                      border: item.sender === "ai" ? `1px solid ${themeStyles.border}` : "none",
+                      fontSize: 13
+                    }}
+                  >
+                    {item.text && <p style={{ margin: 0, lineHeight: 1.4 }}>{item.text}</p>}
+
+                    {item.threadsList && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                        {item.threadsList.map((t, idx) => (
+                          <button
+                            key={t.id}
+                            onClick={() => handleSelectThread(t.id, t.snippet)}
+                            style={{ textAlign: "left", padding: "6px 8px", borderRadius: 6, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.cardBg, cursor: "pointer", fontSize: 11, color: themeStyles.text }}
+                          >
+                            <strong style={{ color: themeStyles.textHeading }}>Email #{idx + 1}:</strong> {t.snippet.slice(0, 80)}...
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {item.summary && (
+                      <div>
+                        <h4 style={{ marginTop: 0, marginBottom: 4, color: themeStyles.textHeading, fontSize: 13 }}>Summary Overview</h4>
+                        <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted }}>{item.summary.overview}</p>
+
+                        {item.summary.decisions.length > 0 && (
+                          <>
+                            <h5 style={{ margin: "6px 0 2px", color: themeStyles.textHeading, fontSize: 12 }}>Decisions</h5>
+                            <ul style={{ fontSize: 11, paddingLeft: 14, margin: 0, color: themeStyles.textMuted }}>
+                              {item.summary.decisions.map((d, i) => (
+                                <li key={i}>{d.text} <em>({d.status})</em></li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        {item.summary.actions.length > 0 && (
+                          <>
+                            <h5 style={{ margin: "6px 0 2px", color: themeStyles.textHeading, fontSize: 12 }}>Actions</h5>
+                            <ul style={{ fontSize: 11, paddingLeft: 14, margin: 0, color: themeStyles.textMuted }}>
+                              {item.summary.actions.map((a, i) => (
+                                <li key={i}>{a.text} {a.owner && `— ${a.owner}`}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {item.draft && (
+                      <div style={{ marginTop: 8, padding: 8, backgroundColor: themeStyles.cardBg, borderRadius: 6, border: `1px solid ${themeStyles.border}` }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
+                          <label style={{ fontSize: 10, color: themeStyles.textMuted }}>
+                            To:
+                            <input
+                              type="text"
+                              value={item.draft.to}
+                              onChange={(e) => {
+                                const updatedTo = e.target.value
+                                setChatHistory((prev) =>
+                                  prev.map((msg) =>
+                                    msg.id === item.id && msg.draft
+                                      ? { ...msg, draft: { ...msg.draft, to: updatedTo } }
+                                      : msg
+                                  )
+                                )
+                              }}
+                              disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                              style={{ width: "100%", marginTop: 2, padding: 4, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 11, boxSizing: "border-box" }}
+                            />
+                          </label>
+                          <label style={{ fontSize: 10, color: themeStyles.textMuted }}>
+                            Subject:
+                            <input
+                              type="text"
+                              value={item.draft.subject}
+                              onChange={(e) => {
+                                const updatedSubject = e.target.value
+                                setChatHistory((prev) =>
+                                  prev.map((msg) =>
+                                    msg.id === item.id && msg.draft
+                                      ? { ...msg, draft: { ...msg.draft, subject: updatedSubject } }
+                                      : msg
+                                  )
+                                )
+                              }}
+                              disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                              style={{ width: "100%", marginTop: 2, padding: 4, borderRadius: 4, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.inputBg, color: themeStyles.text, fontSize: 11, boxSizing: "border-box" }}
+                            />
+                          </label>
+                        </div>
+                        <textarea
+                          value={item.draft.body}
+                          onChange={(e) => {
+                            const updatedBody = e.target.value
+                            setChatHistory((prev) =>
+                              prev.map((msg) =>
+                                msg.id === item.id && msg.draft
+                                  ? { ...msg, draft: { ...msg.draft, body: updatedBody } }
+                                  : msg
+                              )
+                            )
+                          }}
+                          disabled={item.draft.status !== "draft" && item.draft.status !== "failed"}
+                          style={{
+                            width: "100%",
+                            height: 80,
+                            borderRadius: 4,
+                            border: `1px solid ${themeStyles.border}`,
+                            backgroundColor: themeStyles.inputBg,
+                            color: themeStyles.text,
+                            padding: 6,
+                            fontSize: 11,
+                            resize: "vertical",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                        <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+                          {item.draft.status === "sent" ? (
+                            <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>✓ Sent successfully</span>
+                          ) : item.draft.status === "sending" ? (
+                            <span style={{ fontSize: 11, color: themeStyles.textMuted }}>Sending...</span>
+                          ) : item.draft.status === "failed" ? (
+                            <>
+                              {item.draft.errorMessage && (
+                                <span style={{ fontSize: 10, color: "#ef4444", marginRight: "auto" }}>
+                                  {item.draft.errorMessage}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => executeSendEmail(item.id, item.draft!)}
+                                style={{ padding: "4px 10px", borderRadius: 4, backgroundColor: "#ef4444", color: "#fff", border: "none", cursor: "pointer", fontSize: 11 }}
+                              >
+                                Retry Send
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => executeSendEmail(item.id, item.draft!)}
+                              style={{ padding: "5px 12px", borderRadius: 4, backgroundColor: themeStyles.accent, color: isDark ? "#000" : "#fff", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                            >
+                              Send Email
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {summarizing && (
+                  <div style={{ alignSelf: "flex-start", color: themeStyles.textMuted, fontSize: 12, fontStyle: "italic" }}>
+                    Processing request...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Card & Controls Section */}
+          <div style={{ padding: "0 14px 10px 14px", display: "flex", flexDirection: "column", gap: 10, position: "relative" }}>
+            
+            {/* Options Menu Popover */}
+            {showOptionsMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 50,
+                  right: 14,
+                  width: 160,
+                  backgroundColor: themeStyles.popoverBg,
+                  border: `1px solid ${themeStyles.popoverBorder}`,
+                  borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  padding: "6px 0",
+                  zIndex: 100,
+                  display: "flex",
+                  flexDirection: "column"
+                }}
+              >
+                <button
+                  onClick={() => setShowHistoryDrawer(true)}
                   style={{
-                    position: "absolute",
-                    bottom: "calc(100% + 12px)",
-                    left: 0,
-                    width: 220,
-                    borderRadius: 16,
-                    backgroundColor: themeStyles.cardBg,
-                    border: `1px solid ${themeStyles.border}`,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                    padding: "8px 0",
-                    zIndex: 100
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    color: themeStyles.textHeading,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "left"
                   }}
                 >
-                  <div style={{ padding: "6px 16px 8px 16px", fontSize: 11, fontWeight: 600, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Google Apps
-                  </div>
-                  
-                  {googleAppsList.map((app) => (
-                    <div
-                      key={app.name}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "8px 16px",
-                        cursor: "default",
-                        userSelect: "none",
-                        transition: "background-color 0.15s"
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = themeStyles.menuHoverBg)}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
-                        {app.icon}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: themeStyles.textHeading }}>{app.name}</span>
-                        <span style={{ fontSize: 11, color: themeStyles.textMuted }}>{app.desc}</span>
-                      </div>
-                    </div>
-                  ))}
+                  View History
+                </button>
+
+                <button
+                  onClick={() => setTheme(isDark ? "light" : "dark")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    color: themeStyles.textHeading,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  <span>Dark Mode</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: themeStyles.textMuted }}>
+                    {isDark ? "ON" : "OFF"}
+                  </span>
+                </button>
+
+                <div style={{ height: 1, backgroundColor: themeStyles.popoverBorder, margin: "4px 0" }} />
+
+                <button
+                  onClick={signOut}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    color: "#ef4444",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+
+            {/* Rounded Input Box Card */}
+            <form
+              onSubmit={handleSendMessage}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                border: `1px solid ${themeStyles.inputBorder}`,
+                borderRadius: 14,
+                backgroundColor: themeStyles.cardBg,
+                padding: "12px 14px",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Ask anything across your mail"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={transcribing}
+                style={{
+                  border: "none",
+                  outline: "none",
+                  fontSize: 14,
+                  color: themeStyles.textHeading,
+                  width: "100%",
+                  backgroundColor: "transparent",
+                  marginBottom: 12
+                }}
+              />
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 400 }}>
+                  All mail
+                </span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={toggleMic}
+                    title="Voice search"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: recording ? "#ea4335" : themeStyles.textHeading
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="22" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!message.trim()}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      border: "none",
+                      backgroundColor: themeStyles.accent,
+                      color: isDark ? "#000000" : "#FFFFFF",
+                      cursor: message.trim() ? "pointer" : "default",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: message.trim() ? 1 : 0.4,
+                      transition: "opacity 0.15s, background-color 0.15s"
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="19" x2="12" y2="5"/>
+                      <polyline points="5 12 12 5 19 12"/>
+                    </svg>
+                  </button>
                 </div>
-              )}
+              </div>
+            </form>
+
+            {/* Profile Footer Bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingTop: 6,
+                borderTop: `1px solid ${themeStyles.border}`
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={userName}
+                    style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      backgroundColor: isDark ? "#333333" : "#e8e3d9",
+                      color: themeStyles.textHeading,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    {getInitials(userName || userEmail)}
+                  </div>
+                )}
+                <span style={{ fontSize: 13, fontWeight: 500, color: themeStyles.textHeading }}>
+                  {userName || userEmail || "User"}
+                </span>
+              </div>
+
+              <button
+                onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+                title="Options"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: themeStyles.textHeading
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
+                </svg>
+              </button>
             </div>
 
-            <input
-              type="text"
-              placeholder={transcribing ? "Transcribing..." : "Ask anything..."}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={transcribing}
-              style={{ flex: 1, padding: "6px 4px", border: "none", outline: "none", fontSize: "14px", backgroundColor: "transparent", color: themeStyles.text }}
-            />
-
-            <button
-              type="button"
-              onClick={toggleMic}
-              title={recording ? "Stop Recording" : "Record voice message"}
-              aria-label="Toggle voice recording"
-              style={{ flexShrink: 0, width: 34, height: 34, borderRadius: "50%", border: "none", backgroundColor: recording ? "#ea4335" : themeStyles.buttonBg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={recording ? "#ffffff" : themeStyles.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            </button>
-
-            {message.trim() && (
-              <button
-                type="submit"
-                aria-label="Send message"
-                style={{ width: 34, height: 34, borderRadius: "50%", border: "none", backgroundColor: themeStyles.accent, color: "#ffffff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-              >
-                ↑
-              </button>
-            )}
-          </form>
+          </div>
         </div>
       )}
     </div>
