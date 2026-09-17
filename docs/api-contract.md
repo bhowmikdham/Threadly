@@ -595,8 +595,8 @@ Saved anchors survive correction/retry through anchor_from_request_id; complete
 requests and their results are immutable. Five-minute maximum expiry, actual grants,
 account/preferences/policy versions and padded evidence coverage are checked.
 
-No reservation or event write occurs. Participant zones are display-only. This is
-not yet the assistant scheduling/negotiation handler. Full inputs, clarification and
+No reservation or event write occurs. Participant zones are display-only. These
+direct reads are also used by the typed assistant scheduling handler below. Full inputs, clarification and
 error semantics: [Calendar slots](calendar-slots.md).
 
 ## Meeting negotiation state (B14a)
@@ -611,5 +611,28 @@ publication against source/account/preferences/negotiation changes.
 Historical offers/selection receipts expose `usable` and `blockers`; stored
 `selected` is never a booking approval. New replies invalidate old choices and
 require fresh slot queries before reoffering. Complete routes/examples/status and
-recovery contract: [meeting negotiations](meeting-negotiations.md). B14b assistant
-extraction/continuation/artifacts/replies and B15 event execution remain uninstalled.
+recovery contract: [meeting negotiations](meeting-negotiations.md). B14b1 adds typed
+assistant continuation/artifacts below; extraction, generated replies, later-email
+proposals and B15 event execution remain uninstalled.
+
+## Typed assistant scheduling (B14b1)
+
+`POST /assistant/scheduling-requests` (202) accepts explicit `check_time` or
+`suggest_slots`, saved preference version, optional owned context/message anchor,
+and typed constraints. It atomically saves the pinned request/date anchor and a job.
+The worker reuses B13 and task lease fences; unresolved date/clock/AM-PM/DST fold
+becomes a durable question. Answers use the returned
+`POST /assistant/tasks/{task_id}/scheduling-inputs` URL (202), expected version,
+question ID, idempotency key and only requested typed fields. Original `/inputs`
+and generation release contracts are preserved.
+
+Normal task/history/cancel/events endpoints apply. Task views add `scheduling`
+(saved inputs, null for older tasks). Artifacts are `availability` or `schedule_options`
+with owned B13 query/slot IDs, uncertainty, assumptions and expiry. Their GET adds
+`scheduling_status` with current `usable`, `blockers` and `has_available_options`;
+historical content alone is not current availability. A fresh nonempty query can be
+explicitly adopted into a B14a offer through the existing negotiation endpoint.
+
+`GET /assistant/workflows` advertises the explicit handler. No prose extraction,
+automatic router/compound dispatch, draft, send, approval or booking is added.
+[Complete schemas, examples, errors, flow and recovery](assistant-scheduling.md).

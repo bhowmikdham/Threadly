@@ -18,6 +18,7 @@ from app.assistant import (
     lookup_draft,
     mail_search,
     reads,
+    scheduling,
     steps,
     tasks,
 )
@@ -39,6 +40,7 @@ from app.schemas.continuation import TaskInputRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.mail_search import MailSearchRequest
+from app.schemas.scheduling import SchedulingInputRequest, SchedulingRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
 
@@ -124,6 +126,16 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "external_actions": False,
         },
         "remote_resources_verified": False,
+        "scheduling": {
+            "installed": True,
+            "release": scheduling.RELEASE,
+            "entrypoint": "/assistant/scheduling-requests",
+            "operations": ["check_time", "suggest_slots"],
+            "typed_constraints_required": True,
+            "natural_language_extraction": False,
+            "external_actions": False,
+            "automatic_offer_creation": False,
+        },
         "note": "Configuration only; source and remote prerequisites are checked per request.",
     }
 
@@ -150,12 +162,13 @@ async def task_view(session: AsyncSession, task: AssistantTask) -> dict:
         "task_id": task.id,
         "instruction": task.instruction,
         "read_options": task.read_input,
+        "scheduling": task.scheduling_input,
         "compound": await steps.view(session, task),
         "intent": (
             task.route["decision"]["intent"]
             if task.route
             else task.intent_hint
-            if task.compound_input
+            if task.compound_input or task.scheduling_input
             else "summarise"
             if task.release.get("workflow") == "summary-task-1.0.0"
             else None
@@ -220,6 +233,27 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/scheduling-requests", status_code=202)
+async def submit_scheduling(request: SchedulingRequest, user_id: CurrentUser, session: DB):
+    task = await tasks.submit(session, user_id, request.as_request(), schedule=request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/tasks/{task_id}/scheduling-inputs", status_code=202)
+async def submit_scheduling_input(
+    task_id: str,
+    request: SchedulingInputRequest,
+    user_id: CurrentUser,
+    session: DB,
+):
+    task = await scheduling.accept_input(session, user_id, task_id, request)
     result = await task_view(session, task)
     await session.commit()
     return result
@@ -336,6 +370,12 @@ async def list_tasks(
 @router.get("/artifacts/{artifact_id}")
 async def get_artifact(artifact_id: str, user_id: CurrentUser, session: DB):
     artifact = await draft_review.owned_artifact(session, user_id, artifact_id)
+    task = await tasks.owned_task(session, user_id, artifact.task_id)
+    if task.scheduling_input is not None:
+        # Calendar paths take account/preferences/source before task locks.
+        result = await draft_review.artifact_view(session, task, artifact)
+        result["scheduling_status"] = await scheduling.artifact_usability(session, task, artifact)
+        return result
     task = await tasks.owned_task(session, user_id, artifact.task_id, lock=True)
     if task.release.get("workflow") == reads.RELEASE:
         snapshot = (

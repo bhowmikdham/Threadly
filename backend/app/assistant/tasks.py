@@ -47,7 +47,7 @@ async def owned_task(
 
 
 async def submit(
-    session: AsyncSession, user_id: int, request: AssistantRequest, *, compound=None
+    session: AsyncSession, user_id: int, request: AssistantRequest, *, compound=None, schedule=None
 ) -> AssistantTask:
     value = request.model_dump()
     if request.draft_options is None:
@@ -58,6 +58,8 @@ async def submit(
         value.pop("read_options")  # Retain historical request hashes.
     if compound is not None:
         value["compound_input"] = compound.model_dump()
+    if schedule is not None:
+        value["scheduling_input"] = schedule.model_dump()
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -94,8 +96,15 @@ async def submit(
             request.read_options, context, request.draft_options, request.intent_hint
         )
     draft_input = await bind_input(session, user, request.draft_options, context)
-    accepted_release = summary_quality.wrap_release(release_manifest())
-    if context and context.payload.get("schema_version") == "1.1":
+    scheduling_input = None
+    if schedule is not None:
+        from app.assistant import scheduling
+
+        scheduling_input = await scheduling.bind_input(session, user_id, schedule, context)
+        accepted_release = scheduling.release_manifest()
+    else:
+        accepted_release = summary_quality.wrap_release(release_manifest())
+    if schedule is None and context and context.payload.get("schema_version") == "1.1":
         accepted_release = wrap_release(accepted_release)
     if request.read_options is not None:
         accepted_release = reads.wrap_release(accepted_release)
@@ -118,8 +127,15 @@ async def submit(
                 request_hash=request_hash,
                 instruction=request.instruction,
                 compound_input=compound.model_dump() if compound else None,
+                scheduling_input=scheduling_input,
                 read_input=request.read_options.model_dump() if request.read_options else None,
-                continuation_release=None if compound else continuation.release_manifest(),
+                continuation_release=(
+                    scheduling.continuation_manifest()
+                    if schedule
+                    else None
+                    if compound
+                    else continuation.release_manifest()
+                ),
                 context_snapshot_id=context.id if context else None,
                 intent_hint=request.intent_hint,
                 draft_input=draft_input,
@@ -224,6 +240,7 @@ class JobClaim:
     request_created_at: datetime | None = None
     read_input: dict | None = None
     compound_input: dict | None = None
+    scheduling_input: dict | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -306,6 +323,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.created_at,
         task.read_input,
         task.compound_input,
+        task.scheduling_input,
     )
 
 

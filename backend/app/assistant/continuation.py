@@ -98,6 +98,10 @@ async def question_view(session, task) -> dict | None:
 
 def open_question(session, task, now, *, context_id=None, source_hash=None) -> str | None:
     """Called under the task lease fence, in the same transaction as the stopped state."""
+    if task.scheduling_input is not None:
+        from app.assistant import scheduling
+
+        return scheduling.open_question(session, task, now)
     if task.continuation_release is None:
         return None  # Historical jobs keep their prior terminal behavior.
     validate_release(task.continuation_release)
@@ -326,6 +330,10 @@ async def accept_input(session, user_id: int, task_id: str, request: TaskInputRe
     from app.assistant import tasks
 
     task = await tasks.owned_task(session, user_id, task_id, lock=True)
+    if task.scheduling_input is not None:
+        raise ApiError(
+            409, "scheduling_input_required", "Use this task's scheduling input endpoint."
+        )
     request_hash = digest(request.model_dump())
     existing = await session.scalar(
         select(TaskInput).where(
