@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #33 merge `7a59e31b` includes deterministic Calendar slots; current EC2 revision not reverified |
-| Current feature branch | B14a meeting offer/selection state; assistant scheduling replies and live writes remain pending |
+| Merged source / deployment target | PR #34 merge `8712a92c` includes meeting offers and explicit selection; current EC2 revision not reverified |
+| Current feature branch | B14b1 typed scheduling tasks/clarification/artifacts; extraction/replies and live writes remain pending |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 Current package status and remaining delivery order: [backend-progress.md](backend-progress.md).
@@ -60,8 +60,8 @@ Calendar reads, send approvals or the recovery worker.
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Calendar reads | `/calendar/calendars`, `/calendar/preferences`, `/calendar/freebusy` | `calendar/service.py` → fixed Google httpx reads | Owned versioned preferences and busy/unknown evidence | B12 live Google smoke; [contract](calendar-reads.md) |
 | Slot read/check time | `/calendar/slot-requests` and owned receipt GET | `calendar/slots.py`, `time_resolution.py`, `availability.py` | Stable UTC options, clarification, unknown or fewer/zero slots | B13 local fixtures; [contract](calendar-slots.md); live comparison/policy acceptance pending |
-| Meeting offer/selection state | `/calendar/negotiations` plus offers/selections/close | `calendar/negotiations.py` → fresh B13 exact-time read | Historical versioned offers and explicit selection receipts; no booking approval | B14a local fixtures; [contract](meeting-negotiations.md); B14b assistant integration remains |
-| Assistant scheduling | Existing router can propose operations | B12/B13 direct reads and B14a state installed; assistant handler pending B14b | Target: negotiation and slot-grounded drafts | B14b then exact event writes/recovery B15 |
+| Meeting offer/selection state | `/calendar/negotiations` plus offers/selections/close | `calendar/negotiations.py` → fresh B13 exact-time read | Historical versioned offers and explicit selection receipts; no booking approval | B14a local fixtures; [contract](meeting-negotiations.md); B14b1 typed assistant integration added; extraction/replies remain |
+| Assistant scheduling | `/assistant/scheduling-requests`; task `/scheduling-inputs` | Explicit typed B14b1 worker → B13; saved request/message anchor and typed clarification | Availability/options artifacts with current usability; query IDs support explicit B14a adoption | [Contract](assistant-scheduling.md); B14b2 extraction/replies/later-email proposals, then B15 |
 | Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B14 handler integration; never run supported subset |
 | Email send / event creation | Email proposal/read APIs; Calendar pending | B02–B06 email action services; Calendar B14/B15 pending | Email preview and action/recovery status; live writes gated | Exact payload approval + rechecks + reconciliation |
 

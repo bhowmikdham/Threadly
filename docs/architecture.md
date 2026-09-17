@@ -346,7 +346,8 @@ jobs or model-selected tools. It reuses B01 token refresh, requests narrow Calen
 read scopes only through authenticated reconnect, and requires actual list + freebusy
 grants. Transactions close before network calls; short final account/preferences
 locks fence publication. Saved evidence has explicit per-calendar unknown coverage,
-version checks and expiry. No calendar write or scheduling handler is registered.
+version checks and expiry. This service makes no calendar write; B14b1 adds the
+explicit assistant read handler described below.
 [Calendar lifecycle, diagram and B13 handoff](calendar-reads.md).
 
 ### Deterministic Calendar slots (B13)
@@ -359,8 +360,8 @@ conflicts, notice and up to three options without model arithmetic. Saved explic
 working hours or caller-supplied local context may resolve AM/PM; unknown busy data
 cannot do so. Immutable receipts retain assumptions, source versions and stable IDs.
 
-These direct read routes are not yet a durable assistant scheduling handler. B14 owns
-negotiation/assistant integration and fresh slot selection; B15 owns exact approved
+These direct read routes are reused by B14b1's durable typed scheduling handler. B14 owns
+negotiation, further assistant integration and fresh slot selection; B15 owns exact approved
 booking/recovery. External Calendar changes are not pushed into B12 evidence, so a
 five-minute offer always requires fresh validation before booking. Diagram and full
 contract: [Calendar slots](calendar-slots.md).
@@ -373,9 +374,28 @@ commits a checking receipt, invokes B13 outside DB transactions, then fences exa
 time publication against the same offer/version/source. Unknown/busy/stale results
 cannot select an alternative; superseded checks cannot restore earlier state.
 
-The direct API has no model call, generation task or external write. B14b still owns
-assistant scheduling extraction/continuation, grounded artifacts/replies and later-
+The direct API has no model call, generation task or external write. B14b1 adds typed
+assistant scheduling continuation/artifacts. Remaining B14b work owns extraction, replies and later-
 email proposals; B15 owns event approval/execution/reconciliation. Read `usable`/
 blockers on historical records. Sync's real update timestamp prevents an old slot
 query from passing new-thread adoption after an account-lock wait. Runtime API,
 diagrams and recovery: [meeting negotiations](meeting-negotiations.md).
+
+### Typed assistant scheduling reads (B14b1)
+
+`assistant/scheduling.py` runs explicit `check_time`/`suggest_slots` tasks on the
+existing durable worker. Acceptance pins owned source, preferences, release and
+request/message anchor. A versioned scheduling answer schema reuses B08 storage,
+limits and task fencing without altering older continuation releases. B13 resolves
+typed constraints; saved working hours/context can eliminate needless AM/PM questions.
+
+Short transactions lock account → preferences → source → task. Google reads occur
+outside them; publication verifies a matching owned B13 receipt and current source,
+preferences and lease. Stable query keys per task/input allow completed-read reuse
+after publication failure. Unknown/elapsed/fewer/no slots have distinct honest
+outputs. Artifact GET recomputes usability without rewriting historical content.
+
+No model extraction or generated reply is installed here. The explicit handler
+does not enable Calendar compound routing or mutate negotiations automatically.
+Its query IDs can be adopted through B14a's existing checked offer endpoint.
+[API examples, sequence, error and recovery contract](assistant-scheduling.md).

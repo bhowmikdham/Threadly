@@ -198,6 +198,13 @@ class AssistantTask(TimestampMixin, Base):
         ),
         CheckConstraint("version >= 1 AND latest_sequence >= 1", name="ck_task_versions"),
         CheckConstraint("input_version >= 0 AND input_version <= 5", name="ck_task_input_version"),
+        CheckConstraint(
+            "scheduling_input IS NULL OR (read_input IS NULL AND compound_input IS NULL "
+            "AND COALESCE(draft_input, 'null'::jsonb) = 'null'::jsonb "
+            "AND COALESCE(intent_hint, '') = 'plan_schedule' "
+            "AND COALESCE(release->>'workflow', '') = 'assistant-scheduling-1.0.0')",
+            name="ck_task_scheduling_input",
+        ),
         ForeignKeyConstraint(
             ["final_artifact_id", "id", "user_id"],
             ["artifact_revisions.id", "artifact_revisions.task_id", "artifact_revisions.user_id"],
@@ -214,6 +221,7 @@ class AssistantTask(TimestampMixin, Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     read_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     compound_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    scheduling_input: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     final_artifact_id: Mapped[str | None] = mapped_column(String(36))
     instruction: Mapped[str] = mapped_column(Text)
     context_snapshot_id: Mapped[str | None] = mapped_column(String(36))

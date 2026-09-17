@@ -14,6 +14,7 @@ from app.assistant import (
     reads,
     routing,
     routing_v1,
+    scheduling,
     steps,
     summary_quality,
     ui_routing,
@@ -36,6 +37,9 @@ async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
         claim = await claim_next(session)
     if claim is None:
         return False
+    if claim.release.get("workflow") == scheduling.RELEASE:
+        await scheduling.run_task(factory, claim)
+        return True
     if claim.release.get("workflow") in {steps.RELEASE, lookup_draft.RELEASE}:
         await steps.run_task(factory, claim, model, flow_invoker)
         return True

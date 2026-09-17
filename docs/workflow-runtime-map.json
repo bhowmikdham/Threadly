@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "baseline_commit": "7a59e31baf0c8c2a27b2219f15bcde3ba730dfcf",
+  "baseline_commit": "8712a92c76527852aede9a6d6f4c498e5d663e02",
   "deployment_evidence": {
     "commit": "954b4926d5e0c4928ebecde06f2f67e918d5be06",
     "source": "user-provided DEPLOYMENT_READY log; migration c8291e4a6f03 and health checks passed",
@@ -230,16 +230,34 @@
     },
     {
       "id": "meeting_negotiation_state",
-      "status": "B14a_implemented_in_current_pr",
+      "status": "merged_PR34",
       "entry": "POST/GET /calendar/negotiations; POST/GET owned offers/selections; POST close",
       "handlers": [
         "backend/app/calendar/negotiations.py"
       ],
       "output": "immutable_thread_bound_offers_and_explicit_rechecked_selection_receipts_never_booking_approval",
       "remaining": [
-        "B14b_extraction_continuation_artifacts_replies_and_email_proposals",
+        "B14b2_extraction_review_replies_and_email_proposals",
         "live_calendar_seam",
         "B15_approved_event_execution"
+      ],
+      "checkpoint": "docs/backend-execution/checkpoints/B14.md"
+    },
+    {
+      "id": "typed_assistant_scheduling",
+      "status": "B14b1_implemented_in_current_pr",
+      "entry": "POST /assistant/scheduling-requests; POST /assistant/tasks/{task_id}/scheduling-inputs",
+      "handlers": [
+        "backend/app/assistant/scheduling.py",
+        "backend/app/calendar/slots.py"
+      ],
+      "output": "availability_or_schedule_options_artifact_with_current_usability_and_stored_slot_query_ids",
+      "remaining": [
+        "B14b2_evaluated_extraction_review",
+        "slot_grounded_generated_reply",
+        "later_email_choice_proposals",
+        "live_google_validation",
+        "B15_approved_booking"
       ],
       "checkpoint": "docs/backend-execution/checkpoints/B14.md"
     }
@@ -253,7 +271,7 @@
     "unknown_external_outcome_requires_reconciliation"
   ],
   "next_prs": [
-    "B14b assistant scheduling extraction/continuation, grounded artifacts/replies and delayed-email proposals",
+    "B14b2 evaluated scheduling extraction/review, grounded generated replies and delayed-email proposals",
     "B15 exact approved Calendar execution and recovery",
     "B11 non-calendar plans",
     "Broader B10 planner/graphs and live semantic validation",

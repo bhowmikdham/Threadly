@@ -378,3 +378,24 @@ versions with immutable identity; closed rows cannot reopen. No event IDs, actio
 approvals or worker jobs are created. Thread sync now uses actual update-clock time
 for new-source vs older-query checks. Downgrade refuses with negotiation records;
 existing slot queries survive legal empty rollback. [Lifecycle](meeting-negotiations.md).
+
+## Assistant scheduling (migration `f14026e9a035`, B14b1)
+
+Parent `e14026e9a034`. Nullable `assistant_tasks.scheduling_input` saves the typed
+original request, preference snapshot/version, account version, original request or
+message date anchor, and source hash. A trigger forbids changing this accepted
+input, including attaching it to an old task. A check requires the scheduling
+release/intent and excludes compound/read/draft inputs. Older task rows remain null;
+original request hash calculation excludes the new field for older APIs.
+
+Existing owned task/job/question/input/artifact tables implement scheduling state;
+no new table is added. Questions carry requested fields, choices, route hash and
+saved anchor. Append-only typed answers overlay the original constraints. The task
+effective context stays fixed; a new source needs a new task. Worker publication
+uses its existing lease fence plus current source/Calendar checks. Artifacts point
+to owned B13 queries in their payload/provenance and are validated against the saved
+query; B14a adoption still enforces its own query/owner/thread/version rules.
+
+Downgrade refuses while any scheduling task exists. Legal empty rollback preserves
+older assistant history and Calendar receipts. No migration deletes user data.
+[Runtime lifecycle and concurrency](assistant-scheduling.md).
