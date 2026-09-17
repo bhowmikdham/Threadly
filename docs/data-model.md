@@ -399,3 +399,14 @@ query; B14a adoption still enforces its own query/owner/thread/version rules.
 Downgrade refuses while any scheduling task exists. Legal empty rollback preserves
 older assistant history and Calendar receipts. No migration deletes user data.
 [Runtime lifecycle and concurrency](assistant-scheduling.md).
+
+## Scheduling proposals (migration `f14026e9a036`, B14b2a)
+
+`scheduling_proposals` persists one owner/request-key interpretation receipt before
+model inference. It records immutable original request, context/hash, saved Calendar
+binding (account/preferences/date anchor), release, 15-minute expiry, state,
+result/hash and optional consumed task. Composite context/task foreign keys preserve
+ownership. Input and completed result immutability and legal transitions are guarded
+by PostgreSQL trigger. Exact confirmation and task insertion commit together.
+Downgrade refuses while proposals exist; historical typed scheduling tasks survive
+an otherwise empty rollback. See [contract and state diagram](scheduling-extraction.md).

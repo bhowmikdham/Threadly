@@ -375,7 +375,7 @@ time publication against the same offer/version/source. Unknown/busy/stale resul
 cannot select an alternative; superseded checks cannot restore earlier state.
 
 The direct API has no model call, generation task or external write. B14b1 adds typed
-assistant scheduling continuation/artifacts. Remaining B14b work owns extraction, replies and later-
+assistant scheduling continuation/artifacts. B14b2a adds reviewed command extraction below. Remaining B14b work owns replies and later-
 email proposals; B15 owns event approval/execution/reconciliation. Read `usable`/
 blockers on historical records. Sync's real update timestamp prevents an old slot
 query from passing new-thread adoption after an account-lock wait. Runtime API,
@@ -395,7 +395,20 @@ preferences and lease. Stable query keys per task/input allow completed-read reu
 after publication failure. Unknown/elapsed/fewer/no slots have distinct honest
 outputs. Artifact GET recomputes usability without rewriting historical content.
 
-No model extraction or generated reply is installed here. The explicit handler
+This typed handler does not itself call a model; B14b2a preparation is described below.
+Generated replies remain open. The explicit handler
 does not enable Calendar compound routing or mutate negotiations automatically.
 Its query IDs can be adopted through B14a's existing checked offer endpoint.
 [API examples, sequence, error and recovery contract](assistant-scheduling.md).
+
+### Reviewed scheduling extraction (B14b2a)
+
+A separate `/assistant/scheduling-proposals` surface reserves a durable receipt,
+releases DB locks, calls the configured model once for whole-command clauses and
+literal word spans, then deterministically normalizes supported scheduling phrases.
+No email source text enters this prompt. The user reviews the saved proposal and
+confirms its exact hash before `tasks.submit` receives the pinned original scheduling
+binding. Existing B14b1/B13 clarification, Google reads and publication fences remain
+in force. Account/preferences/source locks precede proposal/task locks. This is a
+backend preparation step, not a newly provisioned AWS master Flow. Workflow/state
+charts, unsupported combinations and live-quality gate: [contract](scheduling-extraction.md).

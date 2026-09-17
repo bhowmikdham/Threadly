@@ -1,0 +1,95 @@
+{
+  "release": "reviewed-scheduling-extraction-1.0.0",
+  "contract_hash": "748db394e9049577b391c863ab47ed12357eb16f3c044fb28572dfdc5e53711f",
+  "evaluation": "synthetic_output_contract_replay",
+  "live_model_evaluated": false,
+  "case_count": 17,
+  "passed": 17,
+  "cases": [
+    {
+      "id": "bare-four",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "afternoon-context",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "three-next-week",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "explicit-zone",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "explicit-iso",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "missing-date",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "missing-time",
+      "passed": true,
+      "state": "proposed"
+    },
+    {
+      "id": "mixed-actions",
+      "passed": true,
+      "state": "unsupported"
+    },
+    {
+      "id": "booking",
+      "passed": true,
+      "state": "unsupported"
+    },
+    {
+      "id": "alternatives",
+      "passed": true,
+      "state": "unsupported"
+    },
+    {
+      "id": "unsupported-weekday",
+      "passed": true,
+      "state": "needs_clarification"
+    },
+    {
+      "id": "vague-zone",
+      "passed": true,
+      "state": "needs_clarification"
+    },
+    {
+      "id": "too-many-options",
+      "passed": true,
+      "state": "needs_clarification"
+    },
+    {
+      "id": "wrong-operation",
+      "passed": true,
+      "state": "needs_clarification"
+    },
+    {
+      "id": "attendee",
+      "passed": true,
+      "state": "unsupported"
+    },
+    {
+      "id": "injection",
+      "passed": true,
+      "state": "unsupported"
+    },
+    {
+      "id": "recurrence",
+      "passed": true,
+      "state": "unsupported"
+    }
+  ]
+}

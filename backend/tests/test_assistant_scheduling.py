@@ -673,7 +673,9 @@ def test_internal_route_stays_explicit_and_wrong_answer_endpoint_fails(
     )
     assert wrong.status_code == 409 and wrong.json()["error"]["code"] == "scheduling_input_required"
     config = db_client.get("/assistant/workflows", headers=auth_headers(1)).json()["scheduling"]
-    assert config["typed_constraints_required"] and not config["natural_language_extraction"]
+    assert config["typed_constraints_required"] and config["natural_language_extraction"] is True
+    assert config["extraction"]["requires_complete_request_review"]
+    assert config["extraction"]["entrypoint"] == "/assistant/scheduling-proposals"
 
 
 def test_saved_anchor_timezone_and_dst_questions_are_preserved():

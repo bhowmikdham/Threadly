@@ -47,7 +47,13 @@ async def owned_task(
 
 
 async def submit(
-    session: AsyncSession, user_id: int, request: AssistantRequest, *, compound=None, schedule=None
+    session: AsyncSession,
+    user_id: int,
+    request: AssistantRequest,
+    *,
+    compound=None,
+    schedule=None,
+    schedule_binding=None,
 ) -> AssistantTask:
     value = request.model_dump()
     if request.draft_options is None:
@@ -60,6 +66,10 @@ async def submit(
         value["compound_input"] = compound.model_dump()
     if schedule is not None:
         value["scheduling_input"] = schedule.model_dump()
+    if schedule_binding is not None:
+        if schedule is None or schedule_binding["request"] != schedule.model_dump():
+            raise ValueError("Scheduling binding does not match the request")
+        value["schedule_binding"] = schedule_binding
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -100,7 +110,13 @@ async def submit(
     if schedule is not None:
         from app.assistant import scheduling
 
-        scheduling_input = await scheduling.bind_input(session, user_id, schedule, context)
+        if schedule_binding is not None:
+            await scheduling.check_current(
+                session, user_id, schedule_binding, request.context_snapshot_id
+            )
+            scheduling_input = schedule_binding
+        else:
+            scheduling_input = await scheduling.bind_input(session, user_id, schedule, context)
         accepted_release = scheduling.release_manifest()
     else:
         accepted_release = summary_quality.wrap_release(release_manifest())

@@ -19,6 +19,7 @@ from app.assistant import (
     mail_search,
     reads,
     scheduling,
+    scheduling_proposals,
     steps,
     tasks,
 )
@@ -41,6 +42,7 @@ from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.mail_search import MailSearchRequest
 from app.schemas.scheduling import SchedulingInputRequest, SchedulingRequest
+from app.schemas.scheduling_proposal import ConfirmSchedulingProposal, SchedulingProposalRequest
 from app.schemas.ui_context import UIContextSnapshotRequest
 from app.workflows import registry
 
@@ -132,7 +134,14 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "entrypoint": "/assistant/scheduling-requests",
             "operations": ["check_time", "suggest_slots"],
             "typed_constraints_required": True,
-            "natural_language_extraction": False,
+            "natural_language_extraction": True,
+            "extraction": {
+                "installed": True,
+                "release": scheduling_proposals.extraction.RELEASE,
+                "entrypoint": "/assistant/scheduling-proposals",
+                "requires_complete_request_review": True,
+                "live_model_evaluated": False,
+            },
             "external_actions": False,
             "automatic_offer_creation": False,
         },
@@ -233,6 +242,35 @@ async def get_context(context_id: str, user_id: CurrentUser, session: DB):
 @router.post("/requests", status_code=202)
 async def submit_request(request: AssistantRequest, user_id: CurrentUser, session: DB):
     task = await tasks.submit(session, user_id, request)
+    result = await task_view(session, task)
+    await session.commit()
+    return result
+
+
+@router.post("/scheduling-proposals", status_code=202)
+async def propose_scheduling(request: SchedulingProposalRequest, user_id: CurrentUser, session: DB):
+    proposal, created = await scheduling_proposals.reserve(session, user_id, request)
+    await session.commit()  # Never keep account/preferences/source locks across model inference.
+    if created:
+        state, result = await scheduling_proposals.interpret(proposal)
+        proposal = await scheduling_proposals.complete(session, user_id, proposal.id, state, result)
+    result = await scheduling_proposals.view(session, proposal)
+    await session.commit()
+    return result
+
+
+@router.get("/scheduling-proposals/{proposal_id}")
+async def get_scheduling_proposal(proposal_id: str, user_id: CurrentUser, session: DB):
+    return await scheduling_proposals.view(
+        session, await scheduling_proposals.owned(session, user_id, proposal_id)
+    )
+
+
+@router.post("/scheduling-proposals/{proposal_id}/confirm", status_code=202)
+async def confirm_scheduling_proposal(
+    proposal_id: str, request: ConfirmSchedulingProposal, user_id: CurrentUser, session: DB
+):
+    task = await scheduling_proposals.confirm(session, user_id, proposal_id, request)
     result = await task_view(session, task)
     await session.commit()
     return result

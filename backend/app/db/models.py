@@ -707,6 +707,56 @@ class CommandPlan(Base):
     )
 
 
+class SchedulingProposal(Base):
+    """Immutable scheduling interpretation and pinned source/preferences/anchor."""
+
+    __tablename__ = "scheduling_proposals"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id", name="uq_scheduling_proposal_request"),
+        ForeignKeyConstraint(
+            ["context_snapshot_id", "user_id"],
+            ["context_snapshots.id", "context_snapshots.user_id"],
+            ondelete="CASCADE",
+            name="fk_scheduling_proposal_context",
+        ),
+        ForeignKeyConstraint(
+            ["task_id", "user_id"],
+            ["assistant_tasks.id", "assistant_tasks.user_id"],
+            ondelete="CASCADE",
+            name="fk_scheduling_proposal_task",
+        ),
+        CheckConstraint(
+            "state IN ('planning','proposed','needs_clarification','unsupported',"
+            "'failed','expired','consumed')",
+            name="ck_scheduling_proposal_state",
+        ),
+        CheckConstraint(
+            "(state = 'consumed') = (task_id IS NOT NULL)",
+            name="ck_scheduling_proposal_consumed",
+        ),
+        CheckConstraint(
+            "state NOT IN ('proposed','consumed') OR "
+            "(result IS NOT NULL AND plan_hash IS NOT NULL)",
+            name="ck_scheduling_proposal_result",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    request: Mapped[dict] = mapped_column(JSONB)
+    context_snapshot_id: Mapped[str | None] = mapped_column(String(36))
+    binding: Mapped[dict] = mapped_column(JSONB)
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    release: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(24))
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    plan_hash: Mapped[str | None] = mapped_column(String(64))
+    task_id: Mapped[str | None] = mapped_column(String(36))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CalendarPreference(TimestampMixin, Base):
     __tablename__ = "calendar_preferences"
     __table_args__ = (
