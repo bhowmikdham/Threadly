@@ -364,3 +364,18 @@ negotiation/assistant integration and fresh slot selection; B15 owns exact appro
 booking/recovery. External Calendar changes are not pushed into B12 evidence, so a
 five-minute offer always requires fresh validation before booking. Diagram and full
 contract: [Calendar slots](calendar-slots.md).
+
+### Meeting negotiation foundation (B14a)
+
+`calendar/negotiations.py` groups immutable B13 offers and explicit selection checks
+under an owned synced thread. It locks account → preferences → thread → negotiation,
+commits a checking receipt, invokes B13 outside DB transactions, then fences exact-
+time publication against the same offer/version/source. Unknown/busy/stale results
+cannot select an alternative; superseded checks cannot restore earlier state.
+
+The direct API has no model call, generation task or external write. B14b still owns
+assistant scheduling extraction/continuation, grounded artifacts/replies and later-
+email proposals; B15 owns event approval/execution/reconciliation. Read `usable`/
+blockers on historical records. Sync's real update timestamp prevents an old slot
+query from passing new-thread adoption after an account-lock wait. Runtime API,
+diagrams and recovery: [meeting negotiations](meeting-negotiations.md).

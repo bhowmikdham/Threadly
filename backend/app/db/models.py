@@ -62,7 +62,10 @@ class User(TimestampMixin, Base):
 
 class Thread(TimestampMixin, Base):
     __tablename__ = "threads"
-    __table_args__ = (UniqueConstraint("user_id", "gmail_thread_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "gmail_thread_id"),
+        UniqueConstraint("id", "user_id", name="uq_thread_owner"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -778,3 +781,144 @@ class CalendarSlotRequest(Base):
     error_code: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class MeetingNegotiation(Base):
+    __tablename__ = "meeting_negotiations"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_meeting_owner"),
+        UniqueConstraint("user_id", "request_id", name="uq_meeting_request"),
+        ForeignKeyConstraint(
+            ["thread_id", "user_id"],
+            ["threads.id", "threads.user_id"],
+            ondelete="CASCADE",
+            name="fk_meeting_thread_owner",
+        ),
+        ForeignKeyConstraint(
+            ["current_offer_id", "id", "user_id"],
+            ["meeting_offers.id", "meeting_offers.negotiation_id", "meeting_offers.user_id"],
+            use_alter=True,
+            name="fk_meeting_current_offer",
+        ),
+        ForeignKeyConstraint(
+            ["current_selection_id", "id", "user_id"],
+            [
+                "meeting_selections.id",
+                "meeting_selections.negotiation_id",
+                "meeting_selections.user_id",
+            ],
+            use_alter=True,
+            name="fk_meeting_current_selection",
+        ),
+        CheckConstraint("version >= 1", name="ck_meeting_version"),
+        CheckConstraint(
+            "(state='open' AND current_offer_id IS NULL AND current_selection_id IS NULL) OR "
+            "(state IN ('offered','checking','selected') AND current_offer_id IS NOT NULL) OR "
+            "state='closed'", name="ck_meeting_offer_pointer",
+        ),
+        CheckConstraint(
+            "state NOT IN ('checking','selected') OR current_selection_id IS NOT NULL",
+            name="ck_meeting_selection_pointer",
+        ),
+        CheckConstraint(
+            "(state='closed' AND close_request_id IS NOT NULL AND close_request_hash IS NOT NULL) "
+            "OR (state!='closed' AND close_request_id IS NULL AND close_request_hash IS NULL)",
+            name="ck_meeting_close_receipt",
+        ),
+        CheckConstraint(
+            "state IN ('open','offered','checking','selected','closed')", name="ck_meeting_state"
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    thread_id: Mapped[int]
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    policy_version: Mapped[str] = mapped_column(String(80))
+    version: Mapped[int]
+    state: Mapped[str] = mapped_column(String(20))
+    current_offer_id: Mapped[str | None] = mapped_column(String(36))
+    current_selection_id: Mapped[str | None] = mapped_column(String(36))
+    close_request_id: Mapped[str | None] = mapped_column(String(128))
+    close_request_hash: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MeetingOffer(Base):
+    __tablename__ = "meeting_offers"
+    __table_args__ = (
+        UniqueConstraint("id", "negotiation_id", "user_id", name="uq_meeting_offer_owner"),
+        UniqueConstraint("negotiation_id", "request_id", name="uq_meeting_offer_request"),
+        UniqueConstraint("negotiation_id", "revision", name="uq_meeting_offer_revision"),
+        ForeignKeyConstraint(
+            ["negotiation_id", "user_id"],
+            ["meeting_negotiations.id", "meeting_negotiations.user_id"],
+            ondelete="CASCADE",
+            name="fk_meeting_offer_negotiation",
+        ),
+        ForeignKeyConstraint(
+            ["slot_request_id", "user_id"],
+            ["calendar_slot_requests.id", "calendar_slot_requests.user_id"],
+            name="fk_meeting_offer_slots",
+        ),
+        CheckConstraint(
+            "revision >= 1 AND created_version >= 2 AND thread_version >= 0 "
+            "AND expires_at > created_at",
+            name="ck_meeting_offer_versions",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    negotiation_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[int]
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    revision: Mapped[int]
+    created_version: Mapped[int]
+    thread_version: Mapped[int]
+    slot_request_id: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MeetingSelection(Base):
+    __tablename__ = "meeting_selections"
+    __table_args__ = (
+        UniqueConstraint("id", "negotiation_id", "user_id", name="uq_meeting_selection_owner"),
+        UniqueConstraint("negotiation_id", "request_id", name="uq_meeting_selection_request"),
+        ForeignKeyConstraint(
+            ["negotiation_id", "user_id"],
+            ["meeting_negotiations.id", "meeting_negotiations.user_id"],
+            ondelete="CASCADE",
+            name="fk_meeting_selection_negotiation",
+        ),
+        ForeignKeyConstraint(
+            ["offer_id", "negotiation_id", "user_id"],
+            ["meeting_offers.id", "meeting_offers.negotiation_id", "meeting_offers.user_id"],
+            name="fk_meeting_selection_offer",
+        ),
+        ForeignKeyConstraint(
+            ["checked_slot_request_id", "user_id"],
+            ["calendar_slot_requests.id", "calendar_slot_requests.user_id"],
+            name="fk_meeting_selection_check",
+        ),
+        CheckConstraint(
+            "created_version >= 3 AND expires_at > created_at", name="ck_meeting_selection_versions"
+        ),
+        CheckConstraint(
+            "state IN ('checking','selected','conflict','unknown','failed','superseded')",
+            name="ck_meeting_selection_state",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    negotiation_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[int]
+    offer_id: Mapped[str] = mapped_column(String(36))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    created_version: Mapped[int]
+    slot_id: Mapped[str] = mapped_column(String(36))
+    state: Mapped[str] = mapped_column(String(20))
+    checked_slot_request_id: Mapped[str | None] = mapped_column(String(36))
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -15,8 +15,11 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "d13026e9a033"
+HEAD = "e14026e9a034"
 NEW_TABLES = {
+    "meeting_negotiations",
+    "meeting_offers",
+    "meeting_selections",
     "calendar_slot_requests",
     "calendar_preferences",
     "calendar_evidence",

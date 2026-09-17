@@ -716,7 +716,7 @@
     {
       "id": "B14",
       "title": "Add scheduling offers and meeting negotiation state",
-      "status": "planned",
+      "status": "in_progress",
       "work_packages": [
         "T06",
         "T11",
