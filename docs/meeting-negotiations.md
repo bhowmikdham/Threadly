@@ -12,8 +12,9 @@ user choices; untrusted email/model text cannot call a booking action through th
 
 ## API sequence
 
-All routes below require JWT ownership, actual Calendar read grants and return
-`Cache-Control: no-store`. Gmail thread IDs and current thread versions are available
+All routes below require JWT ownership and return `Cache-Control: no-store`.
+Calendar read grants are required except for the local close operation, which
+still works after grant revocation/disconnection and makes no provider call. Gmail thread IDs and current thread versions are available
 from `GET /threads` or thread detail. Slot/offer/selection IDs are UUIDs returned by
 these APIs; never generate replacements for the stored IDs in the UI/model.
 

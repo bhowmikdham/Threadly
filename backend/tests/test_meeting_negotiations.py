@@ -17,6 +17,7 @@ from app.db.models import (
     MeetingOffer,
     MeetingSelection,
     Thread,
+    User,
 )
 from app.schemas.calendar import CalendarCoverage, SavePreferences
 from app.schemas.negotiations import CloseNegotiation, OfferRequest, SelectOffer
@@ -594,3 +595,32 @@ def test_publication_failure_leaves_checking_receipt_without_partial_selection(
     asyncio.run(verify())
     monkeypatch.setattr(negotiations, "selection_view", original)
     assert select_slot(db_client, auth_headers, neg, offer).json()["state"] == "checking"
+
+
+@pytest.mark.parametrize("change", ["revoked", "disconnected"])
+def test_owner_can_close_after_calendar_access_loss(
+    db_client, db_sessionmaker, auth_headers, setup, change
+):
+    neg, offer, _ = make_offer(db_client, auth_headers)
+
+    async def revoke():
+        async with db_sessionmaker() as session:
+            user = await session.get(User, 1)
+            if change == "revoked":
+                user.google_scopes = []
+            else:
+                user.google_connected = False
+            await session.commit()
+
+    asyncio.run(revoke())
+    before = len(setup.calls)
+    assert select_slot(db_client, auth_headers, neg, offer).status_code == 403
+    path = f"/calendar/negotiations/{neg['id']}/close"
+    body = {"request_id": "close-offline", "expected_version": 2}
+    assert db_client.post(path, headers=auth_headers(2), json=body).status_code == 404
+    response = db_client.post(path, headers=auth_headers(1), json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()["state"] == "closed"
+    assert not response.json()["current_offer"]["usable"]
+    assert db_client.post(path, headers=auth_headers(1), json=body).json() == response.json()
+    assert len(setup.calls) == before

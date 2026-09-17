@@ -15,6 +15,7 @@ from app.db.models import (
     MeetingOffer,
     MeetingSelection,
     Thread,
+    User,
 )
 from app.schemas.calendar import parse_instant
 from app.schemas.negotiations import POLICY, NegotiationOut, OfferOut, SelectionOut
@@ -44,10 +45,13 @@ async def owned(session, model, owner, identifier, negotiation_id=None):
     return row
 
 
-async def locked(session, owner, identifier):
+async def locked(session, owner, identifier, *, require_calendar=True):
     neg = await owned(session, MeetingNegotiation, owner, identifier)
     # Same first locks as B12/B13; sync also serializes account before thread changes.
-    await service.account(session, owner, lock=True)
+    if require_calendar:
+        await service.account(session, owner, lock=True)
+    elif await session.get(User, owner, with_for_update=True, populate_existing=True) is None:
+        raise ApiError(401, "unauthorized", "Account no longer exists.")
     await session.get(CalendarPreference, owner, with_for_update=True)
     thread = await session.scalar(
         select(Thread).where(Thread.id == neg.thread_id, Thread.user_id == owner).with_for_update()
@@ -415,7 +419,8 @@ async def finish(owner, identifier, receipt_id, checked_id, error_code):
 
 async def close(owner, identifier, body):
     async with get_session_factory()() as session:
-        neg, thread = await locked(session, owner, identifier)
+        # Closing is a local owner decision, even after provider access is revoked.
+        neg, thread = await locked(session, owner, identifier, require_calendar=False)
         if neg.state == "closed" and neg.close_request_id == body.request_id:
             if neg.close_request_hash != hashed(body):
                 raise ApiError(409, "idempotency_conflict", "Close key used for different input.")
