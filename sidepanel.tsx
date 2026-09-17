@@ -541,6 +541,113 @@ Respond ONLY with valid JSON matching this schema:
     }
   }
 
+  // Generates a brand-new email (not a reply) from a recipient address and a topic/instruction.
+  const generateComposeEmail = async (
+    toEmail: string,
+    topic: string
+  ): Promise<{ subject: string; body: string }> => {
+    const prompt = `You are an AI assistant composing a brand new email on behalf of the user. This is NOT a reply to any existing thread — there is no prior context to reference.
+
+Recipient: ${toEmail}
+Topic / instructions from the user: "${topic}"
+
+Write a clear, polite, professional email body covering the topic. Also write a concise, relevant subject line. Do NOT prefix the subject with "Re:" since this is a new email, not a reply.
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "subject": "string",
+  "body": "string (the plain text email body content)"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      }
+    )
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error?.message || "Failed to generate composed email.")
+    }
+
+    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}"
+    rawText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim()
+
+    const parsed = JSON.parse(rawText)
+    return {
+      subject: parsed.subject || "New message",
+      body: parsed.body || ""
+    }
+  }
+
+  // Handle a "compose a new email" instruction, e.g.
+  // "Compose an email to: jane@example.com, talking about the Q3 roadmap."
+  // Produces a standalone draft with no threadId/inReplyTo — sending it creates a brand
+  // new email rather than replying in any existing thread.
+  const handleComposeEmail = async (instruction: string, reciteVoice: boolean = false) => {
+    setSummarizing(true)
+
+    try {
+      // Look for an address right after "to" (with or without a colon) first, since that's
+      // the expected phrasing; fall back to scanning the whole instruction for anything
+      // email-shaped if that doesn't match.
+      const toMatch = instruction.match(/\bto:?\s*([^\s,]+@[^\s,;]+)/i)
+      const toEmail = extractEmailAddress(toMatch?.[1] || instruction)
+
+      if (!toEmail) {
+        const errorText =
+          'I couldn\'t find a recipient address. Try something like: "Compose an email to: name@example.com, talking about the project update."'
+        setChatHistory((prev) => [
+          ...prev,
+          { id: Date.now().toString(), sender: "ai", text: errorText }
+        ])
+        if (reciteVoice) speakText(errorText)
+        setSummarizing(false)
+        return
+      }
+
+      // The topic is everything after "about"/"talking about"/"regarding"; fall back to the
+      // full instruction if none of those keywords are present.
+      const topicMatch = instruction.match(/(?:talking about|about|regarding)\s*[:\-]?\s*(.+)$/i)
+      const topic = (topicMatch?.[1] || instruction).trim()
+
+      const generated = await generateComposeEmail(toEmail, topic)
+
+      const draftMessage: ChatMessage = {
+        id: Date.now().toString(),
+        sender: "ai",
+        text: "I've composed a new email for you. Review it and click send when ready:",
+        draft: {
+          to: toEmail,
+          subject: generated.subject,
+          body: generated.body,
+          status: "draft"
+          // no threadId / inReplyTo — this is intentionally a brand new email
+        }
+      }
+
+      setChatHistory((prev) => [...prev, draftMessage])
+
+      if (reciteVoice) {
+        speakText("I composed a new email for you. Review it in the side panel.")
+      }
+    } catch (err: any) {
+      setChatHistory((prev) => [
+        ...prev,
+        { id: Date.now().toString(), sender: "ai", text: `Compose error: ${err.message}` }
+      ])
+      if (reciteVoice) speakText(`Sorry, I couldn't compose that email. ${err.message}`)
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
   // Handle drafting routine when requested
   const handleReplyDraft = async (instruction: string, reciteVoice: boolean = false) => {
     setSummarizing(true)
@@ -803,15 +910,18 @@ Respond ONLY with valid JSON matching this schema:
       { id: Date.now().toString(), sender: "user", text: userText }
     ])
 
+    const isComposeIntent = /^compose\b/i.test(userText) || /\bcompose\s+(an\s+)?email\b/i.test(userText)
     const isReplyIntent = /^reply\b/i.test(userText)
     const isSummarizeIntent = /summarise|summarize/i.test(userText)
 
-    if (isReplyIntent) {
+    if (isComposeIntent) {
+      handleComposeEmail(userText, reciteVoice)
+    } else if (isReplyIntent) {
       handleReplyDraft(userText, reciteVoice)
     } else if (isSummarizeIntent) {
       handleSmartSummarize(reciteVoice)
     } else {
-      const resp = "I can help summarize emails or draft replies. Try saying 'reply saying yes' or 'Summarise'."
+      const resp = "I can help summarize emails, draft replies, or compose new emails. Try 'Summarise', 'reply saying yes', or 'Compose an email to: name@example.com, talking about the project update.'"
       setChatHistory((prev) => [
         ...prev,
         { id: (Date.now() + 1).toString(), sender: "ai", text: resp }
