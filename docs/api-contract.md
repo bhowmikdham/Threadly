@@ -584,3 +584,17 @@ Read-only incremental consent is opt-in on authenticated Google reconnect.
 Partial/omitted/invalid per-calendar results mean unknown; no slot/free/booking
 claim is made. Account/preference changes during network reads prevent publication.
 Full schemas, examples, limits, errors and live gate: [Calendar reads](calendar-reads.md).
+
+## Deterministic Calendar slots (B13)
+
+`POST /calendar/slot-requests` (202) accepts a typed date/time query, idempotency
+request_id and expected_preferences_version. `GET /calendar/slot-requests/{UUID}`
+returns an owned fresh receipt. Direct bounded reads return up to three stable UTC
+options/local labels, explicit clarification, zero/fewer options or unknown coverage.
+Saved anchors survive correction/retry through anchor_from_request_id; complete
+requests and their results are immutable. Five-minute maximum expiry, actual grants,
+account/preferences/policy versions and padded evidence coverage are checked.
+
+No reservation or event write occurs. Participant zones are display-only. This is
+not yet the assistant scheduling/negotiation handler. Full inputs, clarification and
+error semantics: [Calendar slots](calendar-slots.md).

@@ -10,8 +10,8 @@ all target workflows are installed. Machine-readable companion:
 |---|---|
 | EC2 host, API, DB and worker | User-supplied deployment output confirms PR #23 / `954b492`, migration `c8291e4a6f03`, API and dependency checks passed |
 | Provider connectivity on that deployment | Output explicitly reports Bedrock model selection and Google OAuth configuration pending |
-| Merged source / deployment target | PR #31 merge `aeefd320` includes reviewed compound-command plans; current EC2 revision not reverified |
-| Current feature branch | B12 Calendar read preferences/evidence; scheduling and live writes remain gated |
+| Merged source / deployment target | PR #32 merge `eff310eb` includes Calendar read foundations; current EC2 revision not reverified |
+| Current feature branch | B13 deterministic slot read API; assistant negotiation and live writes remain gated |
 | Trained BERT / auth work in another checkout | Auth seed copied into an isolated branch and completed; original checkout/classifier work preserved |
 
 Current package status and remaining delivery order: [backend-progress.md](backend-progress.md).
@@ -59,8 +59,9 @@ Calendar reads, send approvals or the recovery worker.
 | Reviewed compound command | `/assistant/command-plans` then exact `/confirm` | `planner/command.py` + `command_plans.py` → existing task worker | Saved complete-command proposal, then one confirmed compound task | B10c merged PR #31; four pairs only, live semantic quality/automatic dispatch pending |
 | Non-calendar plan | Existing router can recognise intent | Handler pending B11 | Target: editable plan, confirmed commitments | B10 broader execution / B11 |
 | Calendar reads | `/calendar/calendars`, `/calendar/preferences`, `/calendar/freebusy` | `calendar/service.py` → fixed Google httpx reads | Owned versioned preferences and busy/unknown evidence | B12 live Google smoke; [contract](calendar-reads.md) |
-| Schedule/check time/slots | Existing router can propose operations | B12 read API installed; scheduling handler pending B13/B14 | Target: authoritative slots and negotiation | Live Calendar smoke, deterministic time calculations and negotiation |
-| Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B12/B13; never run supported subset |
+| Slot read/check time | `/calendar/slot-requests` and owned receipt GET | `calendar/slots.py`, `time_resolution.py`, `availability.py` | Stable UTC options, clarification, unknown or fewer/zero slots | B13 local fixtures; [contract](calendar-slots.md); live comparison/policy acceptance pending |
+| Assistant scheduling | Existing router can propose operations | B12/B13 direct read APIs installed; assistant handler pending B14 | Target: negotiation and slot-grounded drafts | B14 then exact event writes/recovery B15 |
+| Summary + slots + reply | Complete-plan contract is documented | Full graph not installed | Target: separate summary and slot-grounded draft | B10 planner + B14 handler integration; never run supported subset |
 | Email send / event creation | Email proposal/read APIs; Calendar pending | B02–B06 email action services; Calendar B14/B15 pending | Email preview and action/recovery status; live writes gated | Exact payload approval + rechecks + reconciliation |
 
 ## Fastest route to useful testing
@@ -124,8 +125,8 @@ checkout blindly or enable a sender before its recovery implementation exists.
 | Changed thread during generation | Source error; historical output unchanged | Local compound regression |
 | Cross-user capture/task/step/artifact | No data exposure or cross-owner references | Local ownership / DB constraints |
 | “Summarise, don't reply, check tomorrow” | Preserve negation and all clauses; no partial execution | Full planner + Calendar pending |
-| “Tomorrow at 4” in context | Resolve from sufficient context; clarify genuine ambiguity | Continuation foundation exists; Calendar time engine pending |
-| Three requested slots, only one free | Return one grounded option, no invented slots | B12 reads implemented; B13 pending |
+| “Tomorrow at 4” in context | Resolve from sufficient context; clarify genuine ambiguity | B13 uses saved anchor/context/work hours; genuine ambiguity asks, DST fixtures pass |
+| Three requested slots, only one free | Return one grounded option, no invented slots | B13 independent interval cases return fewer options; live seam pending |
 | Edit after action approval | Old approval cannot authorize changed payload | B04 approval/edit races and B05 mock dispatch tested; public live approval still gated |
 | Provider accepts send but response times out | Unknown outcome; reconcile before any retry | B06 live gate pending |
 

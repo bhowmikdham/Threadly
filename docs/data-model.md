@@ -340,3 +340,21 @@ immutable under UPDATE; the API exposes no deletion. Deleting the user/preferenc
 cascades owned evidence. A query never references another user's preference ID.
 Expiry invalidates reuse but does not delete rows. Downgrade refuses with either
 table populated; old tasks/releases/history are preserved. [Runtime](calendar-reads.md).
+
+## Calendar slot storage (migration `d13026e9a033`, B13)
+
+Parent `c12026e9a032`. Adds `calendar_slot_requests`: UUID id, owner FK, unique
+(owner, request_id), canonical request hash/JSON, immutable anchor time and optional
+owned parent receipt, preference/account/policy versions and preference snapshot,
+resolution JSON, lifecycle state, optional evidence FK, calculation time, result JSON,
+sanitized error code, created/expiry timestamps. Slots are JSON entries with stable
+UUID5 IDs, exact UTC instants and local labels. Evidence checked_at remains in the
+linked B12 record. No reservation or provider event ID is created.
+
+Composite owner FKs prevent foreign evidence/anchor references. The migration adds
+(id, user_id) uniqueness to evidence to support that FK. Positive versions and expiry
+ordering are checked. A trigger permits only processing → terminal publication and
+expiry shortening; inputs, anchors, resolution and published results cannot be updated.
+Account → preference → receipt lock ordering serializes idempotency and publication.
+Downgrade refuses with receipts present and preserves existing B12 data when empty.
+Expiry is a use restriction, not retention cleanup. [Lifecycle](calendar-slots.md).

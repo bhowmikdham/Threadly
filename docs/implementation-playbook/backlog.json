@@ -682,7 +682,8 @@
       "handoff": "Scheduling flow gets verified slot IDs and availability evidence.",
       "assignee": null,
       "evidence": [
-        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)"
+        "../backend-execution/checkpoints/B12.md (Calendar consent, preferences, bounded freebusy and stale-evidence guards; live Google and deterministic slots pending)",
+        "../backend-execution/checkpoints/B13.md (typed deterministic slot queries, saved anchors, DST/context resolution, stable IDs and version/expiry fences; live Google seam and policy acceptance pending)"
       ]
     },
     {
