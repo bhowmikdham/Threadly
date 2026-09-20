@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import "./style.css"
+import { icons } from "~assets/icons"
 
 // API configuration constants
 const ELEVENLABS_API_KEY = process.env.PLASMO_PUBLIC_ELEVENLABS_API_KEY
@@ -49,6 +50,8 @@ interface ChatMessage {
   text?: string
   threadsList?: ThreadOption[]
   summary?: SummaryOutput
+  summaryMeta?: { subject: string | null; messageCount: number }
+  summaryLoading?: boolean
   draft?: DraftReply
   taskId?: string
 }
@@ -850,16 +853,36 @@ Respond ONLY with valid JSON matching this schema:
       const domData = await fetchActiveEmailFromDOM()
 
       if (domData && domData.evidence.length > 0) {
-        const result = await generateSummary(domData.evidence)
+        const messageId = Date.now().toString()
 
         setChatHistory((prev) => [
           ...prev,
-          { id: Date.now().toString(), sender: "ai", summary: result }
+          {
+            id: messageId,
+            sender: "ai",
+            summaryMeta: { subject: domData.subject, messageCount: domData.evidence.length },
+            summaryLoading: true
+          }
         ])
 
-        if (reciteVoice) {
-          speakText(`Here is the summary: ${result.overview}`)
+        try {
+          const result = await generateSummary(domData.evidence)
+          setChatHistory((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId ? { ...msg, summary: result, summaryLoading: false } : msg
+            )
+          )
+          if (reciteVoice) speakText(`Here is the summary: ${result.overview}`)
+        } catch (err: any) {
+          setChatHistory((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, summaryLoading: false, text: `Error generating summary: ${err.message}` }
+                : msg
+            )
+          )
         }
+
         setSummarizing(false)
         return
       }
@@ -954,6 +977,15 @@ Respond ONLY with valid JSON matching this schema:
     handleUserInstruction(userText, false)
   }
 
+  const handleDismissSummary = (id: string) => {
+    setChatHistory((prev) => prev.filter((msg) => msg.id !== id))
+  }
+
+  // "Draft reply" link inside the summary card — jumps straight into the reply flow.
+  const handleDraftReplyFromSummary = () => {
+    handleReplyDraft("Draft a reply to this thread.")
+  }
+
   const handleSelectThread = (threadId: string, snippet: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -1033,7 +1065,9 @@ Respond ONLY with valid JSON matching this schema:
         justifyContent: "space-between",
         padding: "10px 14px",
         borderBottom: `1px solid ${themeStyles.border}`,
-        backgroundColor: themeStyles.cardBg
+        backgroundColor: themeStyles.cardBg,
+        position: "relative",
+        zIndex:400
       }}
     >
       {/* Left Title */}
@@ -1081,10 +1115,7 @@ Respond ONLY with valid JSON matching this schema:
             borderRadius: 6
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="9" y1="3" x2="9" y2="21" />
-          </svg>
+          <img src={icons.sidebar} width={16} height={16} alt="" style={{ filter: recording ? "invert(1)" : "none" }} />
         </button>
       </div>
     </div>
@@ -1175,50 +1206,159 @@ Respond ONLY with valid JSON matching this schema:
         </div>
       )}
 
-      {/* History Drawer */}
-      {signedIn && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "60%",
-            bottom: 0,
-            backgroundColor: themeStyles.drawerBg,
-            zIndex: 150,
-            padding: 14,
-            overflowY: "auto",
-            borderRight: `1px solid ${themeStyles.border}`,
-            boxShadow: "4px 0 12px rgba(0,0,0,0.1)",
-            transform: showHistoryDrawer ? "translateX(0)" : "translateX(-100%)",
-            transition: "transform 0.3s ease-in-out"
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 13, color: themeStyles.textHeading }}>History</h3>
-            <button onClick={() => setShowHistoryDrawer(false)} style={{ backgroundColor: "transparent", border: "none", color: themeStyles.textMuted, fontSize: 14, cursor: "pointer" }}>✕</button>
-          </div>
+      {/* Sidebar (full screen) */}
+{signedIn && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      backgroundColor: themeStyles.bg,
+      zIndex: 300,
+      display: "flex",
+      flexDirection: "column",
+      paddingTop: 48,
+      transform: showHistoryDrawer ? "translateX(0)" : "translateX(-100%)",
+      transition: "transform 0.25s ease-in-out"
+    }}
+  >
+    {/* New Chat button — full width, top */}
+    <div style={{ padding: 14 }}>
+      <button
+        onClick={handleStartNewChat}
+        style={{
+          width: "100%",
+          padding: "12px 14px",
+          borderRadius: 10,
+          border: `1px solid ${themeStyles.border}`,
+          backgroundColor: themeStyles.cardBg,
+          color: themeStyles.text,
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          gap: 8
+        }}
+      >
+        <img src={icons.plus} width={16} height={16} alt="" style={{ filter: isDark ? "invert(1)" : "none" }} />
+        New Chat
+      </button>
+    </div>
 
-          <button onClick={handleStartNewChat} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${themeStyles.border}`, backgroundColor: themeStyles.cardBg, color: themeStyles.textHeading, cursor: "pointer", marginBottom: 14, textAlign: "left", fontSize: 11 }}>
-            + New Chat
-          </button>
+    {/* Chat History list */}
+    <div style={{ flex: 1, overflowY: "auto", padding: "0 14px" }}>
+      <h3 style={{ margin: "0 0 8px 4px", fontSize: 12, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        Chats
+      </h3>
 
-          {savedSessions.length === 0 ? (
-            <p style={{ color: themeStyles.textMuted, fontSize: 11 }}>No chat history.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {savedSessions.map((session) => (
-                <div key={session.id} onClick={() => handleLoadSession(session)} style={{ padding: "6px 8px", borderRadius: 6, backgroundColor: themeStyles.cardBg, border: `1px solid ${themeStyles.border}`, cursor: "pointer" }}>
-                  <div style={{ fontSize: 11, color: themeStyles.textHeading, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.title}</div>
-                  <div style={{ fontSize: 9, color: themeStyles.textMuted, marginTop: 2 }}>
-                    {new Date(session.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
+      {savedSessions.length === 0 ? (
+        <p style={{ color: themeStyles.textMuted, fontSize: 12, padding: "0 4px" }}>No chat history.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+          {savedSessions.map((session) => (
+            <div
+              key={session.id}
+              onClick={() => handleLoadSession(session)}
+              style={{
+                display: "flex",
+               alignItems: "center",
+               justifyContent: "space-between",
+               padding: "8px 4px",
+               cursor: "pointer"
+              }}
+            >
+              <div style={{ fontSize: 12, color: themeStyles.textHeading, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session.title}
+              </div>
+              <div style={{ fontSize: 11, color: themeStyles.text, marginTop: 2 }}>
+                {new Date(session.createdAt).toLocaleDateString()}
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
+
+      {/* Tools used — quick shortcuts to re-trigger common actions */}
+      <h3 style={{ margin: "0 0 8px 4px", fontSize: 12, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        Tools
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <button
+          onClick={() => {
+            setShowHistoryDrawer(false)
+            handleSmartSummarize
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 12px", borderRadius: 8,
+            border: "none", backgroundColor: "transparent",
+            cursor: "pointer", fontSize: 12, color: themeStyles.text, textAlign: "left"
+          }}
+        >
+          <img src={icons.meeting} width={16} height={16} alt="" style={{ filter: isDark ? "invert(1)" : "none" }} />
+          Google Calendar
+        </button>
+
+        <button
+          onClick={() => {
+            setShowHistoryDrawer(false)
+            handleUserInstruction("Draft a reply to this thread")
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 12px", borderRadius: 8,
+            border: "none", backgroundColor: "transparent",
+            cursor: "pointer", fontSize: 12, color: themeStyles.text, textAlign: "left"
+          }}
+        >
+          <img src={icons.draft} width={16} height={16} alt="" style={{ filter: isDark ? "invert(1)" : "none" }} />
+          Google Drive
+        </button>
+
+        <button
+          onClick={() => {
+            setShowHistoryDrawer(false)
+            setMessage("Compose an email to: ")
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 12px", borderRadius: 8,
+           border: "none", backgroundColor: "transparent",
+            cursor: "pointer", fontSize: 12, color: themeStyles.text, textAlign: "left"
+          }}
+        >
+          <img src={icons.hr} width={16} height={16} alt="" style={{ filter: isDark ? "invert(1)" : "none" }} />
+          Contacts
+        </button>
+      </div>
+    </div>
+
+    {/* Back to chat — bottom left */}
+    <div style={{ padding: 14, borderTop: `1px solid ${themeStyles.border}` }}>
+      <button
+        onClick={() => setShowHistoryDrawer(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: themeStyles.textHeading,
+          fontSize: 13,
+          fontWeight: 500,
+          padding: "6px 4px"
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        Back to chat
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Unauthenticated View */}
       {!signedIn ? (
@@ -1410,7 +1550,7 @@ Respond ONLY with valid JSON matching this schema:
                   
                   {/* Summarise this thread */}
                   <button
-                    onClick={() => handleUserInstruction("Summarise this thread")}
+                    onClick={() => handleSmartSummarize()}
                     disabled={!emailOpen}
                     style={{
                       display: "flex",
@@ -1425,11 +1565,7 @@ Respond ONLY with valid JSON matching this schema:
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={themeStyles.textHeading} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="21" y1="6" x2="3" y2="6"/>
-                        <line x1="15" y1="12" x2="3" y2="12"/>
-                        <line x1="17" y1="18" x2="3" y2="18"/>
-                      </svg>
+                      <img src={icons.summarise} width={16} height={16} alt="" style={{ filter: recording ? "invert(1)" : "none" }} />
                       <span style={{ fontSize: 14, color: themeStyles.textHeading, fontWeight: 400 }}>Summarise this thread</span>
                     </div>
                     {!emailOpen && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Open an email</span>}
@@ -1452,10 +1588,7 @@ Respond ONLY with valid JSON matching this schema:
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={themeStyles.textHeading} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 20h9"/>
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                      </svg>
+                      <img src={icons.draft} width={16} height={16} alt="" style={{ filter: recording ? "invert(1)" : "none" }} />
                       <span style={{ fontSize: 14, color: themeStyles.textHeading, fontWeight: 400 }}>Draft a reply to this thread</span>
                     </div>
                     {!emailOpen && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>Open an email</span>}
@@ -1471,8 +1604,8 @@ Respond ONLY with valid JSON matching this schema:
                     key={item.id}
                     style={{
                       alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
-                      maxWidth: "88%",
-                      backgroundColor: item.sender === "user" ? themeStyles.accent : themeStyles.aiBubbleBg,
+                      maxWidth: "100%",
+                      backgroundColor: item.sender === "user" ? themeStyles.accent : themeStyles.bg,
                       color: item.sender === "user" ? (isDark ? "#000000" : "#ffffff") : themeStyles.text,
                       padding: "8px 12px",
                       borderRadius: 12,
@@ -1496,31 +1629,80 @@ Respond ONLY with valid JSON matching this schema:
                       </div>
                     )}
 
-                    {item.summary && (
+                                       {(item.summary || item.summaryMeta) && (
                       <div>
-                        <h4 style={{ marginTop: 0, marginBottom: 4, color: themeStyles.textHeading, fontSize: 13 }}>Summary Overview</h4>
-                        <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted }}>{item.summary.overview}</p>
-
-                        {item.summary.decisions.length > 0 && (
+                        {item.summaryMeta?.subject && (
                           <>
-                            <h5 style={{ margin: "6px 0 2px", color: themeStyles.textHeading, fontSize: 12 }}>Decisions</h5>
-                            <ul style={{ fontSize: 11, paddingLeft: 14, margin: 0, color: themeStyles.textMuted }}>
-                              {item.summary.decisions.map((d, i) => (
-                                <li key={i}>{d.text} <em>({d.status})</em></li>
-                              ))}
-                            </ul>
+                            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: themeStyles.textMuted, marginBottom: 6 }}>
+                              THREAD CONTEXT
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                padding: "8px 10px",
+                                borderRadius: 8,
+                                border: `1px solid ${themeStyles.border}`,
+                                backgroundColor: themeStyles.cardBg,
+                                marginBottom: 10
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                <span style={{ fontSize: 13 }}>🧵</span>
+                                <span style={{ fontSize: 12, color: themeStyles.textHeading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {item.summaryMeta.subject}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleDismissSummary(item.id)}
+                                aria-label="Dismiss"
+                                style={{ background: "transparent", border: "none", color: themeStyles.textMuted, fontSize: 13, cursor: "pointer", padding: 0, flexShrink: 0 }}
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </>
                         )}
 
-                        {item.summary.actions.length > 0 && (
-                          <>
-                            <h5 style={{ margin: "6px 0 2px", color: themeStyles.textHeading, fontSize: 12 }}>Actions</h5>
-                            <ul style={{ fontSize: 11, paddingLeft: 14, margin: 0, color: themeStyles.textMuted }}>
-                              {item.summary.actions.map((a, i) => (
-                                <li key={i}>{a.text} {a.owner && `— ${a.owner}`}</li>
-                              ))}
-                            </ul>
-                          </>
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: themeStyles.textMuted, marginBottom: 6 }}>
+                          SUMMARY
+                        </div>
+
+                        {item.summaryLoading && (
+                          <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted, fontStyle: "italic" }}>
+                          Summarising...
+                          </p>
+                        )}
+
+                        {!item.summaryLoading && item.summary && (
+                        <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0, color: themeStyles.text, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {item.summary.overview && <li>{item.summary.overview}</li>}
+                          {item.summary.decisions.map((d, i) => (
+                            <li key={`d-${i}`}>{d.text}{d.status === "proposed" ? " (proposed)" : ""}</li>
+                          ))}
+                          {item.summary.actions.map((a, i) => (
+                            <li key={`a-${i}`}>{a.text}{a.owner ? ` — ${a.owner}` : ""}{a.due ? ` (due ${a.due})` : ""}</li>
+                          ))}
+                          {item.summary.unresolvedQuestions.map((q, i) => (
+                            <li key={`q-${i}`}>{q.text}</li>
+                          ))}
+                        </ul>
+                        )}
+
+                        {!item.summaryLoading && item.summaryMeta && item.summary && (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                            <span style={{ fontSize: 11, color: themeStyles.textMuted }}>
+                              From {item.summaryMeta.messageCount} message{item.summaryMeta.messageCount === 1 ? "" : "s"}
+                            </span>
+                            <button
+                              onClick={handleDraftReplyFromSummary}
+                              style={{ background: "transparent", border: "none", color: themeStyles.textHeading, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                            >
+                              Draft reply
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}
@@ -1767,11 +1949,7 @@ Respond ONLY with valid JSON matching this schema:
                       color: recording ? "#ea4335" : themeStyles.textHeading
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="22" />
-                    </svg>
+                    <img src={icons.voice} width={16} height={16} alt="" style={{ filter: recording ? "invert(1)" : "none" }} />
                   </button>
 
                   <button
