@@ -30,14 +30,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "CLASSIFY_EMAIL") {
-    const prompt = `Classify this email's priority (HIGH, MEDIUM, LOW) and assign a 1-2 word category label (e.g. Urgent, Sponsorship, Academic, General).
+    const prompt = `Classify this email's priority (HIGH, MEDIUM, LOW), and determine whether the recipient needs to personally take action (reply, approve, complete a task, make a decision) versus it being purely informational.
 Subject: ${message.subject}
 Snippet: ${message.snippet}
 
 Respond strictly in JSON matching this schema:
 {
   "priority": "HIGH" | "MEDIUM" | "LOW",
-  "category": "string"
+  "actionRequired": boolean,
+  "category": "LEGAL" | "HR" | "ACADEMIC" | "MEETING" | "FINANCE" | "OTHER"
 }`
 
     fetch(
@@ -54,11 +55,19 @@ Respond strictly in JSON matching this schema:
       .then((res) => res.json())
       .then((data) => {
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}"
-        sendResponse({ success: true, data: JSON.parse(rawText) })
+        const parsed = JSON.parse(rawText)
+        sendResponse({
+        success: true,
+        data: {
+        priority: parsed.priority || "MEDIUM",
+        actionRequired: typeof parsed.actionRequired === "boolean" ? parsed.actionRequired : false,
+        category: parsed.category || "OTHER"
+        }
+      })
       })
       .catch((err) => {
         console.error("Gemini Classification Error:", err)
-        sendResponse({ success: false, data: { priority: "LOW", category: "General" } })
+        sendResponse({ success: false, data: { priority: "LOW", actionRequired: false, category: "OTHER" } })
       })
 
     return true // Keeps response channel open for async fetch
