@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
 from app.assistant import drafting, lookup_draft, reads, routing, summary_quality, tasks, ui_routing
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.db.models import (
     ArtifactRevision,
@@ -89,7 +90,7 @@ def has_dependency(request):
 
 
 def validate_input(request, context, envelope):
-    if context is None or not context.payload.get("messages"):
+    if context is None or not context_data(context).get("messages"):
         raise ApiError(409, "context_empty", "Capture a nonempty thread before starting the plan.")
     if not envelope or not envelope.get("to"):
         raise ApiError(409, "draft_recipients_missing", "Select draft recipients first.")
@@ -123,7 +124,7 @@ async def check_source(session, claim):
             ContextSnapshot.id == claim.context_id, ContextSnapshot.user_id == claim.user_id
         )
     )
-    if context is None or digest(context.payload) != digest(claim.snapshot):
+    if context is None or digest(context_data(context)) != digest(claim.snapshot):
         raise ApiError(409, "compound_source_changed", "Capture the thread and start a new plan.")
     await reads.validate_source(session, claim.user_id, claim.snapshot, "search_mail")
 

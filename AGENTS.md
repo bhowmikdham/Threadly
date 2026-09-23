@@ -15,6 +15,13 @@ summarise, plan/schedule, reply, compose and bounded other assistance. The reque
 direction is Bedrock with visual Flows and backend-owned context, approvals and
 external execution.
 
+Current Gmail source policy is `docs/on-demand-gmail.md`, superseding historical
+mailbox-sync plans. Default to bounded live Gmail reads and reference-only captures;
+never restore background mailbox import, stored original message bodies or embeddings
+as a prerequisite for assistant workflows. Generated user-requested artifacts and
+exact approved outgoing payloads remain durable. Test legacy compatibility explicitly,
+and add on-demand tests for every source-dependent API/worker path.
+
 The playbook is a target specification, not evidence that features exist. Inspect
 the actual code and current `docs/api-contract.md`, `docs/data-model.md` and
 `docs/architecture.md`; update runtime docs with implementation changes. Supersede

@@ -31,7 +31,7 @@ git -C "$RELEASE_DIR" fetch origin "$RELEASE"
 
 export THREADLY_RELEASE="$RELEASE"
 export THREADLY_ENV_FILE="$ENV_FILE"
-COMPOSE=(docker compose --project-name threadly --env-file "$ENV_FILE" -f "$RELEASE_DIR/infra/deploy/ec2/compose.staging.yml")
+COMPOSE=(docker compose --parallel 1 --project-name threadly --env-file "$ENV_FILE" -f "$RELEASE_DIR/infra/deploy/ec2/compose.staging.yml")
 "${COMPOSE[@]}" config --quiet
 printf '[1/5] Building the reviewed backend release.\n'
 "${COMPOSE[@]}" build api
@@ -54,11 +54,11 @@ printf '[3/5] Applying database migrations before starting application processes
 "${COMPOSE[@]}" run --rm --no-deps -T api alembic upgrade head
 "${COMPOSE[@]}" run --rm --no-deps -T api alembic current
 
-printf '[4/5] Starting API, Chroma, assistant, action and mailbox sync workers.\n'
-"${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 240 api assistant-worker action-worker sync-worker
+printf '[4/5] Starting API, Chroma, assistant and action workers (on-demand Gmail).\n'
+"${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 240 api assistant-worker action-worker
 curl --fail --silent --show-error http://127.0.0.1:8000/healthz
 curl --fail --silent --show-error http://127.0.0.1:8000/readyz
-for WORKER_SERVICE in assistant-worker action-worker sync-worker; do
+for WORKER_SERVICE in assistant-worker action-worker; do
     WORKER_ID=$("${COMPOSE[@]}" ps -q "$WORKER_SERVICE")
     [[ -n "$WORKER_ID" ]] || die "$WORKER_SERVICE container is missing."
     [[ "$(docker inspect --format '{{.State.Running}}' "$WORKER_ID")" == true ]] || die "$WORKER_SERVICE is not running."

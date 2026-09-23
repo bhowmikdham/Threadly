@@ -4,6 +4,7 @@ Events: `token` {"text"} (incremental), `done` {"provider"}, `error` {envelope}.
 A cache hit emits one token then done, no model call. Caddy runs with
 flush_interval -1 so tokens stream through in prod.
 """
+
 import json
 import logging
 from typing import Annotated
@@ -26,6 +27,15 @@ DB = Annotated[AsyncSession, Depends(get_session)]
 
 @router.get("/{thread_id}/summary")
 async def summary_sse(thread_id: str, user_id: CurrentUser, session: DB):
+    from app.config import get_settings
+
+    if get_settings().gmail_source_mode == "on_demand":
+        raise ApiError(
+            410,
+            "legacy_summary_retired",
+            "Capture the selected Gmail thread and submit an assistant request.",
+        )
+
     async def events():
         try:
             async for ev in summarise_thread(session, user_id, thread_id):
@@ -41,9 +51,9 @@ async def summary_sse(thread_id: str, user_id: CurrentUser, session: DB):
         except ProviderError:
             yield {
                 "event": "error",
-                "data": json.dumps(envelope(
-                    "upstream_model_unavailable", "Summary generation did not complete."
-                )),
+                "data": json.dumps(
+                    envelope("upstream_model_unavailable", "Summary generation did not complete.")
+                ),
             }
         except Exception:
             log.exception("summary stream failed")

@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.api.errors import ApiError
 from app.assistant import reads
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.db.models import ArtifactRevision, AssistantTask, ContextSnapshot
 from app.extractor.patterns import PATTERNS
@@ -24,7 +25,7 @@ async def capture(session, owner, context_id):
     )
     if context is None:
         raise ApiError(404, "context_not_found", "Select an owned source capture.")
-    await reads.validate_source(session, owner, context.payload, "search_mail")
+    await reads.validate_source(session, owner, context_data(context), "search_mail")
     return context
 
 
@@ -32,7 +33,7 @@ def entities(context, entity_type=None):
     if entity_type is not None and entity_type not in PATTERNS:
         raise ApiError(422, "entity_type_unknown", "Select a supported entity type.")
     items = []
-    for message in context.payload["messages"]:
+    for message in context_data(context)["messages"]:
         for kind, pattern in PATTERNS.items():
             if entity_type is not None and kind != entity_type:
                 continue
@@ -76,11 +77,13 @@ async def commitments(session, owner, context):
     truncated = len(rows) > LIMIT
     for row in rows[:LIMIT]:
         source = await session.get(ContextSnapshot, row.payload["context_snapshot_id"])
-        if source.payload.get("thread_version") != context.payload.get("thread_version"):
-            continue
         # Exact source validation also handles UI capture versions and deleted messages.
         try:
-            await reads.validate_source(session, owner, source.payload, "search_mail")
+            if context_data(source).get("thread_version") != context_data(context).get(
+                "thread_version"
+            ):
+                continue
+            await reads.validate_source(session, owner, context_data(source), "search_mail")
         except ApiError:
             continue
         selected = set(row.payload["content"]["accepted_item_ids"])

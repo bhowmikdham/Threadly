@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.api.errors import ApiError
 from app.assistant import command_plans, scheduling, tasks, workflows
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.assistant.summary import release_manifest as model_release
 from app.db.models import CommandPlan
@@ -123,7 +124,7 @@ async def reserve(session, owner, request):
             request=value,
             release=manifest,
             context_snapshot_id=request.context_snapshot_id,
-            source_hash=digest(context.payload) if context else None,
+            source_hash=digest(context_data(context)) if context else None,
             state="planning",
             expires_at=now + timedelta(minutes=15),
         )
@@ -388,7 +389,7 @@ async def confirm(session, owner, identifier, confirmation):
     }:
         raise ApiError(409, "plan_changed", "The complete workflow needs review.")
     context = await command_plans.source(session, owner, request)
-    if (digest(context.payload) if context else None) != row.source_hash:
+    if (digest(context_data(context)) if context else None) != row.source_hash:
         raise ApiError(409, "command_source_changed", "Capture current source and replan.")
     value = result["compiled_request"]
     if result["kernel"] == "workflow":

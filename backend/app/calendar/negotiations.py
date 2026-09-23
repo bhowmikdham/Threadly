@@ -11,6 +11,7 @@ from app.db.engine import get_session_factory
 from app.db.models import (
     CalendarPreference,
     CalendarSlotRequest,
+    ContextSnapshot,
     MeetingNegotiation,
     MeetingOffer,
     MeetingSelection,
@@ -45,6 +46,24 @@ async def owned(session, model, owner, identifier, negotiation_id=None):
     return row
 
 
+async def current_mail_source(session, owner, thread):
+    from app.assistant import source_data
+    from app.config import get_settings
+
+    if get_settings().gmail_source_mode != "on_demand":
+        return
+    capture = await session.scalar(
+        select(ContextSnapshot)
+        .where(ContextSnapshot.user_id == owner, ContextSnapshot.thread_id == thread.id)
+        .order_by(ContextSnapshot.created_at.desc(), ContextSnapshot.id.desc())
+        .limit(1)
+    )
+    if capture is None:
+        raise conflict("source_not_captured")
+    data = source_data.context_data(capture)
+    await source_data.validate(session, owner, data)
+
+
 async def locked(session, owner, identifier, *, require_calendar=True):
     neg = await owned(session, MeetingNegotiation, owner, identifier)
     # Same first locks as B12/B13; sync also serializes account before thread changes.
@@ -64,6 +83,8 @@ async def locked(session, owner, identifier, *, require_calendar=True):
     )
     if neg is None or thread is None:
         raise ApiError(404, "meeting_record_missing", "Meeting record not found.")
+    if require_calendar:
+        await current_mail_source(session, owner, thread)
     return neg, thread
 
 
@@ -203,7 +224,8 @@ async def create(owner, body):
             .with_for_update()
         )
         if thread is None:
-            raise ApiError(404, "thread_not_found", "Select an owned synced thread.")
+            raise ApiError(404, "thread_not_found", "Capture an owned Gmail thread first.")
+        await current_mail_source(session, owner, thread)
         if thread.version != body.expected_thread_version or thread.last_msg_id is None:
             raise conflict("thread_changed")
         neg = MeetingNegotiation(
@@ -247,6 +269,7 @@ async def offer(owner, identifier, body):
             replay(existing, body)
             return await offer_view(session, neg, thread, existing)
         writable(neg, body.expected_version)
+        await current_mail_source(session, owner, thread)
         if thread.version != body.expected_thread_version or thread.last_msg_id is None:
             raise conflict("thread_changed")
         query = await slot_query(session, owner, str(body.slot_request_id))

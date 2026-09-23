@@ -102,18 +102,33 @@ async def blockers(session, artifact):
         result.append("sender_changed")
     reply = envelope.get("reply")
     if reply:
-        current = (
-            await session.execute(
-                select(Thread.version)
-                .join(Message, Message.thread_id == Thread.id)
-                .where(
-                    Thread.user_id == artifact.user_id,
-                    Message.user_id == artifact.user_id,
-                    Thread.gmail_thread_id == reply["gmail_thread_id"],
-                    Message.gmail_msg_id == reply["gmail_message_id"],
+        from app.config import get_settings
+
+        if get_settings().gmail_source_mode == "on_demand":
+            from app.assistant.source_data import reply_row
+
+            try:
+                current = reply_row(
+                    artifact.user_id,
+                    reply["gmail_thread_id"],
+                    reply["gmail_message_id"],
+                    reply["thread_version"],
+                ).version
+            except ApiError:
+                current = None
+        else:
+            current = (
+                await session.execute(
+                    select(Thread.version)
+                    .join(Message, Message.thread_id == Thread.id)
+                    .where(
+                        Thread.user_id == artifact.user_id,
+                        Message.user_id == artifact.user_id,
+                        Thread.gmail_thread_id == reply["gmail_thread_id"],
+                        Message.gmail_msg_id == reply["gmail_message_id"],
+                    )
                 )
-            )
-        ).scalar_one_or_none()
+            ).scalar_one_or_none()
         if current != reply["thread_version"]:
             result.append("reply_context_changed")
         if reply.get("rfc_message_id") is None:

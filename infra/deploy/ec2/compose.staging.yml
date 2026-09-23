@@ -61,6 +61,7 @@ services:
     networks: [threadly_net]
 
   sync-worker:
+    profiles: ["retired-mailbox-sync"]
     image: threadly-backend:${THREADLY_RELEASE:?set the release commit}
     command: python -m app.sync.jobs
     restart: unless-stopped

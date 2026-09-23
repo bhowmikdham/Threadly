@@ -1,5 +1,9 @@
 # Google OAuth on domain-free EC2 staging
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 This is a manual test client, not the extension's login UI. It uses the existing
 backend begin/exchange/reconnect endpoints, state, S256 PKCE, account binding and
 encrypted Google token storage. No database migration or new public API is added.

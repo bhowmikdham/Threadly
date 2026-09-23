@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
 from app.assistant import continuation, steps, tasks
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.calendar import service, slots
 from app.db.models import CalendarPreference, CalendarSlotRequest, TaskInput, TaskQuestion
@@ -73,7 +74,9 @@ async def bind_input(session, owner, request, context):
     anchor = now
     if request.anchor_message_id:
         messages = [
-            m for m in context.payload["messages"] if m["message_id"] == request.anchor_message_id
+            m
+            for m in context_data(context)["messages"]
+            if m["message_id"] == request.anchor_message_id
         ]
         if len(messages) != 1 or not messages[0].get("sent_at"):
             raise ApiError(
@@ -90,7 +93,7 @@ async def bind_input(session, owner, request, context):
         "preferences": pref.preferences,
         "anchor_at": anchor.isoformat(),
         "anchor_source": "source_message" if request.anchor_message_id else "request_received",
-        "source_hash": digest(context.payload) if context else None,
+        "source_hash": digest(context_data(context)) if context else None,
     }
 
 
@@ -103,7 +106,7 @@ async def check_current(session, owner, saved, context_id):
     if pref.preferences != saved["preferences"]:
         raise service.conflict()
     context = await continuation.fresh_context(session, owner, context_id, context_id)
-    if (digest(context.payload) if context else None) != saved["source_hash"]:
+    if (digest(context_data(context)) if context else None) != saved["source_hash"]:
         raise ApiError(409, "source_changed", "Capture the current thread and start a new task.")
 
 

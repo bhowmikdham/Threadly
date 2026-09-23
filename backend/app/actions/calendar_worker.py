@@ -238,6 +238,13 @@ async def reconcile_one(factory, *, transport=None, token_loader=None):
 
 
 async def run_once(factory=None, *, transport=None, token_loader=None):
+    from app.assistant.source_data import source_scope
+
+    async with source_scope():
+        return await _run_once(factory, transport=transport, token_loader=token_loader)
+
+
+async def _run_once(factory=None, *, transport=None, token_loader=None):
     factory = factory or get_session_factory()
     if await worker.recover_one(factory, action_type="create_event"):
         return True
@@ -246,6 +253,16 @@ async def run_once(factory=None, *, transport=None, token_loader=None):
     claim = await claim_one(factory, transport=transport)
     if claim is None:
         return False
+    from app.assistant.source_data import prefetch
+    from app.mail.dependency import references
+
+    try:
+        await prefetch(
+            claim.user_id, await references(claim.user_id, [claim.action_id], factory=factory)
+        )
+    except ApiError as exc:
+        await worker.preflight_error(factory, claim, exc.code)
+        return True
     prepared = await prepare(factory, claim, transport=transport)
     if prepared is None:
         return True

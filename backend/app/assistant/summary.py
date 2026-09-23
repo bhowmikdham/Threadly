@@ -87,8 +87,12 @@ def make_artifact(text: str, context_id: str, snapshot: dict) -> dict:
         # Sync does not yet prove live mailbox completeness. Never claim it here.
         "coverage": "partial",
         "assumptions": [
-            "Based on saved, synced and cleaned email excerpts; not a live mailbox check.",
-            f"{snapshot['omitted_messages']} synced messages omitted; "
+            (
+                "Selected Gmail excerpts fetched on demand; source mail is not stored by Threadly."
+                if snapshot.get("source_mode") == "gmail_on_demand"
+                else "Based on saved, synced and cleaned email excerpts; not a live mailbox check."
+            ),
+            f"{snapshot['omitted_messages']} source messages omitted; "
             f"{snapshot['truncated_messages']} included messages truncated.",
         ],
         "evidence": [

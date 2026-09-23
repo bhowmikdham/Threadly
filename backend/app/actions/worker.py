@@ -297,6 +297,13 @@ async def preflight_error(factory, claim, code):
 
 
 async def run_once(factory=None, *, transport=None, token_loader=None):
+    from app.assistant.source_data import source_scope
+
+    async with source_scope():
+        return await _run_once(factory, transport=transport, token_loader=token_loader)
+
+
+async def _run_once(factory=None, *, transport=None, token_loader=None):
     factory = factory or get_session_factory()
     if await recover_one(factory):
         return True
@@ -323,6 +330,16 @@ async def run_once(factory=None, *, transport=None, token_loader=None):
             else "credential_unavailable"
         )
         await preflight_error(factory, claim, code)
+        return True
+    from app.assistant.source_data import prefetch
+    from app.mail.dependency import references
+
+    try:
+        await prefetch(
+            claim.user_id, await references(claim.user_id, [claim.action_id], factory=factory)
+        )
+    except ApiError as exc:
+        await preflight_error(factory, claim, exc.code)
         return True
     dispatch = await prepare(factory, claim, transport=transport)
     if dispatch is None:

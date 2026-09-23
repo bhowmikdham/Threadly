@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.api.errors import ApiError
 from app.assistant import command_plans, reads, scheduling, tasks, workflows
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.assistant.summary import release_manifest as model_release
 from app.calendar import negotiations
@@ -82,7 +83,7 @@ async def source(session, owner, request):
     )
     if context is None:
         raise ApiError(404, "context_not_found", "Capture the current meeting thread.")
-    await reads.validate_source(session, owner, context.payload, "search_mail")
+    await reads.validate_source(session, owner, context_data(context), "search_mail")
     offer = await negotiations.owned(session, MeetingOffer, owner, request.offer_id)
     neg = await negotiations.owned(session, MeetingNegotiation, owner, offer.negotiation_id)
     if (
@@ -92,7 +93,9 @@ async def source(session, owner, request):
         or neg.state == "closed"
     ):
         raise ApiError(409, "meeting_offer_changed", "Review the current offer and thread.")
-    selected = [m for m in context.payload["messages"] if m["message_id"] == request.message_id]
+    selected = [
+        m for m in context_data(context)["messages"] if m["message_id"] == request.message_id
+    ]
     if len(selected) != 1 or not selected[0]["body"].strip():
         raise ApiError(404, "meeting_message_missing", "Select a captured response message.")
     if not selected[0].get("sent_at") or parse_instant(selected[0]["sent_at"]) < offer.created_at:
@@ -145,7 +148,7 @@ async def reserve(session, owner, request):
             request_hash=hashed,
             request=value,
             context_snapshot_id=context.id,
-            source_hash=digest(context.payload),
+            source_hash=digest(context_data(context)),
             release=manifest,
             state="planning",
             expires_at=now + timedelta(minutes=15),
@@ -274,7 +277,7 @@ async def confirm(session, owner, identifier, confirmation):
     context, _, _, _ = await source(
         session, owner, MeetingResponseRequest.model_validate(row.request)
     )
-    if digest(context.payload) != row.source_hash:
+    if digest(context_data(context)) != row.source_hash:
         raise ApiError(409, "meeting_source_changed", "Capture the updated response.")
     state, compiled = compile_choice(
         row, ExtractedChoice.model_validate(row.result["interpretation"])

@@ -11,10 +11,10 @@ class MailSearchRequest(BaseModel):
 
     schema_version: Literal["1.0"]
     query: str = Field(min_length=1, max_length=200, pattern=r"\S")
-    folder: Literal["all_synced", "INBOX", "SENT"]
+    folder: Literal["all_mail", "all_synced", "INBOX", "SENT"]
     received_from: AwareDatetime
     received_before: AwareDatetime
-    cursor: str | None = Field(default=None, min_length=1, max_length=2000)
+    cursor: str | None = Field(default=None, min_length=1, max_length=4000)
 
     @field_validator("received_from", "received_before", mode="before")
     @classmethod

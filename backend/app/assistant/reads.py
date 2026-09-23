@@ -69,14 +69,17 @@ def validate_input(options, context, draft_options, hint):
         raise ApiError(
             422, "read_context_required", "Capture and select the source before reading."
         )
-    messages = context.payload["messages"]
+    from app.assistant.source_data import context_data
+
+    data = context_data(context)
+    messages = data["messages"]
     if options.operation == "transform_text":
         selected = [m for m in messages if m["message_id"] == options.message_id]
         if len(selected) != 1 or not selected[0]["body"].strip():
             raise ApiError(404, "read_source_not_found", "Select a usable message in this capture.")
     if options.cursor:
         search_page(
-            context.id, context.payload, options
+            context.id, data, options
         )  # Reject mismatched cursors at acceptance.
 
 
@@ -109,6 +112,11 @@ async def validate_source(session, user_id, snapshot, operation):
         return
     if not snapshot:
         raise ApiError(409, "read_source_changed", "Capture the source again before reading.")
+    if snapshot.get("source_mode") == "gmail_on_demand":
+        from app.assistant.source_data import validate
+
+        await validate(session, user_id, snapshot)
+        return
     thread = await session.scalar(
         select(Thread)
         .where(Thread.user_id == user_id, Thread.gmail_thread_id == snapshot["thread_id"])
@@ -139,7 +147,11 @@ def envelope(context_id, snapshot, evidence, content, *, selection=False):
         "context_snapshot_id": context_id,
         "coverage": "selection_only" if selection else "partial",
         "assumptions": [
-            "Saved cleaned excerpts only; not a live or mailbox-wide search.",
+            (
+                "Selected Gmail excerpts fetched on demand; not a mailbox-wide search."
+                if snapshot.get("source_mode") == "gmail_on_demand"
+                else "Saved cleaned excerpts only; not a live or mailbox-wide search."
+            ),
             "Attachments and uncaptured text are not included.",
             f"Capture omits {snapshot['omitted_messages']} messages and truncates "
             f"{snapshot['truncated_messages']} included messages.",

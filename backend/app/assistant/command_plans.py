@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.api.errors import ApiError
 from app.assistant import drafting, lookup_draft, reads, steps, summary_quality, tasks, ui_routing
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.assistant.summary import release_manifest as model_release
 from app.db.models import CommandPlan, ContextSnapshot, User
@@ -34,7 +35,7 @@ def planner_release():
 
 def execution_release(context, template):
     base = summary_quality.wrap_release(registry.release_manifest())
-    if context and context.payload.get("schema_version") == "1.1":
+    if context and context_data(context).get("schema_version") == "1.1":
         base = ui_routing.wrap_release(base)
     return (lookup_draft if template.startswith("lookup") else steps).wrap_release(base)
 
@@ -59,9 +60,9 @@ async def source(session, owner, request):
         )
         if context is None:
             raise ApiError(404, "context_not_found", "Select an accessible saved capture.")
-        if not context.payload.get("messages"):
+        if not context_data(context).get("messages"):
             raise ApiError(409, "context_empty", "Select a nonempty capture.")
-        await reads.validate_source(session, owner, context.payload, "search_mail")
+        await reads.validate_source(session, owner, context_data(context), "search_mail")
     user = await session.get(User, owner)
     if user is None:
         raise ApiError(401, "unauthorized", "Account no longer exists.")
@@ -107,7 +108,7 @@ async def reserve(session, owner, request):
             request_hash=hashed,
             request=value,
             context_snapshot_id=request.context_snapshot_id,
-            source_hash=digest(context.payload) if context else None,
+            source_hash=digest(context_data(context)) if context else None,
             release=release,
             state="planning",
             expires_at=now + timedelta(minutes=EXPIRY_MINUTES),
@@ -223,7 +224,7 @@ async def confirm(session, owner, plan_id, confirmation):
     if state != "proposed" or compiled != expected:
         raise ApiError(409, "plan_changed", "The saved interpretation no longer matches its input.")
     context = await source(session, owner, request)
-    if digest(context.payload) != plan.source_hash:
+    if digest(context_data(context)) != plan.source_hash:
         raise ApiError(409, "command_source_changed", "Capture the changed source and replan.")
     value = compiled["compiled_request"]
     schema = LookupDraftRequest if value["template"].startswith("lookup") else CompoundRequest

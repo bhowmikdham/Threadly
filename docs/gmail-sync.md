@@ -1,5 +1,9 @@
 # Gmail sync fidelity — T02 implementation
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 The sync worker supplies deterministic, owner-scoped source data for assistant
 workflows. It reads Gmail; it does not send replies, modify Gmail labels, or create
 calendar events. The API remains `POST /sync`, executed inline.

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import ApiError
 from app.assistant import continuation, reads, summary_quality
 from app.assistant.drafting import bind_input
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.assistant.ui_routing import wrap_release
 from app.db.models import (
@@ -123,7 +124,7 @@ async def submit(
         accepted_release = scheduling.release_manifest()
     else:
         accepted_release = summary_quality.wrap_release(release_manifest())
-    if schedule is None and context and context.payload.get("schema_version") == "1.1":
+    if schedule is None and context and context_data(context).get("schema_version") == "1.1":
         accepted_release = wrap_release(accepted_release)
     if request.read_options is not None:
         accepted_release = reads.wrap_release(accepted_release)

@@ -66,8 +66,8 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('assistant-worker', calls[stop])
         self.assertIn('action-worker', calls[stop])
         self.assertIn('sync-worker', calls[stop])
-        self.assertIn('sync-worker', calls[start])
-        self.assertTrue(any('ps' in c and '-q' in c and 'sync-worker' in c for c in calls))
+        self.assertNotIn('sync-worker', calls[start])
+        self.assertFalse(any('ps' in c and '-q' in c and 'sync-worker' in c for c in calls))
         self.assertTrue(any('ps' in c and '-q' in c and 'action-worker' in c for c in calls))
         self.assertIn('DEPLOYMENT_READY commit=' + RELEASE, result.stdout)
 

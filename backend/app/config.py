@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     jwt_ttl_minutes: int = 1440
     jwt_algorithm: str = "HS256"
 
-    mailbox_background_sync_enabled: bool = True
+    gmail_source_mode: Literal["on_demand", "legacy_sync"] = "on_demand"
+    mailbox_background_sync_enabled: bool = False
     mailbox_sync_max_messages: int = Field(default=5000, ge=100, le=100000)
 
     assistant_disabled_intents: str = ""

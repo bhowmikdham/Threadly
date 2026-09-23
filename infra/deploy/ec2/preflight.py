@@ -20,6 +20,9 @@ def main():
         raise SystemExit("DATABASE_URL must target this stack's postgres service via asyncpg.")
     if settings.inference_provider != "bedrock":
         raise SystemExit("This staging deployment requires INFERENCE_PROVIDER=bedrock.")
+    if settings.gmail_source_mode != "on_demand" or settings.mailbox_background_sync_enabled:
+        raise SystemExit("Staging requires GMAIL_SOURCE_MODE=on_demand and MAILBOX_BACKGROUND_SYNC_ENABLED=false.")
+    print("Gmail on-demand reads configured; mailbox replication disabled.")
     from app.workflows import auxiliary, registry
     registry.load_manifest()
     auxiliary.load_manifest()
