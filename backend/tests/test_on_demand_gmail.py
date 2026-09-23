@@ -530,3 +530,41 @@ def test_thread_list_preserves_cursor_and_no_store_contract(setup, db_client, au
     assert response.status_code == 200, response.text
     calls = [r for r in setup.calls if r.url.path.endswith("/messages")]
     assert len(calls) == 2 and calls[-1].url.params["pageToken"] == "next-page"
+
+
+def test_conversation_inbox_search_five_messages_signed_cursor_and_no_import(
+    setup, db_client, auth_headers, db_sessionmaker, monkeypatch
+):
+    from app.assistant import inbox_chat
+    from tests.test_inbox_chat import Model
+
+    monkeypatch.setattr(
+        inbox_chat, "get_model_client", lambda: Model(query="agenda", date_phrase="September 2026")
+    )
+    request = {
+        "instruction": "Find agenda emails from September 2026",
+        "timezone": "Australia/Melbourne",
+    }
+    response = db_client.post("/assistant/inbox-chat", headers=auth_headers(1), json=request)
+    assert response.status_code == 200, response.text
+    data = response.json()["search"]
+    assert len(data["results"]) == 1 and data["results"][0]["sender"] == "sender@example.test"
+    assert data["coverage"]["persisted"] is False
+    lists = [r for r in setup.calls if r.url.path.endswith("/messages")]
+    assert len(lists) == 1 and lists[0].url.params["maxResults"] == "5"
+    body = {"filters": data["filters"], "cursor": data["next_cursor"]}
+    # A signed cursor cannot cross users or filters, nor cause an extra Gmail fetch.
+    for owner, payload in [
+        (2, body),
+        (1, {**body, "filters": {**body["filters"], "query": "changed"}}),
+    ]:
+        denied = db_client.post(
+            "/assistant/inbox-search-page", headers=auth_headers(owner), json=payload
+        )
+        assert denied.status_code == 409
+    assert len([r for r in setup.calls if r.url.path.endswith("/messages")]) == 1
+    next_page = db_client.post("/assistant/inbox-search-page", headers=auth_headers(1), json=body)
+    assert next_page.status_code == 200
+    assert len([r for r in setup.calls if r.url.path.endswith("/messages")]) == 2
+    assert asyncio.run(_message_count(db_sessionmaker)) == 0
+    assert db_client.post("/assistant/inbox-chat", json=request).status_code == 401
