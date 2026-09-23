@@ -1,7 +1,6 @@
 // contents/hover-trigger.tsx
 import type { PlasmoCSConfig } from "plasmo"
 import { useEffect, useState } from "react"
-import { initGmailClassifier } from "../utils/gmail-classifier"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://mail.google.com/*"]
@@ -15,9 +14,6 @@ const HoverTrigger = () => {
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
-    // Initialize classifier after UI mounts
-    initGmailClassifier()
-
     const handleMouseMove = (e: MouseEvent) => {
       const percentAcross = e.clientX / window.innerWidth
       const raw =
@@ -54,8 +50,7 @@ const HoverTrigger = () => {
         transition: "transform 0.1s linear, opacity 0.1s linear",
         zIndex: 999999,
         cursor: "pointer"
-      }}
-    >
+      }}>
       <button
         onClick={openChat}
         style={{
@@ -71,8 +66,7 @@ const HoverTrigger = () => {
           justifyContent: "center",
           fontSize: 22,
           cursor: "pointer"
-        }}
-      >
+        }}>
         📥✨
       </button>
     </div>

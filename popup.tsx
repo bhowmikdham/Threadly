@@ -1,34 +1,27 @@
-// popup.tsx
 import { useState } from "react"
 
-/**
- * Extension Browser Action Popup Component
- * Simple entry point for extension options and web links.
- */
-function IndexPopup() {
-  const [data, setData] = useState<string>("")
-
+export default function Popup() {
+  const [error, setError] = useState("")
   return (
-    <div style={{ padding: 16 }}>
-      <h2>
-        Welcome to{" "}
-        <a href="https://www.plasmo.com" target="_blank" rel="noreferrer">
-          Mail Mind
-        </a>
-      </h2>
-      {/* Input control for quick query or token entry testing */}
-      <input 
-        onChange={(e) => setData(e.target.value)} 
-        value={data} 
-        placeholder="Quick text input..."
-      />
-      <div style={{ marginTop: 8 }}>
-        <a href="https://docs.plasmo.com" target="_blank" rel="noreferrer">
-          View Extension Documentation
-        </a>
-      </div>
-    </div>
+    <main style={{ width: 260, padding: 20, fontFamily: "system-ui" }}>
+      <h2>Threadly</h2>
+      <p>Your email assistant, with you in control.</p>
+      <button
+        onClick={async () => {
+          try {
+            const [tab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true
+            })
+            if (tab?.id) await chrome.sidePanel.open({ tabId: tab.id })
+            window.close()
+          } catch {
+            setError("Open Gmail and use the Threadly side panel.")
+          }
+        }}>
+        Open assistant
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </main>
   )
 }
-
-export default IndexPopup
