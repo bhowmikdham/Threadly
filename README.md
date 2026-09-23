@@ -40,6 +40,12 @@ the internet. The instance must be running. For a deployed HTTPS API, enter its
 origin in Settings and grant only that server’s requested host permission.
 Changing servers signs you out.
 
+If Sign in says the backend cannot be reached, check that the tunnel terminal is
+still open and the EC2 instance is running. Open `http://127.0.0.1:8000/readyz`
+locally to check the connection; it should return `"status":"ok"`. An expired AWS
+login must be renewed before starting a new tunnel. Retry Sign in after restoring
+the connection. The extension cannot create the AWS tunnel itself.
+
 ## Google sign-in configuration
 
 Use the backend’s existing Google **Web application** OAuth client. In Google
