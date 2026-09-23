@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "release": "bounded-reads-task-1.0.0",
+  "release": "bounded-reads-task-1.1.0",
   "provenance": "Synthetic reference outputs authored for offline contract replay; not observations from a live model.",
   "cases": [
     {"id":"shorten-date", "instruction":"Make this shorter", "body":"Please remember to send the report by Friday.", "output":{"text":"Please send the report by Friday."}, "must_preserve":["report","Friday"]},

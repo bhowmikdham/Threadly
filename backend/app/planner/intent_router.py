@@ -1,6 +1,5 @@
 """Stateless proposal routing. No tools, context reads, approvals or execution."""
 
-import json
 import re
 
 from pydantic import ValidationError
@@ -8,7 +7,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.model_client.client import ModelClient, get_model_client
 from app.model_client.providers import ProviderError
-from app.model_client.structured import reject_duplicate_keys
+from app.model_client.structured import json_object
 from app.planner.intent_prompt import ROUTER_VERSION, routing_prompt
 from app.schemas.assistant import (
     RouteDecision,
@@ -55,10 +54,8 @@ _COMBINATIONS = {
 
 
 def parse_decision(text: str) -> RouteDecision:
-    """No markdown stripping, arbitrary JSON extraction or permissive coercion."""
-    if len(text) > 16000:
-        raise ValueError("route response exceeds the size budget")
-    value = json.loads(text, object_pairs_hook=reject_duplicate_keys)
+    """Validate one bounded object without repairing fields or guessing routes."""
+    value = json_object(text, max_chars=16000)
     decision = RouteDecision.model_validate(value)
     if decision.context_snapshot_id is not None or decision.parameters.recipient_refs:
         raise ValueError("model invented unbound context or recipient references")

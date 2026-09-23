@@ -224,7 +224,9 @@ state. This adds no Calendar handler, compound executor or approval to send.
 
 Explicit `AssistantRequest.read_options` adds native help, literal saved-capture
 search and single-message rewriting through the existing durable task API. New
-read tasks pin `bounded-reads-task-1.0.0`; other task hashes/releases are preserved.
+read tasks now pin `bounded-reads-task-1.1.0` for capability-aware help.
+See [compose routing correction](compose-routing-fix.md) for strict model-output
+parsing, prompt versions and live replay evidence.
 Migration `a6417c29d805` adds nullable `assistant_tasks.read_input` and guards rollback
 with retained read tasks. No external writes or mailbox-wide search are enabled.
 Source ownership/freshness is checked before execution, publication and artifact

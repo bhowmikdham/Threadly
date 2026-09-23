@@ -1,0 +1,66 @@
+{
+  "replay": "compose-routing-replay-1.0",
+  "cases_hash": "2df9dfaeb38a230878c9ecb70030c34fc0af431f936420053d9aaae611a3d3cf",
+  "routing_release": {
+    "workflow": "contextual-task-1.1.0",
+    "summary": {
+      "workflow": "summary-task-1.0.0",
+      "prompt_hash": "80b22fa39b763f43befc092ec5098553ba7d55b710540c3126b4f78e10bb43c6",
+      "configuration_hash": "8188002d31e91522bc5f028662577941d945bca2c438e68ffb5b1572b28b2507"
+    },
+    "router_version": "intent-preview-1.2.0",
+    "routing_prompt_hash": "4ec8dd57747b9f70a75ab542ef8c14cc0f656594bd929f0f5b53b6fe00a83777",
+    "routing_schema_hash": "3ffc195d2780484238d2f21d34798373b00b8b3c475e88bbd89c09c8587bfff2",
+    "reference_policy_hash": "98a638acbf6773b50ec1e130b707ca75ff7c55675c2c900b4b83c986c29c4620",
+    "routing_configuration_hash": "b866dab1876d96a7ffb8948cfc7697b913e871b1c03a536ff8192734da733b88",
+    "summary_prompt_hash": "caa32fee3045d2002fb87bced04e686e10398c6f644eeb5b6a6b80ccf9040ae8",
+    "draft_release": "draft-artifact-1.1.0",
+    "draft_prompt_hash": "02b04d01f10c12abdf9e91db3bbc4fcf363af0bde92e4010febb9e65eb70e71d",
+    "draft_schema_hash": "aee42b960aab9a273013b98e418f06ce6af903c7a50d86799f9a7d77f4a5a158"
+  },
+  "provider": "bedrock",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "routes": [
+    {
+      "case": 0,
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": 0,
+      "repeat": 1,
+      "passed": true
+    },
+    {
+      "case": 0,
+      "repeat": 2,
+      "passed": true
+    },
+    {
+      "case": 1,
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": 2,
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": 3,
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": 4,
+      "repeat": 0,
+      "passed": true
+    }
+  ],
+  "draft_passed": true,
+  "external_actions": false,
+  "mailbox_read": false,
+  "completed_at": "2026-09-23T04:35:52.682Z",
+  "ssm_command_id": "044a0e82-b881-4730-bbc9-cbd79e385082",
+  "scope": "Synthetic routing and draft checks; not broad semantic accuracy or provider-write acceptance."
+}
