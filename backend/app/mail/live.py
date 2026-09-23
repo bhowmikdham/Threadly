@@ -114,11 +114,13 @@ async def thread(owner, thread_id, *, transport=None):
     }
 
 
-async def search_page(owner, query, *, page_token=None, transport=None):
+async def search_page(owner, query, *, page_token=None, transport=None, max_results=PAGE_SIZE):
     """One messages.list page, then bounded details. Never follows nextPageToken."""
+    if type(max_results) is not int or not 1 <= max_results <= PAGE_SIZE:
+        raise ValueError("Invalid page size")
     token, version, email = await account(owner)
     client = GmailClient(token, transport=transport)
-    params = {"maxResults": PAGE_SIZE, "q": query, "includeSpamTrash": "false"}
+    params = {"maxResults": max_results, "q": query, "includeSpamTrash": "false"}
     if page_token:
         params["pageToken"] = page_token
     try:
@@ -126,7 +128,7 @@ async def search_page(owner, query, *, page_token=None, transport=None):
             async with client._client() as http:
                 raw = await client._get(http, f"{BASE}/messages", params)
             refs = raw.get("messages", [])
-            if not isinstance(refs, list) or len(refs) > PAGE_SIZE:
+            if not isinstance(refs, list) or len(refs) > max_results:
                 raise GmailError("Invalid page")
             ids = [identifier(m.get("id")) for m in refs]
             if len(set(ids)) != len(ids):

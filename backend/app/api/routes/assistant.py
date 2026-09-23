@@ -48,6 +48,7 @@ from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
+from app.schemas.inbox_chat import InboxChatRequest, InboxPageRequest
 from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.mail_search import MailSearchRequest
 from app.schemas.meeting_response import MeetingResponseRequest
@@ -71,6 +72,28 @@ async def search_mail(request: MailSearchRequest, user_id: CurrentUser, session:
     result = await mail_search.search(session, user_id, request)
     await session.commit()  # Release the sync fence and transaction-local timeouts.
     return result
+
+
+@router.post("/inbox-chat")
+async def inbox_chat_turn(request: "InboxChatRequest", user_id: CurrentUser):
+    from app.assistant import inbox_chat
+
+    result = await inbox_chat.interpret(request)
+    if result["kind"] == "search":
+        if get_settings().gmail_source_mode != "on_demand":
+            raise ApiError(409, "live_inbox_required", "Connect live Gmail to search your inbox.")
+        filters = result.pop("filters")
+        result["search"] = await inbox_chat.search(user_id, filters)
+    return result
+
+
+@router.post("/inbox-search-page")
+async def inbox_search_page(request: "InboxPageRequest", user_id: CurrentUser):
+    from app.assistant import inbox_chat
+
+    if get_settings().gmail_source_mode != "on_demand":
+        raise ApiError(409, "live_inbox_required", "Connect live Gmail to search your inbox.")
+    return await inbox_chat.search(user_id, request.filters, request.cursor)
 
 
 @router.get("/workflows")

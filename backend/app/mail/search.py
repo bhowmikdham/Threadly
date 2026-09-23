@@ -58,10 +58,11 @@ def decode_cursor(value, owner, version, scope):
         ) from None
 
 
-async def page(owner, query, scope, cursor=None):
+async def page(owner, query, scope, cursor=None, *, page_size=live.PAGE_SIZE):
     _, version, _ = await live.account(owner)
     token = decode_cursor(cursor, owner, version, scope) if cursor else None
-    result = await live.search_page(owner, query, page_token=token)
+    options = {"max_results": page_size} if page_size != live.PAGE_SIZE else {}
+    result = await live.search_page(owner, query, page_token=token, **options)
     if result["account_version"] != version:
         raise ApiError(409, "google_connection_changed", "Restart search.")
     next_cursor = (

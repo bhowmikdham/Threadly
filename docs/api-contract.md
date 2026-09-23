@@ -1,5 +1,7 @@
 # API contract — v0 DRAFT
 
+> Current inbox chat: [conversational search and result cards](inbox-chat.md).
+
 > Current selected-thread behavior: [grounded answers and receipt fixes](grounded-thread-fixes.md).
 
 > Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
