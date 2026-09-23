@@ -126,3 +126,22 @@ steps. The automated live test uses an existing private session and never sends 
 books. Edge-specific UI acceptance uses the unpacked build; automated browser tests
 run packaged Chromium. Arbitrary web pages, attachments and a general cross-app
 assistant are not implemented by this release.
+
+### Live acceptance — 23 September 2026
+
+Built extension → laptop SSM tunnel → EC2 release
+`6533e3d511fa9b592fbb8463f18a10a9d85daf9b` → Google / Bedrock passed:
+
+1. Bounded GYG search and owned selected context.
+2. Automatic summary routing, then “Make it shorter” against its original source.
+3. Grounded factual follow-up in the same conversation.
+4. Contextual reply clarification and readable draft.
+5. New-email request with no mail source, followed by a recipient answer in chat.
+6. Calendar metadata/settings load, then return to the intact conversation.
+
+The helper used an existing private authenticated session in an isolated Chromium
+profile, deleted after the run. No raw email, generated private text, session or
+live screenshot is committed. No send, booking, mailbox import or preference write
+was performed. EC2 API and assistant/action workers were healthy after deployment.
+The recipient alias failure found by the earlier run is resolved by the deployed
+backend release above. The baseline integration evidence remains in the handoff.
