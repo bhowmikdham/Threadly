@@ -707,3 +707,19 @@ both the corresponding environment flag and local user allowlist membership; sco
 exact approval checks still apply. The historical always-disabled write-capability
 statements above are superseded by this explicit pilot behavior. No frontend origin,
 public port, domain or automatic send is enabled by this change.
+
+
+### Frontend selected-message factual questions (2026-09-23)
+
+UI reference release `ui-context-task-1.1.0` supports bounded factual questions
+such as “What is the order total in this email?” against exactly one selected
+message, or an explicitly mapped ordinal. It uses the existing grounded-answer
+quote validator; every answer must be an exact source span. Multiple references,
+ambiguous selection, unavailable text and mixed action requests remain blocked
+or require clarification. Explicit summary and verbatim-read behavior is unchanged.
+The frontend sends included IDs as `visible_message_ids` in displayed order and
+a separately chosen target as the single `selected_message_ids` entry.
+
+The reference contract hash changes with this release. Already completed artifacts
+remain readable; pending tasks/questions pinned to the old reference contract must
+be resubmitted rather than silently run under different interpretation rules.

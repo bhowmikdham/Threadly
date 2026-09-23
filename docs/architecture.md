@@ -441,3 +441,18 @@ Flows do not contain Google or Lambda tools. Background sync stages paged reads
 before one version-fenced atomic publication. API and all three workers share a
 pinned release. Historical partial-feature descriptions above are superseded only
 for the bounded paths listed in the linked map; live acceptance remains pending.
+
+
+### Extension integration reference fix
+
+The Chrome panel uses reference-only schema-1.1 captures. Factual questions with
+one resolved email/message reference now enter the grounded-answer generator with
+only that message, not the whole visible thread. The deterministic UI binder keeps
+its independent source fingerprint and exact ordinal mapping; generation still
+uses the existing validated quote contract. It does not authorize writes or split
+a compound command. No new tables, mailbox cache, model prompt or AWS Flow required.
+
+Verification: full local PostgreSQL suite **1,146 passed, zero skipped** on
+2026-09-23; Ruff passed. Replay cases cover selected/ordinal facts, changed source,
+ambiguous selection, mixed requests, and a real task/worker/artifact lifecycle with
+a fake model. Live EC2 frontend verification is recorded in the integration PR.
