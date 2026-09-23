@@ -310,7 +310,7 @@ Read observations do not rewrite the immutable action payload or approval.
 
 `assistant_tasks.compound_input` can also hold the strict `LookupDraftRequest`
 selected by its `lookup_then_reply`/`lookup_then_compose` template. New tasks pin
-`lookup-draft-template-1.0.0`. Existing summary requests/releases are unchanged.
+`lookup-draft-template-1.1.0`. Existing summary requests/releases are unchanged.
 `assistant_steps` ordinal 1 uses native `search_mail`; ordinal 2 remains a draft.
 Its immutable intermediate artifact uses stream `lookup`; final draft uses `result`.
 The existing two-step/attempt bounds, owner FKs, dependency hashes, immutable

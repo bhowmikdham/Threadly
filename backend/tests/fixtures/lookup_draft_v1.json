@@ -1,6 +1,6 @@
 {
-  "release": "lookup-draft-template-1.0.0",
-  "contract_hash": "7a9c0b1e5e744228204bd73372e8833d2f906a00bd004f631cd36acc803a2fea",
+  "release": "lookup-draft-template-1.1.0",
+  "contract_hash": "6656c2260753fda7a6de3fd6613d19b8a20e3bbc7a90d495d1736a472980a420",
   "data_kind": "synthetic_control_flow_replay",
   "live_model_evaluated": false,
   "reject_requests": [

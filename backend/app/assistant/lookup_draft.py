@@ -8,7 +8,7 @@ from app.assistant.summary import digest
 from app.schemas.lookup_draft import LookupDraftRequest
 from app.schemas.reads import ReadOptions
 
-RELEASE = "lookup-draft-template-1.0.0"
+RELEASE = "lookup-draft-template-1.1.0"
 POLICY = """
 The backend selected only messages matching the user's literal captured-text lookup,
 plus the explicitly selected reply target when replying. This is a partial captured

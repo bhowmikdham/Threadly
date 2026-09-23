@@ -14,7 +14,7 @@ from app.model_client.structured import reject_duplicate_keys
 from app.schemas.assistant import RouteDecision, RouteParameters, StrictModel
 from app.schemas.reads import ReadOptions
 
-RELEASE = "bounded-reads-task-1.0.0"
+RELEASE = "bounded-reads-task-1.1.0"
 PAGE_SIZE = 10
 QUOTE_LIMIT = 1000
 TIMEOUT_SECONDS = 120  # below the 180-second lease
@@ -227,10 +227,15 @@ def help_artifact():
         "content": {
             "operation": "help",
             "text": (
-                "You can summarise a captured thread, prepare reply/new-email drafts, "
-                "read a mapped message, search captured text, or rewrite one selected message. "
-                "Review suggestions before using them. Mailbox-wide search, tracked commitments, "
-                "compound tasks, Calendar booking and sending are not available in this release."
+                "You can summarise selected email threads, prepare reply or new-email drafts, "
+                "read mapped messages, search selected text or bounded Gmail date windows, "
+                "rewrite selected text, and propose work plans with selected commitments. "
+                "With Calendar connected and preferences configured, you can check availability, "
+                "suggest meeting slots, and combine supported summary, scheduling and draft steps. "
+                "Review workflow proposals and outputs before using them. Sending email or "
+                "creating Calendar events requires configured permissions, enabled server controls "
+                "and separate approval of the exact outgoing content. No mailbox import is needed. "
+                "Check capabilities for the actions currently enabled for your account."
             ),
             "claims": [],
             "search_scope": "none",

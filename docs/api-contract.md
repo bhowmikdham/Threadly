@@ -91,7 +91,10 @@ does not mean an executable workflow exists. The frontend must not dispatch tool
 or send messages from this response.
 
 Simple exact commands avoid inference. Richer requests use the selected model's
-small-model configuration, one bounded attempt and strict JSON validation. A hint
+small-model configuration, one bounded attempt and strict JSON validation. The intent
+router and draft generator accept raw JSON or exactly one complete JSON Markdown
+fence; extra prose, multiple objects, duplicate keys and invalid schema/semantics
+remain rejected. Model-selected recipients are never accepted. A hint
 cannot override a compound request. The initial allowed combinations are summary,
 work plan, availability check or slot suggestion followed by reply; entity/mail
 lookup followed by reply or compose; commitment lookup followed by reply.
@@ -398,7 +401,8 @@ state. This adds no Calendar handler, compound executor or approval to send.
 
 Explicit `AssistantRequest.read_options` adds native help, literal saved-capture
 search and single-message rewriting through the existing durable task API. New
-read tasks pin `bounded-reads-task-1.0.0`; other task hashes/releases are preserved.
+read tasks now pin `bounded-reads-task-1.1.0` (capability-aware help text).
+See [the compose routing correction](compose-routing-fix.md) for updated draft/router releases.
 Migration `a6417c29d805` adds nullable `assistant_tasks.read_input` and guards rollback
 with retained read tasks. No external writes or mailbox-wide search are enabled.
 Source ownership/freshness is checked before execution, publication and artifact
