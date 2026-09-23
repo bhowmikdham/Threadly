@@ -135,6 +135,68 @@ test.beforeAll(async () => {
           { id: "gmail_send", ready: false, status: "disabled" }
         ]
       }
+    else if (p === "/assistant/inbox-chat") {
+      if (body.instruction === "hey")
+        data = { kind: "message", text: "Hey! What can I help you with?" }
+      else if (/show.*emails/i.test(body.instruction))
+        data = {
+          kind: "search",
+          search: {
+            filters: {
+              schema_version: "1.0",
+              query: "receipt",
+              folder: "all_mail",
+              received_from: "2026-01-01T00:00:00Z",
+              received_before: "2026-10-01T00:00:00Z"
+            },
+            results: Array.from({ length: 5 }, (_, i) => ({
+              message_id: i ? `msg${i}` : target,
+              thread_id: thread,
+              subject:
+                i === 1
+                  ? "Your flight to Melbourne"
+                  : i
+                    ? `GYG order ${7842 - i}`
+                    : "Test receipt",
+              sender:
+                i === 1 ? "Flights <travel@example.test>" : "Cedar Catering",
+              received_at: "2026-09-23T03:00:00Z",
+              snippet:
+                i === 1
+                  ? "Your flight itinerary: JFK → MEL. Flight QF12"
+                  : "Thanks for your order. Your receipt and pickup details are inside.",
+              flight:
+                i === 1
+                  ? {
+                      origin: "JFK",
+                      destination: "MEL",
+                      flight_number: "QF12",
+                      route_quote: "JFK → MEL",
+                      basis: "email_text_not_live_status"
+                    }
+                  : null
+            })),
+            next_cursor: "signed-next",
+            coverage: { complete: false, page_size: 5 }
+          }
+        }
+      else data = { kind: "continue" }
+    } else if (p === "/assistant/inbox-search-page")
+      data = {
+        filters: body.filters,
+        results: [
+          {
+            message_id: "older",
+            thread_id: thread,
+            subject: "An earlier receipt",
+            sender: "Cedar",
+            received_at: "2026-09-01T03:00:00Z",
+            snippet: "Your earlier order confirmation."
+          }
+        ],
+        next_cursor: null,
+        coverage: { complete: false, page_size: 5 }
+      }
     else if (p === "/assistant/mail-search")
       data = {
         results: [
@@ -390,19 +452,61 @@ test.afterAll(async () => {
   if (profile) await rm(profile, { recursive: true, force: true })
 })
 test("real extension bridge: selected summary, answer and edited reply without send", async () => {
-  await page.getByRole("button", { name: "Add context", exact: true }).click()
-  await page.getByRole("button", { name: "Search mail", exact: true }).click()
-  await page.getByLabel("Search text").fill("receipt")
-  await page.getByRole("button", { name: "Search", exact: true }).click()
-  await page.getByRole("button", { name: "Test receipt", exact: true }).click()
+  await page.getByLabel("Your request").fill("hey")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByText("Hey! What can I help you with?", { exact: true })
+  ).toBeVisible()
+  await expect(page.getByText(/Ambiguous request/)).toHaveCount(0)
+  await page.getByLabel("Your request").fill("Show me all GYG emails")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(page.locator(".mail-glass-card")).toHaveCount(5)
+  await expect(page.getByLabel("Search text")).toHaveCount(0)
+  await expect(page.getByLabel("Flight from JFK to MEL")).toBeVisible()
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "inbox-glass-cards.png")
+  })
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await expect(page.locator(".flight-plane")).toHaveCSS("display", "none")
+  await expect(page.locator(".flight-plane-static")).toBeVisible()
+  await page.setViewportSize({ width: 320, height: 740 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    )
+  ).toBe(true)
+  await page.screenshot({
+    path: path.join("test-results", "inbox-cards-narrow.png")
+  })
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Switch to light appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await page.screenshot({
+    path: path.join("test-results", "inbox-cards-light.png")
+  })
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await page.setViewportSize({ width: 420, height: 900 })
+  await page.emulateMedia({ reducedMotion: "no-preference" })
+  await page.getByRole("button", { name: "Show more emails" }).click()
+  await expect(page.locator(".mail-glass-card")).toHaveCount(6)
+  await page
+    .getByRole("button", { name: "Use email: Test receipt", exact: true })
+    .click()
+  await expect(page.locator(".context-chip")).toBeVisible()
   await expect(page.getByLabel("Request type")).toHaveCount(0)
   await page.screenshot({
     animations: "disabled",
     path: path.join("test-results", "conversation-start.png")
   })
-  await page
-    .getByRole("button", { name: "Summarise this for me", exact: true })
-    .click()
+  await page.getByLabel("Your request").fill("Summarise this thread.")
+  await page.getByLabel("Your request").press("Enter")
   await expect(
     page.getByText("Order 7842 totals $18.60. Pickup is at 6:20 PM.")
   ).toBeVisible()
@@ -446,7 +550,9 @@ test("real extension bridge: selected summary, answer and edited reply without s
   expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
   expect(calls.some((c) => c.path.startsWith("/sync"))).toBe(false)
   await page.reload()
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
   await page.getByRole("button", { name: "History", exact: true }).click()
   await page
     .getByRole("button", { name: /Draft a reply to this thread/ })
@@ -501,9 +607,13 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
     animations: "disabled",
     path: path.join("test-results", "conversation-narrow-dark.png")
   })
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
   await page.getByRole("button", { name: "Switch to light appearance" }).click()
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Close conversation menu", exact: true })
+    .click()
   await page.screenshot({
     animations: "disabled",
     path: path.join("test-results", "conversation-narrow-light.png")
@@ -512,7 +622,9 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
 })
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
   await page.getByRole("button", { name: "History", exact: true }).click()
   await expect(
     page
@@ -522,7 +634,9 @@ test("settings use real capability and versioned preference contracts; history s
   await expect(
     page.getByRole("button", { name: /Draft a reply/ }).first()
   ).toBeVisible()
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
@@ -541,7 +655,9 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Close settings", exact: true })
     .click()
-  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
   await page.getByRole("button", { name: "Sign out", exact: true }).click()
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })

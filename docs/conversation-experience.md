@@ -1,5 +1,7 @@
 # Conversational panel — implementation and acceptance
 
+> Inbox chat update: [new discovery, cards and compact composer](inbox-chat.md). This supersedes the manual Search mail surface below.
+
 Release: `conversation-adapter-1.0.0`, 23 September 2026.
 
 ## Product behavior
@@ -29,7 +31,7 @@ not a claim of feature parity or a copy of proprietary assets.
    a separate exact-content approval and enabled backend permissions.
 
 Navigating to another Gmail page does not silently switch an existing conversation's
-source. Use **+ → Use open email**, Search mail, or a new conversation to change it.
+source. Use **+ → Use open email**, ask for emails and choose a card, or start a new conversation to change it.
 The context chip exposes included messages and an explicit message target. Message
 ordinals preserve the displayed Gmail order. **Rewrite selected message** produces
 a text suggestion through the existing bounded read adapter; it does not send or

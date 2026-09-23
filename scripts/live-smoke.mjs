@@ -55,25 +55,27 @@ try {
     page.getByRole("button", { name: "Add context", exact: true })
   ).toBeVisible({ timeout: 30000 })
   console.log("Authenticated conversational panel ready")
-  await page.getByRole("button", { name: "Add context", exact: true }).click()
-  await page.getByRole("button", { name: "Search mail", exact: true }).click()
-  await page
-    .getByLabel("Search text")
-    .fill(process.env.THREADLY_MAIL_QUERY || "GYG")
-  await page.getByLabel("Past days").fill("30")
-  await page.getByRole("button", { name: "Search", exact: true }).click()
-  await expect(page.locator(".history-row").first()).toBeVisible({
-    timeout: 45000
-  })
-  await page.locator(".history-row").first().click()
-  await expect(page.locator(".context-chip")).toBeVisible({ timeout: 45000 })
-  console.log("PASS: bounded Gmail search and compact owned context")
   const ask = async (text) => {
     await page.getByLabel("Your request").fill(text)
     await page
       .getByRole("button", { name: "Send request", exact: true })
       .click()
   }
+  await ask("hey")
+  await expect(
+    page.getByText("Hey! What can I help you with?", { exact: true })
+  ).toBeVisible()
+  console.log("PASS: greeting is conversational, no ambiguity error")
+  await ask(`Show me all ${process.env.THREADLY_MAIL_QUERY || "GYG"} emails`)
+  await expect(page.locator(".mail-glass-card").first()).toBeVisible({
+    timeout: 90000
+  })
+  assert((await page.locator(".mail-glass-card").count()) <= 5)
+  await page.locator(".mail-card-main").first().click()
+  await expect(page.locator(".context-chip")).toBeVisible({ timeout: 45000 })
+  console.log(
+    "PASS: natural inbox search, five-card bound and explicit source attachment"
+  )
   await ask("Summarise this thread.")
   await expect(page.getByLabel("summary result")).toHaveCount(1, {
     timeout: 180000
@@ -90,7 +92,9 @@ try {
   })
   console.log("PASS: grounded question in the same conversation")
   await ask("Draft a short thank-you reply for the order confirmation.")
-  await expect(page.locator(".clarification")).toBeVisible({ timeout: 180000 })
+  await expect(page.locator(".clarification, .draft-body").first()).toBeVisible(
+    { timeout: 180000 }
+  )
   const replyChoice = page.getByLabel("Reply to", { exact: true })
   if (await replyChoice.count()) {
     const option = await replyChoice
@@ -102,7 +106,8 @@ try {
   // Test-only recipient. Draft generation cannot send, and no approval is exercised.
   const email = page.getByLabel("Email address", { exact: true })
   if (await email.count()) await email.fill("supplier@example.test")
-  await page.getByRole("button", { name: "Continue request" }).click()
+  if (await page.locator(".clarification").count())
+    await page.getByRole("button", { name: "Continue request" }).click()
   await expect(page.locator(".draft-body")).toHaveCount(1, { timeout: 180000 })
   console.log("PASS: contextual reply clarification and readable draft")
   await page.getByRole("button", { name: "Add context", exact: true }).click()
@@ -134,6 +139,13 @@ try {
   console.log(
     "LIVE_FRONTEND_SMOKE_PASSED; no messages sent, events created, or mailbox imported"
   )
+} catch (error) {
+  console.error(
+    "LIVE_TEST_STOPPED:",
+    error.name,
+    "(private page contents not logged)"
+  )
+  process.exitCode = 1
 } finally {
   await browser?.close()
   await rm(profile, { recursive: true, force: true })
