@@ -9,7 +9,7 @@ from app.assistant.ui_context import CAPTURE_POLICY
 from app.schemas.assistant import RouteDecision, RouteParameters
 from app.schemas.ui_context import UIMessageMap
 
-RELEASE = "ui-context-task-1.0.0"
+RELEASE = "ui-context-task-1.1.0"
 ORDINALS = (
     "first",
     "second",
@@ -32,6 +32,14 @@ LOOKUP = (
     r"|what\s+does\s+(?:the\s+)?{reference}\s+say[?.!]?"
 )
 SUMMARISE = r"(?:please\s+)?summari[sz]e\s+(?:the\s+)?{reference}[?.!]?"
+# Bounded factual follow-ups, never a command splitter. Mixed/imperative requests
+# remain unsupported here and belong in the reviewed master workflow.
+FACT_QUESTION = r"^(?:what|which|who|when|where|how (?:much|many|long))\b"
+COMMAND_OR_COMPOUND = (
+    r"[;\n]|\b(?:then|also|send|forward|reply|draft|compose|schedule|book|delete|"
+    r"archive|rewrite|summari[sz]e|ignore|instead)\b"
+    r"|\band\s+(?:what|which|who|when|where|how|can|could|please)\b"
+)
 SUMMARY_REQUEST = "Summarise the single captured message supplied below."
 
 
@@ -43,6 +51,8 @@ def contract_hash() -> str:
             "lookup": LOOKUP,
             "summarise": SUMMARISE,
             "summary_request": SUMMARY_REQUEST,
+            "fact_question": FACT_QUESTION,
+            "command_or_compound": COMMAND_OR_COMPOUND,
             "capture_policy": CAPTURE_POLICY,
             "map_schema": UIMessageMap.model_json_schema(),
             "binding_policy": "one-message:no-cross-surface:no-compound:exact-source-quote-v1",
@@ -95,6 +105,8 @@ def bind_reference(instruction: str, snapshot: dict | None) -> dict | None:
         if re.fullmatch(LOOKUP.format(reference=literal), instruction)
         else "summary"
         if re.fullmatch(SUMMARISE.format(reference=literal), instruction)
+        else "answer"
+        if re.search(FACT_QUESTION, instruction) and not re.search(COMMAND_OR_COMPOUND, instruction)
         else None
     )
     if mode is None:
@@ -121,12 +133,16 @@ def reference_route(binding: dict, context_id: str) -> dict:
         if summary
         else "answer",
         # Exact extraction is a backend rule, not a model-selected lookup tool.
-        operations=["summarise_thread"] if summary else [],
+        operations=["summarise_thread"]
+        if summary
+        else ["lookup_entity"]
+        if binding.get("mode") == "answer"
+        else [],
         context_snapshot_id=context_id,
         parameters=RouteParameters.empty(),
         missing_fields=[binding["reason"]] if status == "needs_clarification" else [],
         clarification=(
-            "Capture this view and select one accessible message with synced text. "
+            "Capture this view and select one accessible message with source text. "
             "Message positions cannot identify threads or meeting options."
             if status == "needs_clarification"
             else None

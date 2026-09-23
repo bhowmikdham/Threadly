@@ -185,7 +185,7 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                         and route["decision"]["intent"] in {"reply", "compose"}
                     )
                     is_answer = (
-                        not binding
+                        (not binding or binding.get("mode") == "answer")
                         and route is not None
                         and route["decision"]["operations"] == ["lookup_entity"]
                     )

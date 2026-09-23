@@ -4,7 +4,7 @@ import json
 
 from app.schemas.assistant import RouteDecision, RoutePreviewRequest
 
-ROUTER_VERSION = "intent-preview-1.3.0"
+ROUTER_VERSION = "intent-preview-1.3.1"
 
 OUTPUT_RULES = """
 FINAL OUTPUT CONTRACT (applies even when backend capabilities are present):

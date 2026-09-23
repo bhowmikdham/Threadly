@@ -815,3 +815,30 @@ def test_time_evidence_does_not_pick_an_arbitrary_message_from_a_thread(target, 
         {"reply_message_id": target} if target else None,
     )
     assert result["decision"]["parameters"]["time_phrase"] == expected
+
+
+@needs_pg
+async def test_live_recipient_alias_opens_a_supported_saved_question(db_sessionmaker, mailbox):
+    from tests.test_intent_router import FakeModel as RouteModel
+
+    task_id, question = await start(
+        db_sessionmaker,
+        mailbox[0],
+        instruction="Write Alex a thank-you email",
+        model=RouteModel(
+            proposal(
+                intent="compose",
+                output_kind="draft",
+                operations=["draft_new"],
+                status="needs_clarification",
+                missing_fields=["recipient_email"],
+                clarification="Which email address?",
+            )
+        ),
+    )
+    assert question["fields"] == ["recipients"]
+    assert question["missing_fields"] == ["recipient"]
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, task_id)
+        assert task.error_code is None
+        assert task.draft_input is None

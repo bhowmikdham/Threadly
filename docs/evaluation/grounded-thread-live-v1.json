@@ -3,7 +3,7 @@
   "cases_hash": "c8214b1082dc04cd73a5eb4a7acc38eaba50b15bb1c9712936a6c90c386f1a47",
   "routing_release": {
     "workflow": "contextual-task-1.2.0",
-    "router_version": "intent-preview-1.3.0",
+    "router_version": "intent-preview-1.3.1",
     "routing_prompt_hash": "3c6bc58fe0e8514f023e707203c132a7c305e1e80721eb7de06e6671f6a80280",
     "routing_schema_hash": "3ffc195d2780484238d2f21d34798373b00b8b3c475e88bbd89c09c8587bfff2",
     "draft_release": "draft-artifact-1.2.2",
@@ -61,6 +61,6 @@
   "compose_repeats_passed": 2,
   "mailbox_read": false,
   "external_actions": false,
-  "ssm_command_id": "fab4c31d-1c42-414d-b427-0665ffe4518d",
-  "scope": "Synthetic selected-thread and compose replay; not broad accuracy or provider-write acceptance."
+  "scope": "Synthetic selected-thread and compose replay; not broad accuracy or provider-write acceptance.",
+  "execution": "Local isolated backend checkout using the existing AWS CLI session; 2026-09-23."
 }

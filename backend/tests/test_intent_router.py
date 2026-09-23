@@ -272,3 +272,43 @@ def test_invalid_subject_is_401_not_500(client, payload):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert result.status_code == 401
+
+
+@pytest.mark.parametrize("alias", ["recipient_email", "recipient_address", "recipients"])
+@pytest.mark.parametrize("bound", [False, True])
+def test_recipient_field_aliases_preserve_the_required_envelope(alias, bound):
+    from app.planner.intent_router import require_context
+
+    decision = RouteDecision.model_validate(
+        proposal(
+            intent="compose",
+            output_kind="draft",
+            operations=["draft_new"],
+            status="needs_clarification",
+            missing_fields=[alias, "recipient"],
+            clarification="Who is this for?",
+        )
+    )
+    result = require_context(decision, has_recipients=bound)
+    assert result.missing_fields == ([] if bound else ["recipient"])
+    assert result.status == ("ready" if bound else "needs_clarification")
+    assert result.parameters.recipient_refs == []
+    assert result.requested_action == "none"
+
+
+def test_recipient_alias_does_not_drop_unknown_fields_or_action_review():
+    from app.planner.intent_router import require_context
+
+    decision = RouteDecision.model_validate(
+        proposal(
+            intent="compose",
+            output_kind="draft",
+            operations=["draft_new"],
+            status="needs_clarification",
+            missing_fields=["recipient_email", "mailbox_scope"],
+            clarification="More information needed.",
+            requested_action="send_email",
+        )
+    )
+    result = require_context(decision, has_recipients=True)
+    assert result.missing_fields == ["mailbox_scope", "saved_action_target"]

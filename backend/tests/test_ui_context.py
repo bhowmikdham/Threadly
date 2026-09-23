@@ -508,3 +508,25 @@ def test_ui_contract_is_discoverable_and_old_capture_rejects_map(
     )
     body = capture_request()
     assert db_client.post("/assistant/context-snapshots", json=body).status_code == 401
+
+
+async def test_grounded_reference_question_uses_only_mapped_message(
+    db_sessionmaker, visible_mailbox
+):
+    task_id, _ = await create_ui_task(
+        db_sessionmaker, visible_mailbox[0], "What was said in the third message?"
+    )
+    model = FakeModel(
+        output=json.dumps(
+            {"found": True, "quotes": [{"source": 1, "quote": "Thanks for clarifying."}]}
+        )
+    )
+    await run_once(db_sessionmaker, model)
+    task, artifact = await result(db_sessionmaker, task_id)
+    assert task.state == "succeeded", task.error_code
+    assert artifact.payload["kind"] == "answer"
+    assert artifact.payload["content"]["text"] == "Thanks for clarifying."
+    assert artifact.payload["evidence"][0]["source_id"] == "m2"
+    assert len(model.calls) == 1
+    assert "Third chronologically" not in model.calls[0][0]
+    assert "Ship Friday" not in model.calls[0][0]
