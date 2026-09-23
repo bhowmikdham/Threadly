@@ -1,64 +1,61 @@
 {
-  "name": "mail-mind",
-  "displayName": "Mail Mind Extension",
-  "version": "0.0.1",
-  "description": "Chrome extension sidepanel interface for email task execution and summary generation.",
-  "author": "Plasmo Corp. <foss@plasmo.com>",
+  "name": "threadly-extension",
+  "displayName": "Threadly",
+  "version": "0.1.0",
+  "description": "Threadly Gmail assistant connected to the reviewed backend workflows.",
+  "author": "Threadly contributors",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "format": "prettier --write background.ts content.ts popup.tsx sidepanel.tsx lib components tests style.css"
   },
   "dependencies": {
-    "@inboxsdk/core": "^2.2.24",
-    "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.1.1",
+    "@playwright/test": "^1.55.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/chrome": "0.0.258",
-    "@types/inboxsdk": "^2.0.14",
-    "@types/node": "20.11.5",
+    "@types/node": "^20.19.43",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
+    "jsdom": "^26.1.0",
     "prettier": "3.2.4",
-    "typescript": "5.3.3"
+    "typescript": "5.3.3",
+    "vitest": "^4.1.11",
+    "plasmo": "0.90.5"
   },
   "manifest": {
     "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
-  },
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    },
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6dZFvQRDRsU3uS3+5wIR38W5nMdy02p9HNqe7/o9z7L2hNUcpkIMTXsAhSFItfgvyBI6XRN9fPuwDjFpyghAB+qVO0CXkNkLXTSiL8qNkJZ7P3QT63tO5wKx6xEPGyz+/ZwCSEDmDiQezWRVIQTuG6Tj5KxOa40S/190y63AGkcvR7hVp4ZRDRHHP39V8eXI26Bu9kYNasMb8/i71iZuTrRkgqgtc0uZXUvHv0DXXM9cv4YNs2/3oChGhX65L2/LQ5gUpIMYle4NXDTuFy+Zt7fu+6xKBnvYzl9UOzoK/uix7UXBbiqeynwII/qCeFDcpHBU6wXMndjK38d2bBvsDwIDAQAB",
     "permissions": [
       "sidePanel",
       "identity",
       "storage",
-      "scripting"
+      "activeTab"
     ],
-    "web_accessible_resources": [
-    {
-      "resources": ["*"],
-      "matches": ["https://mail.google.com/*"]
-    }
-    ],
-    "oauth2": {
-      "client_id": "1054567044769-6dk3mi16v6k1m5omlc5g8akdd94kgv1j.apps.googleusercontent.com",
-      "scopes": [
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.send"
-      ]
-    },
     "host_permissions": [
-  "https://mail.google.com/*",
-  "https://*.inboxsdk.com/*"
-],
+      "https://mail.google.com/*",
+      "http://127.0.0.1/*",
+      "http://localhost/*"
+    ],
     "side_panel": {
       "default_path": "sidepanel.html"
     },
     "action": {
-      "default_title": "Open Mail Mind"
-    }
+      "default_title": "Open Threadly"
+    },
+    "optional_host_permissions": [
+      "https://*/*"
+    ]
   }
 }
