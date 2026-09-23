@@ -97,7 +97,12 @@ def require_context(
         )
     ]
     operations = set(decision.operations)
-    if not has_source and operations & {"summarise_thread", "plan_actions", "transform_text"}:
+    if not has_source and operations & {
+        "summarise_thread",
+        "plan_actions",
+        "transform_text",
+        "lookup_entity",
+    }:
         missing.append("source_context")
     if "draft_reply" in operations and not has_reply_target:
         missing.append("reply_target")
@@ -127,6 +132,11 @@ def require_context(
         )
         return RouteDecision.model_validate(value)
     if decision.status == "needs_clarification":
+        if not decision.operations or decision.output_kind == "clarification":
+            # Clearing preconditions cannot invent a missing executable proposal.
+            raise ApiError(
+                502, "invalid_route_output", "The route omitted its requested operation."
+            )
         value = decision.model_dump()
         value.update(status="ready", missing_fields=[], clarification=None)
         return RouteDecision.model_validate(value)

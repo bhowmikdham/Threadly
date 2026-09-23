@@ -249,7 +249,9 @@ async def test_model_cannot_change_reply_subject(db_sessionmaker, mailbox):
     tid, _ = await draft_task(db_sessionmaker, mailbox[0], reply=True)
     await run_once(db_sessionmaker, DraftModel(output=OUTPUT))
     async with db_sessionmaker() as session:
-        assert (await session.get(AssistantTask, tid)).error_code == "invalid_draft_output"
+        assert (await session.get(AssistantTask, tid)).state == "succeeded"
+    artifact = await artifact_for(db_sessionmaker, tid)
+    assert artifact.payload["content"]["subject"] == "Re: Release"
 
 
 @needs_pg

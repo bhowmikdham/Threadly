@@ -100,7 +100,7 @@ async def test_compound_reply_keeps_calendar_dependency_and_missing_fields():
     assert result.decision.missing_fields == ["reply_target", "timezone", "duration_minutes"]
     assert result.decision.parameters.date_phrase == "next week"
     assert model.calls[0][1] == {"small": True, "max_tokens": 1200}
-    assert "NO mailbox text" in model.calls[0][0]
+    assert "No mailbox text or contact list" in model.calls[0][0]
 
 
 async def test_summary_reply_is_not_captured_by_summary_rule():

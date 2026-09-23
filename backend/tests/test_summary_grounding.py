@@ -151,11 +151,25 @@ def test_all_three_policy_identities_remain_replayable_and_distinct():
         )
         assert prompt.startswith(policy.PROMPT)
     assert hashes[:2] == [
-        "4235198f0358cb28e5898be9814a32671e60c6f393b0beb1f011d074788519cc",
-        "44dcaea33c8a516b72d982185c2f04c63de917d62361cf7f6d2e72d010686cdc",
+        "f4046ebabe932d434f2d4703606afb262b6ec7de535f0f5dc7211dbcd4498bc6",
+        "f94ff4d3d44722c6961d73b9f93fa1a8969fcec454e377e86fd0e3efdd841e4e",
     ]
     assert len(set(hashes)) == 3
     assert summary_policy.VERSION == "summary-quality-1.0.2"
     assert "clearly necessary next step" not in summary_policy.PROMPT
     assert "next step that matters" in summary_policy_v1_0_1.PROMPT
     validate_fixtures(FIXTURES)
+
+
+def test_old_raw_only_release_is_not_relabelled_as_new_parser():
+    from app.api.errors import ApiError
+
+    with pytest.raises(ApiError) as error:
+        summary_quality.policy_for_release(
+            {
+                "workflow": "summary-quality-task-1.0.0",
+                "contract_hash": "2fed42f58b02492f1e8d4f8a6688035fe42f4c2032a9aeb22cf1708bea031274",
+                "base_release": {},
+            }
+        )
+    assert error.value.code == "release_unavailable"

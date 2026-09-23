@@ -1,5 +1,7 @@
 # Architecture — what runs where
 
+> Current selected-thread behavior: [grounded answers and receipt fixes](grounded-thread-fixes.md).
+
 > Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
 > local-search and stored-source assumptions below. Default runtime fetches selected sources
 > from Gmail and stores references only; bulk sync is retired. See that contract before integration.
