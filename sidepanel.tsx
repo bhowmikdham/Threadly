@@ -4,7 +4,6 @@ import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
 import { Icon } from "./components/Icon"
-import { MailSearch } from "./components/MailSearch"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
@@ -178,7 +177,6 @@ function Assistant({
     [menu, setMenu] = useState(false),
     [sources, setSources] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
-    [search, setSearch] = useState(false),
     [history, setHistory] = useState<any>(null),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
@@ -187,13 +185,22 @@ function Assistant({
     last = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     scroll = useRef<HTMLDivElement>(null),
-    atBottom = useRef(true)
+    atBottom = useRef(true),
+    positionedSearch = useRef<string | null>(null)
   useEffect(() => {
     void c.selectActive(true)
     return () => recognition.current?.abort()
   }, [])
   useEffect(() => {
-    if (atBottom.current) last.current?.scrollIntoView({ block: "end" })
+    const newest = c.entries.at(-1)
+    if (newest?.inbox && positionedSearch.current !== newest.id) {
+      positionedSearch.current = newest.id
+      atBottom.current = false
+      scroll.current
+        ?.querySelector(`[data-entry-id="${newest.id}"] .assistant-message`)
+        ?.scrollIntoView({ block: "start" })
+    } else if (atBottom.current && !newest?.inbox)
+      last.current?.scrollIntoView({ block: "end" })
   }, [c.entries])
   useEffect(() => {
     if (input.current) {
@@ -212,7 +219,6 @@ function Assistant({
       setHistory((old) => (more ? [...(old || []), ...r.tasks] : r.tasks))
       setHistoryCursor(r.next_cursor)
       setMenu(false)
-      setSearch(false)
     } catch (e) {
       c.setError(errorText(e))
     }
@@ -272,12 +278,15 @@ function Assistant({
   const newChat = () => {
     c.newChat()
     setHistory(null)
-    setSearch(false)
     setContextOpen(false)
     setMessage("")
     setMenu(false)
   }
-  const title = c.entries[0]?.instruction || "Threadly"
+  const title = c.entries.length
+    ? /^(hi|hey|hello)[.!?]?$/i.test(c.entries[0].instruction.trim())
+      ? "New conversation"
+      : c.entries[0].instruction
+    : "New conversation"
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
   const latest = c.entries.at(-1)
   return (
@@ -305,6 +314,19 @@ function Assistant({
       </header>
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
+          <div className="drawer-title">
+            <span>Threadly</span>
+            <button
+              className="icon-button"
+              aria-label="Close conversation menu"
+              onClick={() => setMenu(false)}>
+              <Icon name="close" />
+            </button>
+          </div>
+          <button onClick={newChat} disabled={c.busy}>
+            <Icon name="edit" />
+            New conversation
+          </button>
           <button onClick={() => void historyPage()}>
             <Icon name="clock" />
             History
@@ -333,26 +355,6 @@ function Assistant({
           atBottom.current =
             !e || e.scrollHeight - e.scrollTop - e.clientHeight < 100
         }}>
-        {search && (
-          <section className="source-surface">
-            <div className="card-heading">
-              <b>Find an email</b>
-              <button
-                className="icon-button"
-                aria-label="Close search"
-                onClick={() => setSearch(false)}>
-                <Icon name="close" />
-              </button>
-            </div>
-            <MailSearch
-              select={async (id) => {
-                await c.selectThread(id)
-                setSearch(false)
-                setSources(false)
-              }}
-            />
-          </section>
-        )}
         {contextOpen && c.selection && (
           <ContextPicker
             selection={c.selection}
@@ -398,7 +400,7 @@ function Assistant({
             )}
           </section>
         )}
-        {!c.entries.length && !history && !search && !contextOpen && (
+        {!c.entries.length && !history && !contextOpen && (
           <section className="conversation-start">
             <span className="welcome-mark">
               <Icon name="sparkle" size={29} />
@@ -449,7 +451,8 @@ function Assistant({
                   </button>
                   <button
                     onClick={() => {
-                      setSearch(true)
+                      setMessage("Show me emails about ")
+                      input.current?.focus()
                       setSources(false)
                     }}>
                     <Icon name="search" />
@@ -501,12 +504,13 @@ function Assistant({
             <button
               disabled={c.busy}
               onClick={() => {
-                setSearch(true)
+                setMessage("Show me emails about ")
+                input.current?.focus()
                 setSources(false)
                 setContextOpen(false)
               }}>
               <Icon name="search" />
-              Search mail
+              Find an email
             </button>
             {c.selection && (
               <button
@@ -535,31 +539,33 @@ function Assistant({
             </button>
           </div>
         )}
+        {c.selection && (
+          <button
+            type="button"
+            className="context-chip"
+            disabled={c.busy}
+            title="View email context"
+            aria-label={`Email context: ${c.selection.thread.subject}`}
+            aria-expanded={contextOpen}
+            onClick={() => {
+              setContextOpen(!contextOpen)
+            }}>
+            <Icon name="mail" size={14} />
+            <span>{c.selection.thread.subject}</span>
+            <small>
+              {c.selection.selectedIds.length}{" "}
+              {c.selection.selectedIds.length === 1 ? "message" : "messages"}
+            </small>
+          </button>
+        )}
         <form className="composer" onSubmit={send}>
-          {c.selection && (
-            <button
-              type="button"
-              className="context-chip"
-              disabled={c.busy}
-              title="View email context"
-              aria-label={`Email context: ${c.selection.thread.subject}`}
-              aria-expanded={contextOpen}
-              onClick={() => {
-                setContextOpen(!contextOpen)
-                setSearch(false)
-              }}>
-              <Icon name="mail" size={14} />
-              <span>{c.selection.thread.subject}</span>
-              <small>{c.selection.selectedIds.length}</small>
-            </button>
-          )}
           <textarea
             ref={input}
             aria-label="Your request"
             placeholder={
               latest?.task?.state === "needs_clarification"
                 ? "Reply or ask a follow-up…"
-                : "Assign a task or ask anything…"
+                : "Ask your inbox…"
             }
             value={message}
             rows={1}

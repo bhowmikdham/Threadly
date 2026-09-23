@@ -937,3 +937,402 @@ summary:focus-visible {
     transition: none !important;
   }
 }
+
+/* Inbox conversation: translucent surfaces, compact controls, grounded rich cards. */
+.threadly {
+  background: radial-gradient(ellipse at 85% 100%, #ded8f128, transparent 65%),
+    var(--bg);
+}
+.threadly.dark {
+  --bg: #242423;
+  --surface: #2c2c2b;
+  --soft: #323230;
+  --border: #484844;
+}
+.chat-header {
+  padding: 12px 16px;
+}
+.chat-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+.conversation {
+  padding: 10px 18px 20px;
+}
+.composer-wrap {
+  padding: 8px 14px 10px;
+}
+.composer {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 28px 34px;
+  align-items: center;
+  gap: 3px;
+  padding: 8px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #ffffff0a, transparent), var(--surface);
+  box-shadow:
+    0 6px 20px #00000012,
+    inset 0 1px #ffffff08;
+}
+.composer textarea {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  min-height: 34px;
+  padding: 6px 2px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.composer-actions {
+  display: contents;
+}
+.composer-actions .icon-button:first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+.composer-actions .composer-hint {
+  display: none;
+}
+.composer-actions .icon-button:nth-of-type(2) {
+  grid-column: 3;
+  grid-row: 1;
+  width: 28px;
+}
+.composer-actions .icon-button:nth-of-type(3) {
+  grid-column: 4;
+  grid-row: 1;
+  width: 28px;
+}
+.composer .send-button {
+  grid-column: 5;
+  grid-row: 1;
+  margin: 0;
+}
+.context-chip {
+  margin: 0 4px 8px;
+  max-width: calc(100% - 8px);
+  width: fit-content;
+  border-radius: 10px;
+  padding: 5px 8px;
+  background: #ffffff06;
+}
+.context-chip > span {
+  min-width: 0;
+  max-width: 260px;
+}
+.context-chip > small {
+  font-size: 9px;
+}
+.composer-footnote {
+  font-size: 9px;
+  opacity: 0.85;
+  margin-bottom: 0;
+}
+.user-message {
+  background: var(--soft);
+  padding: 10px 15px;
+  border-radius: 19px 19px 5px 19px;
+}
+.chat-response {
+  font-size: 15px;
+  line-height: 1.7;
+}
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+.thinking svg {
+  animation: thought-pulse 1.4s ease-in-out infinite;
+}
+@keyframes thought-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+.response-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  margin: 10px 0 4px;
+}
+.response-footer time {
+  font-size: 11px;
+}
+.response-footer .icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+}
+.inbox-intro {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.inbox-scope {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 13px;
+}
+.mail-card-list {
+  display: grid;
+  gap: 10px;
+}
+.mail-glass-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dddbe7;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffffffef, #eeebf5cf);
+  backdrop-filter: blur(18px) saturate(130%);
+  box-shadow:
+    inset 0 1px #fff,
+    0 5px 15px #30264308;
+  animation: card-enter 0.3s ease both;
+  animation-delay: calc(var(--card-order, 0) * 45ms);
+}
+.dark .mail-glass-card {
+  border-color: #ffffff19;
+  background: linear-gradient(135deg, #ffffff0e, #b5a0f207 60%, #ffffff06);
+  box-shadow:
+    inset 0 1px #ffffff09,
+    0 6px 18px #00000012;
+}
+.mail-glass-card:hover,
+.mail-glass-card.is-selected {
+  border-color: var(--accent);
+}
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.mail-card-main {
+  display: flex;
+  gap: 11px;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 15px 13px 8px;
+}
+.mail-card-main:hover:not(:disabled) {
+  background: #ffffff06;
+}
+.mail-card-icon {
+  width: 34px;
+  height: 36px;
+  border: 1px solid #aaa0c62a;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #c7b9eb35, #ffffff08);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.mail-card-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+  flex: 1;
+}
+.mail-card-meta {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mail-card-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-card-meta time {
+  flex: none;
+}
+.mail-card-content strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mail-card-snippet {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.mail-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 7px 14px;
+}
+.mail-card-actions small {
+  font-size: 11px;
+}
+.mail-card-actions .icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 7px;
+}
+.show-more-mail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  border-radius: 20px;
+  font-size: 12px;
+  background: transparent;
+}
+.flight-ticket {
+  margin: 7px 13px 9px;
+  padding: 13px 12px 9px;
+  border: 1px solid #a9aad628;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #b6b7eb18, #8ee0df0c);
+}
+.flight-caption {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+.flight-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 15px;
+}
+.flight-route b {
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+.flight-route span {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+.flight-map {
+  display: block;
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+  color: var(--accent);
+  fill: currentColor;
+}
+.flight-arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-dasharray: 3 5;
+  opacity: 0.55;
+}
+.flight-plane {
+  offset-path: path("M20 72 Q140 -8 260 72");
+  offset-rotate: auto;
+  offset-distance: 50%;
+  animation: flight-arrive 2.4s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+@keyframes flight-arrive {
+  from {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  to {
+    offset-distance: 50%;
+    opacity: 1;
+  }
+}
+.flight-plane-static {
+  display: none;
+}
+.flight-ticket > small {
+  font-size: 10px;
+  text-align: center;
+}
+.panel-menu {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(82%, 300px);
+  border-radius: 0 18px 18px 0;
+  padding: 24px 16px;
+  z-index: 30;
+  box-shadow: 40px 0 60px #00000045;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.panel-menu .menu-account {
+  margin-top: auto;
+}
+.drawer-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.drawer-title > span {
+  font-size: 19px;
+  font-weight: 600;
+}
+@media (max-width: 350px) {
+  .composer {
+    grid-template-columns: 28px minmax(0, 1fr) 28px 32px;
+  }
+  .composer-actions .icon-button:nth-of-type(2) {
+    display: none;
+  }
+  .composer-actions .icon-button:nth-of-type(3) {
+    grid-column: 3;
+  }
+  .composer .send-button {
+    grid-column: 4;
+  }
+  .context-chip > span {
+    max-width: 180px;
+  }
+  .conversation {
+    padding-inline: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mail-glass-card,
+  .thinking svg,
+  .flight-plane {
+    animation: none;
+  }
+  .flight-plane {
+    display: none;
+  }
+  .flight-plane-static {
+    display: block;
+  }
+  button {
+    transition: none;
+  }
+}

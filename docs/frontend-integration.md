@@ -1,5 +1,7 @@
 # Frontend ↔ backend integration handoff
 
+> Inbox chat update: [new discovery, cards and compact composer](inbox-chat.md). This supersedes the manual Search mail surface below.
+
 The extension is a client of the existing FastAPI task system. It does not run
 its own Gemini planner or use a Google access token directly. The backend owns
 source access, task execution, model/Flow selection, approvals and external writes.

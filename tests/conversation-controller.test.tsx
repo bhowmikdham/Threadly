@@ -8,7 +8,13 @@ function mock(handler: (m: any) => any) {
   const calls: any[] = []
   vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (m: any) => {
     calls.push(m)
-    return { ok: true, data: await handler(m) }
+    return {
+      ok: true,
+      data:
+        m.path === "/assistant/inbox-chat"
+          ? { kind: "continue" }
+          : await handler(m)
+    }
   }) as any)
   return calls
 }
@@ -155,5 +161,99 @@ describe("conversation orchestration", () => {
       context_snapshot_id: "ctx",
       read_options: { operation: "transform_text", message_id: "m1" }
     })
+  })
+})
+
+describe("inbox conversation boundaries", () => {
+  it("does not capture the open message or create tasks for a greeting or inbox search", async () => {
+    const calls: any[] = []
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (
+      m: any
+    ) => {
+      calls.push(m)
+      return {
+        ok: true,
+        data:
+          m.body.instruction === "hey"
+            ? { kind: "message", text: "Hey! What can I help you with?" }
+            : {
+                kind: "search",
+                search: {
+                  filters: { query: "GYG" },
+                  results: [],
+                  next_cursor: null
+                }
+              }
+      }
+    }) as any)
+    const { result } = renderHook(() => useAssistant(user))
+    await act(async () => {
+      result.current.setSelection({
+        thread: { thread_id: "unrelated" },
+        messages: [{ gmail_msg_id: "m" }],
+        selectedIds: ["m"],
+        targetId: "m"
+      } as any)
+    })
+    await act(async () => {
+      await result.current.submit("hey")
+    })
+    await act(async () => {
+      await result.current.submit("Show GYG emails")
+    })
+    expect(calls.map((m) => m.path)).toEqual([
+      "/assistant/inbox-chat",
+      "/assistant/inbox-chat"
+    ])
+    expect(result.current.entries[0].message).toMatch(/Hey/)
+    expect(result.current.entries[1].inbox.results).toEqual([])
+    expect(result.current.selection.thread.thread_id).toBe("unrelated")
+  })
+  it("keeps a failed page retry bound to its original filters and cursor, then deduplicates", async () => {
+    const calls: any[] = []
+    const first = { message_id: "m1", thread_id: "t1" }
+    const filters = { query: "GYG", received_from: "2026-01-01T00:00:00Z" }
+    let fail = true
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (
+      m: any
+    ) => {
+      calls.push(m)
+      if (m.path.endsWith("inbox-chat"))
+        return {
+          ok: true,
+          data: {
+            kind: "search",
+            search: { filters, results: [first], next_cursor: "opaque-1" }
+          }
+        }
+      if (fail) throw new Error("Connection interrupted")
+      return {
+        ok: true,
+        data: {
+          filters,
+          results: [first, { message_id: "m2", thread_id: "t2" }],
+          next_cursor: null
+        }
+      }
+    }) as any)
+    const { result } = renderHook(() => useAssistant(user))
+    await act(async () => {
+      await result.current.submit("Show GYG emails")
+    })
+    await act(async () => {
+      await result.current.moreEmails(result.current.entries[0])
+    })
+    expect(result.current.entries[0].inbox.next_cursor).toBe("opaque-1")
+    expect(result.current.entries[0].inbox.results).toEqual([first])
+    fail = false
+    await act(async () => {
+      await result.current.moreEmails(result.current.entries[0])
+    })
+    expect(calls[1].body).toEqual({ filters, cursor: "opaque-1" })
+    expect(calls[2].body).toEqual(calls[1].body)
+    expect(
+      result.current.entries[0].inbox.results.map((m) => m.message_id)
+    ).toEqual(["m1", "m2"])
+    expect(result.current.entries[0].inbox.next_cursor).toBeNull()
   })
 })

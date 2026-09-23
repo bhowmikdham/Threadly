@@ -60,9 +60,33 @@ export interface Artifact {
   latest_artifact_id?: string
   scheduling_status?: any
 }
+export interface InboxResult {
+  message_id: string
+  thread_id: string
+  subject: string
+  sender: string
+  received_at: string
+  snippet: string
+  flight?: {
+    origin: string
+    destination: string
+    flight_number?: string
+    route_quote: string
+    basis: string
+  } | null
+}
+export interface InboxPage {
+  filters: any
+  results: InboxResult[]
+  next_cursor: string | null
+  coverage: { complete: boolean; page_size: number }
+}
 export interface Entry {
   id: string
   instruction: string
+  createdAt?: string
+  message?: string
+  inbox?: InboxPage
   task?: Task
   recipe?: {
     instruction: string

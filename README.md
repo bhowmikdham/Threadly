@@ -71,7 +71,11 @@ optional and remain subject to backend pilot controls and exact approval.
 
 ## What is connected
 
-- On-demand Gmail search with an explicit date window and manual pagination.
+- Chat-driven Gmail discovery: ask “Show me all the GYG emails”; view up to five
+  glass email cards per page, with visible dates and Show more. No search form.
+- Normal greetings, compact composer/context chip, copy/time on responses and a
+  conversation drawer. Literal flight routes get an animated itinerary card, with
+  reduced-motion support and no claim of live flight tracking.
 - Select an open Gmail thread or a search result; choose source messages and a
   specific reply/rewrite target from the context chip. Opening a new conversation
   automatically attaches the open Gmail thread once; navigating Gmail does not
@@ -120,3 +124,5 @@ Google consent window.
 See [conversation design and boundaries](docs/conversation-experience.md) and
 [integration handoff](docs/frontend-integration.md) for endpoint mappings,
 recovery behavior, evidence and remaining external setup.
+
+See [inbox chat behavior and checks](docs/inbox-chat.md) for the new discovery APIs and limits.

@@ -3,7 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { api, errorText, requestId } from "./api"
 import { activeGmail, capture } from "./context"
 import { chatAnswer, isRefinement, refinement } from "./conversation"
-import type { Artifact, Entry, Selection, Task, User } from "./types"
+import type {
+  Artifact,
+  Entry,
+  InboxPage,
+  InboxResult,
+  Selection,
+  Task,
+  User
+} from "./types"
 
 const terminal = new Set([
   "succeeded",
@@ -115,6 +123,56 @@ export function useAssistant(user: User) {
       if (mounted.current) setBusy(false)
     }
   }
+  const chooseEmail = async (mail: InboxResult) => {
+    if (busy) return
+    setBusy(true)
+    setError("")
+    try {
+      const data = await api(`/threads/${encodeURIComponent(mail.thread_id)}`)
+      if (!data.messages.some((m) => m.gmail_msg_id === mail.message_id))
+        throw new Error(
+          "That email is no longer available. Search again for its current version."
+        )
+      if (mounted.current)
+        setSelection({
+          ...data,
+          selectedIds: data.messages.map((m) => m.gmail_msg_id),
+          targetId: mail.message_id
+        })
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      if (mounted.current) setBusy(false)
+    }
+  }
+  const moreEmails = async (entry: Entry) => {
+    if (submitting.current || !entry.inbox?.next_cursor) return
+    submitting.current = true
+    setBusy(true)
+    update(entry.id, { pending: true, error: undefined })
+    try {
+      const next = await api<InboxPage>("/assistant/inbox-search-page", {
+        filters: entry.inbox.filters,
+        cursor: entry.inbox.next_cursor
+      })
+      const seen = new Set(entry.inbox.results.map((r) => r.message_id))
+      update(entry.id, {
+        pending: false,
+        inbox: {
+          ...next,
+          results: [
+            ...entry.inbox.results,
+            ...next.results.filter((r) => !seen.has(r.message_id))
+          ]
+        }
+      })
+    } catch (e) {
+      update(entry.id, { pending: false, error: errorText(e) })
+    } finally {
+      submitting.current = false
+      if (mounted.current) setBusy(false)
+    }
+  }
   const proposal = async (
     id: string,
     instruction: string,
@@ -158,7 +216,10 @@ export function useAssistant(user: User) {
     setBusy(true)
     setError("")
     const id = requestId()
-    setEntries((old) => [...old, { id, instruction, pending: true }])
+    setEntries((old) => [
+      ...old,
+      { id, instruction, pending: true, createdAt: new Date().toISOString() }
+    ])
     try {
       if (
         rewriteMessageId &&
@@ -174,6 +235,44 @@ export function useAssistant(user: User) {
         throw new Error(
           "Which result would you like to change? Open its conversation from History, or describe the full request."
         )
+      if (!follow && !rewriteMessageId) {
+        const previousSearch = [...entries].reverse().find((e) => e.inbox)
+        if (
+          /^(?:please )?(?:show |load )?(?:me )?(?:more|next(?: emails?| page)?)(?: please)?[.!?]?$/i.test(
+            instruction.trim()
+          ) &&
+          previousSearch
+        ) {
+          if (!previousSearch.inbox.next_cursor) {
+            update(id, {
+              pending: false,
+              message:
+                "There are no more results in this search. Try a different sender or date range."
+            })
+            return
+          }
+          const inbox = await api<InboxPage>("/assistant/inbox-search-page", {
+            filters: previousSearch.inbox.filters,
+            cursor: previousSearch.inbox.next_cursor
+          })
+          update(id, { pending: false, inbox })
+          return
+        }
+        const turn = await api("/assistant/inbox-chat", {
+          instruction,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        })
+        if (turn.kind === "message") {
+          update(id, { pending: false, message: turn.text })
+          return
+        }
+        if (turn.kind === "search") {
+          update(id, { pending: false, inbox: turn.search })
+          return
+        }
+        if (turn.kind !== "continue")
+          throw new Error("I couldn’t finish that request. Please try again.")
+      }
       const ctx = !follow && selection ? await capture(selection) : null
       const recipe = follow || {
         instruction,
@@ -402,6 +501,7 @@ export function useAssistant(user: User) {
       )
     )
   return {
+    email: user.email,
     entries,
     selection,
     setSelection,
@@ -410,6 +510,8 @@ export function useAssistant(user: User) {
     setError,
     selectActive,
     selectThread,
+    chooseEmail,
+    moreEmails,
     submit,
     confirm,
     resume,

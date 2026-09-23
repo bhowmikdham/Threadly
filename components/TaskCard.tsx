@@ -4,6 +4,7 @@ import { addresses } from "../lib/api"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
 import { Icon } from "./Icon"
+import { InboxCards } from "./InboxCards"
 
 export function TaskCard({
   entry,
@@ -16,9 +17,11 @@ export function TaskCard({
     p = entry.proposal,
     progress = t?.workflow || t?.compound
   return (
-    <article className="exchange">
+    <article className="exchange" data-entry-id={entry.id}>
       <div className="user-message">{entry.instruction}</div>
       <div className="assistant-message">
+        {entry.message && <p className="chat-response">{entry.message}</p>}
+        {entry.inbox && <InboxCards entry={entry} controller={controller} />}
         {entry.notice && <p className="muted">{entry.notice}</p>}
         {entry.answers?.map((text, i) => (
           <div className="user-message answer-message" key={i}>
@@ -27,7 +30,7 @@ export function TaskCard({
         ))}
         {entry.pending && (
           <p className="thinking" role="status">
-            <Icon name="sparkle" size={15} /> Thinking…
+            <Icon name="sparkle" size={15} /> Thinking it through…
           </p>
         )}
         {t && t.state !== "succeeded" && (
@@ -156,6 +159,39 @@ export function TaskCard({
             report={controller.setError}
           />
         ))}
+        {!entry.pending &&
+          (entry.message || entry.inbox || entry.artifacts?.length > 0) && (
+            <div className="response-footer">
+              {(entry.message || entry.inbox) && (
+                <button
+                  className="icon-button"
+                  aria-label="Copy response"
+                  title="Copy response"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(
+                        entry.message ||
+                          entry.inbox.results
+                            .map((m) => `${m.subject}\n${m.snippet}`)
+                            .join("\n\n")
+                      )
+                      .catch((e) => controller.setError(e.message))
+                  }>
+                  <Icon name="copy" size={15} />
+                </button>
+              )}
+              {entry.createdAt && (
+                <time
+                  dateTime={entry.createdAt}
+                  title={new Date(entry.createdAt).toLocaleString()}>
+                  {new Date(entry.createdAt).toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit"
+                  })}
+                </time>
+              )}
+            </div>
+          )}
         {entry.error && (
           <p role="alert" className="warning">
             {entry.error}
