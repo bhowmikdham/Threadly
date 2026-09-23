@@ -2,6 +2,7 @@
 message when it isn't reachable (CI provides one; locally: `make dev` or
 export THREADLY_TEST_DB).
 """
+
 import asyncio
 import os
 
@@ -9,6 +10,8 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789abcdef-32b!")
 os.environ.setdefault("FERNET_KEY", "F3EhFuo7yg2vcXW615VjV0zmVUCTe9h8O_dcHZZk_NM=")
 os.environ.setdefault("OPENROUTER_API_KEY", "test-or-key")
+os.environ["GMAIL_SOURCE_MODE"] = "legacy_sync"
+os.environ["MAILBOX_BACKGROUND_SYNC_ENABLED"] = "true"
 os.environ["INFERENCE_PROVIDER"] = "legacy"  # individual adapter tests explicitly opt into fakes
 # Never inherit the API's DATABASE_URL: test fixtures below drop/truncate tables.
 os.environ["DATABASE_URL"] = os.environ.get(

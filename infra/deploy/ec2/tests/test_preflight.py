@@ -35,6 +35,8 @@ class PreflightTests(unittest.TestCase):
             "GOOGLE_CLIENT_ID": "",
             "GOOGLE_CLIENT_SECRET": "",
             "GOOGLE_REDIRECT_URI": "",
+            "GMAIL_SOURCE_MODE": "on_demand",
+            "MAILBOX_BACKGROUND_SYNC_ENABLED": "false",
             **overrides,
         }
         result = subprocess.run(
@@ -66,6 +68,8 @@ class PreflightTests(unittest.TestCase):
             {"FERNET_KEY": "invalid"},
             {"DATABASE_URL": "postgresql+asyncpg://threadly:private-test-password@other-host/db"},
             {"INFERENCE_PROVIDER": "legacy"},
+            {"GMAIL_SOURCE_MODE": "legacy_sync"},
+            {"MAILBOX_BACKGROUND_SYNC_ENABLED": "true"},
             {"EMAIL_WRITES_ENABLED": "true"},
         ]:
             with self.subTest(override=override):

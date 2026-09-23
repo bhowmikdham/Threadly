@@ -23,14 +23,18 @@ from app.assistant import (
     reads,
     scheduling,
     scheduling_proposals,
+    source_data,
     steps,
     tasks,
     workflows,
 )
 from app.assistant.context import capture_thread
+from app.assistant.source_data import context_data
 from app.assistant.ui_context import capture_view
+from app.config import get_settings
 from app.db.engine import get_session
 from app.db.models import ArtifactRevision, AssistantTask, ContextSnapshot, TaskEvent
+from app.mail.dependency import gmail_sources
 from app.planner.intent_router import preview_route
 from app.schemas.assistant import (
     AssistantRequest,
@@ -54,12 +58,16 @@ from app.schemas.ui_context import UIContextSnapshotRequest
 from app.schemas.workflow import WorkflowRequest
 from app.workflows import auxiliary, registry
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(gmail_sources)])
 DB = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.post("/mail-search")
 async def search_mail(request: MailSearchRequest, user_id: CurrentUser, session: DB):
+    if get_settings().gmail_source_mode == "on_demand":
+        from app.mail.search import search
+
+        return await search(user_id, request)
     result = await mail_search.search(session, user_id, request)
     await session.commit()  # Release the sync fence and transaction-local timeouts.
     return result
@@ -80,8 +88,14 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
         },
         "mail_search": {
             "installed": True,
-            "scope": "explicit_local_mailbox_window",
-            "folders": ["all_synced", "INBOX", "SENT"],
+            "scope": "explicit_gmail_window"
+            if get_settings().gmail_source_mode == "on_demand"
+            else "explicit_local_mailbox_window",
+            "source_mode": get_settings().gmail_source_mode,
+            "stores_mail": get_settings().gmail_source_mode != "on_demand",
+            "folders": ["all_mail", "INBOX", "SENT"]
+            if get_settings().gmail_source_mode == "on_demand"
+            else ["all_synced", "INBOX", "SENT"],
             "max_window_days": 366,
             "page_size": mail_search.PAGE_SIZE,
             "external_actions": False,
@@ -208,7 +222,7 @@ def context_view(snapshot: ContextSnapshot) -> dict:
         "context_snapshot_id": snapshot.id,
         "captured_at": snapshot.created_at.isoformat(),
         "source_hash": snapshot.source_hash,
-        **snapshot.payload,
+        **context_data(snapshot),
     }
 
 
@@ -264,11 +278,14 @@ async def create_context(
     user_id: CurrentUser,
     session: DB,
 ):
-    snapshot = (
-        await capture_view(session, user_id, request)
-        if isinstance(request, UIContextSnapshotRequest)
-        else await capture_thread(session, user_id, request.thread_id)
-    )
+    if get_settings().gmail_source_mode == "on_demand":
+        snapshot = await source_data.capture(
+            session, user_id, request.thread_id, getattr(request, "ui_map", None)
+        )
+    elif isinstance(request, UIContextSnapshotRequest):
+        snapshot = await capture_view(session, user_id, request)
+    else:
+        snapshot = await capture_thread(session, user_id, request.thread_id)
     result = context_view(snapshot)
     await session.commit()
     return result
@@ -484,7 +501,10 @@ async def get_artifact(artifact_id: str, user_id: CurrentUser, session: DB):
             else None
         )
         await reads.validate_source(
-            session, user_id, snapshot.payload if snapshot else None, task.read_input["operation"]
+            session,
+            user_id,
+            context_data(snapshot) if snapshot else None,
+            task.read_input["operation"],
         )
     return await draft_review.artifact_view(session, task, artifact)
 

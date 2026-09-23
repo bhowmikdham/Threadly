@@ -1,5 +1,9 @@
 # Data model — PostgreSQL
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 Owner: backend. SQLAlchemy models live in `backend/app/db/models.py`; schema
 changes go through alembic (`make db-revision m="..."` then `make db-upgrade`)
 and update this file in the same PR. Baseline migration: `26902c33da74_w1_initial_schema`

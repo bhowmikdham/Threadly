@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import CurrentUser
 from app.api.routes.auth import no_store
 from app.calendar import negotiations, service, slots
+from app.mail.dependency import gmail_sources
 from app.schemas.calendar import (
     CalendarListOut,
     FreeBusyOut,
@@ -25,7 +26,7 @@ from app.schemas.negotiations import (
 )
 from app.schemas.slots import SlotRequest, SlotRequestOut
 
-router = APIRouter(dependencies=[Depends(no_store)])
+router = APIRouter(dependencies=[Depends(no_store), Depends(gmail_sources)])
 
 
 @router.get("/calendars", response_model=CalendarListOut)

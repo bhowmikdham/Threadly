@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser
 from app.assistant import facts
 from app.db.engine import get_session
+from app.mail.dependency import gmail_sources
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(gmail_sources)])
 DB = Annotated[AsyncSession, Depends(get_session)]
 
 

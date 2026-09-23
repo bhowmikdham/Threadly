@@ -197,4 +197,9 @@ async def incremental_sync(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> SyncReport:
+    from app.api.errors import ApiError
+    from app.config import get_settings
+
+    if get_settings().gmail_source_mode == "on_demand":
+        raise ApiError(410, "mailbox_sync_retired", "Mailbox replication is disabled.")
     return await _sync(session, user, access_token, full=False, transport=transport)

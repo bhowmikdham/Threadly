@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from app.actions import email_payload, service
 from app.api.errors import ApiError
 from app.assistant import draft_review, tasks
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.db.models import (
@@ -75,7 +76,7 @@ async def sources(session, task, artifact):
             .where(Thread.id == snapshot.thread_id, Thread.user_id == task.user_id)
             .execution_options(populate_existing=True)
         )
-        if thread is None or thread.version != snapshot.payload.get("thread_version"):
+        if thread is None or thread.version != context_data(snapshot).get("thread_version"):
             raise email_payload.blocked("source_changed")
         versions[context_id] = {
             "source_hash": snapshot.source_hash,
@@ -99,19 +100,31 @@ async def sources(session, task, artifact):
         "rfc_message_id",
     }:
         raise email_payload.blocked("reply_headers_invalid")
-    row = (
-        await session.execute(
-            select(Message, Thread)
-            .join(Thread, Thread.id == Message.thread_id)
-            .where(
-                Message.user_id == task.user_id,
-                Thread.user_id == task.user_id,
-                Message.gmail_msg_id == reply["gmail_message_id"],
-                Thread.gmail_thread_id == reply["gmail_thread_id"],
-            )
-            .execution_options(populate_existing=True)
+    from app.config import get_settings
+
+    if get_settings().gmail_source_mode == "on_demand":
+        from app.assistant.source_data import reply_row
+
+        row = reply_row(
+            task.user_id,
+            reply["gmail_thread_id"],
+            reply["gmail_message_id"],
+            reply["thread_version"],
         )
-    ).one_or_none()
+    else:
+        row = (
+            await session.execute(
+                select(Message, Thread)
+                .join(Thread, Thread.id == Message.thread_id)
+                .where(
+                    Message.user_id == task.user_id,
+                    Thread.user_id == task.user_id,
+                    Message.gmail_msg_id == reply["gmail_message_id"],
+                    Thread.gmail_thread_id == reply["gmail_thread_id"],
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).one_or_none()
     if row is None or row.Thread.version != reply["thread_version"]:
         raise email_payload.blocked("reply_context_changed")
     message = row.Message
@@ -259,9 +272,18 @@ async def view(session, user_id, action_id):
         if any(action.source_versions.get(key) != value for key, value in current.items()):
             blockers.append("source_changed")
     except ApiError as error:
-        if error.code != "email_preview_blocked":
+        if error.code == "email_preview_blocked":
+            blockers.extend(error.detail["blockers"])
+        elif error.code in {
+            "source_not_loaded",
+            "source_changed",
+            "legacy_source_retired",
+            "google_connection_changed",
+        }:
+            # Cancel/reject must remain possible without contacting Gmail.
+            blockers.append(error.code)
+        else:
             raise
-        blockers.extend(error.detail["blockers"])
     approval_id = await session.scalar(
         select(ActionApproval.id).where(
             ActionApproval.action_id == action.id, ActionApproval.user_id == user_id

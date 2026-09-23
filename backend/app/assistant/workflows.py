@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.errors import ApiError
 from app.assistant import drafting, planning, reads, scheduling, steps, summary_quality, tasks
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.calendar import slots
 from app.db.models import ArtifactRevision, AssistantJob, AssistantStep, CalendarSlotRequest
@@ -44,7 +45,7 @@ def release_manifest():
 
 
 async def bind_input(session, owner, request, context, envelope):
-    if context is None or not context.payload.get("messages"):
+    if context is None or not context_data(context).get("messages"):
         raise ApiError(409, "context_empty", "Capture a nonempty thread.")
     plan = None
     if request.accepted_plan_artifact_id:
@@ -85,12 +86,12 @@ async def bind_input(session, owner, request, context, envelope):
     choice_slot = None
     if request.meeting_choice:
         choice_slot = await check_choice(session, owner, request)
-    await reads.validate_source(session, owner, context.payload, "search_mail")
+    await reads.validate_source(session, owner, context_data(context), "search_mail")
     if request.draft_options and (not envelope or not envelope.get("to")):
         raise ApiError(409, "draft_recipients_missing", "Select draft recipients first.")
     return {
         "request": request.model_dump(),
-        "source_hash": digest(context.payload),
+        "source_hash": digest(context_data(context)),
         "schedule": binding,
         "choice_slot": choice_slot,
         "plan": {"artifact_id": plan.id, "payload_hash": digest(plan.payload)} if plan else None,

@@ -10,12 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser
 from app.api.errors import ApiError
 from app.auth import service as auth_service
+from app.config import get_settings
 from app.db import repositories as repo
 from app.db.engine import get_session
 from app.sync import jobs, worker
 from app.sync.gmail import GmailError
 
-router = APIRouter()
+
+def require_sync():
+    if get_settings().gmail_source_mode == "on_demand":
+        raise ApiError(
+            410, "mailbox_sync_retired", "Use on-demand thread reads and bounded Gmail search."
+        )
+
+
+router = APIRouter(dependencies=[Depends(require_sync)])
 
 DB = Annotated[AsyncSession, Depends(get_session)]
 

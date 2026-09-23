@@ -1,5 +1,9 @@
 # Whole backend progress — 17 September 2026
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 Base: PR #36 merged at `06ca1a0b45afb50bd20dad9dfb6c02cc66603d0f` on
 `codex/assistant-intent-routing`. This combined integration PR adds the remaining
 bounded MVP backend paths. Frontend integration is still deferred. A merged PR,

@@ -1,8 +1,8 @@
 # Combined MVP: merge, deploy, then validate
 
 This runbook does not enable writes or run billed model tests. Deploy only the reviewed
-merged commit. The current PR is based on PR #36; the last deployment confirmed in this
-conversation was PR #23, so do not assume EC2 tracks GitHub automatically.
+merged commit. See [on-demand Gmail](../../../docs/on-demand-gmail.md) for the current source policy.
+EC2 does not track GitHub automatically.
 
 ## Before deployment
 
@@ -21,12 +21,14 @@ conversation was PR #23, so do not assume EC2 tracks GitHub automatically.
   for known unknown-outcome records.
 - New optional settings: `ASSISTANT_AUXILIARY_WORKFLOW_MANIFEST` (empty uses configured
   native generation), `ASSISTANT_DISABLED_INTENTS` (empty),
-  `MAILBOX_BACKGROUND_SYNC_ENABLED=true`, `MAILBOX_SYNC_MAX_MESSAGES=5000`.
+  `GMAIL_SOURCE_MODE=on_demand`, `MAILBOX_BACKGROUND_SYNC_ENABLED=false`.
+  These source settings are required by production preflight; mailbox sync is retired.
   Keep API and all workers on the same configuration and application release.
 
 The script stops API and all three workers, creates a pre-migration PostgreSQL dump,
 applies Alembic through `b17026e9a038`, and starts API, assistant-worker, action-worker
-and sync-worker from the same image. It checks API readiness and worker heartbeats.
+from the same image. The old sync worker stays stopped; its Compose service is behind
+the `retired-mailbox-sync` profile. It checks API readiness and active worker heartbeats.
 The host remains domain-free, API bound to loopback, with SSM forwarding for access.
 It does not modify security groups, register callbacks, grant model access, prepare
 new Flows, enable writes or remove the eight-hour host auto-stop timer.
@@ -104,4 +106,4 @@ database afterwards. Rehearse the actual deployed dump before pilot acceptance. 
 upgrade/downgrade test is not evidence that that host's backup was restored.
 
 Run conservative retention dry-run first. Keep enough private disk space for dump +
-restore + staged backfill; do not claim capacity or cost duration without measurements.
+restore; do not claim capacity or cost duration without measurements.

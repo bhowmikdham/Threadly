@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 
 from app.api.errors import ApiError
 from app.assistant import drafting, ui_routing
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.db.models import AssistantJob, ContextSnapshot, TaskInput, TaskQuestion, Thread, User
 from app.planner.intent_router import require_context
@@ -172,6 +173,10 @@ async def fresh_context(session, user_id, context_id, previous_id):
             raise ApiError(
                 409, "source_scope_changed", "Continue with a fresh capture of the same thread."
             )
+    if context_data(context).get("source_mode") == "gmail_on_demand":
+        from app.assistant.source_data import validate
+
+        await validate(session, user_id, context_data(context))
     # Hold the source version stable until the answer transaction commits.
     thread = await session.scalar(
         select(Thread)
@@ -181,9 +186,9 @@ async def fresh_context(session, user_id, context_id, previous_id):
         )
         .with_for_update(read=True)
     )
-    if thread is None or thread.version != context.payload.get("thread_version"):
+    if thread is None or thread.version != context_data(context).get("thread_version"):
         raise ApiError(409, "source_changed", "Sync and capture the source again before answering.")
-    if not any(m["body"].strip() for m in context.payload["messages"]):
+    if not any(m["body"].strip() for m in context_data(context)["messages"]):
         raise ApiError(409, "context_empty", "Select a source with synced text.")
     return context
 
@@ -259,7 +264,7 @@ def resolve_time_context(route, instruction, fields, snapshot, envelope):
 
 def resolve_route(route, instruction, fields, context, envelope):
     """Resolve the saved goal deterministically. Never classify the answer as a new request."""
-    payload = context.payload if context else None
+    payload = context_data(context) if context else None
     context_id = context.id if context else None
     binding = ui_routing.bind_reference(instruction, payload)
     if binding is not None and "context_snapshot_id" in fields:
@@ -392,7 +397,9 @@ async def accept_input(session, user_id: int, task_id: str, request: TaskInputRe
         "message_selection",
         "message_text",
     }:
-        binding = ui_routing.bind_reference(task.instruction, context.payload if context else None)
+        binding = ui_routing.bind_reference(
+            task.instruction, context_data(context) if context else None
+        )
         if not binding or binding["status"] != "ready":
             raise ApiError(
                 422, "reference_not_resolved", "Capture a view that resolves the requested message."

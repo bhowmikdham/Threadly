@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.actions import approval, calendar_preview, email_preview, gmail_sender
 from app.api.deps import CurrentUser
 from app.db.engine import get_session
+from app.mail.dependency import gmail_sources
 from app.schemas.actions import (
     ActionDecisionRequest,
     ActionDecisionView,
@@ -17,7 +18,7 @@ from app.schemas.actions import (
 )
 from app.schemas.calendar_action import ProposeCalendarAction
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(gmail_sources)])
 DB = Annotated[AsyncSession, Depends(get_session)]
 
 

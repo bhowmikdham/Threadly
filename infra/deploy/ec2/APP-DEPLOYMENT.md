@@ -1,4 +1,9 @@
-# Deploy the API, PostgreSQL, Chroma and worker without a domain
+# Deploy the API, PostgreSQL, Chroma and workers without a domain
+
+Current source policy: [on-demand Gmail](../../../docs/on-demand-gmail.md). Set
+`GMAIL_SOURCE_MODE=on_demand` and `MAILBOX_BACKGROUND_SYNC_ENABLED=false` in the
+protected environment before deployment. The retired sync worker is stopped and
+is not restarted. Gmail bodies are not imported into PostgreSQL or Chroma.
 
 The host bootstrap does not clone Git or deploy containers. `deploy-app.sh`
 clones the public Threadly repository into `/opt/threadly/releases/<commit>`,

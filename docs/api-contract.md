@@ -1,5 +1,9 @@
 # API contract — v0 DRAFT
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 The seam between `frontend/` and `backend/`. **Contract-first**: any change to a
 path, field, or event shape happens by PR to this file, reviewed by both sides,
 before the code changes. The pydantic models in `backend/app/schemas/` mirror this.

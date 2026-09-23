@@ -35,7 +35,10 @@ async def submit(session, owner, request_id):
     )
     if old:
         return old
-    if not get_settings().mailbox_background_sync_enabled:
+    if (
+        get_settings().gmail_source_mode == "on_demand"
+        or not get_settings().mailbox_background_sync_enabled
+    ):
         raise ApiError(503, "sync_disabled", "Background sync is paused.")
     if not next(c for c in build_capabilities(user)["capabilities"] if c["id"] == "gmail_read")[
         "ready"
@@ -91,7 +94,10 @@ async def owned(session, owner, identifier):
 
 
 async def claim(factory):
-    if not get_settings().mailbox_background_sync_enabled:
+    if (
+        get_settings().gmail_source_mode == "on_demand"
+        or not get_settings().mailbox_background_sync_enabled
+    ):
         return None
     async with factory.begin() as session:
         now = func.clock_timestamp()

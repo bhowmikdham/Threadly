@@ -42,7 +42,9 @@ async def snapshot(session, owner):
             and str(owner) in settings.write_pilot_user_ids_values,
             "email_reconciliation": settings.email_reconciliation_enabled,
             "calendar_reconciliation": settings.calendar_reconciliation_enabled,
-            "background_sync": settings.mailbox_background_sync_enabled,
+            "background_sync": settings.gmail_source_mode != "on_demand"
+            and settings.mailbox_background_sync_enabled,
+            "gmail_source_mode": settings.gmail_source_mode,
         },
         "readiness": "metadata_only_not_live_provider_verification",
     }

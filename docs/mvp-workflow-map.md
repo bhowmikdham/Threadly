@@ -1,5 +1,9 @@
 # MVP backend integration and testing handoff
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 17 September 2026. Base: merged PR #36 (`06ca1a0b45afb50bd20dad9dfb6c02cc66603d0f`).
 This combined integration implements the remaining bounded backend paths. It does not
 certify live Google/Bedrock behavior or frontend completion. Use OpenAPI and the

@@ -7,6 +7,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import Field
 
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.model_client.structured import reject_duplicate_keys
 from app.schemas.assistant import StrictModel
@@ -179,7 +180,7 @@ async def review(session, owner, task_id, request):
     context = await session.get(ContextSnapshot, task.context_snapshot_id)
     if context is None or context.user_id != owner:
         raise ApiError(409, "plan_source_changed", "Recapture the source thread.")
-    await reads.validate_source(session, owner, context.payload, "search_mail")
+    await reads.validate_source(session, owner, context_data(context), "search_mail")
     payload = copy.deepcopy(current.payload)
     content = payload["content"]
     known = {item["id"]: item for item in content["items"]}
@@ -266,7 +267,7 @@ async def accepted_plan(session, owner, artifact_id, *, lock=False):
     context = await session.get(ContextSnapshot, task.context_snapshot_id)
     if context is None or context.user_id != owner:
         raise ApiError(409, "plan_source_changed", "Recapture the plan source.")
-    await reads.validate_source(session, owner, context.payload, "search_mail")
+    await reads.validate_source(session, owner, context_data(context), "search_mail")
     return artifact
 
 

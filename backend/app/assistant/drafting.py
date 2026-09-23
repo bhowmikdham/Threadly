@@ -7,6 +7,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import select
 
 from app.api.errors import ApiError
+from app.assistant.source_data import context_data
 from app.assistant.summary import digest
 from app.db.models import Message, Thread
 from app.model_client.structured import reject_duplicate_keys
@@ -52,23 +53,34 @@ async def bind_input(session, user, options, context) -> dict | None:
         return result
     if context is None:
         raise ApiError(409, "reply_context_required", "Select a saved thread for this reply.")
-    if options.reply_message_id not in {m["message_id"] for m in context.payload["messages"]}:
+    if options.reply_message_id not in {m["message_id"] for m in context_data(context)["messages"]}:
         raise ApiError(404, "reply_target_not_found", "Select a message in the saved thread.")
-    row = (
-        await session.execute(
-            select(Message, Thread.version)
-            .join(Thread, Thread.id == Message.thread_id)
-            .where(
-                Message.user_id == user.id,
-                Thread.user_id == user.id,
-                Thread.id == context.thread_id,
-                Message.gmail_msg_id == options.reply_message_id,
-            )
+    if context_data(context).get("source_mode") == "gmail_on_demand":
+        from app.assistant.source_data import reply_row, validate
+
+        await validate(session, user.id, context_data(context))
+        row = reply_row(
+            user.id,
+            context_data(context)["thread_id"],
+            options.reply_message_id,
+            context_data(context)["thread_version"],
         )
-    ).one_or_none()
-    if row is None or row.version != context.payload.get("thread_version"):
+    else:
+        row = (
+            await session.execute(
+                select(Message, Thread.version)
+                .join(Thread, Thread.id == Message.thread_id)
+                .where(
+                    Message.user_id == user.id,
+                    Thread.user_id == user.id,
+                    Thread.id == context.thread_id,
+                    Message.gmail_msg_id == options.reply_message_id,
+                )
+            )
+        ).one_or_none()
+    if row is None or row.version != context_data(context).get("thread_version"):
         raise ApiError(
-            409, "reply_context_changed", "Sync and capture the thread again before replying."
+            409, "reply_context_changed", "Capture the current thread again before replying."
         )
     message = row.Message
     headers = (message.reply_metadata or {}).get("headers", {})
@@ -84,13 +96,15 @@ async def bind_input(session, user, options, context) -> dict | None:
     subject = message.subject
     if not subject or len(subject) > 990 or any(ord(c) < 32 or ord(c) == 127 for c in subject):
         raise ApiError(
-            409, "reply_subject_unavailable", "A usable reply subject is missing; sync again."
+            409,
+            "reply_subject_unavailable",
+            "A usable reply subject is missing; select the source again.",
         )
     if not subject.casefold().startswith("re:"):
         subject = "Re: " + subject
     result["reply"] = {
         "gmail_message_id": options.reply_message_id,
-        "gmail_thread_id": context.payload["thread_id"],
+        "gmail_thread_id": context_data(context)["thread_id"],
         "thread_version": row.version,
         "subject": subject,
         "rfc_message_id": rfc_id,

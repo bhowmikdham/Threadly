@@ -1,5 +1,9 @@
 # Architecture — what runs where
 
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
+> local-search and stored-source assumptions below. Default runtime fetches selected sources
+> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+
 Source of truth for the system topology. Mirrors the "MailMind — Dockerised
 Backend Topology" diagram from the project docs (the PDF lives in the team's
 Claude project / drive). Every box below maps to exactly one folder in this repo.

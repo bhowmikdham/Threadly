@@ -36,6 +36,7 @@ async def selection_source(session, owner, selection_id):
     thread = await session.get(Thread, neg.thread_id, populate_existing=True)
     if thread is None or thread.user_id != owner:
         raise ApiError(409, "booking_source_changed", "Recapture the meeting thread.")
+    await negotiations.current_mail_source(session, owner, thread)
     # Callers hold account lock before this check when mutating. Reads may acquire
     # account/preferences here, but no Calendar operation waits for an action task.
     selected = await negotiations.selection_view(session, neg, thread, selection)

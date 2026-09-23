@@ -33,11 +33,39 @@ GENERATION_TIMEOUT_SECONDS = 120  # shorter than the 180-second fenced lease
 
 
 async def run_once(factory=None, model=None, flow_invoker=None) -> bool:
+    from app.assistant.source_data import source_scope
+
+    async with source_scope():
+        return await _run_once(factory, model, flow_invoker)
+
+
+async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
     factory = factory or get_session_factory()
     async with factory.begin() as session:
         claim = await claim_next(session)
     if claim is None:
         return False
+    from dataclasses import replace
+
+    from app.assistant import source_data
+    from app.config import get_settings
+
+    if (
+        claim.snapshot
+        and not source_data.is_reference(claim.snapshot)
+        and get_settings().gmail_source_mode == "on_demand"
+    ):
+        async with factory.begin() as session:
+            await finish(session, claim, error_code="legacy_source_retired", retryable=False)
+        return True
+    if source_data.is_reference(claim.snapshot):
+        try:
+            source = await source_data.fetch(claim.user_id, claim.snapshot["thread_id"])
+            claim = replace(claim, snapshot=source_data.materialize(claim.snapshot, source))
+        except ApiError as exc:
+            async with factory.begin() as session:
+                await finish(session, claim, error_code=exc.code, retryable=exc.status == 503)
+            return True
     from app.operations.status import blocked_intents
 
     if blocked_intents(claim):
