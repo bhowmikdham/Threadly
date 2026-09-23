@@ -72,8 +72,9 @@ does not itself forward a port onto your laptop. AWS CLI authentication and plug
 installation are separate prerequisites; do not store root access keys for this.
 See [AWS port-forwarding instructions](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-sessions-start.html#sessions-start-port-forwarding).
 
-Google OAuth needs a registered callback (localhost can support development) and
-the application's matching configuration. A public IP callback is not accepted
+Google OAuth needs a registered callback and the application's matching configuration.
+Use the [domain-free local test client](../../../docs/google-local-testing.md) with the
+explicit, exact loopback exception; HTTP localhost is rejected by default. A public IP callback is not accepted
 by Google's web OAuth rules. Production CORS in the merged baseline does not
 yet allow an extension origin; browser/extension integration is a later setup
 step, not solved by exposing a port. The domain/TLS deployment will need a

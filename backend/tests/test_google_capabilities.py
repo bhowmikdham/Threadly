@@ -72,6 +72,7 @@ def test_invalid_redirect_and_spoofed_subject_are_rejected(monkeypatch):
         flow,
         "get_settings",
         lambda: SimpleNamespace(
+            google_allow_loopback_test_callback=False,
             google_redirect_uri_allowlist_values={"https://ext.chromiumapp.org/"}
         ),
     )

@@ -28,13 +28,18 @@ def validate_redirect(uri):
         raise ApiError(
             400, "invalid_redirect_uri", "The OAuth redirect URI is not allowed."
         ) from None
+    settings = get_settings()
+    local_test = (
+        settings.google_allow_loopback_test_callback
+        and uri == "http://127.0.0.1:8765/oauth/callback"
+    )
     if (
-        parsed.scheme != "https"
+        (parsed.scheme != "https" and not local_test)
         or not parsed.netloc
         or parsed.fragment
         or parsed.username
         or parsed.password
-        or uri not in get_settings().google_redirect_uri_allowlist_values
+        or uri not in settings.google_redirect_uri_allowlist_values
     ):
         raise ApiError(400, "invalid_redirect_uri", "The OAuth redirect URI is not allowed.")
 

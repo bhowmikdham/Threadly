@@ -32,7 +32,7 @@ jobs:
       - name: Install (dev extras, no heavy ML deps needed for tests)
         run: pip install -e ".[dev]"
       - name: Lint
-        run: python -m ruff check app tests
+        run: python -m ruff check app tests tools
       - name: Tests
         env:
           THREADLY_TEST_DB: postgresql+asyncpg://threadly:change-me@localhost:5432/threadly_test

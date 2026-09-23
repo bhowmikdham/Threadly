@@ -271,6 +271,11 @@ credential availability with installed handlers. No send/Calendar executor is
 enabled. The [Google lifecycle](google-capabilities.md) records the existing frontend
 getAuthToken mismatch, typed API contract and live consent gate.
 
+A separate stdlib laptop test client (`backend/tools/google_local_login.py`) can
+complete the same handshake through an SSM tunnel. An off-by-default setting permits
+one exact loopback HTTP callback; it adds no endpoint and does not change token
+storage, scope authority or write approval. [Setup](google-local-testing.md).
+
 ## Exact email proposals (B03)
 
 `actions/email_preview.py` validates the current edited artifact, effective context

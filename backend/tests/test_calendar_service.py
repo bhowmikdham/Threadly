@@ -315,6 +315,7 @@ def test_calendar_incremental_consent_only_on_authenticated_reconnect(
         lambda: SimpleNamespace(
             google_client_id="client",
             google_client_secret="fixture",
+            google_allow_loopback_test_callback=False,
             write_pilot_user_ids_values=set(),
             google_redirect_uri_allowlist_values={"https://ext.chromiumapp.org/"},
         ),

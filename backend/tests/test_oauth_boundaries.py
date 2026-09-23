@@ -361,3 +361,27 @@ async def test_token_retrieval_cannot_commit_pending_action(db_sessionmaker, con
     async with db_sessionmaker() as session:
         assert await session.scalar(select(AssistantAction)) is None
         assert (await session.get(User, owner)).google_token_version == 2
+
+
+def test_local_test_callback_still_binds_pkce_state_and_replay(db_client, configured, monkeypatch):
+    callback = "http://127.0.0.1:8765/oauth/callback"
+    settings = get_settings()
+    monkeypatch.setattr(settings, "google_allow_loopback_test_callback", True)
+    monkeypatch.setattr(settings, "google_redirect_uri_allowlist", callback)
+    start = db_client.post("/auth/google/begin", json={
+        "redirect_uri": callback, "code_challenge": flow.challenge(VERIFIER),
+    })
+    assert start.status_code == 200
+    params = parse_qs(urlsplit(start.json()["authorization_url"]).query)
+    assert params["redirect_uri"] == [callback]
+    assert params["code_challenge_method"] == ["S256"]
+    body = exchange_body(start.json(), redirect_uri=callback)
+    assert db_client.post("/auth/google/exchange", json={
+        **body, "code_verifier": "b" * 64,
+    }).status_code == 400
+    # Disabling the exception also blocks an already-issued state from exchange.
+    monkeypatch.setattr(settings, "google_allow_loopback_test_callback", False)
+    assert db_client.post("/auth/google/exchange", json=body).status_code == 400
+    monkeypatch.setattr(settings, "google_allow_loopback_test_callback", True)
+    assert db_client.post("/auth/google/exchange", json=body).status_code == 200
+    assert db_client.post("/auth/google/exchange", json=body).status_code == 400

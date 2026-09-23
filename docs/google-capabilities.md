@@ -146,7 +146,9 @@ may depend on account versions. Never delete user action history just to downgra
 
 Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` and/or
 comma-separated `GOOGLE_REDIRECT_URI_ALLOWLIST`, plus the existing encryption/session
-keys. Redirects must be exact allowlisted HTTPS URIs with no credentials or fragment;
+keys. Redirects must be exact allowlisted HTTPS URIs with no credentials or fragment
+(default). The explicit `GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK=true` test exception
+also permits only `http://127.0.0.1:8765/oauth/callback`, still exact allowlisted;
 an empty allowlist rejects exchange. These must also match the actual Google OAuth
 client. No wildcard callback, invented client type or HTTP server-IP login is implied.
 
@@ -164,3 +166,5 @@ The configured client's live compatibility is still an external gate.
 Tests and remaining boundaries: [B01 checkpoint](backend-execution/checkpoints/B01.md).
 
 Calendar API, narrow scope pair and ACL limitations: [Calendar reads](calendar-reads.md).
+
+For domain-free staging, use the [local OAuth test client and setup](google-local-testing.md).
