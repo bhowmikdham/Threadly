@@ -86,4 +86,5 @@ def test_live_replay_pins_current_prompt_schemas_and_cases():
         evidence[k]
         for k in ("summary_passed", "reply_passed", "answer_passed", "absent_fact_passed")
     )
+    assert evidence["compose_repeats_passed"] == 2
     assert not evidence["external_actions"] and not evidence["mailbox_read"]

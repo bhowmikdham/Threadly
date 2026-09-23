@@ -65,6 +65,7 @@ def release_manifest() -> dict:
         "summary_prompt_hash": digest(PROMPT + SUMMARY_POLICY),
         "draft_release": drafting.RELEASE,
         "draft_prompt_hash": digest(drafting.PROMPT),
+        "reply_prompt_hash": digest(drafting.REPLY_PROMPT),
         "draft_schema_hash": digest(drafting.GeneratedDraft.model_json_schema()),
         "reply_schema_hash": digest(drafting.GeneratedReplyDraft.model_json_schema()),
         "grounded_answer": grounded_answer.release_manifest(),

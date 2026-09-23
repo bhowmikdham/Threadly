@@ -214,3 +214,20 @@ async def test_answer_changed_during_generation_is_not_published(
     ).json()
     assert task["state"] == "failed" and task["error_code"] == "source_changed"
     assert task["artifact_id"] is None
+
+
+def test_reply_policy_is_isolated_from_verified_compose_prompt():
+    from app.assistant.summary import digest
+
+    assert (
+        digest(drafting.PROMPT)
+        == "02b04d01f10c12abdf9e91db3bbc4fcf363af0bde92e4010febb9e65eb70e71d"
+    )
+    assert drafting.REPLY_PROMPT != drafting.PROMPT
+    assert drafting.make_prompt(
+        "Write an email", None, {"to": [], "reply": None}, "new"
+    ).startswith(drafting.PROMPT)
+    reply = {"to": [], "reply": {"subject": "Re: Receipt"}, "reply_message_id": "m1"}
+    assert drafting.make_prompt("Draft a reply", SOURCE, reply, "reply").startswith(
+        drafting.REPLY_PROMPT
+    )

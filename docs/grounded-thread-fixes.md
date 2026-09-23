@@ -16,19 +16,21 @@ write enablement is required.
    authority. Clearing a missing precondition cannot promote an empty operation
    or clarification-shaped result to ready; it fails as `invalid_route_output`.
    Supported operations must survive classification even when context is missing.
-3. `draft-artifact-1.2.0` treats the reply subject as a backend-owned header. The
+3. `draft-artifact-1.2.1` treats the reply subject as a backend-owned header. The
    model supplies reply body, missing content facts and source numbers. A bounded
    optional subject echoed by older adapters is validated but never used. The exact
    original reply subject, recipients, thread and Message-ID remain in the backend
    envelope. Header injection and invented recipient fields are still rejected.
-   Compose continues to require a generated subject.
+   Compose continues to require a generated subject and retains its previously
+   evaluated prompt. Reply-specific instructions use a separately pinned prompt
+   to avoid changing compose style behavior.
 4. `grounded-answer-1.0.0` connects a standalone `other / answer / lookup_entity`
    request to a bounded evidence-selection workflow. This answers factual questions
    from selected thread excerpts; it does not search the mailbox, calculate prices,
    consult outside knowledge or execute actions.
 
 `contextual-task-1.2.0` pins these dependencies; lookup/draft pins
-`lookup-draft-template-1.2.0`. Old queued tasks with unavailable release contracts
+`lookup-draft-template-1.2.1`. Old queued tasks with unavailable release contracts
 fail closed. Saved tasks are not relabelled or silently rerouted.
 
 ## Follow-up API contract
@@ -95,7 +97,7 @@ generation.
 
 `python -m app.planner.evaluate_thread_fixes` prints synthetic asset hashes without
 calling a provider. Add `--live` with Bedrock configured and writes disabled for
-six routing checks plus four generated outputs: summary, reply, factual answer,
-and absent-fact answer. The committed evaluation receipt pins the exact assets and
+six routing checks plus six generated outputs: summary, reply, factual answer,
+absent-fact answer and two no-signature compose regressions. The committed evaluation receipt pins the exact assets and
 records real Haiku results. Live GYG acceptance is kept in the PR as status-only
 evidence; private mail and generated receipt text must not be committed to GitHub.

@@ -93,7 +93,7 @@ source scope, choose a Flow, change the envelope, send, or book.
   task/step retries are bounded at three, and no transaction spans model calls.
 
 The same backend executor owns both summary and lookup pairs. Release
-`lookup-draft-template-1.2.0` pins its separate request/schema, read limits, prompt,
+`lookup-draft-template-1.2.1` pins its separate request/schema, read limits, prompt,
 source-selection policy and inherited generation configuration. The original
 `compound-template-1.0.0` contract hash is unchanged. Registry entries and AWS Flow
 resources do not change: only draft generation invokes the configured Flow.
