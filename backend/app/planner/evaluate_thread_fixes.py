@@ -68,6 +68,7 @@ def assets():
                 "routing_schema_hash",
                 "draft_release",
                 "draft_prompt_hash",
+                "reply_prompt_hash",
                 "draft_schema_hash",
                 "reply_schema_hash",
                 "grounded_answer",
@@ -137,6 +138,28 @@ async def run(model):
         assert answer["content"]["found"] == (case == "answer")
         if case == "answer":
             assert "18.60" in answer["content"]["text"]
+    # Reply policy changes must not contaminate the previously verified compose style.
+    from app.planner.evaluate_routing import COMPOSE
+
+    compose_envelope = {"to": ["qa@example.test"], "cc": [], "bcc": [], "reply": None}
+    for _repeat in range(2):
+        text, _ = await model.generate(
+            drafting.make_prompt(COMPOSE, None, compose_envelope, "new"), max_tokens=2500
+        )
+        compose_claim = SimpleNamespace(
+            snapshot=None,
+            context_id=None,
+            draft_input=compose_envelope,
+            task_id="synthetic-compose",
+            instruction=COMPOSE,
+        )
+        composed = drafting.make_artifact(text, compose_claim, "new")["content"]
+        body = composed["body"].casefold()
+        assert all(word in body for word in ("thank", "update", "review", "tomorrow"))
+        assert not any(
+            term in body for term in ("best regards", "sincerely", "feedback", "get back")
+        )
+        assert not composed["unresolved_fields"]
     return {
         **assets(),
         "provider": info.provider,
@@ -146,6 +169,7 @@ async def run(model):
         "reply_passed": True,
         "answer_passed": True,
         "absent_fact_passed": True,
+        "compose_repeats_passed": 2,
         "mailbox_read": False,
         "external_actions": False,
     }

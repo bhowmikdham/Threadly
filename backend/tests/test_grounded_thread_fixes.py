@@ -67,7 +67,7 @@ def test_summary_fence_preserves_citation_and_budget_checks():
             )
 
 
-@pytest.mark.parametrize("model_subject", [None, "New subject", "Re: Missing emoji"])
+@pytest.mark.parametrize("model_subject", [None, "", "New subject", "Re: Missing emoji"])
 def test_reply_subject_remains_exactly_backend_owned(model_subject):
     original = "Re: Hola 👋 Order 🧾"
     envelope = {
@@ -97,6 +97,19 @@ def test_reply_subject_remains_exactly_backend_owned(model_subject):
         drafting.make_artifact(
             json.dumps({**value, "subject": "X\r\nBcc: other@example.test"}), claim, "reply"
         )
+
+
+def test_empty_reply_echo_does_not_relax_compose_or_header_validation():
+    for subject in ("", None):
+        with pytest.raises(ValueError):
+            drafting.GeneratedDraft.model_validate(
+                {"subject": subject, "body": "Thanks.", "sources": [], "unresolved_fields": []}
+            )
+    for subject in ("\r\n", "\x00", 42):
+        with pytest.raises(ValueError):
+            drafting.GeneratedReplyDraft.model_validate(
+                {"subject": subject, "body": "Thanks.", "sources": [], "unresolved_fields": []}
+            )
 
 
 def test_resolved_context_cannot_promote_empty_clarification_to_ready():
@@ -214,3 +227,20 @@ async def test_answer_changed_during_generation_is_not_published(
     ).json()
     assert task["state"] == "failed" and task["error_code"] == "source_changed"
     assert task["artifact_id"] is None
+
+
+def test_reply_policy_is_isolated_from_verified_compose_prompt():
+    from app.assistant.summary import digest
+
+    assert (
+        digest(drafting.PROMPT)
+        == "02b04d01f10c12abdf9e91db3bbc4fcf363af0bde92e4010febb9e65eb70e71d"
+    )
+    assert drafting.REPLY_PROMPT != drafting.PROMPT
+    assert drafting.make_prompt(
+        "Write an email", None, {"to": [], "reply": None}, "new"
+    ).startswith(drafting.PROMPT)
+    reply = {"to": [], "reply": {"subject": "Re: Receipt"}, "reply_message_id": "m1"}
+    assert drafting.make_prompt("Draft a reply", SOURCE, reply, "reply").startswith(
+        drafting.REPLY_PROMPT
+    )
