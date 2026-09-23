@@ -16,9 +16,11 @@ write enablement is required.
    authority. Clearing a missing precondition cannot promote an empty operation
    or clarification-shaped result to ready; it fails as `invalid_route_output`.
    Supported operations must survive classification even when context is missing.
-3. `draft-artifact-1.2.1` treats the reply subject as a backend-owned header. The
+3. `draft-artifact-1.2.2` treats the reply subject as a backend-owned header. The
    model supplies reply body, missing content facts and source numbers. A bounded
-   optional subject echoed by older adapters is validated but never used. The exact
+   optional subject echoed by adapters is validated but never used. An exact empty
+   string is treated as an omitted reply subject; compose still requires a nonempty
+   subject and control characters remain invalid. The exact
    original reply subject, recipients, thread and Message-ID remain in the backend
    envelope. Header injection and invented recipient fields are still rejected.
    Compose continues to require a generated subject and retains its previously
@@ -30,7 +32,7 @@ write enablement is required.
    consult outside knowledge or execute actions.
 
 `contextual-task-1.2.0` pins these dependencies; lookup/draft pins
-`lookup-draft-template-1.2.1`. Old queued tasks with unavailable release contracts
+`lookup-draft-template-1.2.2`. Old queued tasks with unavailable release contracts
 fail closed. Saved tasks are not relabelled or silently rerouted.
 
 ## Follow-up API contract

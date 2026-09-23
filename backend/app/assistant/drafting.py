@@ -13,7 +13,7 @@ from app.db.models import Message, Thread
 from app.model_client.structured import json_object
 from app.schemas.assistant import StrictModel
 
-RELEASE = "draft-artifact-1.2.1"
+RELEASE = "draft-artifact-1.2.2"
 PROMPT = """Write an email draft for the user's stated purpose. Return JSON only with
 subject (one line), body (plain text), unresolved_fields (array of missing facts),
 and sources (array of supplied message numbers used). Do not return recipients,
@@ -63,6 +63,13 @@ class GeneratedReplyDraft(GeneratedDraft):
     subject: str | None = Field(
         default=None, min_length=1, max_length=998, pattern=r"^[^\r\n\x00-\x1f\x7f]+$"
     )
+
+    @field_validator("subject", mode="before")
+    @classmethod
+    def empty_echo_is_omitted(cls, value):
+        # Some generators express an omitted, backend-owned header as an empty string.
+        # Only that exact representation is normalized; control characters still fail.
+        return None if value == "" else value
 
 
 async def bind_input(session, user, options, context) -> dict | None:

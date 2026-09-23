@@ -67,7 +67,7 @@ def test_summary_fence_preserves_citation_and_budget_checks():
             )
 
 
-@pytest.mark.parametrize("model_subject", [None, "New subject", "Re: Missing emoji"])
+@pytest.mark.parametrize("model_subject", [None, "", "New subject", "Re: Missing emoji"])
 def test_reply_subject_remains_exactly_backend_owned(model_subject):
     original = "Re: Hola 👋 Order 🧾"
     envelope = {
@@ -97,6 +97,19 @@ def test_reply_subject_remains_exactly_backend_owned(model_subject):
         drafting.make_artifact(
             json.dumps({**value, "subject": "X\r\nBcc: other@example.test"}), claim, "reply"
         )
+
+
+def test_empty_reply_echo_does_not_relax_compose_or_header_validation():
+    for subject in ("", None):
+        with pytest.raises(ValueError):
+            drafting.GeneratedDraft.model_validate(
+                {"subject": subject, "body": "Thanks.", "sources": [], "unresolved_fields": []}
+            )
+    for subject in ("\r\n", "\x00", 42):
+        with pytest.raises(ValueError):
+            drafting.GeneratedReplyDraft.model_validate(
+                {"subject": subject, "body": "Thanks.", "sources": [], "unresolved_fields": []}
+            )
 
 
 def test_resolved_context_cannot_promote_empty_clarification_to_ready():
