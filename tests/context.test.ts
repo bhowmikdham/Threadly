@@ -13,6 +13,28 @@ const selection: any = {
   targetId: "m3"
 }
 describe("reference-only source capture", () => {
+  it("keeps Gmail's displayed order even when provider messages arrive chronologically", async () => {
+    vi.mocked(chrome.tabs.query).mockResolvedValue([
+      { id: 1, url: "https://mail.google.com/mail/u/0/" }
+    ] as any)
+    vi.mocked(chrome.tabs.sendMessage).mockResolvedValue({
+      accountEmail: "owner@example.test",
+      threadId: "thread1",
+      messageIds: ["m3", "m1"],
+      selectedMessageId: "m3"
+    } as any)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: selection
+    } as any)
+    const s = await activeGmail({
+      id: 1,
+      email: "owner@example.test",
+      name: null
+    })
+    expect(s.messages.map((m) => m.gmail_msg_id)).toEqual(["m3", "m1", "m2"])
+    expect(s.selectedIds).toEqual(["m3", "m1"])
+  })
   it("preserves displayed source order and binds an explicit target independently", async () => {
     const calls: any[] = []
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (

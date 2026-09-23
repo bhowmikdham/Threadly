@@ -1,6 +1,6 @@
-# Threadly Chrome extension
+# Threadly browser extension
 
-Tushar’s Gmail side panel connected to Threadly’s backend. This branch contains
+A conversational Gmail side panel connected to Threadly’s backend. This branch contains
 the extension; the backend is maintained on `codex/assistant-intent-routing`.
 Do not merge the two repository layouts just to run them together.
 
@@ -15,12 +15,13 @@ npm test
 npm run build
 ```
 
-In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load
+In Microsoft Edge, open `edge://extensions` (Chrome: `chrome://extensions`),
+enable Developer mode, choose **Load
 unpacked**, and select `build/chrome-mv3-prod`. Reload any existing Gmail tabs.
 The committed public manifest key keeps the unpacked extension ID stable:
 `ffmlcgieiefcjkjkebfhfkglehgljbhk`.
 
-Open Threadly from Chrome’s extensions menu or the Gmail hover widget. Settings
+Open Threadly from the browser’s extensions menu or the Gmail hover widget. Settings
 lets you choose your backend. The default is `http://127.0.0.1:8000`.
 
 ## EC2 development connection
@@ -72,9 +73,12 @@ optional and remain subject to backend pilot controls and exact approval.
 
 - On-demand Gmail search with an explicit date window and manual pagination.
 - Select an open Gmail thread or a search result; choose source messages and a
-  specific reply/rewrite target. Browser message bodies are not imported.
+  specific reply/rewrite target from the context chip. Opening a new conversation
+  automatically attaches the open Gmail thread once; navigating Gmail does not
+  silently replace the pinned source. Browser message bodies are not imported.
 - Summary, grounded questions, reply and new-email drafts, and selected-message
-  rewriting through durable backend tasks.
+  rewriting through durable backend tasks (context chip → choose message →
+  Rewrite selected message). New questions and commands use the backend router.
 - Reviewed multi-step plans and scheduling; per-step progress, cancellation,
   typed clarification, task history and reconnectable result status.
 - Editable draft revisions, exact outgoing preview, explicit approval, and
@@ -82,7 +86,7 @@ optional and remain subject to backend pilot controls and exact approval.
 - Calendar preferences, slot selection with a fresh recheck, exact event preview,
   explicit approval and event status/recovery.
 - Browser dictation puts text into the input for review; it never submits by
-  itself. Availability depends on Chrome and microphone permission.
+  itself. Availability depends on the browser and microphone permission.
 
 No mailbox sync, automatic send, automatic booking, direct Google API calls from
 the side panel, public model keys, or fabricated fallback classifications remain.
@@ -113,5 +117,6 @@ never sends email or creates events. Set `THREADLY_MAIL_QUERY` to another search
 term if needed. It tests existing authenticated sessions, **not** the interactive
 Google consent window.
 
-See [integration handoff](docs/frontend-integration.md) for endpoint mappings,
+See [conversation design and boundaries](docs/conversation-experience.md) and
+[integration handoff](docs/frontend-integration.md) for endpoint mappings,
 recovery behavior, evidence and remaining external setup.

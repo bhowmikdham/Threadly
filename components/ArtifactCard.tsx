@@ -38,13 +38,32 @@ export function ArtifactCard({
   }
   const copy = () =>
     perform(async () => {
-      await navigator.clipboard.writeText(c.body || c.overview || c.text || "")
+      await navigator.clipboard.writeText(
+        [
+          c.body || c.overview || c.text || "",
+          ...[
+            ["Decisions", c.decisions],
+            ["Actions", c.actions],
+            ["Open questions", c.open_questions || c.questions]
+          ].flatMap(([title, rows]: any) =>
+            rows?.length
+              ? [
+                  `${title}:\n${rows.map((r: any) => "• " + display(r)).join("\n")}`
+                ]
+              : []
+          )
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      )
       setNotice("Copied to clipboard.")
     })
   if (artifact.kind === "draft")
     return <DraftCard value={value} replace={replace} />
   return (
-    <section className="artifact" aria-label={`${artifact.kind} result`}>
+    <section
+      className={`artifact result-${artifact.kind}`}
+      aria-label={`${artifact.kind} result`}>
       <div className="card-heading">
         <strong>
           {{
@@ -134,7 +153,6 @@ function Evidence({ value }: { value: Artifact }) {
                   : e.source_kind?.replaceAll("_", " ")}
               </span>
               {e.quote && <blockquote className="prose">{e.quote}</blockquote>}
-              <small>{e.ref_id}</small>
             </div>
           ))}
         </details>
@@ -234,7 +252,8 @@ function DraftCard({
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<EmailAction | null>(null),
     [confirmed, setConfirmed] = useState(false),
-    [history, setHistory] = useState<any[]>([])
+    [history, setHistory] = useState<any[]>([]),
+    [editing, setEditing] = useState(false)
   const [resolved, setResolved] = useState(false),
     key = useRef(requestId()),
     decisionKey = useRef(requestId())
@@ -338,7 +357,8 @@ function DraftCard({
         }
       )
       replace(result)
-      setNotice("New revision saved. Review it before preparing a send.")
+      setEditing(false)
+      setNotice("Changes saved.")
     })
   const prepare = () =>
     run(async () => {
@@ -403,51 +423,62 @@ function DraftCard({
         </strong>
         <span className="muted">Revision {value.revision}</span>
       </div>
-      <label>
-        To
-        <input
-          value={to}
-          disabled={locked}
-          onChange={(e) => setTo(e.target.value)}
-        />
-      </label>
-      <details>
-        <summary>Cc and Bcc</summary>
+      {!editing && (
+        <div className="draft-reading">
+          <p className="draft-envelope">
+            <span>To</span> {to}
+          </p>
+          <p className="draft-subject">{subject}</p>
+          <p className="prose draft-body">{body}</p>
+        </div>
+      )}
+      <div hidden={!editing}>
         <label>
-          Cc
+          To
           <input
-            value={cc}
+            value={to}
             disabled={locked}
-            onChange={(e) => setCc(e.target.value)}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </label>
+        <details>
+          <summary>Cc and Bcc</summary>
+          <label>
+            Cc
+            <input
+              value={cc}
+              disabled={locked}
+              onChange={(e) => setCc(e.target.value)}
+            />
+          </label>
+          <label>
+            Bcc
+            <input
+              value={bcc}
+              disabled={locked}
+              onChange={(e) => setBcc(e.target.value)}
+            />
+          </label>
+        </details>
+        <label>
+          Subject
+          <input
+            value={subject}
+            disabled={locked || !!envelope?.reply}
+            onChange={(e) => setSubject(e.target.value)}
           />
         </label>
         <label>
-          Bcc
-          <input
-            value={bcc}
+          Message
+          <textarea
+            aria-label="Message"
+            rows={7}
+            value={body}
             disabled={locked}
-            onChange={(e) => setBcc(e.target.value)}
+            onChange={(e) => setBody(e.target.value)}
           />
         </label>
-      </details>
-      <label>
-        Subject
-        <input
-          value={subject}
-          disabled={locked || !!envelope?.reply}
-          onChange={(e) => setSubject(e.target.value)}
-        />
-      </label>
-      <label>
-        Message
-        <textarea
-          aria-label="Message"
-          rows={7}
-          value={body}
-          disabled={locked}
-          onChange={(e) => setBody(e.target.value)}
-        />
-      </label>
+      </div>
       {c.unresolved_fields?.length > 0 && (
         <div className="warning">
           <b>Needs your input</b>
@@ -468,9 +499,19 @@ function DraftCard({
         </div>
       )}
       <div className="button-row">
-        <button disabled={!dirty || locked || !value.is_latest} onClick={save}>
-          Save edits
-        </button>
+        {!editing ? (
+          <button
+            disabled={locked || !value.is_latest}
+            onClick={() => setEditing(true)}>
+            Edit draft
+          </button>
+        ) : (
+          <button
+            disabled={!dirty || locked || !value.is_latest}
+            onClick={save}>
+            Save edits
+          </button>
+        )}
         <button
           disabled={busy}
           onClick={() =>

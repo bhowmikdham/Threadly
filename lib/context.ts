@@ -32,6 +32,12 @@ export async function activeGmail(user: User): Promise<Selection | null> {
   // Never replace unresolved DOM ordinals with the last message or silently guess a reply target.
   return {
     ...data,
+    messages: [
+      ...selectedIds.map((id) =>
+        data.messages.find((m) => m.gmail_msg_id === id)
+      ),
+      ...data.messages.filter((m) => !selectedIds.includes(m.gmail_msg_id))
+    ],
     selectedIds,
     targetId: ids.has(observed.selectedMessageId)
       ? observed.selectedMessageId

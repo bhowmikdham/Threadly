@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react"
 
 import "./style.css"
 
+import { ContextPicker } from "./components/ContextPicker"
+import { Icon } from "./components/Icon"
 import { MailSearch } from "./components/MailSearch"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
-import type { Capability, Mode, User } from "./lib/types"
+import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
 export default function SidePanel() {
@@ -16,12 +18,10 @@ export default function SidePanel() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
-    [dark, setDark] = useState(false),
-    [sessionKey, setSessionKey] = useState(0)
+    [dark, setDark] = useState(true)
   const refresh = async () => {
     const s = await bridge<any>({ type: "STATUS" })
     setUser(s.user)
-    setSessionKey((n) => n + 1)
     if (s.user) {
       try {
         const c = await api("/assistant/capabilities")
@@ -36,9 +36,9 @@ export default function SidePanel() {
     void refresh()
       .catch((e) => setError(errorText(e)))
       .finally(() => setReady(true))
-    void chrome.storage.local.get("darkMode").then((s) => setDark(!!s.darkMode))
-  }, [])
-  useEffect(() => {
+    void chrome.storage.local
+      .get("darkMode")
+      .then((s) => setDark(s.darkMode !== false))
     const changed = (changes: any, area: string) => {
       if (
         area === "session" &&
@@ -47,7 +47,6 @@ export default function SidePanel() {
       ) {
         setUser(null)
         setCapabilities([])
-        setSessionKey((n) => n + 1)
       }
     }
     chrome.storage.onChanged.addListener(changed)
@@ -69,108 +68,139 @@ export default function SidePanel() {
     await bridge({ type: "LOGOUT" })
     setUser(null)
     setCapabilities([])
-    setSessionKey((n) => n + 1)
     setSettings(false)
+    setError("")
+  }
+  const theme = () => {
+    setDark(!dark)
+    void chrome.storage.local.set({ darkMode: !dark })
   }
   return (
     <main className={dark ? "threadly dark" : "threadly"}>
-      <header className="app-header">
-        <strong>Threadly</strong>
-        <div>
+      {(!user || settings) && (
+        <header className="app-header">
+          <span className="wordmark">
+            <Icon name="sparkle" />
+            Threadly
+          </span>
           <button
-            aria-label="Toggle dark mode"
-            onClick={() => {
-              setDark(!dark)
-              void chrome.storage.local.set({ darkMode: !dark })
-            }}>
-            {dark ? "☀" : "☾"}
+            className="icon-button"
+            aria-label={settings ? "Close settings" : "Settings"}
+            title={settings ? "Close settings" : "Settings"}
+            onClick={() => setSettings(!settings)}>
+            <Icon name={settings ? "close" : "menu"} />
           </button>
-          <button aria-label="Settings" onClick={() => setSettings(!settings)}>
-            ⚙
-          </button>
-        </div>
-      </header>
+        </header>
+      )}
       {!ready ? (
         <p className="empty" role="status">
           Connecting…
         </p>
-      ) : settings ? (
-        <Settings
-          user={user}
-          capabilities={capabilities}
-          onAuth={refresh}
-          onClose={() => setSettings(false)}
-          onPreferences={() => {}}
-        />
-      ) : user ? (
-        <Assistant
-          key={`${user.id}:${sessionKey}`}
-          user={user}
-          capabilities={capabilities}
-          openSettings={() => setSettings(true)}
-        />
       ) : (
-        <section className="welcome">
-          <div>
-            <h1>Welcome to Threadly</h1>
-            <p>
-              Search your mail, summarise threads, plan meetings and draft
-              replies—with you in control.
-            </p>
-            <button className="primary" disabled={busy} onClick={login}>
-              {busy ? "Signing in…" : "Sign in with Google"}
-            </button>
-            <p className="muted">
-              Your Google connection is managed by Threadly’s backend. No
-              mailbox import is needed.
-            </p>
-          </div>
-        </section>
+        <>
+          {settings && (
+            <Settings
+              user={user}
+              capabilities={capabilities}
+              onAuth={refresh}
+              onClose={() => setSettings(false)}
+              onPreferences={() => {}}
+            />
+          )}
+          {user && (
+            <div className="assistant-host" hidden={settings}>
+              <Assistant
+                key={user.id}
+                user={user}
+                openSettings={() => setSettings(true)}
+                logout={logout}
+                theme={theme}
+                dark={dark}
+              />
+            </div>
+          )}
+          {!user && !settings && (
+            <section className="welcome">
+              <div>
+                <span className="welcome-mark">
+                  <Icon name="sparkle" size={32} />
+                </span>
+                <h1>
+                  A little less work.
+                  <br />A little more flow.
+                </h1>
+                <p>Your email, your calendar, one conversation.</p>
+                <button
+                  className="primary login-button"
+                  disabled={busy}
+                  onClick={login}>
+                  {busy ? "Connecting…" : "Sign in with Google"}
+                </button>
+                <p className="muted">
+                  Read what matters. Find the words. Make time.
+                  <br />
+                  You review before anything is sent or booked.
+                </p>
+              </div>
+            </section>
+          )}
+        </>
       )}
       {error && (
         <p className="global-error" role="alert">
           {error}
+          <button
+            className="icon-button"
+            aria-label="Dismiss error"
+            onClick={() => setError("")}>
+            <Icon name="close" size={14} />
+          </button>
         </p>
       )}
-      <footer>
-        <span className="avatar">
-          {(user?.name || user?.email || "G").slice(0, 2).toUpperCase()}
-        </span>
-        <span className="account">{user?.email || "Guest"}</span>
-        {user && <button onClick={logout}>Sign out</button>}
-      </footer>
     </main>
   )
 }
 function Assistant({
   user,
-  capabilities,
-  openSettings
+  openSettings,
+  logout,
+  theme,
+  dark
 }: {
   user: User
-  capabilities: Capability[]
   openSettings: () => void
+  logout: () => void
+  theme: () => void
+  dark: boolean
 }) {
   const c = useAssistant(user),
     [message, setMessage] = useState(""),
-    [mode, setMode] = useState<Mode>("ask"),
-    [to, setTo] = useState(""),
-    [replyInWorkflow, setReplyInWorkflow] = useState(false),
+    [menu, setMenu] = useState(false),
+    [sources, setSources] = useState(false),
+    [contextOpen, setContextOpen] = useState(false),
     [search, setSearch] = useState(false),
     [history, setHistory] = useState<any>(null),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
-    [recording, setRecording] = useState(false)
+    [recording, setRecording] = useState(false),
+    [approvalInfo, setApprovalInfo] = useState(false)
   const recognition = useRef<any>(null),
-    last = useRef<HTMLDivElement>(null)
+    last = useRef<HTMLDivElement>(null),
+    input = useRef<HTMLTextAreaElement>(null),
+    scroll = useRef<HTMLDivElement>(null),
+    atBottom = useRef(true)
   useEffect(() => {
-    last.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    void c.selectActive(true)
+    return () => recognition.current?.abort()
+  }, [])
+  useEffect(() => {
+    if (atBottom.current) last.current?.scrollIntoView({ block: "end" })
   }, [c.entries])
-  useEffect(
-    () => () => {
-      recognition.current?.abort()
-    },
-    []
-  )
+  useEffect(() => {
+    if (input.current) {
+      input.current.style.height = "auto"
+      input.current.style.height = `${Math.min(input.current.scrollHeight, 150)}px`
+    }
+  }, [message])
   const historyPage = async (more = false) => {
     try {
       const r = await api(
@@ -181,6 +211,8 @@ function Assistant({
       )
       setHistory((old) => (more ? [...(old || []), ...r.tasks] : r.tasks))
       setHistoryCursor(r.next_cursor)
+      setMenu(false)
+      setSearch(false)
     } catch (e) {
       c.setError(errorText(e))
     }
@@ -190,7 +222,14 @@ function Assistant({
     if (c.busy || !message.trim()) return
     const text = message
     setMessage("")
-    void c.submit(text, mode, to, replyInWorkflow)
+    setSources(false)
+    atBottom.current = true
+    void c.submit(text)
+  }
+  const suggest = (text: string) => {
+    if (c.busy) return
+    atBottom.current = true
+    void c.submit(text)
   }
   const dictate = () => {
     if (recording) {
@@ -202,7 +241,7 @@ function Assistant({
       (window as any).webkitSpeechRecognition
     if (!Recognition) {
       c.setError(
-        "Dictation is unavailable in this browser. You can type your request."
+        "Dictation isn’t available in this browser. You can type your request."
       )
       return
     }
@@ -211,14 +250,13 @@ function Assistant({
     r.lang = navigator.language
     r.interimResults = false
     r.continuous = false
-    r.onresult = (e: any) => {
+    r.onresult = (e: any) =>
       setMessage(
         (old) => `${old}${old ? " " : ""}${e.results[0][0].transcript}`
       )
-    }
     r.onerror = () => {
       c.setError(
-        "Dictation could not start. Check microphone permission or type your request."
+        "Couldn’t start dictation. Check microphone access or type your request."
       )
       setRecording(false)
     }
@@ -227,42 +265,122 @@ function Assistant({
       r.start()
       setRecording(true)
     } catch {
-      c.setError("Microphone could not start.")
+      c.setError("Couldn’t start the microphone.")
       setRecording(false)
     }
   }
-  const chooseMode = (m: Mode) => {
-    setMode(m)
-    if (m === "summarise") setMessage("Summarise this thread.")
-    if (m === "reply") setMessage("Draft a reply to this thread.")
-    if (m === "compose") setMessage("")
-    if (m === "workflow") setMessage("")
+  const newChat = () => {
+    c.newChat()
+    setHistory(null)
+    setSearch(false)
+    setContextOpen(false)
+    setMessage("")
+    setMenu(false)
   }
+  const title = c.entries[0]?.instruction || "Threadly"
+  const firstName = user.name?.trim().split(/\s+/)[0] || ""
+  const latest = c.entries.at(-1)
   return (
     <>
-      <nav className="toolbar">
-        <button disabled={c.busy} onClick={c.newChat}>
-          ＋ New chat
+      <header className="chat-header">
+        <button
+          className="icon-button"
+          aria-label="Conversation menu"
+          title="Conversation menu"
+          aria-expanded={menu}
+          onClick={() => setMenu(!menu)}>
+          <Icon name="menu" />
         </button>
-        <button onClick={() => void historyPage()}>History</button>
-        <button onClick={() => setSearch(!search)}>Search mail</button>
-      </nav>
-      <div className="conversation">
+        <span className="chat-title" title={title}>
+          {title}
+        </span>
+        <button
+          className="icon-button"
+          aria-label="New chat"
+          title="New chat"
+          disabled={c.busy}
+          onClick={newChat}>
+          <Icon name="edit" />
+        </button>
+      </header>
+      {menu && (
+        <nav className="panel-menu" aria-label="Conversation menu">
+          <button onClick={() => void historyPage()}>
+            <Icon name="clock" />
+            History
+          </button>
+          <button
+            onClick={() => {
+              openSettings()
+              setMenu(false)
+            }}>
+            Settings
+          </button>
+          <button onClick={theme}>
+            {dark ? "Switch to light appearance" : "Switch to dark appearance"}
+          </button>
+          <div className="menu-account">
+            <small>{user.email}</small>
+            <button onClick={logout}>Sign out</button>
+          </div>
+        </nav>
+      )}
+      <div
+        className="conversation"
+        ref={scroll}
+        onScroll={() => {
+          const e = scroll.current
+          atBottom.current =
+            !e || e.scrollHeight - e.scrollTop - e.clientHeight < 100
+        }}>
         {search && (
-          <MailSearch
-            select={async (id) => {
-              await c.selectThread(id)
-              setSearch(false)
+          <section className="source-surface">
+            <div className="card-heading">
+              <b>Find an email</b>
+              <button
+                className="icon-button"
+                aria-label="Close search"
+                onClick={() => setSearch(false)}>
+                <Icon name="close" />
+              </button>
+            </div>
+            <MailSearch
+              select={async (id) => {
+                await c.selectThread(id)
+                setSearch(false)
+                setSources(false)
+              }}
+            />
+          </section>
+        )}
+        {contextOpen && c.selection && (
+          <ContextPicker
+            selection={c.selection}
+            onChange={c.setSelection}
+            close={() => setContextOpen(false)}
+            busy={c.busy}
+            rewrite={(id) => {
+              void c.submit(
+                "Rewrite the selected message to be clearer and more concise, preserving its meaning.",
+                id
+              )
             }}
           />
         )}
         {history && (
-          <section className="artifact">
+          <section className="history-surface">
             <div className="card-heading">
-              <b>Recent tasks</b>
-              <button onClick={() => setHistory(null)}>Close</button>
+              <h2>Recent conversations</h2>
+              <button
+                className="icon-button"
+                aria-label="Close history"
+                onClick={() => setHistory(null)}>
+                <Icon name="close" />
+              </button>
             </div>
-            {history.length === 0 && <p>No tasks yet.</p>}
+            {history.length === 0 && (
+              <p>Your conversations will appear here.</p>
+            )}
             {history.map((t) => (
               <button
                 className="history-row"
@@ -272,7 +390,7 @@ function Assistant({
                   setHistory(null)
                 }}>
                 <span>{t.instruction}</span>
-                <small>{t.state.replaceAll("_", " ")}</small>
+                <Icon name="chevron" size={14} />
               </button>
             ))}
             {historyCursor && (
@@ -280,100 +398,77 @@ function Assistant({
             )}
           </section>
         )}
-        <section className="context">
-          <div className="button-row">
-            <button disabled={c.busy} onClick={c.selectActive}>
-              Use open Gmail thread
-            </button>
-            {c.selection && (
-              <button disabled={c.busy} onClick={() => c.setSelection(null)}>
-                Clear selection
-              </button>
-            )}
-          </div>
-          {c.selection && (
-            <details open>
-              <summary>{c.selection.thread.subject}</summary>
-              <p className="muted">
-                Choose the messages to include. Reply and rewrite require one
-                explicit target. Message numbers refer only to the included
-                messages.
-              </p>
-              {c.selection.messages.map((m, i) => (
-                <div className="message-choice" key={m.gmail_msg_id}>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={c.selection.selectedIds.includes(m.gmail_msg_id)}
-                      onChange={(e) => {
-                        const s = c.selection
-                        c.setSelection({
-                          ...s,
-                          selectedIds: e.target.checked
-                            ? [...s.selectedIds, m.gmail_msg_id]
-                            : s.selectedIds.filter(
-                                (id) => id !== m.gmail_msg_id
-                              ),
-                          targetId:
-                            !e.target.checked && s.targetId === m.gmail_msg_id
-                              ? null
-                              : s.targetId
-                        })
-                      }}
-                    />
-                    <span>
-                      {c.selection.selectedIds.includes(m.gmail_msg_id)
-                        ? `Message ${c.selection.messages.slice(0, i + 1).filter((item) => c.selection.selectedIds.includes(item.gmail_msg_id)).length}`
-                        : "Excluded message"}{" "}
-                      · {m.from_addr}
-                      <small>
-                        {m.sent_at || m.received_at
-                          ? new Date(
-                              m.sent_at || m.received_at
-                            ).toLocaleString()
-                          : ""}
-                      </small>
-                    </span>
-                  </label>
-                  <button
-                    aria-pressed={c.selection.targetId === m.gmail_msg_id}
-                    onClick={() => {
-                      const s = c.selection
-                      c.setSelection({
-                        ...s,
-                        targetId: m.gmail_msg_id,
-                        selectedIds: [
-                          ...new Set([...s.selectedIds, m.gmail_msg_id])
-                        ]
-                      })
-                      const match = m.from_addr?.match(/<([^>]+)>/)
-                      setTo(match?.[1] || m.from_addr || "")
-                    }}>
-                    {c.selection.targetId === m.gmail_msg_id
-                      ? "Target selected"
-                      : "Use as target"}
-                  </button>
-                </div>
-              ))}
-            </details>
-          )}
-        </section>
-        {c.entries.length === 0 && !history && !search && (
-          <div className="empty">
-            <h1>Welcome to Threadly</h1>
-            <p>
-              Ask about a selected email, prepare a draft, or review a plan for
-              several steps.
+        {!c.entries.length && !history && !search && !contextOpen && (
+          <section className="conversation-start">
+            <span className="welcome-mark">
+              <Icon name="sparkle" size={29} />
+            </span>
+            <h1>
+              {firstName ? `${firstName}, shall we?` : "What’s on your mind?"}
+            </h1>
+            <p className="start-subtitle">
+              {c.selection
+                ? "A fresh perspective on what’s in front of you."
+                : "Your day, a little lighter."}
             </p>
-            <div className="button-row">
-              <button onClick={() => chooseMode("summarise")}>Summarise</button>
-              <button onClick={() => chooseMode("reply")}>Draft reply</button>
-              <button onClick={() => chooseMode("compose")}>Compose</button>
-              <button onClick={() => chooseMode("workflow")}>
-                Plan / schedule
-              </button>
+            <div className="suggestions" aria-label="Suggested actions">
+              {c.selection ? (
+                <>
+                  <button
+                    disabled={c.busy}
+                    onClick={() => suggest("Summarise this thread.")}>
+                    <Icon name="sparkle" />
+                    Summarise this for me
+                    <Icon name="chevron" size={14} />
+                  </button>
+                  <button
+                    disabled={c.busy}
+                    onClick={() => suggest("Draft a reply to this thread.")}>
+                    <Icon name="edit" />
+                    Help me reply
+                    <Icon name="chevron" size={14} />
+                  </button>
+                  <button
+                    disabled={c.busy}
+                    onClick={() =>
+                      suggest("What needs my attention in this email?")
+                    }>
+                    <Icon name="check" />
+                    What needs my attention?
+                    <Icon name="chevron" size={14} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    disabled={c.busy}
+                    onClick={() => void c.selectActive()}>
+                    <Icon name="mail" />
+                    Ask about the open email
+                    <Icon name="chevron" size={14} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSearch(true)
+                      setSources(false)
+                    }}>
+                    <Icon name="search" />
+                    Find an email
+                    <Icon name="chevron" size={14} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMessage("Write an email ")
+                      input.current?.focus()
+                    }}>
+                    <Icon name="edit" />
+                    Find the right words
+                    <Icon name="chevron" size={14} />
+                  </button>
+                </>
+              )}
             </div>
-          </div>
+          </section>
         )}
         {c.entries.map((entry) => (
           <TaskCard key={entry.id} entry={entry} controller={c} />
@@ -383,95 +478,150 @@ function Assistant({
       {c.error && (
         <p role="alert" className="global-error">
           {c.error}
+          <button
+            className="icon-button"
+            aria-label="Dismiss error"
+            onClick={() => c.setError("")}>
+            <Icon name="close" size={14} />
+          </button>
         </p>
       )}
-      <form className="composer" onSubmit={send}>
-        <div className="button-row">
-          <label className="mode">
-            Request
-            <select
-              aria-label="Request type"
-              value={mode}
-              onChange={(e) => chooseMode(e.target.value as Mode)}>
-              <option value="ask">Ask / automatic routing</option>
-              <option value="summarise">Summarise</option>
-              <option value="reply">Reply draft</option>
-              <option value="compose">New email</option>
-              <option value="workflow">Plan / schedule / multiple steps</option>
-              <option value="transform">Rewrite selected message</option>
-            </select>
-          </label>
-          {mode === "workflow" && (
-            <button type="button" onClick={openSettings}>
-              Calendar settings
+      <div className="composer-wrap">
+        {sources && (
+          <div className="source-menu" aria-label="Add context">
+            <button
+              disabled={c.busy}
+              onClick={() => {
+                void c.selectActive()
+                setSources(false)
+              }}>
+              <Icon name="mail" />
+              Use open Gmail thread
+            </button>
+            <button
+              disabled={c.busy}
+              onClick={() => {
+                setSearch(true)
+                setSources(false)
+                setContextOpen(false)
+              }}>
+              <Icon name="search" />
+              Search mail
+            </button>
+            {c.selection && (
+              <button
+                disabled={c.busy}
+                onClick={() => {
+                  c.setSelection(null)
+                  setSources(false)
+                }}>
+                Remove email context
+              </button>
+            )}
+          </div>
+        )}
+        {approvalInfo && (
+          <div className="approval-info" role="status">
+            <Icon name="shield" />
+            <span>
+              Suggestions first. You review the exact email or event before
+              anything is sent or booked.
+            </span>
+            <button
+              className="icon-button"
+              aria-label="Close approval info"
+              onClick={() => setApprovalInfo(false)}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        )}
+        <form className="composer" onSubmit={send}>
+          {c.selection && (
+            <button
+              type="button"
+              className="context-chip"
+              disabled={c.busy}
+              title="View email context"
+              aria-label={`Email context: ${c.selection.thread.subject}`}
+              aria-expanded={contextOpen}
+              onClick={() => {
+                setContextOpen(!contextOpen)
+                setSearch(false)
+              }}>
+              <Icon name="mail" size={14} />
+              <span>{c.selection.thread.subject}</span>
+              <small>{c.selection.selectedIds.length}</small>
             </button>
           )}
-        </div>
-        {["reply", "compose", "workflow"].includes(mode) && (
-          <label>
-            Recipient
-            {mode === "workflow" ? " (if the plan includes a draft)" : ""}
-            <input
-              type="text"
-              placeholder="name@example.com"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </label>
-        )}
-        {mode === "workflow" && (
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={replyInWorkflow}
-              onChange={(e) => setReplyInWorkflow(e.target.checked)}
-            />
-            Draft should reply to the selected target message
-          </label>
-        )}
-        {mode === "compose" && c.selection && (
-          <p className="muted">
-            New-email mode uses your instruction without the selected thread.
-          </p>
-        )}
-        <textarea
-          aria-label="Your request"
-          placeholder="Assign a task or ask anything…"
-          value={message}
-          rows={3}
-          maxLength={mode === "workflow" ? 4000 : 8000}
-          disabled={c.busy}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault()
-              send()
+          <textarea
+            ref={input}
+            aria-label="Your request"
+            placeholder={
+              latest?.task?.state === "needs_clarification"
+                ? "Reply or ask a follow-up…"
+                : "Assign a task or ask anything…"
             }
-          }}
-        />
-        <div className="composer-actions">
-          <button
-            type="button"
+            value={message}
+            rows={1}
+            maxLength={4000}
             disabled={c.busy}
-            aria-label={recording ? "Stop dictation" : "Dictate request"}
-            onClick={dictate}>
-            {recording ? "Stop microphone" : "Microphone"}
-          </button>
-          <span className="muted">
-            {recording
-              ? "Listening · review text before sending"
-              : c.busy
-                ? "Working…"
-                : "Review suggestions before using them"}
-          </span>
-          <button
-            className="primary"
-            type="submit"
-            disabled={c.busy || !message.trim()}>
-            Submit
-          </button>
-        </div>
-      </form>
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault()
+                send()
+              }
+            }}
+          />
+          <div className="composer-actions">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Add context"
+              title="Add context"
+              aria-expanded={sources}
+              disabled={c.busy}
+              onClick={() => setSources(!sources)}>
+              <Icon name="plus" />
+            </button>
+            <span className="composer-hint">
+              {recording ? "Listening…" : c.busy ? "Working on it…" : ""}
+            </span>
+            <button
+              type="button"
+              className={`icon-button${recording ? " recording" : ""}`}
+              aria-label={recording ? "Stop dictation" : "Dictate request"}
+              title="Dictate request"
+              disabled={c.busy}
+              onClick={dictate}>
+              <Icon name="mic" size={17} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Approval information"
+              title="You’re in control"
+              onClick={() => setApprovalInfo(!approvalInfo)}>
+              <Icon name="shield" size={17} />
+            </button>
+            <button
+              className="send-button"
+              type="submit"
+              title="Send request"
+              aria-label="Send request"
+              disabled={c.busy || !message.trim()}>
+              <Icon name="send" size={18} />
+            </button>
+          </div>
+        </form>
+        <p className="composer-footnote">
+          Threadly can make mistakes. Review important details.
+        </p>
+      </div>
     </>
   )
 }
