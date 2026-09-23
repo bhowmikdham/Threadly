@@ -461,6 +461,11 @@ ten minutes and is consumed before network exchange. `POST /auth/google/exchange
 checks the original verifier, callback and state; the JWT/profile response is unchanged.
 Authenticated `POST /auth/google/disconnect` clears local Google credentials only.
 
+Domain-free staging may explicitly enable `GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK=true`.
+Only `http://127.0.0.1:8765/oauth/callback` then accepts HTTP, still requiring exact
+redirect allowlisting and the same state/PKCE exchange. Default remains HTTPS-only.
+See [local test setup](google-local-testing.md).
+
 `GET /assistant/capabilities` returns typed account/capability/reconnect metadata
 from stored actual grants. No user ID or scope authority is accepted from the caller.
 Gmail send and Calendar writes remain disabled. B12 installs Calendar list/freebusy

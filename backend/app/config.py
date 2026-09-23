@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = ""
     google_redirect_uri_allowlist: str = ""
+    # Explicit domain-free staging exception; only the fixed local test callback.
+    google_allow_loopback_test_callback: bool = False
     fernet_key: str = ""  # encrypts refresh tokens at rest (auth/crypto.py)
 
     # Explicit migration switch; Bedrock never falls back to another cloud.
