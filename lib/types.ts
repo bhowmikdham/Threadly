@@ -1,10 +1,3 @@
-export type Mode =
-  | "ask"
-  | "summarise"
-  | "reply"
-  | "compose"
-  | "workflow"
-  | "transform"
 export interface User {
   id: number
   email: string
@@ -33,6 +26,7 @@ export interface Selection {
 }
 export interface Task {
   task_id: string
+  effective_context_snapshot_id?: string
   instruction: string
   state: string
   version: number
@@ -44,6 +38,7 @@ export interface Task {
   compound?: any
   scheduling?: any
   context_snapshot_id?: string
+  effective_draft_input?: any
   draft_input?: any
 }
 export interface Artifact {
@@ -69,6 +64,13 @@ export interface Entry {
   id: string
   instruction: string
   task?: Task
+  recipe?: {
+    instruction: string
+    contextId: string | null
+    hint?: string
+    draft?: any
+  }
+  answers?: string[]
   proposal?: any
   artifacts?: Artifact[]
   error?: string

@@ -34,7 +34,8 @@ function resultTask(body: any, kind: string) {
     version: 2,
     artifact_id: aid,
     error_code: null,
-    context_snapshot_id: "ctx-1",
+    context_snapshot_id: body.context_snapshot_id || null,
+    effective_context_snapshot_id: body.context_snapshot_id || null,
     workflow: null,
     compound: null
   }
@@ -167,16 +168,80 @@ test.beforeAll(async () => {
         thread_id: thread,
         thread_version: 1
       }
-    } else if (p === "/assistant/requests")
+    } else if (p === "/assistant/context-snapshots/ctx-1")
+      data = {
+        thread_id: thread,
+        thread_version: 1,
+        ui_map: {
+          visible_message_ids: [target],
+          selected_message_ids: [target]
+        }
+      }
+    else if (p === "/assistant/requests") {
+      // Synthetic backend router: UI never selects an intent for a new command.
+      const intent =
+        body.intent_hint ||
+        (/summari[sz]e/i.test(body.instruction)
+          ? "summarise"
+          : /reply/i.test(body.instruction)
+            ? "reply"
+            : /write.*email/i.test(body.instruction)
+              ? "compose"
+              : "other")
       data = resultTask(
         body,
-        body.intent_hint === "summarise"
+        intent === "summarise"
           ? "summary"
-          : ["reply", "compose"].includes(body.intent_hint)
+          : ["reply", "compose"].includes(intent)
             ? "draft"
             : "answer"
       )
-    else if (p === "/assistant/tasks")
+      data.request = body
+      if (["reply", "compose"].includes(intent) && !body.draft_options) {
+        data.state = "needs_clarification"
+        data.artifact_id = null
+        data.question = {
+          question_id: "q-1",
+          expected_version: 2,
+          fields:
+            intent === "reply"
+              ? ["reply_message_id", "recipients"]
+              : ["recipients"],
+          prompt: "Provide or select: recipients.",
+          expired: false
+        }
+      }
+      if (/meeting time/i.test(body.instruction)) {
+        data.state = "unsupported"
+        data.artifact_id = null
+        data.route = {
+          decision: {
+            intent: "plan_schedule",
+            operations: ["schedule"],
+            requested_action: "none"
+          }
+        }
+      }
+      if (data.state !== "queued") tasks.set(data.task_id, data)
+    } else if (p.endsWith("/inputs")) {
+      const t = tasks.get(p.split("/")[3])
+      expect(body.question_id).toBe(t.question.question_id)
+      const generated = resultTask(
+        {
+          ...t.request,
+          draft_options: {
+            to: body.answer.recipients,
+            reply_message_id: body.answer.reply_message_id
+          }
+        },
+        "draft"
+      )
+      const finished = tasks.get(generated.task_id)
+      artifacts.get(finished.artifact_id).task_id = t.task_id
+      tasks.delete(generated.task_id)
+      tasks.set(t.task_id, { ...finished, task_id: t.task_id, question: null })
+      data = { ...generated, task_id: t.task_id, question: null }
+    } else if (p === "/assistant/tasks")
       data = { tasks: [...tasks.values()], next_cursor: null }
     else if (/^\/assistant\/tasks\/[^/]+$/.test(p))
       data = tasks.get(p.split("/").at(-1)!)
@@ -325,22 +390,46 @@ test.afterAll(async () => {
   if (profile) await rm(profile, { recursive: true, force: true })
 })
 test("real extension bridge: selected summary, answer and edited reply without send", async () => {
+  await page.getByRole("button", { name: "Add context", exact: true }).click()
   await page.getByRole("button", { name: "Search mail", exact: true }).click()
   await page.getByLabel("Search text").fill("receipt")
   await page.getByRole("button", { name: "Search", exact: true }).click()
   await page.getByRole("button", { name: "Test receipt", exact: true }).click()
-  await page.getByRole("button", { name: "Use as target" }).click()
-  await page.getByLabel("Request type").selectOption("summarise")
-  await page.getByRole("button", { name: "Submit", exact: true }).click()
+  await expect(page.getByLabel("Request type")).toHaveCount(0)
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "conversation-start.png")
+  })
+  await page
+    .getByRole("button", { name: "Summarise this for me", exact: true })
+    .click()
   await expect(
     page.getByText("Order 7842 totals $18.60. Pickup is at 6:20 PM.")
   ).toBeVisible()
-  await page.getByLabel("Request type").selectOption("ask")
+  await page.getByLabel("Your request").fill("Make it shorter")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(page.getByLabel("summary result")).toHaveCount(2)
+  const refinement = calls
+    .filter((c) => c.path === "/assistant/requests")
+    .at(-1).body
+  expect(refinement.context_snapshot_id).toBe("ctx-1")
+  expect(refinement.instruction).toContain("Summarise this thread.")
+  expect(refinement.instruction).toContain("Make it shorter")
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "conversation-summary.png")
+  })
   await page.getByLabel("Your request").fill("How much did I pay?")
-  await page.getByRole("button", { name: "Submit", exact: true }).click()
+  await page.getByRole("button", { name: "Send request", exact: true }).click()
   await expect(page.getByText("$18.60", { exact: true })).toBeVisible()
-  await page.getByLabel("Request type").selectOption("reply")
-  await page.getByRole("button", { name: "Submit", exact: true }).click()
+  await page.getByLabel("Your request").fill("Draft a reply to this thread.")
+  await page.getByRole("button", { name: "Send request", exact: true }).click()
+  await page.getByLabel("Reply to", { exact: true }).selectOption(target)
+  await page
+    .getByLabel("Email address", { exact: true })
+    .fill("supplier@example.test")
+  await page.getByRole("button", { name: "Continue request" }).click()
+  await page.getByRole("button", { name: "Edit draft" }).click()
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
     "Thank you for the update."
   )
@@ -357,6 +446,7 @@ test("real extension bridge: selected summary, answer and edited reply without s
   expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
   expect(calls.some((c) => c.path.startsWith("/sync"))).toBe(false)
   await page.reload()
+  await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "History", exact: true }).click()
   await page
     .getByRole("button", { name: /Draft a reply to this thread/ })
@@ -365,36 +455,74 @@ test("real extension bridge: selected summary, answer and edited reply without s
   expect(calls.filter((c) => c.path.endsWith("/actions"))).toHaveLength(1)
   expect(calls.some((c) => c.path === "/assistant/actions/action-1")).toBe(true)
   await page.screenshot({
+    animations: "disabled",
     path: path.join("test-results", "extension-preview.png"),
     fullPage: true
   })
 })
 test("multi-step proposal requires explicit confirmation and scheduling renders real slots", async () => {
-  await page.getByLabel("Request type").selectOption("workflow")
-  await page.getByLabel("Recipient (if the plan includes a draft)").fill("")
   await page.getByLabel("Your request").fill("Find a meeting time tomorrow.")
-  await page.getByRole("button", { name: "Submit", exact: true }).click()
-  await expect(page.getByText("Review the complete workflow")).toBeVisible()
+  await page.getByRole("button", { name: "Send request", exact: true }).click()
+  await expect(page.getByText("Here’s what I’ll do")).toBeVisible()
   expect(calls.filter((c) => c.path.endsWith("/confirm"))).toHaveLength(0)
-  await page
-    .getByRole("button", { name: "Confirm this complete workflow" })
-    .click()
+  await page.getByRole("button", { name: "Continue with these steps" }).click()
   await expect(page.getByText("Found 1 option.")).toBeVisible()
   await expect(
     page.getByRole("button", { name: "Select and recheck" })
   ).toBeVisible()
 })
+test("a new-email recipient is answered in chat and the panel fits narrow light and dark views", async () => {
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await page
+    .getByLabel("Your request")
+    .fill("Write an email thanking Alex for the update.")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByText("Who should this go to?", { exact: true })
+  ).toBeVisible()
+  const count = calls.filter((c) => c.path === "/assistant/requests").length
+  await page.getByLabel("Your request").fill("alex@example.test")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(page.locator(".draft-body")).toBeVisible()
+  expect(calls.filter((c) => c.path === "/assistant/requests")).toHaveLength(
+    count
+  )
+  expect(
+    calls.filter((c) => c.path.endsWith("/inputs")).at(-1).body.answer
+  ).toEqual({ recipients: ["alex@example.test"] })
+  await page.setViewportSize({ width: 320, height: 640 })
+  await expect(page.getByRole("button", { name: "Send request" })).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true)
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "conversation-narrow-dark.png")
+  })
+  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page.getByRole("button", { name: "Switch to light appearance" }).click()
+  await page.getByRole("button", { name: "Conversation menu" }).click()
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "conversation-narrow-light.png")
+  })
+  await page.setViewportSize({ width: 420, height: 900 })
+})
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
+  await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "History", exact: true }).click()
   await expect(
     page
-      .getByRole("heading", { name: "Recent tasks" })
-      .or(page.getByText("Recent tasks", { exact: true }))
+      .getByRole("heading", { name: "Recent conversations" })
+      .or(page.getByText("Recent conversations", { exact: true }))
   ).toBeVisible()
   await expect(
-    page.getByRole("button", { name: /succeeded/ }).first()
+    page.getByRole("button", { name: /Draft a reply/ }).first()
   ).toBeVisible()
+  await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
@@ -410,6 +538,10 @@ test("settings use real capability and versioned preference contracts; history s
     calls.find((c) => c.path === "/calendar/preferences" && c.body)?.body
       .expected_version
   ).toBe(1)
+  await page
+    .getByRole("button", { name: "Close settings", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "Sign out", exact: true }).click()
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { addresses, api, errorText, requestId } from "./api"
+import { api, errorText, requestId } from "./api"
 import { activeGmail, capture } from "./context"
-import type { Artifact, Entry, Mode, Selection, Task, User } from "./types"
+import { chatAnswer, isRefinement, refinement } from "./conversation"
+import type { Artifact, Entry, Selection, Task, User } from "./types"
 
 const terminal = new Set([
   "succeeded",
@@ -15,8 +16,7 @@ export function useAssistant(user: User) {
   const [entries, setEntries] = useState<Entry[]>([]),
     [selection, setSelection] = useState<Selection | null>(null),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [preferences, setPreferences] = useState<any>(null)
+    [error, setError] = useState("")
   const mounted = useRef(true),
     polling = useRef(new Set<string>()),
     submitting = useRef(false)
@@ -80,14 +80,14 @@ export function useAssistant(user: User) {
       polling.current.delete(initial.task_id)
     }
   }
-  const selectActive = async () => {
+  const selectActive = async (quiet = false) => {
     setBusy(true)
     setError("")
     try {
       const s = await activeGmail(user)
       if (mounted.current) {
         setSelection(s)
-        if (!s)
+        if (!s && !quiet)
           setError(
             "Open an email in Gmail, or choose a thread from Search mail."
           )
@@ -121,15 +121,12 @@ export function useAssistant(user: User) {
     contextId: string | null,
     draft: any
   ) => {
-    let p = preferences
-    if (!p) {
-      try {
-        p = await api("/calendar/preferences")
-        if (mounted.current) setPreferences(p)
-      } catch (e) {
-        if (e.code !== "calendar_preferences_missing" && e.status !== 403)
-          throw e
-      }
+    // Settings can change while this conversation stays mounted. Bind fresh preferences.
+    let p = null
+    try {
+      p = await api("/calendar/preferences")
+    } catch (e) {
+      if (e.code !== "calendar_preferences_missing" && e.status !== 403) throw e
     }
     const value = await api("/assistant/workflow-proposals", {
       schema_version: "1.0",
@@ -141,70 +138,83 @@ export function useAssistant(user: User) {
     })
     update(id, { proposal: value, pending: false })
   }
-  const submit = async (
-    instruction: string,
-    mode: Mode,
-    to: string,
-    replyInWorkflow: boolean
-  ) => {
+  const submit = async (instruction: string, rewriteMessageId?: string) => {
     if (submitting.current || !instruction.trim()) return
+    const last = entries.at(-1)
+    const response = rewriteMessageId ? null : chatAnswer(last, instruction)
+    if (response) {
+      submitting.current = true
+      setBusy(true)
+      update(last.id, { answers: [...(last.answers || []), instruction] })
+      try {
+        await answer(last, response)
+      } finally {
+        submitting.current = false
+        if (mounted.current) setBusy(false)
+      }
+      return
+    }
     submitting.current = true
     setBusy(true)
     setError("")
     const id = requestId()
     setEntries((old) => [...old, { id, instruction, pending: true }])
     try {
-      const using = mode === "compose" ? null : selection
-      const ctx = using ? await capture(using) : null
-      let draft = null
       if (
-        mode === "reply" ||
-        mode === "compose" ||
-        (mode === "workflow" && !!to.trim())
-      ) {
-        const isReply =
-          mode === "reply" || (mode === "workflow" && replyInWorkflow)
-        if (isReply && !using?.targetId)
-          throw new Error("Select the specific message to reply to.")
-        draft = {
-          to: addresses(to),
-          cc: [],
-          bcc: [],
-          ...(isReply ? { reply_message_id: using.targetId } : {})
-        }
-        if (!draft.to.length)
-          throw new Error("Enter the intended recipient address.")
+        rewriteMessageId &&
+        (!selection ||
+          selection.targetId !== rewriteMessageId ||
+          !selection.selectedIds.includes(rewriteMessageId))
+      )
+        throw new Error(
+          "Choose the message to rewrite from the email context first."
+        )
+      const follow = rewriteMessageId ? null : refinement(last, instruction)
+      if (!rewriteMessageId && isRefinement(instruction) && !follow)
+        throw new Error(
+          "Which result would you like to change? Open its conversation from History, or describe the full request."
+        )
+      const ctx = !follow && selection ? await capture(selection) : null
+      const recipe = follow || {
+        instruction,
+        contextId: ctx?.context_snapshot_id || null,
+        hint: rewriteMessageId ? "other" : null,
+        draft: null
       }
-      if (mode === "workflow") {
-        await proposal(id, instruction, ctx?.context_snapshot_id || null, draft)
-        return
-      }
-      const options =
-        mode === "transform"
-          ? { operation: "transform_text", message_id: using?.targetId }
-          : undefined
-      if (mode === "transform" && !using?.targetId)
-        throw new Error("Select one message to rewrite.")
+      update(id, {
+        recipe,
+        ...(follow
+          ? {
+              notice:
+                "Regenerating the previous request with your wording preference and its original sources."
+            }
+          : {})
+      })
       const task = await api<Task>("/assistant/requests", {
         schema_version: "1.0",
         request_id: id,
-        instruction,
-        intent_hint:
-          mode === "ask" ? null : mode === "transform" ? "other" : mode,
-        context_snapshot_id: ctx?.context_snapshot_id || null,
+        instruction: recipe.instruction,
+        intent_hint: recipe.hint,
+        context_snapshot_id: recipe.contextId,
         continuation: null,
-        ...(draft ? { draft_options: draft } : {}),
-        ...(options ? { read_options: options } : {})
+        ...(recipe.draft ? { draft_options: recipe.draft } : {}),
+        ...(rewriteMessageId
+          ? {
+              read_options: {
+                operation: "transform_text",
+                message_id: rewriteMessageId
+              }
+            }
+          : {})
       })
       const done = await watch(id, task)
-      const route = done?.route?.decision
-      if (
-        mounted.current &&
-        done?.state === "unsupported" &&
-        route?.requested_action === "none" &&
-        (route?.operations?.length > 1 || route?.intent === "plan_schedule")
+      await proposeIfNeeded(
+        id,
+        done,
+        recipe.instruction,
+        recipe.contextId,
+        recipe.draft
       )
-        await proposal(id, instruction, ctx?.context_snapshot_id || null, draft)
     } catch (e) {
       update(id, { error: errorText(e), pending: false })
     } finally {
@@ -212,7 +222,44 @@ export function useAssistant(user: User) {
       if (mounted.current) setBusy(false)
     }
   }
+  const proposeIfNeeded = async (
+    id: string,
+    done: Task,
+    instruction: string,
+    contextId: string | null,
+    draft: any
+  ) => {
+    const route = done?.route?.decision
+    if (
+      mounted.current &&
+      done?.state === "unsupported" &&
+      route?.requested_action === "none" &&
+      (route?.operations?.length > 1 || route?.intent === "plan_schedule")
+    ) {
+      const envelope = done.effective_draft_input || done.draft_input
+      const options = envelope
+        ? {
+            to: envelope.to,
+            cc: envelope.cc,
+            bcc: envelope.bcc,
+            reply_message_id:
+              envelope.reply_message_id ||
+              envelope.reply?.gmail_message_id ||
+              null
+          }
+        : draft
+      await proposal(
+        id,
+        instruction,
+        done.effective_context_snapshot_id || contextId,
+        options
+      )
+    }
+  }
   const confirm = async (entry: Entry) => {
+    if (submitting.current) return
+    submitting.current = true
+    setBusy(true)
     update(entry.id, { pending: true, error: undefined })
     try {
       const task = await api<Task>(
@@ -223,6 +270,9 @@ export function useAssistant(user: User) {
       await watch(entry.id, task)
     } catch (e) {
       update(entry.id, { pending: false, error: errorText(e) })
+    } finally {
+      submitting.current = false
+      if (mounted.current) setBusy(false)
     }
   }
   const resume = async (entry: Entry) => {
@@ -245,6 +295,7 @@ export function useAssistant(user: User) {
     }
   }
   const answer = async (entry: Entry, values: Record<string, any>) => {
+    setBusy(true)
     update(entry.id, { pending: true, error: undefined })
     try {
       if (values.context_snapshot_id) {
@@ -264,20 +315,71 @@ export function useAssistant(user: User) {
           answer: values
         }
       )
-      await watch(entry.id, task)
+      const done = await watch(entry.id, task)
+      await proposeIfNeeded(
+        entry.id,
+        done,
+        entry.recipe?.instruction ||
+          entry.task.instruction ||
+          entry.instruction,
+        done.context_snapshot_id || null,
+        entry.recipe?.draft || null
+      )
     } catch (e) {
       update(entry.id, { pending: false, error: errorText(e) })
+    } finally {
+      if (mounted.current) setBusy(false)
     }
   }
   const loadTask = async (task: Task) => {
-    const id =
-      entries.find((e) => e.task?.task_id === task.task_id)?.id || task.task_id
-    setEntries((old) =>
-      old.some((e) => e.task?.task_id === task.task_id)
-        ? old
-        : [...old, { id, instruction: task.instruction, task }]
-    )
-    await watch(id, task)
+    if (submitting.current || busy) return
+    setBusy(true)
+    setSelection(null)
+    setError("")
+    const id = task.task_id
+    setEntries([{ id, instruction: task.instruction, task }])
+    try {
+      const contextId =
+        task.effective_context_snapshot_id || task.context_snapshot_id
+      if (contextId) {
+        const saved = await api(`/assistant/context-snapshots/${contextId}`)
+        const data = await api(
+          `/threads/${encodeURIComponent(saved.thread_id)}`
+        )
+        if (data.thread.version !== saved.thread_version)
+          throw new Error(
+            "This email has changed since that conversation. Attach its current version before asking another question."
+          )
+        const ids =
+          saved.ui_map?.visible_message_ids ||
+          saved.messages?.map((m) => m.message_id) ||
+          []
+        if (
+          !ids.length ||
+          !ids.every((id) => data.messages.some((m) => m.gmail_msg_id === id))
+        )
+          throw new Error(
+            "The original email context is no longer available. Attach an email to continue."
+          )
+        if (mounted.current)
+          setSelection({
+            ...data,
+            messages: ids.map((id) =>
+              data.messages.find((m) => m.gmail_msg_id === id)
+            ),
+            selectedIds: ids,
+            targetId:
+              saved.ui_map?.selected_message_ids?.length === 1
+                ? saved.ui_map.selected_message_ids[0]
+                : null
+          })
+      }
+    } catch (e) {
+      if (mounted.current) setError(errorText(e))
+    } finally {
+      await watch(id, task)
+      if (mounted.current) setBusy(false)
+    }
   }
   const replace = (entryId: string, a: Artifact) =>
     setEntries((old) =>
@@ -306,8 +408,6 @@ export function useAssistant(user: User) {
     busy,
     error,
     setError,
-    preferences,
-    setPreferences,
     selectActive,
     selectThread,
     submit,
@@ -318,7 +418,12 @@ export function useAssistant(user: User) {
     loadTask,
     replace,
     newChat: () => {
-      if (!busy) setEntries([])
+      if (!busy) {
+        setEntries([])
+        setError("")
+        setSelection(null)
+        void selectActive(true)
+      }
     }
   }
 }

@@ -95,6 +95,7 @@ describe("reviewed draft integration", () => {
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
     fireEvent.click(screen.getByText("Review outgoing email"))
     await screen.findByText("Approve and send")
+    fireEvent.click(screen.getByText("Edit draft"))
     fireEvent.change(screen.getByLabelText("Message"), {
       target: { value: "Changed content" }
     })
@@ -111,6 +112,7 @@ describe("reviewed draft integration", () => {
     })
     const replace = vi.fn()
     render(<ArtifactCard value={draft} replace={replace} report={vi.fn()} />)
+    fireEvent.click(screen.getByText("Edit draft"))
     fireEvent.change(screen.getByLabelText("To"), {
       target: { value: "new@example.test" }
     })

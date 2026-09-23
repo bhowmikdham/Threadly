@@ -39,8 +39,8 @@ sequenceDiagram
 | Use open Gmail thread      | content-script metadata → `GET /threads/{id}`                | Provider IDs only; validate account where visible; no DOM body import                  |
 | Search mail                | `POST /assistant/mail-search`                                | Explicit date/folder window; one page at a time; query/cursor kept together            |
 | Select source              | `POST /assistant/context-snapshots` schema 1.1               | Fresh thread version, included message IDs and explicit target; no supplied email body |
-| Summary / question / draft | `POST /assistant/requests`                                   | Durable task; compose excludes selected-thread source                                  |
-| Rewrite                    | `/assistant/requests` + `read_options.transform_text`        | Exactly one selected message                                                           |
+| Summary / question / draft | `POST /assistant/requests`                                   | Durable task; backend validates source/recipients; no frontend intent dropdown                                  |
+| Rewrite                    | `/assistant/requests` + `read_options.transform_text`        | Context chip action; exactly one selected message                                                           |
 | Multi-step / schedule      | `/assistant/workflow-proposals`, `/{id}/confirm`             | Display complete proposal; confirm saved plan hash before execution                    |
 | Progress / history         | `GET /assistant/tasks`, `GET /assistant/tasks/{id}`          | Backend states; fetch step artifacts; keep task ID when connection is lost             |
 | Clarification              | `/tasks/{id}/inputs` or `/scheduling-inputs`                 | Only fields requested by the current question; bind question ID and version            |
@@ -113,7 +113,10 @@ was upgraded to 4.1.11. Do not use `npm audit fix --force` to silently downgrade
 Plasmo. Keep the development server local; evaluate a build-tool migration as its
 own change. These tools are development dependencies, not shipped service code.
 
-### Recorded verification — 23 September 2026
+### Previous integration verification — 23 September 2026
+
+This is the baseline before the conversational redesign. See
+[conversation release](conversation-experience.md) for the current checks.
 
 - Frontend: TypeScript check passed; **41 tests passed**; production build passed.
 - Packaged Chromium extension: **4 acceptance scenarios passed** (summary →

@@ -52,9 +52,10 @@ try {
   const { expect } = await import("@playwright/test")
   const error = () => page.locator("[role=alert]").allTextContents()
   await expect(
-    page.getByRole("button", { name: "Search mail", exact: true })
+    page.getByRole("button", { name: "Add context", exact: true })
   ).toBeVisible({ timeout: 30000 })
-  console.log("Authenticated panel ready")
+  console.log("Authenticated conversational panel ready")
+  await page.getByRole("button", { name: "Add context", exact: true }).click()
   await page.getByRole("button", { name: "Search mail", exact: true }).click()
   await page
     .getByLabel("Search text")
@@ -65,49 +66,59 @@ try {
     timeout: 45000
   })
   await page.locator(".history-row").first().click()
-  await expect(
-    page.getByRole("button", { name: "Use as target" }).first()
-  ).toBeVisible({ timeout: 45000 })
-  await page.getByRole("button", { name: "Use as target" }).first().click()
-  console.log("PASS: live bounded Gmail search and owned thread selection")
-  for (const [mode, prompt, selector] of [
-    ["summarise", "Summarise this thread.", '[aria-label="summary result"]'],
-    [
-      "ask",
-      "What is the order total in this email?",
-      '[aria-label="answer result"]'
-    ],
-    [
-      "reply",
-      "Draft a short thank-you reply for the order confirmation.",
-      'textarea[aria-label="Message"]'
-    ]
-  ]) {
-    await page.getByLabel("Request type").selectOption(mode)
-    await page.getByLabel("Your request").fill(prompt)
-    await page.getByRole("button", { name: "Submit", exact: true }).click()
-    try {
-      await expect(page.locator(selector).last()).toBeVisible({
-        timeout: 180000
-      })
-    } catch {
-      console.log("VISIBLE_ERRORS:", JSON.stringify(await error()))
-      throw new Error(`Live ${mode} did not render a completed result`)
-    }
-    console.log(`PASS: live ${mode} task and rendered result`)
+  await expect(page.locator(".context-chip")).toBeVisible({ timeout: 45000 })
+  console.log("PASS: bounded Gmail search and compact owned context")
+  const ask = async (text) => {
+    await page.getByLabel("Your request").fill(text)
+    await page
+      .getByRole("button", { name: "Send request", exact: true })
+      .click()
   }
-  await page.getByLabel("Request type").selectOption("compose")
-  await page.getByLabel("Recipient", { exact: true }).fill("alex@example.test")
-  await page
-    .getByLabel("Your request")
-    .fill(
-      "Write Alex a short email thanking them for the project update. Say I will review it tomorrow."
-    )
-  await page.getByRole("button", { name: "Submit", exact: true }).click()
-  await expect(page.locator('textarea[aria-label="Message"]')).toHaveCount(2, {
+  await ask("Summarise this thread.")
+  await expect(page.getByLabel("summary result")).toHaveCount(1, {
     timeout: 180000
   })
-  console.log("PASS: live independent compose while a thread is selected")
+  console.log("PASS: automatic summary routing")
+  await ask("Make it shorter")
+  await expect(page.getByLabel("summary result")).toHaveCount(2, {
+    timeout: 180000
+  })
+  console.log("PASS: summary refinement keeps original source")
+  await ask("What is the order total in this email?")
+  await expect(page.getByLabel("answer result")).toBeVisible({
+    timeout: 180000
+  })
+  console.log("PASS: grounded question in the same conversation")
+  await ask("Draft a short thank-you reply for the order confirmation.")
+  await expect(page.locator(".clarification")).toBeVisible({ timeout: 180000 })
+  const replyChoice = page.getByLabel("Reply to", { exact: true })
+  if (await replyChoice.count()) {
+    const option = await replyChoice
+      .locator("option")
+      .nth(1)
+      .getAttribute("value")
+    await replyChoice.selectOption(option)
+  }
+  // Test-only recipient. Draft generation cannot send, and no approval is exercised.
+  const email = page.getByLabel("Email address", { exact: true })
+  if (await email.count()) await email.fill("supplier@example.test")
+  await page.getByRole("button", { name: "Continue request" }).click()
+  await expect(page.locator(".draft-body")).toHaveCount(1, { timeout: 180000 })
+  console.log("PASS: contextual reply clarification and readable draft")
+  await page.getByRole("button", { name: "Add context", exact: true }).click()
+  await page.getByRole("button", { name: "Remove email context" }).click()
+  await ask(
+    "Write Alex a short email thanking them for the project update. Say I will review it tomorrow."
+  )
+  await expect(
+    page.getByText("Who should this go to?", { exact: true })
+  ).toBeVisible({ timeout: 180000 })
+  await ask("alex@example.test")
+  await expect(page.locator(".draft-body")).toHaveCount(2, { timeout: 180000 })
+  console.log(
+    "PASS: new-email recipient answered in chat, with no mail source attached"
+  )
+  await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
@@ -115,7 +126,11 @@ try {
   await expect(page.getByLabel("Timezone", { exact: true })).toBeVisible({
     timeout: 45000
   })
-  console.log("PASS: live Calendar list; no preferences changed")
+  await page
+    .getByRole("button", { name: "Close settings", exact: true })
+    .click()
+  await expect(page.locator(".draft-body")).toHaveCount(2)
+  console.log("PASS: Calendar settings preserve the conversation")
   console.log(
     "LIVE_FRONTEND_SMOKE_PASSED; no messages sent, events created, or mailbox imported"
   )
