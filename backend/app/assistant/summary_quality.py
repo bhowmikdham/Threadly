@@ -7,9 +7,9 @@ from pydantic import Field, model_validator
 
 from app.api.errors import ApiError
 from app.assistant import summary, summary_policy, summary_policy_v1, summary_policy_v1_0_1
-from app.model_client.structured import reject_duplicate_keys
+from app.model_client.structured import json_object
 
-RELEASE = "summary-quality-task-1.0.0"
+RELEASE = "summary-quality-task-1.1.0"
 
 
 def words(value: str) -> int:
@@ -49,7 +49,7 @@ def contract_hash(policy=None) -> str:
                 policy.ITEM_WORDS,
                 policy.TOTAL_WORDS,
             ],
-            "validation": "bounded-nonrepeating-fields-native-source-validation-v1",
+            "validation": "bounded-nonrepeating-fields-native-source-validation-json-envelope-v2",
         }
     )
 
@@ -91,8 +91,7 @@ def make_prompt(snapshot: dict, instruction: str, *, policy=None) -> str:
 
 
 def make_artifact(text: str, context_id: str, snapshot: dict) -> dict:
-    if len(text) > 16000:
-        raise ValueError("Summary output too large")
-    ConciseSummary.model_validate(json.loads(text, object_pairs_hook=reject_duplicate_keys))
+    value = json_object(text, max_chars=16000)
+    ConciseSummary.model_validate(value)
     # Stable frontend shape and backend-owned evidence/coverage; no model assumptions.
-    return summary.make_artifact(text, context_id, snapshot)
+    return summary.make_artifact(json.dumps(value), context_id, snapshot)

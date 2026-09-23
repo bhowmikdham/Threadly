@@ -100,6 +100,13 @@ async def workflow_configuration(user_id: CurrentUser) -> dict:
             "page_size": mail_search.PAGE_SIZE,
             "external_actions": False,
         },
+        "grounded_answers": {
+            "installed": True,
+            "operation": "lookup_entity",
+            "scope": "selected_thread_excerpts",
+            "answer_style": "verified_source_quotes",
+            "external_actions": False,
+        },
         "read_actions": {
             "release": reads.RELEASE,
             "operations": ["help", "search_mail", "transform_text"],

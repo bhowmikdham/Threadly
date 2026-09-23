@@ -74,26 +74,16 @@ def test_help_describes_current_workflows_without_promising_write_access():
 def test_live_replay_pins_current_prompt_schemas_and_cases():
     from pathlib import Path
 
-    from app.assistant import routing
-    from app.assistant.summary import digest
-    from app.planner.evaluate_routing import CASES, REPLAY_VERSION
+    from app.planner.evaluate_thread_fixes import assets
 
     evidence = json.loads(
-        (Path(__file__).parents[2] / "docs/evaluation/compose-routing-live-v1.json").read_text()
+        (Path(__file__).parents[2] / "docs/evaluation/grounded-thread-live-v1.json").read_text()
     )
-    assert evidence["replay"] == REPLAY_VERSION
-    assert evidence["cases_hash"] == digest(CASES)
-    current = routing.release_manifest()
-    # Deployment-specific model/configuration hashes differ in offline fixtures.
-    for key in (
-        "router_version",
-        "routing_prompt_hash",
-        "routing_schema_hash",
-        "draft_release",
-        "draft_prompt_hash",
-        "draft_schema_hash",
-    ):
-        assert evidence["routing_release"][key] == current[key]
-    assert len(evidence["routes"]) == 7 and all(r["passed"] for r in evidence["routes"])
-    assert evidence["draft_passed"]
+    for key, value in assets().items():
+        assert evidence[key] == value
+    assert len(evidence["routes"]) == 6 and all(r["passed"] for r in evidence["routes"])
+    assert all(
+        evidence[k]
+        for k in ("summary_passed", "reply_passed", "answer_passed", "absent_fact_passed")
+    )
     assert not evidence["external_actions"] and not evidence["mailbox_read"]

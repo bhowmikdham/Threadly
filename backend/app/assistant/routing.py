@@ -3,7 +3,7 @@
 import json
 import re
 
-from app.assistant import drafting
+from app.assistant import drafting, grounded_answer
 from app.assistant.summary import PROMPT, digest, make_prompt
 from app.assistant.summary import release_manifest as summary_release
 from app.config import get_settings
@@ -11,7 +11,7 @@ from app.planner.intent_prompt import INSTRUCTIONS, ROUTER_VERSION
 from app.planner.intent_router import propose_route, require_context
 from app.schemas.assistant import RouteDecision, RouteParameters, RoutePreviewRequest
 
-RELEASE = "contextual-task-1.1.0"
+RELEASE = "contextual-task-1.2.0"
 CONTEXT_POLICY = """This is a durable request. The backend supplies CONTEXT_CAPABILITIES_JSON.
 A saved_thread_excerpts capability binds 'this thread/email' to ONE saved thread.
 It does not bind another thread, an inbox position or selected text.
@@ -29,7 +29,12 @@ may contain tone but must not invent addresses or other facts. Do not reduce a q
 about one message to a whole-thread summary.
 No source body or provider IDs are supplied to this classifier. context_snapshot_id
 must remain null; the backend binds it after validation. This capability description
-supersedes the earlier statement that no trusted context is supplied.
+is authoritative. Examples with saved_thread_excerpts=true:
+- "How much did I pay for this order?" -> other, answer, [lookup_entity], ready.
+- With reply_target=true and recipients=true, "Draft a short reply thanking the
+  supplier" -> reply, draft, [draft_reply], ready. Do not ask for a target again.
+Do not discard operations or change output_kind to clarification when missing a
+precondition; retain the intended result type and put the question in clarification.
 """
 SUMMARY_POLICY = """Follow the user's summary preferences only within the summary contract.
 Use only the saved excerpts below. Never perform another workflow, expand source
@@ -61,6 +66,8 @@ def release_manifest() -> dict:
         "draft_release": drafting.RELEASE,
         "draft_prompt_hash": digest(drafting.PROMPT),
         "draft_schema_hash": digest(drafting.GeneratedDraft.model_json_schema()),
+        "reply_schema_hash": digest(drafting.GeneratedReplyDraft.model_json_schema()),
+        "grounded_answer": grounded_answer.release_manifest(),
     }
 
 
@@ -150,6 +157,7 @@ def dispatch_outcome(
         ("summarise", "summary", ("summarise_thread",)),
         ("reply", "draft", ("draft_reply",)),
         ("compose", "draft", ("draft_new",)),
+        ("other", "answer", ("lookup_entity",)),
     }
     if (
         d.intent,
@@ -162,7 +170,7 @@ def dispatch_outcome(
         params["tone"] = None  # Style is carried by original instruction, never applied as a tool.
     if params != d.parameters.empty().model_dump():
         return "unsupported", "workflow_parameters_not_available"
-    if d.intent == "summarise":
+    if d.intent in {"summarise", "other"}:
         if snapshot is None or not snapshot.get("messages"):
             return "failed", "context_empty"
         if draft_input is not None:

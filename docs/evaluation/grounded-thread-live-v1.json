@@ -1,0 +1,64 @@
+{
+  "replay": "grounded-thread-replay-1.0",
+  "cases_hash": "c8214b1082dc04cd73a5eb4a7acc38eaba50b15bb1c9712936a6c90c386f1a47",
+  "routing_release": {
+    "workflow": "contextual-task-1.2.0",
+    "router_version": "intent-preview-1.3.0",
+    "routing_prompt_hash": "3c6bc58fe0e8514f023e707203c132a7c305e1e80721eb7de06e6671f6a80280",
+    "routing_schema_hash": "3ffc195d2780484238d2f21d34798373b00b8b3c475e88bbd89c09c8587bfff2",
+    "draft_release": "draft-artifact-1.2.0",
+    "draft_prompt_hash": "a3db2f8e2957c2b01752121ecc0fb6e4d7138f4a05f378508544ff6a097ce671",
+    "draft_schema_hash": "aee42b960aab9a273013b98e418f06ce6af903c7a50d86799f9a7d77f4a5a158",
+    "reply_schema_hash": "412d1c884b3d4cf7efab6f57088a8dda0c746a226b0c137518a7bc3fc81a0ed9",
+    "grounded_answer": {
+      "workflow": "grounded-answer-1.0.0",
+      "prompt_hash": "6ba2e52ad993dc999db789c11fb52e6d84ec5be71f5a2228da537257680c61db",
+      "schema_hash": "71290c7d925cd5cde746709f0ab7fbfef3af297305a13a0b1b2d314ef9b2990f",
+      "validation": "exact-source-span-whitespace-only-v1"
+    }
+  },
+  "summary_contract": "7272c6453b34d445a25f06d986bec01d1364f42b4a3488d2be57b48fd2a9962a",
+  "summary_release": "summary-quality-task-1.1.0",
+  "provider": "bedrock",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "routes": [
+    {
+      "case": "summary",
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": "summary",
+      "repeat": 1,
+      "passed": true
+    },
+    {
+      "case": "reply",
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": "reply",
+      "repeat": 1,
+      "passed": true
+    },
+    {
+      "case": "answer",
+      "repeat": 0,
+      "passed": true
+    },
+    {
+      "case": "answer",
+      "repeat": 1,
+      "passed": true
+    }
+  ],
+  "summary_passed": true,
+  "reply_passed": true,
+  "answer_passed": true,
+  "absent_fact_passed": true,
+  "mailbox_read": false,
+  "external_actions": false,
+  "ssm_command_id": "56788239-25d7-4e5a-bbf3-533ef9f568f6",
+  "scope": "Synthetic selected-thread replay, not broad accuracy or provider-write acceptance."
+}

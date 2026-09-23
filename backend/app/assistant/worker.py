@@ -10,6 +10,7 @@ from app.api.errors import ApiError
 from app.assistant import (
     continuation,
     drafting,
+    grounded_answer,
     lookup_draft,
     reads,
     routing,
@@ -58,7 +59,8 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
         async with factory.begin() as session:
             await finish(session, claim, error_code="legacy_source_retired", retryable=False)
         return True
-    if source_data.is_reference(claim.snapshot):
+    source_reference = claim.snapshot if source_data.is_reference(claim.snapshot) else None
+    if source_reference:
         try:
             source = await source_data.fetch(claim.user_id, claim.snapshot["thread_id"])
             claim = replace(claim, snapshot=source_data.materialize(claim.snapshot, source))
@@ -182,9 +184,16 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                         and not previous
                         and route["decision"]["intent"] in {"reply", "compose"}
                     )
-                    stage = "draft" if is_draft else "summary"
+                    is_answer = (
+                        not binding
+                        and route is not None
+                        and route["decision"]["operations"] == ["lookup_entity"]
+                    )
+                    stage = "answer" if is_answer else "draft" if is_draft else "summary"
                     mode = "reply" if is_draft and route["decision"]["intent"] == "reply" else "new"
-                    if is_draft:
+                    if is_answer:
+                        prompt = grounded_answer.make_prompt(snapshot, claim.instruction)
+                    elif is_draft:
                         prompt = drafting.make_prompt(
                             claim.instruction, claim.snapshot, claim.draft_input, mode
                         )
@@ -206,7 +215,7 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                     operation = "draft_reply" if mode == "reply" else "draft_new"
                     if not is_draft:
                         operation = "summarise_thread"
-                    entry = manifest.operations[operation] if manifest else None
+                    entry = manifest.operations[operation] if manifest and not is_answer else None
                     if isinstance(entry, registry.FlowEntry):
                         result = await (flow_invoker or FlowInvoker()).invoke(entry, prompt)
                         text = result.text
@@ -221,7 +230,9 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                             "release": claim.release,
                         }
                     payload = (
-                        drafting.make_artifact(text, claim, mode)
+                        grounded_answer.make_artifact(text, claim.context_id, snapshot)
+                        if is_answer
+                        else drafting.make_artifact(text, claim, mode)
                         if is_draft
                         else (summary_quality.make_artifact if concise else make_artifact)(
                             text, claim.context_id, snapshot
@@ -238,12 +249,24 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                 "routing": "invalid_route_output",
                 "draft": "invalid_draft_output",
                 "summary": "invalid_summary_output",
+                "answer": "invalid_answer_output",
             }[stage]
         except SQLAlchemyError:
             raise  # Checkpoint failure belongs to durable lease recovery, not model failure.
         except Exception:
             # Never log source content, prompt text or provider error bodies.
             error = "routing_failed" if stage == "routing" else "generation_failed"
+    if payload is not None and source_reference:
+        # Re-read outside the publication transaction. A model call may outlive a
+        # changed/deleted email or revoked Google connection; cached source is insufficient.
+        from app.mail import live
+
+        try:
+            current_source = await live.thread(claim.user_id, source_reference["thread_id"])
+            source_data.materialize(source_reference, current_source)
+        except ApiError as exc:
+            payload = None
+            error, retryable = exc.code, exc.status == 503
     if payload is not None and provenance is not None and claim.continuation_release:
         provenance = {
             **provenance,
