@@ -116,9 +116,10 @@ own change. These tools are development dependencies, not shipped service code.
 ### Recorded verification — 23 September 2026
 
 - Frontend: TypeScript check passed; **41 tests passed**; production build passed.
-- Packaged Chromium extension: **3 acceptance scenarios passed** (summary →
+- Packaged Chromium extension: **4 acceptance scenarios passed** (summary →
   question → edited reply → exact preview → reopen existing action; confirmed
-  workflow → slots; preferences/history/logout). No real providers used in these
+  workflow → slots; preferences/history/logout; disconnected login displays
+  connection recovery instructions without opening Google). No real providers used in these
   deterministic browser tests.
 - Live built extension → SSM → EC2 → Google/Bedrock: **passed** bounded GYG search,
   selected summary, “What is the order total in this email?”, reply draft,

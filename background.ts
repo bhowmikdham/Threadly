@@ -63,6 +63,22 @@ async function transport(
     cache: "no-store",
     redirect: "error",
     signal: AbortSignal.timeout(150000)
+  }).catch((error: unknown) => {
+    const timedOut =
+      error instanceof DOMException && error.name === "TimeoutError"
+    const local = ["127.0.0.1", "localhost"].includes(new URL(origin).hostname)
+    const message = timedOut
+      ? "The backend took too long to respond."
+      : `Cannot reach the Threadly backend at ${origin}.`
+    const recovery = local
+      ? "Keep the EC2 connection terminal open and check that the server is running."
+      : "Check your connection and the server address in Settings."
+    throw Object.assign(
+      new Error(
+        `${message} ${recovery}${jwt ? " Check task or action status before submitting again; a request may still be processing." : " Then try Sign in again."}`
+      ),
+      { code: timedOut ? "backend_timeout" : "backend_unreachable" }
+    )
   })
   const text = await response.text()
   let data: any

@@ -119,6 +119,10 @@ test.beforeAll(async () => {
     const body = raw ? JSON.parse(raw) : undefined
     const p = req.url!.split("?")[0]
     calls.push({ path: req.url!, body })
+    if (p === "/auth/google/begin") {
+      req.socket.destroy()
+      return
+    }
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
@@ -410,4 +414,20 @@ test("settings use real capability and versioned preference contracts; history s
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
   ).toBeVisible()
+})
+
+test("disconnected backend gives actionable login recovery without opening Google", async () => {
+  const pageCount = context.pages().length
+  await page.getByRole("button", { name: "Sign in with Google" }).click()
+  await expect(page.getByRole("alert")).toContainText(
+    "Cannot reach the Threadly backend"
+  )
+  await expect(page.getByRole("alert")).toContainText(
+    "Keep the EC2 connection terminal open"
+  )
+  await expect(page.getByRole("alert")).not.toContainText("Failed to fetch")
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" })
+  ).toBeEnabled()
+  expect(context.pages()).toHaveLength(pageCount)
 })
