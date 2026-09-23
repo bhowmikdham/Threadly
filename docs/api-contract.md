@@ -723,3 +723,21 @@ a separately chosen target as the single `selected_message_ids` entry.
 The reference contract hash changes with this release. Already completed artifacts
 remain readable; pending tasks/questions pinned to the old reference contract must
 be resubmitted rather than silently run under different interpretation rules.
+
+### Conversational recipient questions (2026-09-23)
+
+Router release `intent-preview-1.3.1` normalizes only `recipient_email`,
+`recipient_address` and `recipients` missing-field labels to the existing
+`recipient` precondition. A compose request without an authoritative recipient
+envelope now opens the existing typed `recipients` question instead of failing
+with `clarification_fields_unavailable`. It never derives an address from a
+name or from email content. Already bound recipients clear that precondition;
+unknown missing fields and exact saved-action review requirements remain intact.
+
+The prompt and schema are unchanged. Six alias/envelope replays, an unknown-field
+and action-review regression, and a PostgreSQL task/worker/question regression
+cover the change. The committed synthetic Bedrock receipt was rerun on this router
+release (six route checks, summary, reply, present/absent factual answers and two
+compose checks); it is not a mailbox-wide or external-write acceptance claim.
+Pending jobs pinned to an unavailable older release fail closed and must be
+resubmitted. Completed artifacts remain readable.

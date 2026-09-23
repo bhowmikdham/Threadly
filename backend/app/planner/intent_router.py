@@ -52,6 +52,14 @@ _COMBINATIONS = {
     ("lookup_commitments", "draft_reply"),
 }
 
+# Explicit semantic aliases observed in model output. These name a missing input;
+# they never supply an address, resolve a person, or authorize an external action.
+_MISSING_FIELD_ALIASES = {
+    "recipient_email": "recipient",
+    "recipient_address": "recipient",
+    "recipients": "recipient",
+}
+
 
 def parse_decision(text: str) -> RouteDecision:
     """Validate one bounded object without repairing fields or guessing routes."""
@@ -87,9 +95,10 @@ def require_context(
     """Deterministic preconditions; a snapshot binds source text, never a reply/action target."""
     if decision.status == "unsupported":
         return decision
+    fields = [_MISSING_FIELD_ALIASES.get(field, field) for field in decision.missing_fields]
     missing = [
         field
-        for field in decision.missing_fields
+        for field in fields
         if not (
             (has_source and field == "source_context")
             or (has_reply_target and field == "reply_target")
