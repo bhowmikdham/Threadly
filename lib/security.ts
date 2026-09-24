@@ -33,6 +33,16 @@ export function allowedPath(path: string) {
     !/%(?:2f|5c|2e)/i.test(path)
   )
 }
+export function allowedRequest(path: string, method: string) {
+  if (!allowedPath(path)) return false
+  if (["GET", "POST", "PUT"].includes(method)) return true
+  return (
+    method === "DELETE" &&
+    /^\/assistant\/conversations\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+      path
+    )
+  )
+}
 export function trustedSender(
   sender: { id?: string; url?: string; tab?: unknown },
   id: string

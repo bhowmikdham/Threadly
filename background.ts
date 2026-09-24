@@ -1,5 +1,5 @@
 import {
-  allowedPath,
+  allowedRequest,
   backendOrigin,
   base64url,
   callbackCode,
@@ -49,7 +49,7 @@ async function transport(
   body?: unknown,
   jwt?: string
 ) {
-  if (!allowedPath(path) || !["GET", "POST", "PUT"].includes(method))
+  if (!allowedRequest(path, method))
     throw new Error("Unsupported backend request.")
   const response = await fetch(origin + path, {
     method,

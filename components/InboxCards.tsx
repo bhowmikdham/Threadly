@@ -44,14 +44,31 @@ export function InboxCards({
   controller: any
 }) {
   const page = entry.inbox
-  const dates = [page.filters.received_from, page.filters.received_before].map(
-    (x) =>
+  if (
+    !page ||
+    !page.filters ||
+    !Array.isArray(page.results) ||
+    page.results.some(
+      (mail) =>
+        !mail ||
+        typeof mail.message_id !== "string" ||
+        typeof mail.thread_id !== "string"
+    )
+  )
+    return (
+      <p className="warning" role="alert">
+        These email results could not be displayed. Please run the search again.
+      </p>
+    )
+  const dates = [page.filters.received_from, page.filters.received_before]
+    .filter((x) => typeof x === "string" && !Number.isNaN(Date.parse(x)))
+    .map((x) =>
       new Date(x).toLocaleDateString(undefined, {
         day: "numeric",
         month: "short",
         year: "numeric"
       })
-  )
+    )
   return (
     <section className="inbox-results" aria-label="Email results">
       <p className="inbox-intro">
@@ -59,14 +76,16 @@ export function InboxCards({
           ? `Here ${page.results.length === 1 ? "is" : "are"} ${page.results.length} matching ${page.results.length === 1 ? "email" : "emails"}.`
           : "I didn’t find any matching emails in these dates."}
       </p>
-      <p className="inbox-scope">
-        {dates.join(" – ")}
-        {page.filters.folder === "INBOX"
-          ? " · Inbox"
-          : page.filters.folder === "SENT"
-            ? " · Sent"
-            : ""}
-      </p>
+      {dates.length > 0 && (
+        <p className="inbox-scope">
+          {dates.join(" – ")}
+          {page.filters.folder === "INBOX"
+            ? " · Inbox"
+            : page.filters.folder === "SENT"
+              ? " · Sent"
+              : ""}
+        </p>
+      )}
       <div className="mail-card-list">
         {page.results.map((mail, i) => {
           const selected = controller.selection?.targetId === mail.message_id
@@ -123,7 +142,7 @@ export function InboxCards({
           )
         })}
       </div>
-      {page.next_cursor && (
+      {page.next_cursor && controller.canPage(entry) && (
         <button
           className="show-more-mail"
           disabled={controller.busy}

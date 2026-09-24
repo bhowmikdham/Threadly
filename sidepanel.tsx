@@ -275,8 +275,8 @@ function Assistant({
       setRecording(false)
     }
   }
-  const newChat = () => {
-    c.newChat()
+  const newChat = async () => {
+    await c.newChat()
     setHistory(null)
     setContextOpen(false)
     setMessage("")
@@ -308,7 +308,7 @@ function Assistant({
           aria-label="New chat"
           title="New chat"
           disabled={c.busy}
-          onClick={newChat}>
+          onClick={() => void newChat()}>
           <Icon name="edit" />
         </button>
       </header>
@@ -323,13 +323,27 @@ function Assistant({
               <Icon name="close" />
             </button>
           </div>
-          <button onClick={newChat} disabled={c.busy}>
+          <button onClick={() => void newChat()} disabled={c.busy}>
             <Icon name="edit" />
             New conversation
           </button>
+          <button
+            disabled={c.busy}
+            onClick={async () => {
+              if (
+                window.confirm(
+                  "Delete this conversation? Existing tasks and drafts will remain in Recent work."
+                )
+              ) {
+                await c.deleteChat()
+                setMenu(false)
+              }
+            }}>
+            Delete this conversation
+          </button>
           <button onClick={() => void historyPage()}>
             <Icon name="clock" />
-            History
+            Recent work
           </button>
           <button
             onClick={() => {
@@ -372,7 +386,7 @@ function Assistant({
         {history && (
           <section className="history-surface">
             <div className="card-heading">
-              <h2>Recent conversations</h2>
+              <h2>Recent work</h2>
               <button
                 className="icon-button"
                 aria-label="Close history"
@@ -381,7 +395,9 @@ function Assistant({
               </button>
             </div>
             {history.length === 0 && (
-              <p>Your conversations will appear here.</p>
+              <p>
+                Your generated drafts, summaries and plans will appear here.
+              </p>
             )}
             {history.map((t) => (
               <button
@@ -490,6 +506,25 @@ function Assistant({
         </p>
       )}
       <div className="composer-wrap">
+        {c.contextBlocked && (
+          <div className="context-recovery" role="alert">
+            <div>
+              <b>Email context needs attention</b>
+              <span>
+                The email saved with this conversation changed or is no longer
+                available.
+              </span>
+            </div>
+            <button
+              disabled={c.busy}
+              onClick={() => void c.selectActive()}>
+              Use open email
+            </button>
+            <button disabled={c.busy} onClick={c.clearContext}>
+              Continue without email
+            </button>
+          </div>
+        )}
         {sources && (
           <div className="source-menu" aria-label="Add context">
             <button

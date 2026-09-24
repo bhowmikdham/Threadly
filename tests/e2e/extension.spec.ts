@@ -118,8 +118,31 @@ test.beforeAll(async () => {
     let raw = ""
     for await (const chunk of req) raw += chunk
     const body = raw ? JSON.parse(raw) : undefined
-    const p = req.url!.split("?")[0]
-    calls.push({ path: req.url!, body })
+    let p = req.url!.split("?")[0]
+    const conversational = p === "/assistant/conversation-turns"
+    const originalTurn = conversational ? { ...body } : null
+    calls.push({ path: req.url!, body: body ? structuredClone(body) : body })
+    if (conversational) {
+      // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
+      if (
+        body.instruction === "hey" ||
+        (/^show.*emails/i.test(body.instruction) &&
+          !/next page/.test(body.instruction))
+      )
+        p = "/assistant/inbox-chat"
+      else if (/next page/.test(body.instruction))
+        p = "/assistant/inbox-search-page"
+      else if (body.instruction === "alex@example.test") {
+        const t = tasks.get(body.active_task_id)
+        p = `/assistant/tasks/${t.task_id}/inputs`
+        body.question_id = t.question.question_id
+        body.answer = { recipients: ["alex@example.test"] }
+      } else {
+        p = "/assistant/requests"
+        if (body.instruction === "Make it shorter")
+          body.intent_hint = "summarise"
+      }
+    }
     if (p === "/auth/google/begin") {
       req.socket.destroy()
       return
@@ -183,7 +206,13 @@ test.beforeAll(async () => {
       else data = { kind: "continue" }
     } else if (p === "/assistant/inbox-search-page")
       data = {
-        filters: body.filters,
+        filters: body.filters || {
+          schema_version: "1.0",
+          query: "receipt",
+          folder: "all_mail",
+          received_from: "2026-01-01T00:00:00Z",
+          received_before: "2026-10-01T00:00:00Z"
+        },
         results: [
           {
             message_id: "older",
@@ -409,6 +438,17 @@ test.beforeAll(async () => {
         error: { code: "not_found", message: "Unexpected test route " + p }
       }
     }
+    if (conversational) {
+      data = {
+        ...(data.task_id
+          ? { kind: "task", text: "", task: data }
+          : p === "/assistant/inbox-search-page"
+            ? { kind: "message", text: "Here are more results.", search: data }
+            : data),
+        conversation_id: originalTurn.conversation_id,
+        version: originalTurn.expected_version + 1
+      }
+    }
     res.end(JSON.stringify(data))
   })
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r))
@@ -514,10 +554,10 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page.getByLabel("Your request").press("Enter")
   await expect(page.getByLabel("summary result")).toHaveCount(2)
   const refinement = calls
-    .filter((c) => c.path === "/assistant/requests")
+    .filter((c) => c.path === "/assistant/conversation-turns")
     .at(-1).body
   expect(refinement.context_snapshot_id).toBe("ctx-1")
-  expect(refinement.instruction).toContain("Summarise this thread.")
+  expect(refinement.active_task_id).toBeTruthy()
   expect(refinement.instruction).toContain("Make it shorter")
   await page.screenshot({
     animations: "disabled",
@@ -553,7 +593,7 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "History", exact: true }).click()
+  await page.getByRole("button", { name: "Recent work", exact: true }).click()
   await page
     .getByRole("button", { name: /Draft a reply to this thread/ })
     .click()
@@ -586,16 +626,19 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   await expect(
     page.getByText("Who should this go to?", { exact: true })
   ).toBeVisible()
-  const count = calls.filter((c) => c.path === "/assistant/requests").length
+  const count = calls.filter(
+    (c) => c.path === "/assistant/conversation-turns"
+  ).length
   await page.getByLabel("Your request").fill("alex@example.test")
   await page.getByLabel("Your request").press("Enter")
   await expect(page.locator(".draft-body")).toBeVisible()
-  expect(calls.filter((c) => c.path === "/assistant/requests")).toHaveLength(
-    count
-  )
   expect(
-    calls.filter((c) => c.path.endsWith("/inputs")).at(-1).body.answer
-  ).toEqual({ recipients: ["alex@example.test"] })
+    calls.filter((c) => c.path === "/assistant/conversation-turns")
+  ).toHaveLength(count + 1)
+  expect(
+    calls.filter((c) => c.path === "/assistant/conversation-turns").at(-1).body
+      .instruction
+  ).toEqual("alex@example.test")
   await page.setViewportSize({ width: 320, height: 640 })
   await expect(page.getByRole("button", { name: "Send request" })).toBeVisible()
   expect(
@@ -625,11 +668,11 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "History", exact: true }).click()
+  await page.getByRole("button", { name: "Recent work", exact: true }).click()
   await expect(
     page
-      .getByRole("heading", { name: "Recent conversations" })
-      .or(page.getByText("Recent conversations", { exact: true }))
+      .getByRole("heading", { name: "Recent work" })
+      .or(page.getByText("Recent work", { exact: true }))
   ).toBeVisible()
   await expect(
     page.getByRole("button", { name: /Draft a reply/ }).first()
