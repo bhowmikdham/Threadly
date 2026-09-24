@@ -1,8 +1,19 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.4`. Feature switch:
+Implementation release: `contextual-conversation-1.1.5`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. Release `1.1.4` adds bounded batch reads and a dense-search case in
+`c23026e9a039`. Release `1.1.5` keeps search and reads on demand, makes the
+quoted Gmail search behavior explicit to the model, and returns a latest-request
+answer for correction when it cites an older result while newer returned cards
+remain unread, even if the answer avoids rank wording. It also gives specific citation/coverage feedback on invalid
+answers, preserves only verified current-search citations in a tool-budget
+fallback, and evaluates an ambiguous newer purchase against an older obvious
+receipt. Its paced, two-trial synthetic Bedrock replay passed **36/36** checks
+with no quality or availability failures; the sanitized
+[receipt](evaluation/contextual-conversation-live-v5.json) pins the prompt, tool
+and case hashes. Synthetic results do not establish general inbox accuracy.
+
+Release `1.1.4` added bounded batch reads and a dense-search case in
 which an order is behind a page of promotions. Its paced, two-trial synthetic Bedrock
 evaluation passed **34/34** checks; the sanitized
 [receipt](evaluation/contextual-conversation-live-v4.json) pins the prompt, tool and
@@ -60,6 +71,9 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   control for a different visible email.
 - Each search page returns up to five candidates from one bounded Gmail query. Gmail may
   match headers as well as message text, and local bounds may leave fewer than five cards.
+  The query literal is quoted as an exact phrase. For a merchant-order request, the
+  model starts with the user-supplied merchant term alone so a receipt that uses
+  “purchase” rather than “order” is not excluded by an overly narrow phrase.
   The coordinator can inspect up to five current `mail-N` candidates in one bounded
   `read_search_results` call, or read one candidate more fully. The batch returns at most
   2,000 body characters per message, cites only returned text and never widens a search
@@ -69,6 +83,16 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   The response validator returns common unqualified “latest order/email” claims to the
   model for correction when current or retained search coverage is incomplete. This is
   a narrow boundary check, not a general semantic verifier.
+- When the user asks for the latest result, any answer citing a searched message
+  is checked against newer returned cards, regardless of its rank wording. If a
+  newer card has not been read, the model is asked to inspect it. A source-free
+  direct clarifying question can finish without that read. A follow-up that claims
+  a rank also receives this check and must cite a verified current-turn read;
+  retained search references alone are not evidence. Follow-ups use the retained
+  displayed result order because card text and dates are not saved. These checks do not classify
+  order status or assert that the search covered the entire mailbox; source-based
+  claims still need exact read quotes. Uncited clarifications cannot assert what
+  the mailbox contains.
 - Search defaults to the past year, with an explicit window of at most 366 days. Search
   literals/folder/date wording must come from user dialogue. Provider cursors remain signed
   and account-bound. At most 25 addressable references are retained for one search;
@@ -78,7 +102,9 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   resets the card list; card text is not stored in conversation state.
 - If the model reaches its tool/transcript budget after a search, the API returns the
   current bounded search cards with a limited-coverage explanation instead of losing
-  them to `conversation_tool_limit`. It never invents an order or claims a complete search.
+  them to `conversation_tool_limit`. Only exact citations already verified from those
+  current search cards may accompany the fallback; an unrelated pinned email is excluded.
+  It never invents an order or claims a complete search.
   A tool-limit error can still occur when no search results are available to present.
 - `mail-1`, `mail-2`, etc. preserve displayed search order. Tools accept these references,
   not model-invented provider IDs. A new search replaces the old result set.
@@ -194,8 +220,11 @@ responses.
 ```mermaid
 flowchart LR
   A[Find my latest GYG order] --> B[Search GYG on demand]
-  B --> C[Read plausible order result]
-  C --> D[Answer with evidence and recent email cards]
+  B --> C[Read newer ambiguous cards and candidate orders]
+  C --> V{Confirmed order and newer returned cards checked?}
+  V -->|Yes| D[Answer with exact source evidence and recent email cards]
+  V -->|No, more within bounds| C
+  V -->|Cannot finish| Q[Ask for narrower details or show limited-coverage cards]
   D --> E[Should I reply?]
   E --> F[Read pinned or referenced message]
   F --> G[Recommend no reply if evidence supports that]

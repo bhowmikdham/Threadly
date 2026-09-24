@@ -95,6 +95,58 @@ def test_latest_order_can_use_a_bounded_batch_read():
     )
 
 
+def test_ambiguous_newer_order_requires_merchant_query_read_citation_and_qualified_rank():
+    case = _case("merchant_order_ambiguous_newer")
+    calls = [
+        _call("search_mail", query="GYG"),
+        _call("read_search_results", references=["mail-1", "mail-2"]),
+    ]
+    grounded = _response(
+        "message",
+        "I found GYG purchase 3344 among the results I checked.",
+        evidence=[{"reference": "mail-1", "quote": "Purchase 3344 was confirmed."}],
+    )
+
+    assert evaluate.grade(case, grounded, calls) == []
+    assert "wrong_merchant_search_query" in evaluate.grade(
+        case, grounded, [_call("search_mail", query="GYG order"), calls[1]]
+    )
+    assert "newer_order_source_not_read" in evaluate.grade(
+        case, grounded, [calls[0], _call("read_email", reference="mail-2")]
+    )
+    assert "newer_order_missing_cited_evidence" in evaluate.grade(
+        case, _response("message", grounded["text"]), calls
+    )
+    assert "newer_order_contradicted" in evaluate.grade(
+        case,
+        _response(
+            "message",
+            "I found purchase 3344, but it was only a promotion and not an order.",
+            evidence=grounded["evidence"],
+        ),
+        calls,
+    )
+    assert "older_order_ranked_latest" in evaluate.grade(
+        case,
+        _response(
+            "message",
+            "The latest GYG order I found in this search is #2241. "
+            "The newer update mentions purchase 3344 but its receipt is in the app.",
+            evidence=grounded["evidence"],
+        ),
+        calls,
+    )
+    assert "incomplete_search_overclaim" in evaluate.grade(
+        case,
+        _response(
+            "message",
+            "Your latest GYG order is 3344.",
+            evidence=grounded["evidence"],
+        ),
+        calls,
+    )
+
+
 def test_ordered_search_reference_can_be_read_in_a_batch_but_must_be_cited():
     case = _case("ordered_reference")
     answer = _response(
@@ -110,6 +162,21 @@ def test_ordered_search_reference_can_be_read_in_a_batch_but_must_be_cited():
     assert "ordered_reference_missing_citation" in evaluate.grade(
         case, _response("message", answer["text"]), calls
     )
+
+
+async def test_ordered_reference_fixture_can_batch_read_retained_results_without_new_search():
+    from app.schemas.conversation import ReadSearchResults
+
+    case = _case("ordered_reference")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+    assert runtime.search_page is None
+
+    result = await runtime.call(
+        "read_search_results", ReadSearchResults(references=["mail-1", "mail-2"])
+    )
+
+    assert [item["reference"] for item in result["results"]] == ["mail-1", "mail-2"]
+    assert "2241" in runtime.evidence["mail-2"]
 
 
 def test_dense_order_grading_requires_pagination_read_citation_and_qualified_recency():
@@ -136,15 +203,10 @@ def test_dense_order_grading_requires_pagination_read_citation_and_qualified_rec
         ],
     }
     assert evaluate.grade(case, corrected, calls) == []
-    # Promotion subjects/snippets may suffice to continue without inspecting
-    # every first-page body; the order itself still needs a grounded read.
-    assert (
-        evaluate.grade(
-            case,
-            grounded,
-            [calls[0], calls[2], _call("read_email", reference="mail-6")],
-        )
-        == []
+    assert "newer_first_page_not_inspected" in evaluate.grade(
+        case,
+        grounded,
+        [calls[0], calls[2], _call("read_email", reference="mail-6")],
     )
     assert "search_pagination_order" in evaluate.grade(
         case, grounded, [calls[2], calls[0], calls[3]]
@@ -276,6 +338,31 @@ async def test_latest_order_fixture_separates_raw_page_from_model_observation():
     assert "thread_id" not in observation["results"][0]
 
 
+async def test_merchant_order_fixture_is_phrase_sensitive_with_newer_ambiguous_result():
+    from app.schemas.conversation import ReadSearchResults, SearchMail
+
+    case = _case("merchant_order_ambiguous_newer")
+    broad = evaluate.FixtureRuntime(case, case["turns"][0])
+    result = await broad.call("search_mail", SearchMail(query="GYG"))
+    assert result["displayed_result_order"] == ["mail-1", "mail-2"]
+    assert result["results"][0]["subject"] == "GYG rewards update"
+    assert "3344" not in result["results"][0]["snippet"]
+    assert result["results"][0]["received_at"] > result["results"][1]["received_at"]
+    inspected = await broad.call(
+        "read_search_results", ReadSearchResults(references=["mail-1", "mail-2"])
+    )
+    assert "3344" in inspected["results"][0]["messages"][0]["body"]
+    assert "2241" in inspected["results"][1]["messages"][0]["body"]
+
+    narrow = evaluate.FixtureRuntime(case, case["turns"][0])
+    phrase_result = await narrow.call("search_mail", SearchMail(query="GYG order"))
+    assert phrase_result["displayed_result_order"] == ["mail-1"]
+    assert phrase_result["results"][0]["subject"] == "GYG order confirmation"
+    only_match = await narrow.call("read_search_results", ReadSearchResults(references=["mail-1"]))
+    assert "2241" in only_match["results"][0]["messages"][0]["body"]
+    assert "3344" not in only_match["results"][0]["messages"][0]["body"]
+
+
 async def test_dense_latest_order_fixture_requires_a_bounded_second_page():
     from app.schemas.conversation import MoreMail, ReadEmail, ReadSearchResults, SearchMail
 
@@ -300,6 +387,7 @@ async def test_dense_latest_order_fixture_requires_a_bounded_second_page():
     assert second["has_more"] is False
     assert second["displayed_result_order"] == [f"mail-{number}" for number in range(1, 7)]
     assert second["results"][0]["reference"] == "mail-6"
+    assert len(runtime.search_page["results"]) == 6
     order = await runtime.call("read_search_results", ReadSearchResults(references=["mail-6"]))
     assert "2241" in order["results"][0]["messages"][0]["body"]
     assert runtime.evidence["mail-6"] == evaluate.RECEIPT
