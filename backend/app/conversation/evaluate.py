@@ -23,7 +23,14 @@ from app.conversation.runtime import (
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
-RECEIPT_RELEASE = "contextual-conversation-live-v4"
+AMBIGUOUS_NEWER_ORDER = (
+    "GYG rewards update. New menu ideas and member offers are available this week. "
+    "Browse the app for seasonal meals and loyalty rewards. "
+    "More menu ideas and member offers are available this week. "
+    "Browse the app for seasonal meals and loyalty rewards. "
+    "Purchase 3344 was confirmed. Your receipt is available in the app."
+)
+RECEIPT_RELEASE = "contextual-conversation-live-v5"
 CASES = [
     {
         "id": "social_typo",
@@ -50,6 +57,16 @@ CASES = [
         "kinds": ["message"],
         "required": ["search_mail"],
         "words": ["2241"],
+        "forbid": ["prepare_workflow"],
+    },
+    {
+        "id": "merchant_order_ambiguous_newer",
+        "turns": ["Find my latest GYG order"],
+        "search": True,
+        "merchant_rank_search": True,
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "words": ["3344"],
         "forbid": ["prepare_workflow"],
     },
     {
@@ -167,6 +184,7 @@ class FixtureRuntime:
         self.case, self.evidence, self.calls, self.read_scopes = case, {}, [], {}
         self.search_page = None
         self.search_page_index = -1
+        self.search_query = None
         self.result_order = list(case.get("order", []))
         history = case.get("history", [])
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
@@ -176,6 +194,11 @@ class FixtureRuntime:
 
     def _source_text(self, reference):
         sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
+        if self.case.get("merchant_rank_search"):
+            sources = {
+                "mail-1": (AMBIGUOUS_NEWER_ORDER if self.search_query == "gyg" else RECEIPT),
+                "mail-2": RECEIPT,
+            }
         if self.case.get("dense_search"):
             sources = {
                 f"mail-{number}": f"GYG promotion {number}: save on your next order."
@@ -200,6 +223,34 @@ class FixtureRuntime:
         return text
 
     def _search_rows(self):
+        if self.case.get("merchant_rank_search"):
+            older_reference = "mail-2" if self.search_query == "gyg" else "mail-1"
+            older = {
+                "message_id": "fixture-older-order",
+                "thread_id": "fixture-older-thread",
+                "reference": older_reference,
+                "subject": "GYG order confirmation",
+                "sender": "receipts@example.test",
+                "received_at": "2026-09-20T10:00:00Z",
+                "snippet": "GYG order 2241 confirmed",
+                "flight": None,
+            }
+            if self.search_query != "gyg":
+                # The quoted phrase "GYG order" only matches the older receipt.
+                return [older]
+            return [
+                {
+                    "message_id": "fixture-newer-order",
+                    "thread_id": "fixture-newer-thread",
+                    "reference": "mail-1",
+                    "subject": "GYG rewards update",
+                    "sender": "updates@example.test",
+                    "received_at": "2026-09-23T10:00:00Z",
+                    "snippet": " ".join(AMBIGUOUS_NEWER_ORDER.split())[:220],
+                    "flight": None,
+                },
+                older,
+            ]
         if self.case.get("dense_search"):
             if self.search_page_index == 0:
                 return [
@@ -271,6 +322,7 @@ class FixtureRuntime:
                 )
                 if "gyg" not in args.query.casefold():
                     raise ValueError("Only user's GYG literal is available")
+                self.search_query = args.query.casefold()
                 filters = InboxFilters(
                     schema_version="1.0",
                     query=args.query,
@@ -293,9 +345,12 @@ class FixtureRuntime:
                 self.search_page_index += 1
             rows = self._search_rows()
             self.result_order.extend(row["reference"] for row in rows)
+            previous_rows = (
+                self.search_page["results"] if name == "more_mail" and self.search_page else []
+            )
             self.search_page = {
                 "filters": filters,
-                "results": rows,
+                "results": [*previous_rows, *rows],
                 "next_cursor": (
                     "fixture-page-2"
                     if self.case.get("dense_search") and self.search_page_index == 0
@@ -310,7 +365,7 @@ class FixtureRuntime:
             }
             observations = [
                 {k: v for k, v in row.items() if k not in {"message_id", "thread_id"}}
-                for row in self.search_page["results"]
+                for row in rows
             ]
             return {
                 "results": observations,
@@ -327,8 +382,10 @@ class FixtureRuntime:
                 args.references
             ):
                 raise ValueError("Choose one to five distinct search references")
-            if not self.search_page:
-                raise ValueError("Search first")
+            # Production retains displayed references across turns, even though
+            # its search cards and timestamps are transient. Mirror that path.
+            if not self.result_order:
+                raise ValueError("No displayed search references")
             texts = {}
             for reference in args.references:
                 if not re.fullmatch(r"mail-[1-9][0-9]*", reference):
@@ -451,6 +508,49 @@ def grade(case, response, calls):
             failures.append("invalid_search_path")
         if engine.overclaims_incomplete_search(text, case["turns"][-1]):
             failures.append("incomplete_search_overclaim")
+    elif case_id == "merchant_order_ambiguous_newer":
+        searches = _tool_inputs(calls, "search_mail")
+        if len(searches) != 1 or searches[0].get("query", "").casefold() != "gyg":
+            failures.append("wrong_merchant_search_query")
+        if "mail-1" not in _read_references(calls):
+            failures.append("newer_order_source_not_read")
+        # A quoted number alone must not pass an answer that calls the newer
+        # confirmed purchase a promotion or denies that it is an order.
+        if re.search(
+            r"\b3344\b.{0,100}\b(?:only a promotion|not an order|not a purchase|"
+            r"not confirmed|isn't an order|isn't a purchase)\b",
+            text,
+            re.I | re.S,
+        ) or re.search(
+            r"\b(?:only a promotion|not an order|not a purchase|not confirmed)"
+            r"\b.{0,100}\b3344\b",
+            text,
+            re.I | re.S,
+        ):
+            failures.append("newer_order_contradicted")
+        if re.search(
+            r"\b(?:latest|newest|most recent)\b.{0,100}\b2241\b|"
+            r"\b2241\b.{0,100}\b(?:latest|newest|most recent)\b",
+            text,
+            re.I | re.S,
+        ):
+            failures.append("older_order_ranked_latest")
+        if not any(
+            evidence.get("reference") == "mail-1"
+            and "3344" in evidence.get("quote", "")
+            and " ".join(evidence.get("quote", "").split())
+            in " ".join(AMBIGUOUS_NEWER_ORDER.split())
+            for evidence in response.get("evidence", [])
+        ):
+            failures.append("newer_order_missing_cited_evidence")
+        if any(
+            step.get("tool") in {"search_mail", "read_email", "read_search_results"}
+            and step.get("status") != "ok"
+            for step in response.get("trace", [])
+        ):
+            failures.append("invalid_merchant_search_path")
+        if engine.overclaims_incomplete_search(text, case["turns"][-1]):
+            failures.append("incomplete_search_overclaim")
     elif case_id == "dense_latest_order_second_page":
         search_index = next(
             (index for index, call in enumerate(calls) if call["name"] == "search_mail"), None
@@ -470,6 +570,8 @@ def grade(case, response, calls):
             for call in calls
         ):
             failures.append("unbounded_search_work")
+        if not set(f"mail-{number}" for number in range(1, 6)).issubset(_read_references(calls)):
+            failures.append("newer_first_page_not_inspected")
         if not any(
             (call["name"] == "read_email" and call["input"].get("reference") == "mail-6")
             or (

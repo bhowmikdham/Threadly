@@ -77,9 +77,11 @@ TOOLS = {
     "search_mail": (
         SearchMail,
         (
-            "Find email on demand using a literal term from the user's conversation. "
-            "Returns five recent matches with references; not necessarily five actual"
-            " orders. Default coverage is the past year. No mailbox import."
+            "Find email on demand using a user-supplied literal. The query is "
+            "quoted as one exact Gmail phrase: for 'latest GYG order', pass only "
+            "the merchant name 'GYG', not 'GYG order' or task words. Returns "
+            "five recent matches with references, not necessarily five actual "
+            "orders. Default coverage is the past year. No mailbox import."
         ),
     ),
     "more_mail": (
@@ -135,8 +137,10 @@ TOOLS = {
         Respond,
         (
             "Finish with a concise helpful answer, grounded recommendation or "
-            "material clarification. Cite exact quotes from read_email for email "
-            "claims. Greeting and conversational answers need no evidence. A "
+            "material clarification. Cite exact quotes from read_email or "
+            "read_search_results for email claims. Search-card snippets alone "
+            "are not citation evidence. Greeting and conversational answers "
+            "need no evidence. A "
             "no-action recommendation is success."
         ),
     ),

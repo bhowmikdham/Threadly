@@ -759,7 +759,9 @@ checked for current-user ownership. No client transcript is accepted.
 
 The 200 response always includes `conversation_id`, the incremented `version`, `kind`,
 `text` and `latency_ms`. Normal model-driven completion also includes `release` and
-`trace:[{tool,status}]`; recovery from a previously checkpointed durable task/proposal may
+`trace:[{tool,status,reason?}]`; `reason` is a safe machine code on rejected
+source-based `respond` attempts (coverage or citation validation), never a quote or
+provider response. Recovery from a previously checkpointed durable task/proposal may
 return the durable reference without replaying model trace metadata. Optional result fields are:
 
 | Field | Shape and meaning |
@@ -805,7 +807,23 @@ excerpts capped at 2,000 body characters per reference; only returned text can s
 answer citations. Pinned `selected` references and stale/search-invented references are
 rejected. When a search has produced cards but the finite tool budget is reached, the
 turn completes with those cards and a limited-coverage message, without asserting an
-unverified answer.
+unverified answer. The fallback may carry a citation from a rejected answer only when
+its reference and exact quote were already verified against a read observation; a new
+search clears those retained citations, and only references from the current
+search cards can appear in that fallback. Search-card snippets alone never become
+answer evidence. Rejected `respond` attempts receive their specific coverage or
+citation feedback even when the model repeats the same answer; each still counts
+against the finite turn budget. For a request asking for the latest result, an
+answer citing an older searched message is returned to the model if newer cards
+remain unread, regardless of whether the answer explicitly claims a rank. The
+model can batch-read those references or ask for clarification. A follow-up that
+claims a rank receives the same check; any concrete inbox-rank claim without a
+verified current-turn citation is rejected, even when only retained search
+references remain. Current-turn checks compare returned
+timestamps with read state; follow-ups use retained displayed order because card
+text and timestamps are not stored. Neither check classifies unread mail. An
+uncited clarification must be a direct question or simple request for details;
+it cannot assert what the mailbox contains.
 
 All failures use `{"error":{"code":"<machine code>","message":"<safe text>","detail":null}}`
 (validation failures use a sanitized `detail` array). Relevant stable codes include
