@@ -172,7 +172,9 @@ test.beforeAll(async () => {
               received_from: "2026-01-01T00:00:00Z",
               received_before: "2026-10-01T00:00:00Z"
             },
-            results: Array.from({ length: 5 }, (_, i) => ({
+            // One conversational turn can page Gmail internally and return
+            // more than five addressable cards without another UI request.
+            results: Array.from({ length: 10 }, (_, i) => ({
               message_id: i ? `msg${i}` : target,
               thread_id: thread,
               subject:
@@ -248,6 +250,13 @@ test.beforeAll(async () => {
             subject: "Test receipt",
             body_clean: "Order 7842 totals $18.60.",
             sent_at: "2026-09-23T03:00:00Z"
+          },
+          {
+            gmail_msg_id: "msg9",
+            from_addr: "supplier@example.test",
+            subject: "GYG order 7833",
+            body_clean: "Earlier GYG order 7833.",
+            sent_at: "2026-09-22T03:00:00Z"
           }
         ]
       }
@@ -501,6 +510,17 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page.getByLabel("Your request").fill("Show me all GYG emails")
   await page.getByLabel("Your request").press("Enter")
   await expect(page.locator(".mail-glass-card")).toHaveCount(5)
+  await expect(
+    page.getByText("Showing 5 of 10 emails from this search.")
+  ).toBeVisible()
+  const turnsBeforeReveal = calls.filter(
+    (call) => call.path === "/assistant/conversation-turns"
+  ).length
+  await page.getByRole("button", { name: "Show 5 more results" }).click()
+  await expect(page.locator(".mail-glass-card")).toHaveCount(10)
+  expect(
+    calls.filter((call) => call.path === "/assistant/conversation-turns").length
+  ).toBe(turnsBeforeReveal)
   await expect(page.getByLabel("Search text")).toHaveCount(0)
   await expect(page.getByLabel("Flight from JFK to MEL")).toBeVisible()
   await page.screenshot({
@@ -535,7 +555,13 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page.setViewportSize({ width: 420, height: 900 })
   await page.emulateMedia({ reducedMotion: "no-preference" })
   await page.getByRole("button", { name: "Show more emails" }).click()
-  await expect(page.locator(".mail-glass-card")).toHaveCount(6)
+  await expect(page.locator(".mail-glass-card")).toHaveCount(11)
+  await page
+    .getByRole("button", { name: "Use email: GYG order 7833", exact: true })
+    .click()
+  await expect(
+    page.getByRole("button", { name: "Use email: GYG order 7833", exact: true })
+  ).toHaveAttribute("aria-pressed", "true")
   await page
     .getByRole("button", { name: "Use email: Test receipt", exact: true })
     .click()
