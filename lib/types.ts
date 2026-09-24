@@ -84,6 +84,8 @@ export interface InboxPage {
 export interface Entry {
   id: string
   instruction: string
+  evidence?: { reference: string; quote: string }[]
+  conversationVersion?: number
   createdAt?: string
   message?: string
   inbox?: InboxPage

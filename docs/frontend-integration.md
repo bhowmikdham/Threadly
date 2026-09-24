@@ -1,10 +1,15 @@
 # Frontend ↔ backend integration handoff
 
-> Inbox chat update: [new discovery, cards and compact composer](inbox-chat.md). This supersedes the manual Search mail surface below.
+Current integration: extension PR #50 uses the backend-owned conversation API from
+backend PR #49. The earlier inbox-chat API and manual Search mail surface remain
+historical contracts, not the route for ordinary user messages. See
+[conversation behavior](conversation-experience.md) and the backend's
+`docs/contextual-conversation.md` for its release gates and limits.
 
-The extension is a client of the existing FastAPI task system. It does not run
-its own Gemini planner or use a Google access token directly. The backend owns
-source access, task execution, model/Flow selection, approvals and external writes.
+The extension is a client of FastAPI conversation and task services. It does not
+run its own Gemini planner, classify typed requests, or use a Google access token
+directly. The backend owns conversation memory, source access, task execution,
+model/Flow selection, approvals and external writes.
 
 ```mermaid
 sequenceDiagram
@@ -14,14 +19,14 @@ sequenceDiagram
     participant API as EC2 API
     participant Jobs as Assistant worker
     participant Provider as Gmail / Calendar / Bedrock
-    User->>UI: Select thread and request
-    UI->>Worker: Authenticated API request
-    Worker->>API: JWT + explicit source references
-    API->>Provider: Read bounded owned source
-    API-->>UI: Task ID / state
-    Jobs->>Provider: Read source and generate / check availability
-    UI->>API: Poll task and fetch artifacts
-    API-->>UI: Grounded result / typed clarification
+    User->>UI: Ask or select email and ask
+    UI->>Worker: Exact turn + conversation version + source/task references
+    Worker->>API: JWT + POST /assistant/conversation-turns
+    API->>Provider: Bedrock decision; bounded owned Gmail read if needed
+    API-->>UI: Answer, five-card search page, task or proposal
+    Jobs->>Provider: Run selected specialist workflow if requested
+    UI->>API: Poll durable task and fetch artifacts if returned
+    API-->>UI: Grounded result / typed clarification / reviewed plan
     User->>UI: Edit and review exact outgoing content
     UI->>API: Create internal action preview
     API-->>UI: Payload hash, version, blockers
@@ -39,12 +44,13 @@ sequenceDiagram
 | Session maintenance        | `/auth/refresh`                                              | Refresh before expiry; clear session on 401                                            |
 | Connection status          | `GET /assistant/capabilities`                                | Show actual account readiness; never infer send authority from Gmail read scope        |
 | Use open Gmail thread      | content-script metadata → `GET /threads/{id}`                | Provider IDs only; validate account where visible; no DOM body import                  |
-| Search mail                | `POST /assistant/mail-search`                                | Explicit date/folder window; one page at a time; query/cursor kept together            |
+| Ordinary chat, inbox search and follow-ups | `POST /assistant/conversation-turns` | Exact user text, versioned conversation ID/request ID, timezone and owned source/task references; backend decides whether to answer, search, page or prepare work |
+| Restore/delete current chat | `GET/DELETE /assistant/conversations/{id}` | Owner-scoped history; delete retains tasks and action records; session restores the last chat pointer |
 | Select source              | `POST /assistant/context-snapshots` schema 1.1               | Fresh thread version, included message IDs and explicit target; no supplied email body |
-| Summary / question / draft | `POST /assistant/requests`                                   | Durable task; backend validates source/recipients; no frontend intent dropdown                                  |
-| Rewrite                    | `/assistant/requests` + `read_options.transform_text`        | Context chip action; exactly one selected message                                                           |
-| Multi-step / schedule      | `/assistant/workflow-proposals`, `/{id}/confirm`             | Display complete proposal; confirm saved plan hash before execution                    |
-| Progress / history         | `GET /assistant/tasks`, `GET /assistant/tasks/{id}`          | Backend states; fetch step artifacts; keep task ID when connection is lost             |
+| Summary / question / draft | Conversation result with task reference, then `GET /assistant/tasks/{id}` | Backend chooses and validates specialist workflow; UI polls durable work and fetches artifacts |
+| Explicit selected-message rewrite | `POST /assistant/requests` + `read_options.transform_text` | Context chip action; exactly one selected message; ordinary typed revisions remain conversation turns |
+| Multi-step / schedule      | Conversation result with proposal, then `/{id}/confirm` | Display complete saved plan; explicit plan-hash confirmation before execution |
+| Progress / Recent work     | `GET /assistant/tasks`, `GET /assistant/tasks/{id}` | Backend task states and artifacts; this list is durable work, not the entire chat transcript |
 | Clarification              | `/tasks/{id}/inputs` or `/scheduling-inputs`                 | Only fields requested by the current question; bind question ID and version            |
 | Cancel task                | `/tasks/{id}/cancel`                                         | Versioned cancellation; no send implied                                                |
 | Draft edit/history         | `/tasks/{id}/draft-revisions`                                | New immutable revision; edits hide and invalidate previous preview                     |
@@ -61,10 +67,13 @@ sequenceDiagram
 
 - JWTs use trusted `chrome.storage.session`, so content scripts cannot read them.
   Google refresh tokens and client secrets remain on EC2.
-- No mailbox or chat-text cache is written to extension storage. The panel holds
-  loaded text in memory while open. The backend retains its existing task,
-  artifact and source-reference records. Generated artifacts can contain excerpts;
-  this is not a claim that no email-derived text exists in backend task history.
+- No mailbox cache is written to extension storage. The panel holds loaded email
+  text in memory while open. `chrome.storage.session` retains the current
+  conversation ID/version and, while a request is uncertain, the exact user
+  instruction and source/task references needed for idempotent retry. Backend
+  conversation history is encrypted and bounded to 12 exchanges with a seven-day
+  expiry; answers and short evidence quotes may contain email-derived content.
+  Generated task artifacts remain in their existing durable records.
 - Settings and action identifiers are the only durable extension data. Action
   references are namespaced by backend origin and backend user ID. Reopening a
   draft/booking reloads the authoritative action status, not a cached payload.
@@ -75,10 +84,14 @@ sequenceDiagram
 - Message numbering follows included sources; excluded messages are not counted.
   The target is independent of the source list. A reply never guesses the last
   message. Ordinals refer to the saved selection, not a later Gmail navigation.
-- Polling pauses with an actionable message after repeated network errors. Task
-  history recovers backend jobs; action references recover pending writes on the
-  same installation. A lost browser profile cannot reconstruct action history
-  without a future backend action-list endpoint; do not recreate uncertain sends.
+- A timed-out chat turn is retried only with its original ID, version and body;
+  another turn is blocked until recovery or a new chat. The sidebar restores
+  backend chat history within the same browser session; search cards are not
+  restored and must be fetched again. Polling pauses with an actionable message
+  after repeated task-status errors. Recent work recovers durable backend jobs;
+  action references recover pending writes on the same installation. A lost
+  browser profile cannot reconstruct action history without a future backend
+  action-list endpoint; do not recreate uncertain sends.
 - Stale source, preference, revision and approval conflicts are shown, not retried
   with modified payloads. Calendar offers expire and are never described as holds.
 - External writes are still disabled in the current staging configuration. UI
@@ -90,13 +103,15 @@ sequenceDiagram
   account-bound action references.
 - `content.ts`, `lib/gmail-context.ts`: Gmail ID discovery and guarded body insertion.
 - `lib/context.ts`: owned source retrieval and reference-only capture.
-- `lib/use-assistant.ts`: task submission, polling, continuation and proposal confirmation.
+- `lib/use-assistant.ts`: versioned conversation turns/restoration/retry,
+  task polling, typed continuation and proposal confirmation.
+- `components/InboxCards.tsx`: bounded search cards and explicit source selection.
 - `components/TaskCard.tsx`: task progress, questions and workflow proposal review.
 - `components/ArtifactCard.tsx`: human-readable results, draft revision/review and sending.
 - `components/Booking.tsx`: slot recheck and exact Calendar event review.
 - `components/Settings.tsx`: backend origin, Google capabilities and scheduling preferences.
-- `components/MailSearch.tsx`: bounded provider search with manual pagination.
-- `sidepanel.tsx`: shared panel shell, selection, composer, history and account lifecycle.
+- `sidepanel.tsx`: shared panel shell, selection, composer, Recent work and
+  account lifecycle.
 
 ## Verification and external setup
 
@@ -105,9 +120,20 @@ screenshots must not enter Git, CI artifacts or PR descriptions. The live helper
 is opt-in and only reads the user’s private laptop login session.
 
 Google’s Web application must allow the stable extension callback documented in
-README. Adding the callback to EC2 alone is insufficient. The interactive Google
-consent flow requires the authorized account; an injected existing test session
-only verifies authenticated frontend/API integration.
+README, and the backend must allow the same callback. Adding it to EC2 alone is
+insufficient. The interactive Google consent flow requires an authorized test
+account; an injected existing session only verifies authenticated frontend/API
+integration. The staging conversation endpoint also requires the backend PR #49
+migration, enabled feature gate, exact reviewed Bedrock profile and the operator's
+model-content/logging review. Keep external writes disabled for the initial smoke.
+
+The packaged Chromium tests use a deterministic API fixture to exercise UI and
+transport. That fixture maps sample phrases to responses; it is not frontend
+routing code or evidence that a live model understands arbitrary requests. The
+backend's versioned synthetic Bedrock replay exercises model decisions over fake
+mail, while a separate read-only staging smoke is still needed for live Gmail.
+The live helper uses a private
+existing session and does not verify interactive OAuth or Edge-specific behavior.
 
 The original Plasmo 0.90.5 build chain retains transitive npm audit findings.
 Compatible dependency patches were applied and the newly added Vitest dependency
@@ -117,8 +143,8 @@ own change. These tools are development dependencies, not shipped service code.
 
 ### Previous integration verification — 23 September 2026
 
-This is the baseline before the conversational redesign. See
-[conversation release](conversation-experience.md) for the current checks.
+This is the 23 September baseline before the backend-owned conversation release.
+See [conversation release](conversation-experience.md) for current checks.
 
 - Frontend: TypeScript check passed; **41 tests passed**; production build passed.
 - Packaged Chromium extension: **4 acceptance scenarios passed** (summary →

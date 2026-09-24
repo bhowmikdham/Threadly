@@ -1,8 +1,10 @@
 # Threadly browser extension
 
-A conversational Gmail side panel connected to Threadly’s backend. This branch contains
-the extension; the backend is maintained on `codex/assistant-intent-routing`.
-Do not merge the two repository layouts just to run them together.
+A conversational Gmail side panel connected to Threadly’s backend. This extension
+release depends on the contextual conversation API in backend PR #49
+(`codex/contextual-conversation`, based on `codex/assistant-intent-routing`). Deploy
+that reviewed backend release before testing this extension against EC2. The backend
+and extension branches have separate layouts; do not combine their trees to run them.
 
 ## Install locally
 
@@ -72,7 +74,8 @@ optional and remain subject to backend pilot controls and exact approval.
 ## What is connected
 
 - Chat-driven Gmail discovery: ask “Show me all the GYG emails”; view up to five
-  glass email cards per page, with visible dates and Show more. No search form.
+  glass email cards per page, with visible dates and Show more. The backend searches
+  Gmail on demand within bounded coverage. No search form or mailbox import.
 - Normal greetings, compact composer/context chip, copy/time on responses and a
   conversation drawer. Literal flight routes get an animated itinerary card, with
   reduced-motion support and no claim of live flight tracking.
@@ -82,9 +85,14 @@ optional and remain subject to backend pilot controls and exact approval.
   silently replace the pinned source. Browser message bodies are not imported.
 - Summary, grounded questions, reply and new-email drafts, and selected-message
   rewriting through durable backend tasks (context chip → choose message →
-  Rewrite selected message). New questions and commands use the backend router.
+  Rewrite selected message). Ordinary chat turns use
+  `POST /assistant/conversation-turns`; Bedrock can answer directly, retrieve bounded
+  email evidence or hand work to the existing specialist workflows. The explicit
+  context-chip rewrite remains a typed backend task.
 - Reviewed multi-step plans and scheduling; per-step progress, cancellation,
-  typed clarification, task history and reconnectable result status.
+  typed clarification, task history and reconnectable result status. The current
+  conversation restores from backend history in the same browser session; search
+  cards are refreshed by asking again.
 - Editable draft revisions, exact outgoing preview, explicit approval, and
   uncertain-send recovery. **Copy**, **Insert body**, and **Send** are separate.
 - Calendar preferences, slot selection with a fresh recheck, exact event preview,
@@ -97,6 +105,15 @@ the side panel, public model keys, or fabricated fallback classifications remain
 The old subject-only Gemini inbox badges are removed: the current backend has no
 corresponding classification API. Backend voice endpoints are not claimed as
 implemented; dictation uses the browser’s own capability.
+
+The new chat endpoint is disabled by default on EC2. The reviewed backend release
+must be deployed with its migration, the configured Sydney Bedrock inference profile,
+and `CONVERSATION_ENABLED=true`. Enable
+`BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true` only after reviewing the model's
+content boundary and account invocation-logging settings. Keep external email and
+Calendar writes disabled for the initial read/generation test. Without the chat
+feature gate, normal messages return `conversation_disabled` rather than silently
+falling back to the old browser-side rules.
 
 ## Tests and handoff
 
@@ -118,8 +135,8 @@ THREADLY_LIVE_TEST=1 node scripts/live-smoke.mjs
 This fetches bounded GYG search results and selected thread content, invokes the
 configured model for summary/question/drafts, and reads Calendar metadata. It
 never sends email or creates events. Set `THREADLY_MAIL_QUERY` to another search
-term if needed. It tests existing authenticated sessions, **not** the interactive
-Google consent window.
+term if needed. It tests existing authenticated sessions in an isolated Chromium
+profile, **not** the interactive Google consent window or Edge-specific UI.
 
 See [conversation design and boundaries](docs/conversation-experience.md) and
 [integration handoff](docs/frontend-integration.md) for endpoint mappings,

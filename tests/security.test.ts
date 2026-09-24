@@ -4,6 +4,7 @@ import { addresses } from "../lib/api"
 import { gmailId, readGmailSelection } from "../lib/gmail-context"
 import {
   allowedPath,
+  allowedRequest,
   backendOrigin,
   callbackCode,
   trustedSender
@@ -34,6 +35,24 @@ describe("extension trust boundaries", () => {
     "/assistant/x#fragment",
     "/sync/jobs"
   ])("blocks unsafe bridge paths %s", (v) => expect(allowedPath(v)).toBe(false))
+  it("allows deletion only for one UUID conversation resource", () => {
+    expect(
+      allowedRequest(
+        "/assistant/conversations/123e4567-e89b-12d3-a456-426614174000",
+        "DELETE"
+      )
+    ).toBe(true)
+    expect(
+      allowedRequest(
+        "/assistant/conversations/019a1b02-8c4a-7b53-8d1a-c87917ab12cd",
+        "DELETE"
+      )
+    ).toBe(true)
+    expect(allowedRequest("/assistant/tasks/task-1", "DELETE")).toBe(false)
+    expect(
+      allowedRequest("/assistant/conversations/not-a-uuid", "DELETE")
+    ).toBe(false)
+  })
   it("does not grant Gmail content scripts privileged backend access", () => {
     expect(
       trustedSender(

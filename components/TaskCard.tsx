@@ -21,6 +21,19 @@ export function TaskCard({
       <div className="user-message">{entry.instruction}</div>
       <div className="assistant-message">
         {entry.message && <p className="chat-response">{entry.message}</p>}
+        {entry.evidence?.length > 0 && (
+          <details className="work-details">
+            <summary>Sources</summary>
+            {entry.evidence.map((e, i) => (
+              <blockquote key={i}>{e.quote}</blockquote>
+            ))}
+          </details>
+        )}
+        {entry.error && !t && controller.canRetry?.(entry) && (
+          <button onClick={() => controller.retry(entry)}>
+            Retry response
+          </button>
+        )}
         {entry.inbox && <InboxCards entry={entry} controller={controller} />}
         {entry.notice && <p className="muted">{entry.notice}</p>}
         {entry.answers?.map((text, i) => (

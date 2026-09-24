@@ -1,16 +1,18 @@
 # Conversational panel — implementation and acceptance
 
-> Inbox chat update: [new discovery, cards and compact composer](inbox-chat.md). This supersedes the manual Search mail surface below.
-
-Release: `conversation-adapter-1.0.0`, 23 September 2026.
+Extension PR #50 is the client of backend PR #49, whose model/prompt release is
+`contextual-conversation-1.1.1`. The earlier 23 September adapter and
+[inbox-chat](inbox-chat.md) releases are historical baselines, not the
+ordinary-chat route in this build.
 
 ## Product behavior
 
 Threadly is a conversation beside Gmail. The primary interaction is one request
-box and the attached email, not a category selector. A slim header holds the
-conversation title, menu and new-conversation action. Suggestions start real tasks;
-they are not a second navigation system. Results are readable text, draft cards
-or meeting options, with controls appearing when relevant.
+box and an optional pinned email, not a category selector. A slim header holds
+the conversation title, menu and new-conversation action. Suggestions submit
+ordinary turns. Results are readable answers, up to five email cards per search
+page, durable task artifacts, drafts or meeting options. Copy, insertion,
+approval and external execution remain separate controls.
 
 The reference was the installed Superhuman Go extension in **Microsoft Edge**, on
 its public introductory page: compact header, contextual suggestions, a source
@@ -22,16 +24,24 @@ not a claim of feature parity or a copy of proprietary assets.
 ### A typical conversation
 
 1. Open Threadly beside an email. It retrieves the open thread once through the
-   backend, using provider identifiers. The source chip names that email.
-2. Ask “Summarise this for me.” The backend routes and produces the result.
-3. Ask a factual question about that email. The selected context stays attached.
-4. Ask for a reply. Missing recipient or message choices appear in the conversation.
-   A single literal recipient answer can be typed in the main input.
-5. Read the draft. Copy it, edit it, or request an outgoing preview. Sending requires
-   a separate exact-content approval and enabled backend permissions.
+   backend, using provider identifiers rather than browser message bodies. The
+   source chip names the selected email.
+2. Ask “Summarise this for me.” The backend conversation coordinator can select
+   the existing summary workflow and return a durable task. The panel shows
+   progress and the resulting artifact.
+3. Ask a factual follow-up. The selected source and task references stay
+   attached; the coordinator can read bounded evidence and answer with quotes.
+4. Ask for a reply, ask whether a no-reply receipt needs one, or ask to revise a
+   draft. The backend decides whether to advise, ask for a missing field, create
+   a draft or save an unreviewed revision. A single typed answer can go in the
+   main input; multi-field questions use the inline form.
+5. Review any generated draft. Copy, insert body and Send are distinct. Sending
+   requires a separate exact-content preview, explicit approval and enabled
+   backend permission gates; an ordinary chat message cannot approve an action.
 
 Navigating to another Gmail page does not silently switch an existing conversation's
-source. Use **+ → Use open email**, ask for emails and choose a card, or start a new conversation to change it.
+source. Use **+ → Use open Gmail thread**, ask for emails and choose a card, or
+start a new conversation to change it.
 The context chip exposes included messages and an explicit message target. Message
 ordinals preserve the displayed Gmail order. **Rewrite selected message** produces
 a text suggestion through the existing bounded read adapter; it does not send or
@@ -41,95 +51,111 @@ replace the original email.
 
 ```mermaid
 flowchart TD
-    A[User enters request] --> B{Answer to one saved question?}
-    B -->|Yes| C[Submit typed answer with task version and question ID]
-    B -->|No| D{Bounded wording refinement?}
-    D -->|Yes| E[Original user request and pinned source plus refinement]
-    D -->|No| F[New request with current owned source]
-    E --> G[Backend task and intent router]
-    F --> G
-    C --> G
-    G --> H{Backend outcome}
-    H -->|Result| I[Readable answer, draft or options]
-    H -->|Missing input| J[Contextual question]
-    H -->|Supported multi-step or schedule| K[Complete backend proposal]
-    K --> L[User confirms saved plan]
-    L --> G
-    I --> M[Optional exact outgoing preview]
-    M --> N[Separate explicit approval]
-    N --> O[Backend permission, freshness and execution checks]
+    A[User enters a chat turn] --> B[Extension sends exact text, version and owned references]
+    B --> C[Backend conversation API]
+    C --> D[Recent dialogue, pinned source, task and capabilities]
+    D --> E[Bedrock Converse decision]
+    E -->|Need evidence| F[Bounded owned Gmail read or search]
+    F --> E
+    E -->|Answer, advice or question| G[Validate response and evidence]
+    E -->|Prepare work| H[Existing specialist workflow]
+    G --> I[Sidebar response or email cards]
+    H --> J[Durable task, draft or reviewed proposal]
+    J --> I
+    I -->|Separate exact outgoing review| K[Explicit approval control]
+    K --> L[Backend permission, freshness and execution checks]
 ```
 
-- New natural-language commands use `intent_hint: null`; the browser does not
-  classify them with a replacement model or force a category.
-- Backend `unsupported` outcomes for multiple operations or `plan_schedule` are
-  handed to `/assistant/workflow-proposals`. The complete plan remains unexecuted
-  until the user confirms its saved hash. This also works after missing inputs are
-  supplied. Unsupported combinations are not presented as successful partial work.
-- An explicit context-chip rewrite uses `read_options.transform_text` and exactly
-  the selected message ID. Other typed rewrite commands remain subject to the
-  backend's current routing/reference support; the chip action is the verified path.
-- A single pending recipient/AM-PM/duration question accepts only its typed answer
-  in chat. Multiple-field questions use the inline form. “Send it” is never treated
-  as approval by this adapter. Question IDs, versions and expiry remain authoritative.
-- “Make it shorter” and a bounded set of wording refinements regenerate the last
-  summary or draft from the **original user instruction and original sources**.
-  They do not feed assistant prose back as facts. This is not arbitrary conversation
-  memory or exact editing of generated prose. Manually saved draft revisions require
-  **Edit draft**; regeneration refuses to silently lose those saved edits. Ambiguous
-  multiple outputs and unsupported references ask for a full request.
-- Settings keeps the conversation mounted. History restores one backend task and
-  its owned source, checking the current thread version. It does not reconstruct
-  an entire persisted chat transcript. A changed/unavailable source is shown clearly.
+- Ordinary requests go to `POST /assistant/conversation-turns` with the exact
+  user text, `conversation_id`, `expected_version`, `request_id`, timezone and
+  optional owned source/task references. The browser does not classify an
+  intent, prepend a previous instruction or reinterpret a greeting. The five
+  intent categories guide specialist workflows only when the backend chooses
+  to prepare work.
+- “Show me all GYG emails” and “show more” remain chat turns. The backend
+  extracts a literal query, searches Gmail on demand in a bounded window and
+  returns no more than five cards per page. Dates and coverage are shown; the
+  cards do not imply an exhaustive mailbox search or a proven latest order.
+  Selecting a card explicitly pins its owned one-message source.
+- Compound work and scheduling return a complete saved proposal when needed.
+  The user confirms its plan hash separately before the saved workflow runs.
+  Partial work is not displayed as a completed multi-step request.
+- An active typed question can be answered through chat, where the backend
+  validates the answer against the saved question. Multiple fields remain in
+  the inline form. “Send it” in chat is never an email or event approval.
+- An ordinary wording follow-up uses server-held history and the current task
+  or draft. A draft revision invalidates the old outgoing review. Explicit
+  selected-message rewrite still calls `/assistant/requests` with
+  `read_options.transform_text` and exactly one selected message.
+- The sidebar stores only the conversation ID/version and any exact unfinished
+  turn in extension session storage. It reloads encrypted, bounded backend
+  history in the same browser session. Search snippets/cards are not restored;
+  ask to search again. **Recent work** lists durable tasks and drafts, not the
+  full chat transcript. Deleting a chat keeps those tasks and action records.
+- An uncertain turn is retried with the identical request ID and body. Another
+  message is blocked until that turn resolves or the user starts a new chat.
+  A changed or unavailable pinned email asks for an explicit new source or for
+  the user to continue without email context.
 - Draft editing preserves immutable revisions, invalidates old outgoing review,
-  and retains the existing separate Copy / Insert / Send behavior. Calendar options
-  still require a fresh availability check and exact event review.
+  and retains separate Copy / Insert / Send behavior. Calendar options still
+  require a fresh availability check and exact event review.
 
 ## Implementation map
 
 | Area | Files | Backend contract |
 | --- | --- | --- |
-| Shell, composer, suggestions, menus | `sidepanel.tsx`, `style.css`, `components/Icon.tsx` | Existing authentication and capabilities |
-| Pinned source and message order | `lib/context.ts`, `components/ContextPicker.tsx` | Owned thread read and schema 1.1 context snapshot |
-| Task and clarification lifecycle | `lib/use-assistant.ts`, `components/TaskCard.tsx` | Requests, tasks, inputs, workflow proposal/confirm |
-| Bounded follow-up interpretation | `lib/conversation.ts` | Original request/context and backend draft envelope |
-| Results, editing and outgoing review | `components/ArtifactCard.tsx` | Artifacts, revisions and existing exact actions |
-| Calendar | Existing Settings/Booking components | Preferences, offers, recheck and exact event actions |
+| Shell, composer, suggestions, menus | `sidepanel.tsx`, `style.css`, `components/Icon.tsx` | Authentication, capabilities and exact user turn |
+| Pinned source and message order | `lib/context.ts`, `components/ContextPicker.tsx` | Owned thread read and context snapshot |
+| Chat turns and recovery | `lib/use-assistant.ts` | Conversation turn, get and delete endpoints; version and idempotency |
+| Email cards | `components/InboxCards.tsx` | Bounded search page returned by the conversation API |
+| Task and clarification lifecycle | `lib/use-assistant.ts`, `components/TaskCard.tsx` | Durable task, typed input and proposal confirmation |
+| Draft and outgoing review | `components/ArtifactCard.tsx` | Immutable revisions, exact action preview and approval |
+| Calendar | `components/Settings.tsx`, `components/Booking.tsx` | Preferences, offers, recheck and exact event actions |
 
-No new dependency, browser permission, provider API, schema migration or model
-prompt is introduced by the visual redesign. Browser dictation only fills the
-input. No background mailbox sync or automatic provider write is added.
+No new extension runtime dependency, browser permission, direct provider API
+or public AI key is introduced by this integration. The backend does add a
+conversation schema migration and versioned model prompt. Flight cards are
+decorative and require explicit route codes; they do not track a live flight.
+Dictation only fills the input. No mailbox sync or automatic provider write is
+added. The backend retains bounded short answers and evidence quotes, which
+may contain email-derived text; no mailbox import is not a claim of zero
+retention. Its `docs/contextual-conversation.md` details those boundaries.
 
 ## Verification
 
-- TypeScript and production build passed; **60 unit/controller tests passed**.
-- **5 packaged Chromium scenarios passed**: summary → grounded answer → reply
-  and edited exact preview; reviewed scheduling; new-email recipient answered in
-  chat; preferences/history/logout; disconnected login recovery.
-- Controller regressions cover natural routing, explicit plan confirmation,
-  continuing after missing inputs, and selected-message rewrite bounds.
-- Synthetic screenshots inspected at 420 px and 320 px; both light and dark themes.
-  Keyboard Enter submits, Shift+Enter adds a line, IME composition does not submit,
-  focus indicators remain visible, and reduced motion is respected.
-- Live integration acceptance is recorded below after the matching backend release
-  is deployed. Synthetic test success alone is not provider acceptance.
+The extension's deterministic tests exercise the packaged browser bridge and UI
+with a fake API. Unit/controller checks cover ordinary turns without client
+intent rules, versioning, exact uncertain-turn retry, restored context, search
+pagination, chat deletion and approval boundaries. Five packaged Chromium
+scenarios cover greeting, cards, 320 px light/dark layout, summary/refinement,
+factual follow-up, draft review, proposal confirmation, Calendar settings,
+Recent work and disconnected-login recovery. Keyboard Enter submits,
+Shift+Enter adds a line, IME composition does not submit, and reduced motion
+is respected. The fake API maps sample phrases to fixture outcomes; these
+tests do not measure a live model's semantic quality.
 
 ### Deployment dependency and limits
 
-The corresponding backend integration PR is #43. Besides grounded selected-message
-questions, it normalizes three recipient field aliases to the existing saved
-question contract (`intent-preview-1.3.1`). It does not infer email addresses or
-weaken exact approval. Existing pending tasks pinned to older unavailable contracts
-must be resubmitted; completed outputs remain readable.
+Backend PR #49 must be merged and deployed before this extension is used with
+EC2. Its migration is `c23026e9a039` and its chat endpoint is disabled by
+default. Set `CONVERSATION_ENABLED=true` only with the reviewed Sydney Bedrock
+profile and after the operator reviews the account's model-content and
+invocation-logging boundary; `BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true` is a
+manual acknowledgement, not a technical audit. Keep email and Calendar writes
+disabled for the initial read/generation smoke. A disabled chat endpoint
+returns `conversation_disabled` rather than falling back to browser rules.
 
-Staging email and Calendar writes remain disabled. Real Gmail insertion, interactive
-browser OAuth, real sending and event creation are separate account acceptance
-steps. The automated live test uses an existing private session and never sends or
-books. Edge-specific UI acceptance uses the unpacked build; automated browser tests
-run packaged Chromium. Arbitrary web pages, attachments and a general cross-app
+The backend synthetic two-trial Bedrock replay passed 26/26 versioned cases on
+24 September 2026. This is real model invocation over fake mail tools, not a
+live Gmail test or a general correctness guarantee. Run the extension's opt-in
+`scripts/live-smoke.mjs` after deployment and the local SSM tunnel to assess
+actual read/generation behavior with an existing private session. It never
+sends or books. Interactive Google OAuth, real Edge UI, Gmail insertion,
+mailbox-specific quality and controlled write/recovery remain separate
+acceptance gates. Arbitrary web pages, attachments and a general cross-app
 assistant are not implemented by this release.
 
-### Live acceptance — 23 September 2026
+### Historical live acceptance — 23 September 2026
 
 Built extension → laptop SSM tunnel → EC2 release
 `6533e3d511fa9b592fbb8463f18a10a9d85daf9b` → Google / Bedrock passed:
@@ -144,6 +170,10 @@ Built extension → laptop SSM tunnel → EC2 release
 The helper used an existing private authenticated session in an isolated Chromium
 profile, deleted after the run. No raw email, generated private text, session or
 live screenshot is committed. No send, booking, mailbox import or preference write
-was performed. EC2 API and assistant/action workers were healthy after deployment.
-The recipient alias failure found by the earlier run is resolved by the deployed
-backend release above. The baseline integration evidence remains in the handoff.
+was performed. This earlier run predates backend PR #49 and does not certify the
+new conversation API. The baseline integration evidence remains in the handoff.
+
+Current limits: up to 12 backend-retained exchanges, one active task and one
+search result set in working context; arbitrary long-running autonomous
+planning is not implemented. Semantic factual correctness still requires
+human assessment beyond exact-quote validation.
