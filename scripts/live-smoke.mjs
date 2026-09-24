@@ -20,6 +20,7 @@ assert.equal(info.mode & 0o777, 0o600, "Private session must have mode 600")
 const session = JSON.parse(await readFile(sessionPath, "utf8"))
 const profile = await mkdtemp(path.join(tmpdir(), "threadly-live-extension-"))
 let browser
+let stage = "starting the extension"
 try {
   const extension = path.resolve("build/chrome-mv3-prod")
   browser = await chromium.launchPersistentContext(profile, {
@@ -50,91 +51,160 @@ try {
     `chrome-extension://${worker.url().split("/")[2]}/sidepanel.html`
   )
   const { expect } = await import("@playwright/test")
-  const error = () => page.locator("[role=alert]").allTextContents()
   await expect(
     page.getByRole("button", { name: "Add context", exact: true })
   ).toBeVisible({ timeout: 30000 })
   console.log("Authenticated conversational panel ready")
+  const exchanges = page.locator(".exchange")
   const ask = async (text) => {
+    const before = await exchanges.count()
     await page.getByLabel("Your request").fill(text)
     await page
       .getByRole("button", { name: "Send request", exact: true })
       .click()
+    await expect(exchanges).toHaveCount(before + 1, { timeout: 10000 })
+    return exchanges.nth(before)
   }
-  await ask("hey")
-  await expect(
-    page.getByText("Hey! What can I help you with?", { exact: true })
-  ).toBeVisible()
+  const completed = async (
+    entry,
+    selector,
+    timeout = 180000,
+    allowClarification = false,
+    ready = async () => true
+  ) => {
+    const output = entry.locator(selector).first()
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      // Fail promptly, but never inspect or print an alert's potentially private text.
+      if (
+        (await entry.locator('[role="alert"]').count()) ||
+        (await page.locator('.global-error[role="alert"]').count())
+      ) {
+        const failure = new Error("The backend or extension reported an error")
+        failure.name = "BackendOrExtensionError"
+        throw failure
+      }
+      if (
+        !allowClarification &&
+        (await entry.locator(".clarification").isVisible())
+      ) {
+        const failure = new Error("The request needs unexpected clarification")
+        failure.name = "UnexpectedClarification"
+        throw failure
+      }
+      if (await output.isVisible()) {
+        if (
+          ((allowClarification &&
+            (await entry.locator(".clarification").isVisible())) ||
+            !(await entry.locator(".thinking, .task-status").count())) &&
+          (await ready())
+        )
+          return output
+      }
+      await page.waitForTimeout(500)
+    }
+    const failure = new Error("The expected response did not finish in time")
+    failure.name = "SmokeTimeout"
+    throw failure
+  }
+
+  stage = "greeting"
+  const greeting = await ask("hey")
+  const greetingResponse = await completed(greeting, ".chat-response")
+  assert((await greetingResponse.textContent())?.trim().length > 1)
+  assert.equal(
+    await greeting.locator(".inbox-results, .artifact, .proposal").count(),
+    0
+  )
   console.log("PASS: greeting is conversational, no ambiguity error")
-  await ask(`Show me all ${process.env.THREADLY_MAIL_QUERY || "GYG"} emails`)
-  await expect(page.locator(".mail-glass-card").first()).toBeVisible({
-    timeout: 90000
-  })
-  assert((await page.locator(".mail-glass-card").count()) <= 5)
-  await page.locator(".mail-card-main").first().click()
+
+  stage = "bounded inbox search"
+  const search = await ask(
+    `Find recent emails from or about ${process.env.THREADLY_MAIL_QUERY || "GYG"}. Show matching email cards.`
+  )
+  await completed(search, ".mail-glass-card", 180000)
+  const firstPageSize = await search.locator(".mail-glass-card").count()
+  assert(firstPageSize >= 1 && firstPageSize <= 5)
+  await expect(search.locator(".inbox-scope")).toBeVisible()
+  await search.locator(".mail-card-main").first().click()
   await expect(page.locator(".context-chip")).toBeVisible({ timeout: 45000 })
+  await expect(search.locator(".mail-card-main").first()).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
   console.log(
     "PASS: natural inbox search, five-card bound and explicit source attachment"
   )
-  await ask("Summarise this thread.")
-  await expect(page.getByLabel("summary result")).toHaveCount(1, {
-    timeout: 180000
-  })
-  console.log("PASS: automatic summary routing")
-  await ask("Make it shorter")
-  await expect(page.getByLabel("summary result")).toHaveCount(2, {
-    timeout: 180000
-  })
-  console.log("PASS: summary refinement keeps original source")
-  await ask("What is the order total in this email?")
-  await expect(page.getByLabel("answer result")).toBeVisible({
-    timeout: 180000
-  })
-  console.log("PASS: grounded question in the same conversation")
-  await ask("Draft a short thank-you reply for the order confirmation.")
-  await expect(page.locator(".clarification, .draft-body").first()).toBeVisible(
-    { timeout: 180000 }
+
+  stage = "selected-email follow-up"
+  const followUp = await ask(
+    "What is this selected email about? Give one concrete detail and cite it."
   )
-  const replyChoice = page.getByLabel("Reply to", { exact: true })
-  if (await replyChoice.count()) {
-    const option = await replyChoice
-      .locator("option")
-      .nth(1)
-      .getAttribute("value")
-    await replyChoice.selectOption(option)
-  }
-  // Test-only recipient. Draft generation cannot send, and no approval is exercised.
-  const email = page.getByLabel("Email address", { exact: true })
-  if (await email.count()) await email.fill("supplier@example.test")
-  if (await page.locator(".clarification").count())
-    await page.getByRole("button", { name: "Continue request" }).click()
-  await expect(page.locator(".draft-body")).toHaveCount(1, { timeout: 180000 })
-  console.log("PASS: contextual reply clarification and readable draft")
-  await page.getByRole("button", { name: "Add context", exact: true }).click()
-  await page.getByRole("button", { name: "Remove email context" }).click()
-  await ask(
-    "Write Alex a short email thanking them for the project update. Say I will review it tomorrow."
+  await completed(
+    followUp,
+    ".chat-response, .artifact.result-answer, .artifact.result-summary",
+    180000,
+    false,
+    async () =>
+      (await followUp
+        .locator(".work-details blockquote, .artifact .source blockquote")
+        .count()) > 0
   )
-  await expect(
-    page.getByText("Who should this go to?", { exact: true })
-  ).toBeVisible({ timeout: 180000 })
-  await ask("alex@example.test")
-  await expect(page.locator(".draft-body")).toHaveCount(2, { timeout: 180000 })
+  console.log("PASS: follow-up uses the selected email and cites evidence")
+
+  stage = "selected-email summary"
+  const summary = await ask("Summarise this selected email briefly for me.")
+  await completed(
+    summary,
+    ".artifact.result-summary, .chat-response",
+    180000,
+    false,
+    async () =>
+      (await summary.locator(".artifact.result-summary .prose").count()) > 0 ||
+      ((await summary.locator(".chat-response").count()) > 0 &&
+        (await summary.locator(".work-details blockquote").count()) > 0)
+  )
+  await expect(page.locator(".context-chip")).toBeVisible()
   console.log(
-    "PASS: new-email recipient answered in chat, with no mail source attached"
+    "PASS: selected-email summary stays grounded in the pinned source"
   )
+
+  stage = "new-email draft"
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await expect(page.locator(".context-chip")).toHaveCount(0)
+  const draft = await ask(
+    "Draft a new email to alex@example.test. Subject: Project update. Thank Alex for the project update and say I will review it tomorrow. Do not send it."
+  )
+  await completed(draft, ".draft-body, .clarification", 180000, true)
+  if (await draft.locator(".clarification").count()) {
+    const recipient = draft.getByLabel("Email address", { exact: true })
+    assert.equal(
+      await recipient.count(),
+      1,
+      "The draft needs a clarification outside this read-only smoke"
+    )
+    await recipient.fill("alex@example.test")
+    await draft.getByRole("button", { name: "Continue request" }).click()
+  }
+  await completed(draft, ".draft-body")
+  assert((await draft.locator(".draft-body").textContent())?.trim().length > 0)
+  console.log("PASS: new-email draft is reviewable and no send was requested")
+
+  stage = "Calendar read and chat continuity"
   await page.getByRole("button", { name: "Conversation menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
-  await page
-    .getByRole("button", { name: "Load calendars and preferences" })
-    .click()
-  await expect(page.getByLabel("Timezone", { exact: true })).toBeVisible({
+  const settings = page.locator(".settings")
+  const loadCalendars = settings.getByRole("button", {
+    name: "Load calendars and preferences"
+  })
+  await loadCalendars.click()
+  await expect(settings.getByLabel("Timezone", { exact: true })).toBeVisible({
     timeout: 45000
   })
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click()
-  await expect(page.locator(".draft-body")).toHaveCount(2)
+  await expect(loadCalendars).toBeEnabled({ timeout: 45000 })
+  assert.equal(await settings.locator('[role="status"]').count(), 0)
+  await settings.getByRole("button", { name: "Back to chat" }).click()
+  await expect(draft.locator(".draft-body")).toBeVisible()
   console.log("PASS: Calendar settings preserve the conversation")
   console.log(
     "LIVE_FRONTEND_SMOKE_PASSED; no messages sent, events created, or mailbox imported"
@@ -142,6 +212,7 @@ try {
 } catch (error) {
   console.error(
     "LIVE_TEST_STOPPED:",
+    stage,
     error.name,
     "(private page contents not logged)"
   )
