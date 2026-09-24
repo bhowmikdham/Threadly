@@ -1,6 +1,6 @@
 """Conversation transport and bounded model tools. Provider IDs are never tool arguments."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field
 
@@ -35,6 +35,12 @@ class MoreMail(StrictModel):
 class ReadEmail(StrictModel):
     reference: str = Field(min_length=1, max_length=40)
     scope: Literal["selected_message", "visible_thread"] = "selected_message"
+
+
+class ReadSearchResults(StrictModel):
+    references: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(
+        min_length=1, max_length=5
+    )
 
 
 class Evidence(StrictModel):
@@ -87,6 +93,15 @@ TOOLS = {
             "about it or preparing a workflow. A selected_message read returns one "
             "selected or searched email; visible_thread reads the owned pinned capture. "
             "Only backend-issued references are valid."
+        ),
+    ),
+    "read_search_results": (
+        ReadSearchResults,
+        (
+            "Read one to five backend-issued mail-N references from the current search. "
+            "Returns bounded excerpts of each selected email so you can distinguish "
+            "relevant messages from promotions and cite exact returned text. "
+            "Cannot read the pinned selection or widen results to a thread."
         ),
     ),
     "prepare_workflow": (

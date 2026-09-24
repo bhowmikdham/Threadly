@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import logging
+import random
 import re
 
 from pydantic import ValidationError
@@ -15,6 +17,20 @@ from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_confi
 
 TERMINAL = {"respond", "prepare_workflow", "answer_question", "revise_draft"}
 MAX_CALLS = 8
+RETRYABLE_PROVIDER_CODES = frozenset(
+    {
+        "ThrottlingException",
+        "ModelTimeoutException",
+        "ModelNotReadyException",
+        "ServiceUnavailableException",
+        "InternalServerException",
+        "ReadTimeoutError",
+        "ConnectTimeoutError",
+        "EndpointConnectionError",
+        "ConnectionClosedError",
+    }
+)
+log = logging.getLogger("threadly.conversation.provider")
 
 
 class IncompleteSearchCoverage(ValueError):
@@ -25,7 +41,7 @@ async def run(context, runtime, model=None):
     messages = [{"role": "user", "content": [{"text": json.dumps(context)}]}]
     seen, calls, trace = set(), 0, []
     try:
-        async with asyncio.timeout(120):
+        async with asyncio.timeout(120) as turn_timeout:
             while calls < MAX_CALLS:
                 for attempt in range(3):
                     try:
@@ -34,18 +50,24 @@ async def run(context, runtime, model=None):
                         )
                         break
                     except ConversationProviderError as exc:
-                        if (
-                            exc.code
-                            not in {
-                                "ThrottlingException",
-                                "ModelTimeoutException",
-                                "ServiceUnavailableException",
-                                "InternalServerException",
-                            }
-                            or attempt == 2
-                        ):
+                        # Log only normalized diagnostics. SDK exception text can
+                        # contain URLs and provider response bodies; never include it.
+                        log.warning(
+                            "conversation_bedrock_attempt_failed code=%s http_status=%s "
+                            "request_id=%s elapsed_ms=%s attempt=%s",
+                            exc.code,
+                            exc.http_status,
+                            exc.request_id,
+                            exc.elapsed_ms,
+                            attempt + 1,
+                        )
+                        if exc.code not in RETRYABLE_PROVIDER_CODES or attempt == 2:
                             raise
-                        await asyncio.sleep(2 ** (attempt + 1))
+                        delay = 2 ** (attempt + 1) + random.uniform(0, 0.5)
+                        remaining = turn_timeout.when() - asyncio.get_running_loop().time()
+                        if remaining <= delay + 5:
+                            raise
+                        await asyncio.sleep(delay)
                 blocks = message.get("content", [])
                 requests = [b["toolUse"] for b in blocks if "toolUse" in b]
                 if not requests or len(requests) > MAX_CALLS - calls:
@@ -169,6 +191,30 @@ async def run(context, runtime, model=None):
         raise ApiError(
             503, "conversation_unavailable", "I couldn’t finish that response. Retry this message."
         ) from None
+    # A search can reach the finite tool or transcript budget after returning
+    # useful cards. Preserve those bounded results instead of turning a
+    # recoverable discovery request into an HTTP error. Never infer a fact from
+    # unread mail or claim the search covered the entire mailbox.
+    page = getattr(runtime, "search_page", None)
+    if isinstance(page, dict):
+        if page.get("results"):
+            text = (
+                "I found matching emails but couldn't finish checking them in this "
+                "request. The email cards below are from this search; choose one to "
+                "ask about it, or narrow the search by date or sender."
+            )
+        else:
+            text = (
+                "I couldn't finish checking this bounded email search. Try a more "
+                "specific term, date or sender."
+            )
+        return {
+            "kind": "message",
+            "text": text,
+            "evidence": [],
+            "release": RELEASE,
+            "trace": trace,
+        }
     raise ApiError(
         422,
         "conversation_tool_limit",

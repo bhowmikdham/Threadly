@@ -28,6 +28,7 @@ from app.schemas.inbox_chat import InboxFilters
 from app.schemas.workflow import WorkflowRequest
 
 SEARCH_REFERENCE_LIMIT = 25
+SEARCH_READ_BODY_CHARS = 2000
 WORKFLOW_BINDING_ERROR = "workflow_binding_invalid"
 
 
@@ -336,6 +337,8 @@ class Runtime:
             return await self.search(args if name == "search_mail" else None)
         if name == "read_email":
             return await self.read(args.reference, args.scope)
+        if name == "read_search_results":
+            return await self.read_search_results(args.references)
         if name == "prepare_workflow":
             return await self.workflow(args)
         if name == "answer_question":
@@ -389,7 +392,8 @@ class Runtime:
                 (
                     key
                     for key, v in self.state["refs"].items()
-                    if v.get("message_id") == row["message_id"]
+                    if key in self.state["result_order"]
+                    and v.get("message_id") == row["message_id"]
                 ),
                 None,
             )
@@ -411,8 +415,20 @@ class Runtime:
         if len(self.state["result_order"]) >= SEARCH_REFERENCE_LIMIT:
             page["next_cursor"] = None
         self.state["search"] = {k: page[k] for k in ("filters", "next_cursor", "coverage")}
-        # Return cards for this page; IDs/order survive, original subject/body/snippets do not.
-        self.search_page = page
+        # The model sees one page at a time, but the UI needs every card shown
+        # during this turn. Otherwise a second page can leave an earlier
+        # `mail-N` addressable even though its card was never returned to the UI.
+        # A new search resets the aggregate because its references are replaced.
+        previous_cards = self.search_page["results"] if args is None and self.search_page else []
+        cards_by_reference = {row["reference"]: row for row in [*previous_cards, *retained_results]}
+        visible_cards = [
+            cards_by_reference[ref]
+            for ref in self.state["result_order"]
+            if ref in cards_by_reference
+        ]
+        self.search_page = {**page, "results": visible_cards}
+        # Return only this page to the model; IDs/order survive, original
+        # subject/body/snippets do not persist in conversation storage.
         return {
             "results": observations,
             "has_more": bool(page["next_cursor"]),
@@ -494,6 +510,82 @@ class Runtime:
             "coverage": (
                 "captured thread messages" if scope == "visible_thread" else "selected message only"
             ),
+            "fetched_at": datetime.now(UTC).isoformat(),
+        }
+
+    async def read_search_results(self, references):
+        """Inspect one bounded batch of currently displayed Gmail search references.
+
+        Reuse the single-message read path for owner checks and source identity.
+        Only the capped excerpts enter the model transcript and citation evidence.
+        """
+        if not 1 <= len(references) <= 5 or len(set(references)) != len(references):
+            raise ValueError("Choose one to five distinct search references")
+        displayed = set(self.state.get("result_order", []))
+        for reference in references:
+            source = self.state["refs"].get(reference)
+            if (
+                not re.fullmatch(r"mail-[1-9][0-9]*", reference)
+                or reference not in displayed
+                or not source
+                or not source.get("message_id")
+                or not source.get("thread_id")
+                or source.get("context_id")
+            ):
+                raise ValueError("Use only current searched email references")
+
+        sentinel = object()
+        prior = {
+            reference: (
+                self.evidence.get(reference, sentinel),
+                self.loaded.get(reference, sentinel),
+                set(self.read_scopes[reference]) if reference in self.read_scopes else sentinel,
+            )
+            for reference in references
+        }
+        results = []
+        try:
+            for reference in references:
+                result = await self.read(reference)
+                messages = []
+                for message in result["messages"]:
+                    body = message["body"]
+                    messages.append(
+                        {
+                            **message,
+                            "body": body[:SEARCH_READ_BODY_CHARS],
+                            "truncated": message["truncated"] or len(body) > SEARCH_READ_BODY_CHARS,
+                        }
+                    )
+                excerpt_evidence = "\n".join(
+                    str(message.get(field) or "")
+                    for message in messages
+                    for field in ("subject", "sender", "reply_to", "body")
+                )
+                earlier_evidence = prior[reference][0]
+                # An earlier full read was also shown to the model. A later
+                # capped batch must not invalidate a quote from that read.
+                self.evidence[reference] = (
+                    excerpt_evidence
+                    if earlier_evidence is sentinel
+                    else earlier_evidence + "\n" + excerpt_evidence
+                )
+                results.append({"reference": reference, "messages": messages})
+        except Exception:
+            for reference, values in prior.items():
+                for mapping, value in zip(
+                    (self.evidence, self.loaded, self.read_scopes), values, strict=True
+                ):
+                    if value is sentinel:
+                        mapping.pop(reference, None)
+                    else:
+                        mapping[reference] = value
+            raise
+
+        return {
+            "results": results,
+            "untrusted_source": True,
+            "coverage": "selected searched messages only",
             "fetched_at": datetime.now(UTC).isoformat(),
         }
 

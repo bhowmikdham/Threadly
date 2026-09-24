@@ -1,6 +1,8 @@
 """Separate Converse tool adapter; strict text-only workflows remain unchanged."""
 
 import asyncio
+import re
+import time
 from contextlib import suppress
 
 from app.config import get_settings
@@ -8,11 +10,44 @@ from app.model_client.bedrock import _runtime_client
 from app.model_client.providers import ProviderError
 from app.pii.masking import mask_structure, unmask
 
+AWS_ERROR_CODES = frozenset(
+    {
+        "ThrottlingException",
+        "ModelTimeoutException",
+        "ModelNotReadyException",
+        "ServiceUnavailableException",
+        "InternalServerException",
+        "AccessDeniedException",
+        "ValidationException",
+    }
+)
+TRANSPORT_ERROR_CODES = frozenset(
+    {"ReadTimeoutError", "ConnectTimeoutError", "EndpointConnectionError", "ConnectionClosedError"}
+)
+_REQUEST_ID = re.compile(r"[A-Za-z0-9-]{1,80}\Z")
+
 
 class ConversationProviderError(ProviderError):
-    def __init__(self, code):
-        self.code = code
-        super().__init__(code)
+    """Only allowlisted transport metadata may cross into internal diagnostics."""
+
+    def __init__(self, code, *, http_status=None, request_id=None, elapsed_ms=None):
+        self.code = (
+            code
+            if isinstance(code, str) and code in AWS_ERROR_CODES | TRANSPORT_ERROR_CODES
+            else "provider_unavailable"
+        )
+        self.http_status = (
+            http_status if type(http_status) is int and 100 <= http_status <= 599 else None
+        )
+        self.request_id = (
+            request_id
+            if isinstance(request_id, str) and _REQUEST_ID.fullmatch(request_id)
+            else None
+        )
+        self.elapsed_ms = (
+            elapsed_ms if type(elapsed_ms) is int and 0 <= elapsed_ms <= 300_000 else None
+        )
+        super().__init__(self.code)
 
 
 class ConversationModel:
@@ -26,6 +61,7 @@ class ConversationModel:
         if not settings.bedrock_mail_processing_acknowledged:
             raise ProviderError("Bedrock mail processing is not acknowledged")
         client = None
+        started = time.monotonic()
         try:
             # Mask decoded values instead of serialized JSON, which may contain
             # Unicode escapes that a phone-like match would corrupt. The map is
@@ -81,17 +117,28 @@ class ConversationModel:
         except ProviderError:
             raise
         except Exception as exc:
-            code = getattr(exc, "response", {}).get("Error", {}).get("Code")
-            allowed = {
-                "ThrottlingException",
-                "ModelTimeoutException",
-                "ServiceUnavailableException",
-                "InternalServerException",
-                "AccessDeniedException",
-                "ValidationException",
-            }
+            response = getattr(exc, "response", None)
+            response = response if isinstance(response, dict) else {}
+            error = response.get("Error")
+            metadata = response.get("ResponseMetadata")
+            error = error if isinstance(error, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            code = error.get("Code")
+            # Botocore transport exceptions have no AWS error response. Restrict
+            # classification to named SDK classes; never log their messages or URL.
+            cls = type(exc)
+            if not isinstance(code, str) or code not in AWS_ERROR_CODES:
+                code = (
+                    cls.__name__
+                    if cls.__module__ == "botocore.exceptions"
+                    and cls.__name__ in TRANSPORT_ERROR_CODES
+                    else "provider_unavailable"
+                )
             raise ConversationProviderError(
-                code if code in allowed else "provider_unavailable"
+                code,
+                http_status=metadata.get("HTTPStatusCode"),
+                request_id=metadata.get("RequestId"),
+                elapsed_ms=round((time.monotonic() - started) * 1000),
             ) from None
         finally:
             if client is not None:
