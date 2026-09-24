@@ -1,5 +1,9 @@
+import { useState } from "react"
+
 import type { Entry, InboxResult } from "../lib/types"
 import { Icon } from "./Icon"
+
+const VISIBLE_MAIL_BATCH = 5
 
 export function FlightCard({
   flight
@@ -43,6 +47,7 @@ export function InboxCards({
   entry: Entry
   controller: any
 }) {
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_MAIL_BATCH)
   const page = entry.inbox
   if (
     !page ||
@@ -73,7 +78,9 @@ export function InboxCards({
     <section className="inbox-results" aria-label="Email results">
       <p className="inbox-intro">
         {page.results.length
-          ? `Here ${page.results.length === 1 ? "is" : "are"} ${page.results.length} matching ${page.results.length === 1 ? "email" : "emails"}.`
+          ? page.results.length > visibleCount
+            ? `Showing ${visibleCount} of ${page.results.length} emails from this search.`
+            : `Here ${page.results.length === 1 ? "is" : "are"} ${page.results.length} ${page.results.length === 1 ? "email" : "emails"} from this search.`
           : "I didn’t find any matching emails in these dates."}
       </p>
       {dates.length > 0 && (
@@ -87,7 +94,7 @@ export function InboxCards({
         </p>
       )}
       <div className="mail-card-list">
-        {page.results.map((mail, i) => {
+        {page.results.slice(0, visibleCount).map((mail, i) => {
           const selected = controller.selection?.targetId === mail.message_id
           return (
             <article
@@ -142,14 +149,28 @@ export function InboxCards({
           )
         })}
       </div>
-      {page.next_cursor && controller.canPage(entry) && (
+      {page.results.length > visibleCount && (
         <button
           className="show-more-mail"
-          disabled={controller.busy}
-          onClick={() => void controller.moreEmails(entry)}>
-          Show more emails <Icon name="chevron" size={14} />
+          onClick={() =>
+            setVisibleCount((count) => count + VISIBLE_MAIL_BATCH)
+          }>
+          Show{" "}
+          {Math.min(VISIBLE_MAIL_BATCH, page.results.length - visibleCount)}{" "}
+          more results
+          <Icon name="chevron" size={14} />
         </button>
       )}
+      {page.results.length <= visibleCount &&
+        page.next_cursor &&
+        controller.canPage(entry) && (
+          <button
+            className="show-more-mail"
+            disabled={controller.busy}
+            onClick={() => void controller.moreEmails(entry)}>
+            Show more emails <Icon name="chevron" size={14} />
+          </button>
+        )}
       {!page.results.length && (
         <p className="muted">Try another sender, subject or date range.</p>
       )}

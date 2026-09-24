@@ -123,8 +123,12 @@ try {
     `Find recent emails from or about ${process.env.THREADLY_MAIL_QUERY || "GYG"}. Show matching email cards.`
   )
   await completed(search, ".mail-glass-card", 180000)
-  const firstPageSize = await search.locator(".mail-glass-card").count()
-  assert(firstPageSize >= 1 && firstPageSize <= 5)
+  const initiallyVisible = await search.locator(".mail-glass-card").count()
+  assert(initiallyVisible >= 1 && initiallyVisible <= 5)
+  const reveal = search.getByRole("button", { name: /^Show \d+ more results$/ })
+  while (await reveal.count()) await reveal.click()
+  const returnedCards = await search.locator(".mail-glass-card").count()
+  assert(returnedCards >= initiallyVisible && returnedCards <= 25)
   await expect(search.locator(".inbox-scope")).toBeVisible()
   await search.locator(".mail-card-main").first().click()
   await expect(page.locator(".context-chip")).toBeVisible({ timeout: 45000 })
@@ -133,7 +137,7 @@ try {
     "true"
   )
   console.log(
-    "PASS: natural inbox search, five-card bound and explicit source attachment"
+    `PASS: natural inbox search, ${initiallyVisible} initially visible of ${returnedCards} bounded cards, and explicit source attachment`
   )
 
   stage = "selected-email follow-up"
