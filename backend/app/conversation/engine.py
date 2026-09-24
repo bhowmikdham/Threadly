@@ -42,6 +42,10 @@ class MissingSourceEvidence(ValueError):
     """A source-based answer omitted citations, including an unread ranking claim."""
 
 
+class FreshSearchRequired(ValueError):
+    """The latest explicit mailbox request cannot answer from a previous search."""
+
+
 class UnverifiedSourceEvidence(ValueError):
     """A response cited a reference or quote outside the read observations."""
 
@@ -235,6 +239,28 @@ async def run(context, runtime, model=None):
                             }
                         }
                         status = "error"
+                    except FreshSearchRequired:
+                        trace.append(
+                            {"tool": name, "status": "invalid", "reason": "fresh_search_required"}
+                        )
+                        search_failed = getattr(
+                            runtime, "fresh_search_attempted", False
+                        ) and not getattr(runtime, "fresh_search_done", False)
+                        result = {
+                            "json": {
+                                "error": "fresh_search_required",
+                                "message": (
+                                    "The current Gmail search did not complete. Do not claim "
+                                    "which messages exist; say you couldn't check just now "
+                                    "or ask a source-free clarification."
+                                    if search_failed
+                                    else "This is a new mailbox request. Use search_mail for the "
+                                    "current sender or unfiltered Inbox scope before answering; "
+                                    "earlier mail references and counts are not current evidence."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except MissingSourceEvidence:
                         trace.append(
                             {"tool": name, "status": "invalid", "reason": "citation_required"}
@@ -339,6 +365,18 @@ async def run(context, runtime, model=None):
             "release": RELEASE,
             "trace": trace,
         }
+    if (
+        getattr(runtime, "fresh_search_scope", None)
+        and getattr(runtime, "fresh_search_attempted", False)
+        and not getattr(runtime, "fresh_search_done", False)
+    ):
+        return {
+            "kind": "message",
+            "text": "I couldn't check your inbox right now. Please try again.",
+            "evidence": [],
+            "release": RELEASE,
+            "trace": trace,
+        }
     raise ApiError(
         422,
         "conversation_tool_limit",
@@ -401,6 +439,16 @@ def _tool_error(tool_use_id, code, message):
 
 
 def validate_response(answer: Respond, runtime):
+    if getattr(runtime, "fresh_search_scope", None):
+        if not getattr(runtime, "fresh_search_attempted", False):
+            raise FreshSearchRequired("Search the latest explicit mailbox scope first")
+        if not getattr(runtime, "fresh_search_done", False):
+            if not answer.evidence and (
+                (answer.kind == "clarification" and _asks_only_for_details(answer.text))
+                or (answer.kind == "message" and _reports_search_unavailable(answer.text))
+            ):
+                return {"kind": answer.kind, "text": answer.text, "evidence": []}
+            raise FreshSearchRequired("The current mailbox search did not complete")
     for source in answer.evidence:
         text = runtime.evidence.get(source.reference)
         if not text or " ".join(source.quote.split()) not in " ".join(text.split()):
@@ -444,6 +492,24 @@ def validate_response(answer: Respond, runtime):
         "text": answer.text,
         "evidence": [x.model_dump() for x in answer.evidence],
     }
+
+
+def _reports_search_unavailable(text):
+    """Allow only a bounded availability report when no fresh Gmail page exists."""
+    value = " ".join(text.split())
+    return bool(
+        re.fullmatch(
+            r"(?:I (?:couldn't|could not|can't|cannot|was unable to) "
+            r"(?:search|check|access|load|fetch|connect to|reach) "
+            r"(?:Gmail|your (?:inbox|mailbox|email|emails|messages))|"
+            r"(?:Gmail|inbox|mailbox|email search) (?:is )?"
+            r"(?:temporarily )?(?:unavailable|not available))"
+            r"(?: (?:right now|just now|at the moment))?[.!]?"
+            r"(?: (?:Please )?try again(?: later| shortly)?[.!]?)?",
+            value,
+            re.I,
+        )
+    )
 
 
 def _uninspected_newer_results(answer, runtime):

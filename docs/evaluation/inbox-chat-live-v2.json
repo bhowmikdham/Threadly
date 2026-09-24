@@ -1,0 +1,58 @@
+{
+  "release": "inbox-chat-1.1.0",
+  "prompt_hash": "60de823e3722f4972a731b5970ef464476440fd4981efdcf1b3c4c9bf00395a5",
+  "schema_hash": "f589f50ba10bfdfafd380aa2479a26ab96106aa3c6476ebaa8951e4bfd83054f",
+  "page_size": 5,
+  "cases_hash": "9ec2be9a908eb21be38ae7b688e401446d7b70d872d367ed312efd2e3b1666ab",
+  "cases": [
+    {
+      "instruction": "hey",
+      "kind": "message",
+      "passed": true
+    },
+    {
+      "instruction": "Show me all the GYG emails",
+      "kind": "search",
+      "passed": true
+    },
+    {
+      "instruction": "Find my flight emails",
+      "kind": "search",
+      "passed": true
+    },
+    {
+      "instruction": "Show GYG emails from last month",
+      "kind": "search",
+      "passed": true
+    },
+    {
+      "instruction": "Find emails from alex@example.test",
+      "kind": "search",
+      "passed": true
+    },
+    {
+      "instruction": "Show my latest emails",
+      "kind": "search",
+      "passed": true
+    },
+    {
+      "instruction": "Summarise this thread",
+      "kind": "continue",
+      "passed": true
+    },
+    {
+      "instruction": "Find GYG emails and draft a reply",
+      "kind": "continue",
+      "passed": true
+    },
+    {
+      "instruction": "Write Alex an email thanking them",
+      "kind": "continue",
+      "passed": true
+    }
+  ],
+  "mailbox_read": false,
+  "external_actions": false,
+  "provider": "bedrock",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0"
+}
