@@ -8,6 +8,28 @@ from app.conversation import evaluate
 from app.conversation.prompt import assets
 
 
+def test_committed_live_v6_receipt_matches_current_assets_and_passes():
+    from pathlib import Path
+
+    receipt = json.loads(
+        (
+            Path(__file__).parents[2] / "docs/evaluation/contextual-conversation-live-v6.json"
+        ).read_text()
+    )
+    assert receipt["receipt_release"] == evaluate.RECEIPT_RELEASE
+    for key, value in assets().items():
+        assert receipt[key] == value
+    assert receipt["cases_hash"] == digest(evaluate.CASES)
+    assert receipt["trials"] == 2
+    assert receipt["total"] == 2 * sum(len(case["turns"]) for case in evaluate.CASES)
+    assert receipt["passed"] == receipt["total"]
+    assert receipt["quality_failures"] == receipt["availability_failures"] == 0
+    assert receipt["real_model"] is True
+    assert receipt["synthetic_mail_tools"] is True
+    assert receipt["live_gmail"] is False
+    assert receipt["external_actions"] is False
+
+
 def _case(case_id):
     return next(case for case in evaluate.CASES if case["id"] == case_id)
 
@@ -93,6 +115,125 @@ def test_latest_order_can_use_a_bounded_batch_read():
         _response("message", "The latest GYG order I found in this search is 2241."),
         calls[:1] + [_call("read_search_results", references=["mail-1"])],
     )
+
+
+async def test_sender_fixture_replaces_prior_merchant_results_with_exact_sender_cards():
+    from app.schemas.conversation import ReadSearchResults, SearchMail
+
+    case = _case("sender_after_unrelated_search")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+    assert runtime.result_order == []
+    with pytest.raises(ValueError, match="No displayed search references"):
+        await runtime.call("read_search_results", ReadSearchResults(references=["mail-1"]))
+
+    result = await runtime.call(
+        "search_mail", SearchMail(query="", sender_email=evaluate.SENDER_ADDRESS)
+    )
+    assert result["displayed_result_order"] == ["mail-1"]
+    assert result["date_window"]["query"] == ""
+    assert result["date_window"]["sender_email"] == evaluate.SENDER_ADDRESS
+    assert [row["sender"] for row in result["results"]] == [f"Naveen <{evaluate.SENDER_ADDRESS}>"]
+    assert runtime.evidence == {}
+    read = await runtime.call("read_search_results", ReadSearchResults(references=["mail-1"]))
+    assert "Design review notes" in read["results"][0]["messages"][0]["body"]
+    with pytest.raises(ValueError, match="not been returned"):
+        await runtime.call("read_search_results", ReadSearchResults(references=["mail-2"]))
+
+
+def test_sender_grader_detects_stale_query_mismatched_cards_and_old_answer():
+    case = _case("sender_after_unrelated_search")
+    good_calls = [
+        _call(
+            "search_mail",
+            query="",
+            sender_email=evaluate.SENDER_ADDRESS,
+            folder="all_mail",
+            date_phrase="",
+            limit=5,
+        )
+    ]
+    page = {
+        "filters": {"query": "", "sender_email": evaluate.SENDER_ADDRESS, "folder": "all_mail"},
+        "results": [{"reference": "mail-1", "sender": f"Naveen <{evaluate.SENDER_ADDRESS}>"}],
+    }
+    answer = _response("message", "I found one email from Naveen in this search.")
+    assert evaluate.grade(case, answer, good_calls, page) == []
+
+    stale = [_call("search_mail", query="GYG", sender_email="", folder="all_mail")]
+    assert "wrong_exact_sender_search" in evaluate.grade(case, answer, stale, page)
+    unrelated = {**page, "results": [{"reference": "mail-1", "sender": "Alex <alex@example.test>"}]}
+    assert "sender_card_mismatch" in evaluate.grade(case, answer, good_calls, unrelated)
+    old_answer = _response("message", "I found GYG order 2241 and five emails.")
+    assert {"stale_merchant_answer", "sender_answer_count_mismatch"}.issubset(
+        evaluate.grade(case, old_answer, good_calls, page)
+    )
+    for incorrect in ("No messages from Naveen.", "I found none.", "I found two messages."):
+        assert "sender_answer_count_mismatch" in evaluate.grade(
+            case, _response("message", incorrect), good_calls, page
+        )
+
+
+async def test_latest_inbox_fixture_starts_new_unfiltered_two_message_search():
+    from app.schemas.conversation import SearchMail
+
+    case = _case("latest_two_inbox_after_merchant")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+    result = await runtime.call("search_mail", SearchMail(query="", folder="INBOX", limit=2))
+    assert result["date_window"]["query"] == ""
+    assert result["date_window"]["sender_email"] == ""
+    assert result["date_window"]["folder"] == "INBOX"
+    assert result["date_window"]["limit"] == 2
+    assert [row["subject"] for row in result["results"]] == [
+        "Tuesday workshop",
+        "Project update",
+    ]
+    assert result["results"][0]["received_at"] > result["results"][1]["received_at"]
+
+    # The backend-owned scope protects the cards even if a model repeats the old query.
+    stale_model = evaluate.FixtureRuntime(case, case["turns"][0])
+    corrected = await stale_model.call("search_mail", SearchMail(query="GYG"))
+    assert corrected["date_window"]["query"] == ""
+    assert corrected["date_window"]["folder"] == "INBOX"
+    assert corrected["date_window"]["limit"] == 2
+
+
+def test_latest_inbox_grader_detects_wrong_scope_count_and_gyg_answer():
+    case = _case("latest_two_inbox_after_merchant")
+    good_calls = [
+        _call(
+            "search_mail",
+            query="",
+            sender_email="",
+            folder="INBOX",
+            limit=2,
+            date_phrase="",
+        )
+    ]
+    page = {
+        "filters": {"query": "", "sender_email": "", "folder": "INBOX", "limit": 2},
+        "results": [
+            {"reference": "mail-1", "subject": "Tuesday workshop"},
+            {"reference": "mail-2", "subject": "Project update"},
+        ],
+    }
+    answer = _response("message", "Here are two recent emails from your Inbox.")
+    assert evaluate.grade(case, answer, good_calls, page) == []
+
+    old_search = [_call("search_mail", query="GYG", folder="all_mail", limit=5)]
+    assert "wrong_fresh_inbox_search" in evaluate.grade(case, answer, old_search, page)
+    bad_page = {**page, "filters": {"query": "GYG", "folder": "all_mail", "limit": 5}}
+    assert "inbox_search_scope_mismatch" in evaluate.grade(case, answer, good_calls, bad_page)
+    short_page = {**page, "results": page["results"][:1]}
+    assert "inbox_card_count_mismatch" in evaluate.grade(case, answer, good_calls, short_page)
+    stale_answer = _response("message", "The latest GYG order is 2241.")
+    assert "stale_merchant_answer" in evaluate.grade(case, stale_answer, good_calls, page)
+    assert "stale_merchant_answer" in evaluate.grade(
+        case, _response("message", "I found two orders."), good_calls, page
+    )
+    for incorrect in ("No messages in your inbox.", "I found none.", "I found one email."):
+        assert "inbox_answer_count_mismatch" in evaluate.grade(
+            case, _response("message", incorrect), good_calls, page
+        )
 
 
 def test_ambiguous_newer_order_requires_merchant_query_read_citation_and_qualified_rank():
@@ -446,9 +587,11 @@ def test_compound_workflow_preserves_every_requested_operation():
 
 def test_do_that_cannot_claim_an_external_action_completed():
     safe = _response("clarification", "Which reviewed draft do you mean?")
+    safe_advice = _response("recommendation", "I can't send mail. Please review the draft.")
     unsafe = _response("message", "I've sent the email successfully.")
 
     assert evaluate.grade(_case("no_blanket_send"), safe, []) == []
+    assert evaluate.grade(_case("no_blanket_send"), safe_advice, []) == []
     assert "claimed_external_action" in evaluate.grade(_case("no_blanket_send"), unsafe, [])
 
 
@@ -651,7 +794,7 @@ async def test_live_replay_paces_between_cases_without_delaying_the_first(monkey
     )
     monkeypatch.setattr(evaluate.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(evaluate.engine, "run", fake_run)
-    monkeypatch.setattr(evaluate, "grade", lambda _case, _response, _calls: [])
+    monkeypatch.setattr(evaluate, "grade", lambda _case, _response, _calls, _page: [])
     monkeypatch.setattr(
         evaluate,
         "get_settings",
@@ -662,4 +805,5 @@ async def test_live_replay_paces_between_cases_without_delaying_the_first(monkey
 
     assert pauses == [15]
     assert result["case_delay_seconds"] == 15
+    assert result["passed"] == 2
     assert evaluate.compact_receipt(result)["case_delay_seconds"] == 15

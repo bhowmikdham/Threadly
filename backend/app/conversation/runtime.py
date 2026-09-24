@@ -32,6 +32,36 @@ SEARCH_READ_BODY_CHARS = 2000
 WORKFLOW_BINDING_ERROR = "workflow_binding_invalid"
 
 
+def fresh_search_scope(latest_turn):
+    """Keep an explicit new search separate from older displayed mail references."""
+
+    sender = inbox_chat.explicit_sender_email(latest_turn)
+    # A quoted From header in a question about the selected email is source
+    # context, not a request to search the mailbox for that sender.
+    sender_discovery = (
+        re.search(
+            r"\b(?:e-?mails?|messages?|threads?|mail)\s+"
+            r"(?:(?:i|we|that|which|all|any|the|new|recent|latest|received|got|have|was|were|sent)\s+){0,3}"
+            r"(?:from|sent\s+by)\s*:?[ \t]*" + re.escape(sender or ""),
+            latest_turn,
+            re.I,
+        )
+        if sender
+        else None
+    )
+    if sender and sender_discovery:
+        return {"kind": "sender", "sender_email": sender}
+    match = re.search(
+        r"\b(?:latest|newest|most\s+recent)\s+([1-5])\s+"
+        r"(?:emails?|messages?)\s+(?:in|from)\s+(?:my\s+)?inbox\s*[?.!]*$",
+        latest_turn,
+        re.I,
+    )
+    if match:
+        return {"kind": "recent_inbox", "limit": int(match[1])}
+    return None
+
+
 def _normalise_words(value):
     return " ".join(value.casefold().split())
 
@@ -211,10 +241,22 @@ class Runtime:
         self.lease = lease
         self.evidence, self.loaded, self.read_scopes = {}, {}, {}
         self.search_page = None
+        self.fresh_search_scope = fresh_search_scope(request.instruction)
+        self.fresh_search_done = False
+        self.fresh_search_attempted = False
         self.active = self.artifact = None
         # Addresses are exposed as backend-issued references, not writable model strings.
         user_text = "\n".join([h["user"] for h in state["history"]] + [request.instruction])
         self.recipients = user_recipient_references(user_text)
+
+    def _reset_previous_search(self):
+        # A new explicit mailbox request supersedes old search references. The
+        # independently pinned source, if any, remains available to the user.
+        self.state["refs"] = {
+            key: value for key, value in self.state["refs"].items() if key == "selected"
+        }
+        self.state["result_order"] = []
+        self.state.pop("search", None)
 
     def authoritative_instruction(self):
         """Build workflow input exclusively from bounded user-authored turns.
@@ -242,6 +284,8 @@ class Runtime:
         }
 
     async def context(self):
+        if self.fresh_search_scope:
+            self._reset_previous_search()
         if "context_snapshot_id" in self.request.model_fields_set:
             if self.request.context_snapshot_id:
                 async with self.factory() as session:
@@ -348,29 +392,68 @@ class Runtime:
         raise ValueError("Unknown capability")
 
     async def search(self, args):
+        if args is not None and self.fresh_search_scope:
+            self.fresh_search_attempted = True
         if get_settings().gmail_source_mode != "on_demand":
             raise ApiError(409, "live_inbox_required", "Connect live Gmail to search.")
         cursor = None
         if args is not None:
+            query, sender_email, folder, date_phrase, limit = (
+                args.query,
+                args.sender_email,
+                args.folder,
+                args.date_phrase,
+                args.limit,
+            )
+            if self.fresh_search_scope:
+                if self.fresh_search_scope["kind"] == "recent_inbox":
+                    # The latest turn explicitly requests an unfiltered Inbox
+                    # listing; an old merchant query cannot narrow it.
+                    query, sender_email, folder, date_phrase = "", "", "INBOX", ""
+                    limit = self.fresh_search_scope["limit"]
+                else:
+                    # `from:` is produced by the backend, never copied from a
+                    # model-generated Gmail operator or an earlier search.
+                    sender_email = self.fresh_search_scope["sender_email"]
+                    if query.casefold() == sender_email.casefold():
+                        query = ""
+                    elif query and query.casefold() not in self.request.instruction.casefold():
+                        query = ""
+                    if query.casefold() in {"email", "emails", "message", "messages"}:
+                        query = ""
+                    if (
+                        date_phrase
+                        and date_phrase.casefold() not in self.request.instruction.casefold()
+                    ):
+                        date_phrase = ""
+                    folder = (
+                        "INBOX"
+                        if re.search(r"\binbox\b", self.request.instruction, re.I)
+                        else "all_mail"
+                    )
             user_text = "\n".join(
                 [h["user"] for h in self.state["history"]] + [self.request.instruction]
             )
-            for value in (args.query, args.date_phrase):
+            for value in (query, date_phrase, sender_email):
                 if value and value.casefold() not in user_text.casefold():
                     raise ValueError("Search literals must come from user dialogue")
-            if args.folder != "all_mail" and args.folder.casefold() not in user_text.casefold():
+            if folder != "all_mail" and folder.casefold() not in user_text.casefold():
                 raise ValueError("Folder is not user supplied")
             start, end = inbox_chat.date_window(
-                args.date_phrase, datetime.now(UTC), self.request.timezone
+                date_phrase, datetime.now(UTC), self.request.timezone
             )
             filters = InboxFilters(
                 schema_version="1.0",
-                query=args.query,
-                folder=args.folder,
+                query=query,
+                sender_email=sender_email,
+                folder=folder,
                 received_from=start,
                 received_before=end,
+                limit=limit,
             )
         else:
+            if self.fresh_search_scope and not self.fresh_search_done:
+                raise ValueError("Start a new search for this request before paging")
             previous = self.state.get("search")
             if not previous or not previous.get("next_cursor"):
                 raise ApiError(409, "search_exhausted", "There are no more results in this search.")
@@ -379,6 +462,8 @@ class Runtime:
             filters = InboxFilters.model_validate_json(json.dumps(previous["filters"]))
             cursor = previous["next_cursor"]
         page = await inbox_chat.search(self.owner, filters, cursor)
+        if args is not None and self.fresh_search_scope:
+            self.fresh_search_done = True
         if args is not None:
             self.evidence = {k: v for k, v in self.evidence.items() if k == "selected"}
             self.loaded = {k: v for k, v in self.loaded.items() if k == "selected"}

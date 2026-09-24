@@ -24,8 +24,10 @@ class ConversationTurn(InboxChatRequest):
 
 class SearchMail(StrictModel):
     query: str = Field(max_length=200)
+    sender_email: str = Field(default="", max_length=254)
     date_phrase: str = Field(default="", max_length=100)
     folder: Literal["all_mail", "INBOX", "SENT"] = "all_mail"
+    limit: int = Field(default=5, ge=1, le=5)
 
 
 class MoreMail(StrictModel):
@@ -80,8 +82,12 @@ TOOLS = {
             "Find email on demand using a user-supplied literal. The query is "
             "quoted as one exact Gmail phrase: for 'latest GYG order', pass only "
             "the merchant name 'GYG', not 'GYG order' or task words. Returns "
-            "five recent matches with references, not necessarily five actual "
-            "orders. Default coverage is the past year. No mailbox import."
+            "up to limit recent matches with references, not necessarily actual "
+            "orders. For 'emails from person@example.com', set sender_email to "
+            "the exact address and leave query empty unless the user also gave "
+            "independent search words. For 'latest 2 emails in my inbox', use "
+            "query='', folder='INBOX', limit=2; start a new search rather than "
+            "reading earlier results. Default coverage is the past year. No mailbox import."
         ),
     ),
     "more_mail": (

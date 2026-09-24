@@ -1,14 +1,25 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.5`. Feature switch:
+Implementation release: `contextual-conversation-1.1.6`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. Release `1.1.5` keeps search and reads on demand, makes the
-quoted Gmail search behavior explicit to the model, and returns a latest-request
-answer for correction when it cites an older result while newer returned cards
-remain unread, even if the answer avoids rank wording. It also gives specific citation/coverage feedback on invalid
-answers, preserves only verified current-search citations in a tool-budget
-fallback, and evaluates an ambiguous newer purchase against an older obvious
-receipt. Its paced, two-trial synthetic Bedrock replay passed **36/36** checks
+`c23026e9a039`. Release `1.1.6` makes an explicit sender address an exact From
+constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
+unfiltered Inbox search with that page limit. These requests discard an older
+search's cards and cursor while preserving any independently pinned source. Its
+paced, two-trial synthetic Bedrock replay passed **40/40** checks without quality
+or provider failures; the sanitized [v6 receipt](evaluation/contextual-conversation-live-v6.json)
+pins the prompt, tool and case hashes. An [earlier replay](evaluation/contextual-conversation-live-v6-attempt1.json)
+passed 38/40 because the evaluator treated a safe review recommendation as an
+invalid answer type for “do that”; its external-action check found no send claim.
+The accepted type was corrected and the entire suite rerun.
+
+Release `1.1.5` kept search and reads on demand, made the quoted Gmail search
+behavior explicit to the model, and returned a latest-request answer for correction
+when it cited an older result while newer returned cards remained unread, even if
+the answer avoided rank wording. It also gave specific citation/coverage feedback
+on invalid answers and preserved only verified current-search citations in a tool-budget
+fallback. Its replay included an ambiguous newer purchase against an older obvious
+receipt. The paced, two-trial synthetic Bedrock replay passed **36/36** checks
 with no quality or availability failures; the sanitized
 [receipt](evaluation/contextual-conversation-live-v5.json) pins the prompt, tool
 and case hashes. Synthetic results do not establish general inbox accuracy.
@@ -69,8 +80,11 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
 - A selected email is pinned until the user changes/removes it. Changing the open Gmail
   tab does not silently change a reviewed draft's source. Use the existing attach-current
   control for a different visible email.
-- Each search page returns up to five candidates from one bounded Gmail query. Gmail may
-  match headers as well as message text, and local bounds may leave fewer than five cards.
+- Each search page requests 1–5 candidates from one bounded Gmail query, according to
+  `limit`. It can return fewer or none. Gmail may match headers as well as message
+  text, and local bounds can reduce the number of displayed cards further. To fill
+  a result page after local rejection, the backend reads at most five provider pages
+  and 25 candidate details; an opaque cursor remains when that bound is reached.
   The query literal is quoted as an exact phrase. For a merchant-order request, the
   model starts with the user-supplied merchant term alone so a receipt that uses
   “purchase” rather than “order” is not excluded by an overly narrow phrase.
@@ -94,9 +108,18 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   claims still need exact read quotes. Uncited clarifications cannot assert what
   the mailbox contains.
 - Search defaults to the past year, with an explicit window of at most 366 days. Search
-  literals/folder/date wording must come from user dialogue. Provider cursors remain signed
-  and account-bound. At most 25 addressable references are retained for one search;
-  pagination stops at that boundary. If the model checks more than one five-result page
+  literals/folder/date wording must come from user dialogue. An explicit “from
+  person@example.com” turn sets a separate exact `sender_email` constraint; the backend
+  generates Gmail's `from:` operator and verifies returned parsed From addresses. The
+  address alone leaves the quoted phrase `query` empty. Additional phrase words must
+  come from the current user request. “Latest 2 emails in my inbox” starts an unfiltered
+  `INBOX` search with `query: ""`, `sender_email: ""` and `limit: 2`; the same rule supports
+  N from 1 to 5. The backend requires the fresh search before an answer about that scope
+  and does not reuse an older merchant query, sender filter or page cursor. A new search
+  replaces old `mail-N` references; the pinned `selected` source is independent.
+  Provider cursors remain signed and account-bound, including the sender and limit in
+  their scope. At most 25 addressable references are retained for one search;
+  pagination stops at that boundary. If the model checks more than one search page
   during one turn, the API returns all cards from those pages in their `mail-N` order (up
   to 25) so a later “second one” refers to a card the user actually saw. A new search
   resets the card list; card text is not stored in conversation state.
@@ -248,13 +271,16 @@ user must review the complete revised subject, body and recipients before any se
 - `tests/test_conversation*.py`: actual PostgreSQL/API state, ownership, leases, privacy,
   adapter failure behavior, reference captures and workflow handoff tests.
 - Run live evaluation explicitly: `python -m app.conversation.evaluate --live --trials 2 --case-delay-seconds 15`.
-  The pinned Australian Haiku profile passed 34/34 synthetic checks on 24 September 2026;
-  the receipt above records release, prompt/tool/case hashes and per-case results without
+  The [v5 receipt](evaluation/contextual-conversation-live-v5.json) records 36/36
+  passing synthetic checks for release `1.1.5` on 24 September 2026, with release,
+  prompt/tool/case hashes and per-case results without
   input or output content. The account audit found model invocation logging disabled in
   Sydney and account retention mode `inherit`, which follows the model's default rather than
   promising zero retention. The processing acknowledgement was set only for this synthetic
-  test command; staging remains off by default. A fixture/model replay is not a live Gmail
-  test or proof of general reasoning accuracy.
+  test command; staging remains off by default. The `1.1.6` replay, including the new
+  sender and latest-N Inbox cases, passed 40/40 across two trials in the
+  [v6 receipt](evaluation/contextual-conversation-live-v6.json). A fixture/model
+  replay is not a live Gmail test or proof of general reasoning accuracy.
 
 Known limits: only 12 exchanges, one active task and one search result set are in working
 context; arbitrary long-running autonomous planning is not implemented. Only existing

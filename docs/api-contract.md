@@ -749,6 +749,33 @@ compose checks); it is not a mailbox-wide or external-write acceptance claim.
 Pending jobs pinned to an unavailable older release fail closed and must be
 resubmitted. Completed artifacts remain readable.
 
+## Conversational inbox discovery (on demand)
+
+`POST /assistant/inbox-chat` accepts `{instruction, timezone}` under the session JWT.
+The current interpreter release is `inbox-chat-1.1.0`. It returns `release` and one of
+`kind: message` with `text`, `kind: continue`, or `kind: search` with `search`.
+For “Find emails from person@example.com”, `search.filters` has an empty `query` and
+`sender_email: "person@example.com"`. The sender must be an exact address explicitly
+written after “from” or “sent by” in the user request. The backend generates Gmail's
+`from:` constraint and checks each returned parsed From address. Other literal words
+can form a separate quoted phrase query. Search results are live, transient and
+limited to one result page of at most five messages; the interpreter uses `limit: 5`.
+The backend may inspect up to five provider pages (25 candidate details maximum)
+to fill that result page after local checks reject a hit.
+
+`POST /assistant/inbox-search-page` accepts `{filters, cursor}` with the exact filters
+returned by the first page. Filters contain `schema_version: "1.0"`, `query` (possibly
+empty), `sender_email` (possibly empty), `folder: all_mail|INBOX|SENT`, UTC
+`received_from`/`received_before`, `limit` (1–5) and `cursor: null`. The response is
+`{filters, results, next_cursor, coverage}`; each result has owned Gmail message/thread
+IDs, subject, sender, received time, snippet and optional literal flight preview.
+The cursor binds the user, account version, full search scope, release and page size.
+Changing the sender, limit or other filters requires a new search. Both routes use
+the existing error envelope and perform no mail write. The
+[v2 receipt](evaluation/inbox-chat-live-v2.json) records nine passing synthetic Bedrock
+cases for `inbox-chat-1.1.0`; the [v1 receipt](evaluation/inbox-chat-live-v1.json)
+belongs to release `1.0.0`.
+
 ## Contextual conversation API (feature-gated)
 
 `POST /assistant/conversation-turns`: `{conversation_id, request_id, expected_version,
@@ -767,7 +794,7 @@ return the durable reference without replaying model trace metadata. Optional re
 | Field | Shape and meaning |
 |---|---|
 | `evidence` | Array of `{reference,quote}` exact-source citations on grounded message/recommendation answers; absent on task/proposal results. |
-| `search` | Transient current-turn cards: each Gmail page contributes up to five `results` (`message_id`, `thread_id`, `subject`, `sender`, `received_at`, `snippet`, optional literal `flight` preview). If the model reads multiple pages in one turn, the response aggregates their cards in addressable `mail-N` order, up to 25. `next_cursor` and incomplete `coverage` describe the last page. A new search resets the aggregate. Cards are not replayed from conversation storage. |
+| `search` | Transient current-turn cards: each Gmail page contributes up to the requested `limit` of 1–5 `results` (`message_id`, `thread_id`, `subject`, `sender`, `received_at`, `snippet`, optional literal `flight` preview). If the model reads multiple pages in one turn, the response aggregates their cards in addressable `mail-N` order, up to 25. `filters` includes the exact `sender_email` and `limit`; `next_cursor` and incomplete `coverage` describe the last page. A new search resets the aggregate. Cards are not replayed from conversation storage. |
 | `task_id`, `task` | Existing durable task ID and full task view (`state`, optimistic `version`, question/artifact/event references, release and timestamps). Poll through the existing task APIs. |
 | `proposal_id`, `proposal` | Existing command-plan ID and full reviewable proposal. Confirmation is a separate typed endpoint and is not implied by chat. |
 | `artifacts` | Immediate full artifact views when the turn creates a draft revision. The durable task's `artifact_id` is authoritative for later fetch/retry. |
@@ -778,6 +805,19 @@ existing polling, typed inputs, review and confirmation endpoints. Neither the r
 response is execution approval. Ordinary follow-up text uses another turn with the returned
 version. A retry must reuse identical request ID and the complete input, including whether
 optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
+
+In `contextual-conversation-1.1.6`, the model's `search_mail` tool accepts
+`{query, sender_email?, date_phrase?, folder?, limit?}`; `sender_email` defaults to empty
+and `limit` defaults to 5, with 1–5 allowed. An explicit new “from
+person@example.com” request starts a fresh exact-sender search with an empty phrase
+unless the latest user turn supplied separate search words. “Latest 2 emails in my
+inbox” starts a fresh search with `query: ""`, `sender_email: ""`, `folder: "INBOX"`
+and `limit: 2`; N may be 1–5. The backend resets old `mail-N` results and the old
+cursor for these requests, enforces the current scope before an answer and leaves an
+independently pinned email available. A `more_mail` call pages only the current search.
+The [v6 receipt](evaluation/contextual-conversation-live-v6.json) records 40/40 passing
+synthetic Bedrock checks for release `1.1.6`; the
+[v5 receipt](evaluation/contextual-conversation-live-v5.json) covers release `1.1.5`.
 
 For `prepare_workflow(intent=summarise, reference=selected|mail-N)`, the backend requires
 that reference to have been read and creates a typed `operations:["summary"]` task with
