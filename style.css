@@ -1196,17 +1196,16 @@ summary:focus-visible {
 .mail-card-icon {
   width: 36px;
   height: 36px;
-  border: 1px solid #a99bca40;
+  border: 1px solid #e7e7e7;
   border-radius: 12px;
-  background: linear-gradient(145deg, #c7b9eb3e, #ffffff12);
-  color: var(--accent);
+  background: #fff;
   display: grid;
   place-items: center;
   flex: none;
 }
 .dark .mail-card-icon {
-  border-color: #c3b5ef3b;
-  background: linear-gradient(145deg, #c3b5ef28, #ffffff0c);
+  border-color: #ffffff24;
+  background: #f7f7f7;
 }
 .mail-card-content {
   display: flex;

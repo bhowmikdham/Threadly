@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
-import { Icon } from "./components/Icon"
+import { GmailIcon, Icon } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
@@ -450,7 +450,7 @@ function Assistant({
                   <button
                     disabled={inputBusy}
                     onClick={() => void c.selectActive()}>
-                    <Icon name="mail" />
+                    <GmailIcon />
                     Ask about the open email
                     <Icon name="chevron" size={14} />
                   </button>
@@ -552,7 +552,7 @@ function Assistant({
                 void c.selectActive()
                 setSources(false)
               }}>
-              <Icon name="mail" />
+              <GmailIcon />
               Use open Gmail thread
             </button>
             <button
@@ -608,7 +608,7 @@ function Assistant({
                 aria-label={`Attached email: ${c.selection.thread.subject}. View details`}
                 aria-expanded={contextOpen}
                 onClick={() => setContextOpen(!contextOpen)}>
-                <Icon name="mail" size={15} />
+                <GmailIcon size={15} />
                 <span>{c.selection.thread.subject}</span>
               </button>
               <button
