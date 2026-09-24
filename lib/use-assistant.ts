@@ -35,6 +35,46 @@ type PendingTurn = {
   body: Readonly<ConversationTurnBody>
 }
 
+type SelectionReference = {
+  threadId: string
+  threadVersion: number
+  visibleMessageIds: string[]
+  selectedIds: string[]
+  targetId: string | null
+}
+
+const selectionReference = (value: Selection): SelectionReference => ({
+  threadId: value.thread.thread_id,
+  threadVersion: value.thread.version,
+  visibleMessageIds: value.messages.map((message) => message.gmail_msg_id),
+  selectedIds: [...value.selectedIds],
+  targetId: value.targetId
+})
+
+const validSelectionReference = (value: any): value is SelectionReference =>
+  value &&
+  typeof value.threadId === "string" &&
+  value.threadId.length > 0 &&
+  Number.isInteger(value.threadVersion) &&
+  value.threadVersion >= 0 &&
+  Array.isArray(value.visibleMessageIds) &&
+  value.visibleMessageIds.length > 0 &&
+  value.visibleMessageIds.length <= 100 &&
+  value.visibleMessageIds.every(
+    (id: unknown) => typeof id === "string" && id.length > 0
+  ) &&
+  new Set(value.visibleMessageIds).size === value.visibleMessageIds.length &&
+  Array.isArray(value.selectedIds) &&
+  value.selectedIds.length <= value.visibleMessageIds.length &&
+  new Set(value.selectedIds).size === value.selectedIds.length &&
+  value.selectedIds.every(
+    (id: unknown) =>
+      typeof id === "string" && value.visibleMessageIds.includes(id)
+  ) &&
+  (value.targetId === null ||
+    (typeof value.targetId === "string" &&
+      value.selectedIds.includes(value.targetId)))
+
 type ConversationHistoryItem = {
   user: string
   assistant: string
@@ -56,22 +96,91 @@ export function useAssistant(user: User) {
     [selection, setSelection] = useState<Selection | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [contextBlocked, setContextBlocked] = useState(false)
+    [contextBlocked, setContextBlocked] = useState(false),
+    [restoring, setRestoring] = useState(true),
+    [restoreFailed, setRestoreFailed] = useState(false)
   const mounted = useRef(true),
     polling = useRef(new Set<string>()),
     submitting = useRef(false),
     conversation = useRef({ id: requestId(), version: 0 }),
     retryTurn = useRef<PendingTurn | null>(null),
     contextCleared = useRef(false),
-    pinnedCapture = useRef<{ selection: Selection; id: string } | null>(null)
+    contextRevision = useRef(0),
+    selectionOverride = useRef<SelectionReference | null>(null),
+    pinnedCapture = useRef<{ selection: Selection; id: string } | null>(null),
+    storageQueue = useRef<Promise<void>>(Promise.resolve())
   const storageKey = `threadlyConversation:${user.id}`
-  const saveConversation = async (pendingTurn = retryTurn.current) => {
-    await chrome.storage.session?.set({
-      [storageKey]: { ...conversation.current, pendingTurn }
+  const queueStorage = (write: () => Promise<void> | undefined) => {
+    const next = storageQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        await write()
+      })
+    storageQueue.current = next
+    return next
+  }
+  const saveConversation = (pendingTurn = retryTurn.current) => {
+    const saved = {
+      ...conversation.current,
+      pendingTurn,
+      contextCleared: contextCleared.current,
+      selectionOverride: selectionOverride.current
+    }
+    return queueStorage(() =>
+      chrome.storage.session?.set({ [storageKey]: saved })
+    )
+  }
+  const forgetConversation = () =>
+    queueStorage(() => chrome.storage.session?.remove(storageKey))
+  const persistContextChoice = () => {
+    void saveConversation().catch((e) => {
+      if (mounted.current)
+        setError(
+          `Email context could not be saved in this browser. ${errorText(e)}`
+        )
     })
+  }
+  const markContextAttached = (value: Selection) => {
+    contextRevision.current += 1
+    contextCleared.current = false
+    // Keep only provider IDs and the chosen order, never email content. The
+    // server pin remains authoritative once a turn commits this selection.
+    selectionOverride.current = selectionReference(value)
+    persistContextChoice()
   }
   useEffect(() => {
     let alive = true
+    const restoreLocalSelection = async (reference: unknown) => {
+      const revision = contextRevision.current
+      if (!validSelectionReference(reference))
+        throw new Error(
+          "The selected email reference is invalid. Attach it again."
+        )
+      const data = await api(
+        `/threads/${encodeURIComponent(reference.threadId)}`
+      )
+      if (!alive || submitting.current || contextRevision.current !== revision)
+        return
+      if (data.thread.version !== reference.threadVersion)
+        throw new Error(
+          "The selected email changed. Attach its current version."
+        )
+      const messages = reference.visibleMessageIds.map((id) =>
+        data.messages.find((message: any) => message.gmail_msg_id === id)
+      )
+      if (messages.some((message) => !message))
+        throw new Error(
+          "The selected email changed. Attach its current version."
+        )
+      selectionOverride.current = reference
+      setSelection({
+        ...data,
+        messages,
+        selectedIds: reference.selectedIds,
+        targetId: reference.targetId
+      })
+      setContextBlocked(false)
+    }
     const restore = async () => {
       const saved = (await chrome.storage.session?.get(storageKey))?.[
         storageKey
@@ -81,6 +190,19 @@ export function useAssistant(user: User) {
       try {
         value = await api(`/assistant/conversations/${saved.id}`)
       } catch (e) {
+        if (e.status === 404 && saved.version === 0 && !saved.pendingTurn) {
+          conversation.current = { id: saved.id, version: 0 }
+          contextCleared.current = saved.contextCleared === true
+          setSelection(null)
+          if (saved.selectionOverride)
+            try {
+              await restoreLocalSelection(saved.selectionOverride)
+            } catch (selectionError) {
+              setContextBlocked(true)
+              setError(errorText(selectionError))
+            }
+          return
+        }
         if (
           e.status === 404 &&
           saved.pendingTurn?.body?.expected_version === 0
@@ -97,11 +219,21 @@ export function useAssistant(user: User) {
               error: "This response was interrupted. Retry it safely."
             }
           ])
+          if (saved.selectionOverride)
+            try {
+              await restoreLocalSelection(saved.selectionOverride)
+            } catch (selectionError) {
+              setContextBlocked(true)
+              setError(errorText(selectionError))
+            }
           return
         }
         if (e.status === 404 || e.code === "conversation_account_changed")
-          await chrome.storage.session?.remove(storageKey)
-        else if (alive) setError(errorText(e))
+          await forgetConversation()
+        else if (alive) {
+          setRestoreFailed(true)
+          setError(`Conversation could not be restored. ${errorText(e)}`)
+        }
         return
       }
       try {
@@ -110,6 +242,16 @@ export function useAssistant(user: User) {
           id: value.conversation_id,
           version: Math.max(saved.version || 0, value.version)
         }
+        // A detached pin is a local choice until the next turn commits an
+        // explicit null. Keep it detached across side-panel reopen, but let a
+        // newer server conversation version take precedence.
+        contextCleared.current =
+          saved.contextCleared === true && value.version <= saved.version
+        selectionOverride.current =
+          value.version <= saved.version &&
+          validSelectionReference(saved.selectionOverride)
+            ? saved.selectionOverride
+            : null
         const history: ConversationHistoryItem[] = value.history || []
         const restoredEntries: Entry[] = history.map((h, i) => ({
           id: h.request_id || `restored-${i}`,
@@ -176,9 +318,24 @@ export function useAssistant(user: User) {
           }
         }
         setEntries(restoredEntries)
-        if (value.context_snapshot_id) {
+        const pendingEmailWithoutSelection =
+          typeof retryTurn.current?.body.context_snapshot_id === "string" &&
+          !validSelectionReference(saved.selectionOverride)
+        if (saved.selectionOverride && value.version <= saved.version) {
+          try {
+            await restoreLocalSelection(saved.selectionOverride)
+          } catch (selectionError) {
+            setContextBlocked(true)
+            setError(errorText(selectionError))
+          }
+        } else if (
+          value.context_snapshot_id &&
+          !contextCleared.current &&
+          !pendingEmailWithoutSelection
+        ) {
           // Keep submission blocked while the saved pin is being validated.
           setContextBlocked(true)
+          const revision = contextRevision.current
           try {
             const source = await api(
               `/assistant/context-snapshots/${value.context_snapshot_id}`
@@ -186,7 +343,12 @@ export function useAssistant(user: User) {
             const data = await api(
               `/threads/${encodeURIComponent(source.thread_id)}`
             )
-            if (!alive || submitting.current) return
+            if (
+              !alive ||
+              submitting.current ||
+              contextRevision.current !== revision
+            )
+              return
             if (data.thread.version === source.thread_version) {
               const selectedIds =
                 source.ui_map?.visible_message_ids ||
@@ -269,10 +431,22 @@ export function useAssistant(user: User) {
           )
         }
       } catch (e) {
-        if (alive) setError(errorText(e))
+        if (alive) {
+          setRestoreFailed(true)
+          setError(`Conversation could not be fully restored. ${errorText(e)}`)
+        }
       }
     }
     void restore()
+      .catch((e) => {
+        if (alive) {
+          setRestoreFailed(true)
+          setError(`Conversation could not be restored. ${errorText(e)}`)
+        }
+      })
+      .finally(() => {
+        if (alive) setRestoring(false)
+      })
     return () => {
       alive = false
     }
@@ -338,6 +512,13 @@ export function useAssistant(user: User) {
     }
   }
   const selectActive = async (quiet = false) => {
+    if (retryTurn.current) {
+      if (!quiet)
+        setError(
+          "Retry the unfinished message or start a new conversation before changing its email."
+        )
+      return
+    }
     if (quiet && (await chrome.storage.session?.get(storageKey))?.[storageKey])
       return
     setBusy(true)
@@ -348,7 +529,7 @@ export function useAssistant(user: User) {
         if (s) {
           setSelection(s)
           setContextBlocked(false)
-          contextCleared.current = false
+          markContextAttached(s)
           pinnedCapture.current = null
         } else if (!quiet)
           setError(
@@ -364,19 +545,26 @@ export function useAssistant(user: User) {
     }
   }
   const selectThread = async (id: string) => {
+    if (retryTurn.current) {
+      setError(
+        "Retry the unfinished message or start a new conversation before changing its email."
+      )
+      return
+    }
     setBusy(true)
     setError("")
     try {
       const data = await api(`/threads/${encodeURIComponent(id)}`)
       if (mounted.current) {
         setContextBlocked(false)
-        contextCleared.current = false
         pinnedCapture.current = null
-        setSelection({
+        const chosen = {
           ...data,
           selectedIds: data.messages.map((m) => m.gmail_msg_id),
           targetId: null
-        })
+        }
+        markContextAttached(chosen)
+        setSelection(chosen)
       }
     } catch (e) {
       if (mounted.current) setError(errorText(e))
@@ -386,6 +574,12 @@ export function useAssistant(user: User) {
   }
   const chooseEmail = async (mail: InboxResult) => {
     if (busy) return
+    if (retryTurn.current) {
+      setError(
+        "Retry the unfinished message or start a new conversation before changing its email."
+      )
+      return
+    }
     setBusy(true)
     setError("")
     try {
@@ -399,14 +593,15 @@ export function useAssistant(user: User) {
           (m) => m.gmail_msg_id === mail.message_id
         )
         setContextBlocked(false)
-        contextCleared.current = false
         pinnedCapture.current = null
-        setSelection({
+        const selection = {
           ...data,
           messages: [chosen],
           selectedIds: [mail.message_id],
           targetId: mail.message_id
-        })
+        }
+        markContextAttached(selection)
+        setSelection(selection)
       }
     } catch (e) {
       setError(errorText(e))
@@ -454,6 +649,12 @@ export function useAssistant(user: User) {
   }
   const submit = async (instruction: string, rewriteMessageId?: string) => {
     if (submitting.current || !instruction.trim()) return
+    if (restoreFailed) {
+      setError(
+        "Reopen Threadly to retry loading this conversation, or start a new conversation."
+      )
+      return
+    }
     if (!rewriteMessageId && contextBlocked) {
       setError(
         "Resolve the unavailable email context first: attach another email or continue without it."
@@ -568,6 +769,10 @@ export function useAssistant(user: User) {
     conversation.current = {
       id: turn.conversation_id,
       version: Math.max(conversation.current.version, turn.version)
+    }
+    if ("context_snapshot_id" in body) {
+      contextCleared.current = false
+      selectionOverride.current = null
     }
     retryTurn.current = null
     update(id, {
@@ -718,12 +923,15 @@ export function useAssistant(user: User) {
       )
       let storageError = ""
       try {
-        await chrome.storage.session?.remove(storageKey)
+        await forgetConversation()
       } catch (e) {
         storageError = `The chat was deleted on the server, but browser storage could not be cleared. ${errorText(e)}`
       }
       conversation.current = { id: requestId(), version: 0 }
       retryTurn.current = null
+      contextRevision.current += 1
+      selectionOverride.current = null
+      setRestoreFailed(false)
       pinnedCapture.current = null
       contextCleared.current = false
       setContextBlocked(false)
@@ -857,9 +1065,11 @@ export function useAssistant(user: User) {
       setError("")
       conversation.current = { id: requestId(), version: 0 }
       retryTurn.current = null
+      contextRevision.current += 1
+      selectionOverride.current = null
       pinnedCapture.current = null
       contextCleared.current = false
-      await chrome.storage.session?.remove(storageKey)
+      await forgetConversation()
       setEntries([{ id, instruction: task.instruction, task }])
       try {
         const contextId =
@@ -933,20 +1143,47 @@ export function useAssistant(user: User) {
     entries,
     selection,
     setSelection: (value: Selection | null) => {
-      contextCleared.current = value === null
+      if (retryTurn.current) {
+        setError(
+          "Retry the unfinished message or start a new conversation before changing its email."
+        )
+        return
+      }
+      if (value) markContextAttached(value)
+      else {
+        contextRevision.current += 1
+        contextCleared.current = true
+        selectionOverride.current = null
+      }
       pinnedCapture.current = null
       setContextBlocked(false)
       setSelection(value)
+      if (!value) persistContextChoice()
     },
     contextBlocked,
     clearContext: () => {
+      if (retryTurn.current) {
+        setError(
+          "Retry the unfinished message or start a new conversation before detaching its email."
+        )
+        return
+      }
+      contextRevision.current += 1
       contextCleared.current = true
+      selectionOverride.current = null
       pinnedCapture.current = null
       setContextBlocked(false)
       setSelection(null)
       setError("")
+      persistContextChoice()
     },
     busy,
+    restoring,
+    restoreFailed,
+    contextLocked: Boolean(retryTurn.current),
+    pendingUsesHiddenEmail:
+      typeof retryTurn.current?.body.context_snapshot_id === "string" &&
+      !selection,
     error,
     setError,
     selectActive,
@@ -968,7 +1205,7 @@ export function useAssistant(user: User) {
       if (!busy && !submitting.current) {
         try {
           submitting.current = true
-          await chrome.storage.session?.remove(storageKey)
+          await forgetConversation()
         } catch (e) {
           setError(errorText(e))
           return
@@ -977,6 +1214,9 @@ export function useAssistant(user: User) {
         }
         conversation.current = { id: requestId(), version: 0 }
         retryTurn.current = null
+        contextRevision.current += 1
+        selectionOverride.current = null
+        setRestoreFailed(false)
         pinnedCapture.current = null
         contextCleared.current = false
         setContextBlocked(false)

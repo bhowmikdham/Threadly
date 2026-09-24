@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { useAssistant } from "../lib/use-assistant"
@@ -128,6 +128,72 @@ describe("backend-owned conversation", () => {
     ).toBe(true)
     expect(stored.at(-1)[0]["threadlyConversation:1"].pendingTurn).toBeNull()
   })
+  it("does not change email context while an unfinished turn needs retry", async () => {
+    const key = "threadlyConversation:1"
+    const saved: Record<string, any> = {}
+    ;(chrome.storage.session.get as any).mockImplementation(
+      async (name: string) => (name in saved ? { [name]: saved[name] } : {})
+    )
+    ;(chrome.storage.session.set as any).mockImplementation(
+      async (values: Record<string, any>) => {
+        Object.assign(saved, values)
+      }
+    )
+    ;(chrome.storage.session.remove as any).mockImplementation(
+      async (name: string) => {
+        delete saved[name]
+      }
+    )
+    const calls = mock((m) => {
+      if (m.path === "/threads/thread-1")
+        return {
+          thread: { thread_id: "thread-1", version: 1, subject: "Receipt" },
+          messages: [{ gmail_msg_id: "message-1" }]
+        }
+      if (m.path === "/assistant/context-snapshots")
+        return { context_snapshot_id: "ctx-1" }
+      if (m.path === "/assistant/conversation-turns")
+        throw new Error("Interrupted")
+      return respond(m)
+    })
+    const selection = {
+      thread: { thread_id: "thread-1", version: 1, subject: "Receipt" },
+      messages: [{ gmail_msg_id: "message-1" }],
+      selectedIds: ["message-1"],
+      targetId: "message-1"
+    } as any
+    const { result } = renderHook(() => useAssistant(user))
+    await act(async () => {
+      result.current.setSelection(selection)
+    })
+    await act(async () => {
+      await result.current.submit("Summarise this receipt")
+    })
+    const issued = calls.find(
+      (call) => call.path === "/assistant/conversation-turns"
+    )?.body
+    expect(result.current.canRetry(result.current.entries[0])).toBe(true)
+    const replacement = {
+      thread: { thread_id: "thread-2", version: 1, subject: "Other receipt" },
+      messages: [{ gmail_msg_id: "message-2" }],
+      selectedIds: ["message-2"],
+      targetId: "message-2"
+    } as any
+    await act(async () => {
+      result.current.clearContext()
+      result.current.setSelection(replacement)
+      await result.current.chooseEmail({
+        thread_id: "thread-2",
+        message_id: "message-2"
+      } as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(result.current.selection?.thread.thread_id).toBe("thread-1")
+    expect(result.current.contextLocked).toBe(true)
+    expect(result.current.error).toMatch(/retry the unfinished message/i)
+    expect(calls.some((call) => call.path === "/threads/thread-2")).toBe(false)
+    expect(saved[key]?.pendingTurn?.body).toEqual(issued)
+  })
   it("keeps an exact replay after a version conflict confirms the same request", async () => {
     const calls: any[] = []
     let failed = false
@@ -235,6 +301,156 @@ describe("backend-owned conversation", () => {
       await result.current.retry(result.current.entries[0])
     })
     expect(calls.at(-1).body).toEqual(body)
+  })
+  it("keeps a pending replacement email through two panel reopens and retries the exact turn", async () => {
+    const key = "threadlyConversation:1"
+    const body = {
+      conversation_id: "123e4567-e89b-42d3-a456-426614174000",
+      request_id: "123e4567-e89b-42d3-a456-426614174001",
+      expected_version: 1,
+      instruction: "Summarise this newer receipt",
+      timezone: "Australia/Melbourne",
+      context_snapshot_id: "ctx-new",
+      active_task_id: null
+    }
+    const saved: Record<string, any> = {
+      [key]: {
+        id: body.conversation_id,
+        version: 1,
+        pendingTurn: { id: body.request_id, body },
+        selectionOverride: {
+          threadId: "new-thread",
+          threadVersion: 3,
+          visibleMessageIds: ["new-message"],
+          selectedIds: ["new-message"],
+          targetId: "new-message"
+        }
+      }
+    }
+    ;(chrome.storage.session.get as any).mockImplementation(
+      async (name: string) => (name in saved ? { [name]: saved[name] } : {})
+    )
+    ;(chrome.storage.session.set as any).mockImplementation(
+      async (values: Record<string, any>) => {
+        Object.assign(saved, values)
+      }
+    )
+    ;(chrome.storage.session.remove as any).mockImplementation(
+      async (name: string) => {
+        delete saved[name]
+      }
+    )
+    const calls = mock((m) => {
+      if (m.path === `/assistant/conversations/${body.conversation_id}`)
+        return {
+          conversation_id: body.conversation_id,
+          version: 1,
+          history: [{ user: "Earlier request", assistant: "Earlier answer" }],
+          pending_request_id: body.request_id,
+          context_snapshot_id: "ctx-old"
+        }
+      if (m.path === "/threads/new-thread")
+        return {
+          thread: {
+            thread_id: "new-thread",
+            version: 3,
+            subject: "New receipt"
+          },
+          messages: [{ gmail_msg_id: "new-message" }]
+        }
+      return respond(m)
+    })
+    const first = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(first.result.current.selection?.thread.subject).toBe("New receipt")
+    )
+    expect(
+      first.result.current.canRetry(first.result.current.entries.at(-1)!)
+    ).toBe(true)
+    first.unmount()
+
+    const second = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(second.result.current.selection?.thread.subject).toBe(
+        "New receipt"
+      )
+    )
+    expect(
+      second.result.current.canRetry(second.result.current.entries.at(-1)!)
+    ).toBe(true)
+    await act(async () => {
+      await second.result.current.retry(second.result.current.entries.at(-1)!)
+    })
+    const retried = calls.filter(
+      (call) => call.path === "/assistant/conversation-turns"
+    )
+    expect(retried).toHaveLength(1)
+    expect(retried[0].body).toEqual(body)
+    second.unmount()
+  })
+  it("does not show an older server email for a legacy pending turn with a different source", async () => {
+    const body = {
+      conversation_id: "123e4567-e89b-42d3-a456-426614174000",
+      request_id: "123e4567-e89b-42d3-a456-426614174001",
+      expected_version: 1,
+      instruction: "Summarise the newer receipt",
+      timezone: "Australia/Melbourne",
+      context_snapshot_id: "ctx-new",
+      active_task_id: null
+    }
+    ;(chrome.storage.session.get as any).mockResolvedValue({
+      "threadlyConversation:1": {
+        id: body.conversation_id,
+        version: 1,
+        pendingTurn: { id: body.request_id, body }
+      }
+    })
+    const calls = mock((m) => {
+      if (m.path === `/assistant/conversations/${body.conversation_id}`)
+        return {
+          conversation_id: body.conversation_id,
+          version: 1,
+          history: [{ user: "Earlier request", assistant: "Earlier answer" }],
+          pending_request_id: body.request_id,
+          context_snapshot_id: "ctx-old"
+        }
+      if (m.path === "/assistant/context-snapshots/ctx-old")
+        return {
+          thread_id: "old-thread",
+          thread_version: 1,
+          ui_map: {
+            visible_message_ids: ["old-message"],
+            selected_message_ids: ["old-message"]
+          }
+        }
+      if (m.path === "/threads/old-thread")
+        return {
+          thread: {
+            thread_id: "old-thread",
+            version: 1,
+            subject: "Old receipt"
+          },
+          messages: [{ gmail_msg_id: "old-message" }]
+        }
+      return respond(m)
+    })
+    const { result } = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(result.current.canRetry(result.current.entries.at(-1)!)).toBe(true)
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(result.current.selection).toBeNull()
+    expect(result.current.pendingUsesHiddenEmail).toBe(true)
+    await act(async () => {
+      await result.current.retry(result.current.entries.at(-1)!)
+    })
+    const retried = calls.filter(
+      (call) => call.path === "/assistant/conversation-turns"
+    )
+    expect(retried).toHaveLength(1)
+    expect(retried[0].body).toEqual(body)
   })
   it("matches restored turns by request ID even when another turn has identical text", async () => {
     const body = {
@@ -349,6 +565,304 @@ describe("backend-owned conversation", () => {
       await result.current.submit("hey")
     })
     expect(calls.at(-1).body.context_snapshot_id).toBeNull()
+  })
+  it("keeps an email detached when the panel reopens before the next turn", async () => {
+    const key = "threadlyConversation:1"
+    const saved: Record<string, any> = {
+      [key]: { id: "conversation-1", version: 1, pendingTurn: null }
+    }
+    ;(chrome.storage.session.get as any).mockImplementation(
+      async (name: string) => (name in saved ? { [name]: saved[name] } : {})
+    )
+    ;(chrome.storage.session.set as any).mockImplementation(
+      async (values: any) => {
+        Object.assign(saved, values)
+      }
+    )
+    ;(chrome.storage.session.remove as any).mockImplementation(
+      async (name: string) => {
+        delete saved[name]
+      }
+    )
+    const calls = mock((m) => {
+      if (m.path === "/assistant/conversations/conversation-1")
+        return {
+          conversation_id: "conversation-1",
+          version: 1,
+          history: [{ user: "Read this", assistant: "I found the email." }],
+          context_snapshot_id: "ctx-1"
+        }
+      if (m.path === "/assistant/context-snapshots/ctx-1")
+        return {
+          thread_id: "thread-1",
+          thread_version: 1,
+          ui_map: {
+            visible_message_ids: ["message-1"],
+            selected_message_ids: ["message-1"]
+          }
+        }
+      if (m.path === "/threads/thread-1")
+        return {
+          thread: { thread_id: "thread-1", version: 1, subject: "Receipt" },
+          messages: [{ gmail_msg_id: "message-1", subject: "Receipt" }]
+        }
+      return respond(m)
+    })
+    const first = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(first.result.current.selection?.thread.subject).toBe("Receipt")
+    )
+    await act(async () => {
+      first.result.current.clearContext()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(first.result.current.selection).toBeNull()
+    first.unmount()
+
+    const reopened = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(reopened.result.current.entries[0]?.message).toBe(
+        "I found the email."
+      )
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(reopened.result.current.selection).toBeNull()
+    await act(async () => {
+      await reopened.result.current.submit("Show me recent emails")
+    })
+    const turn = calls
+      .filter((call) => call.path === "/assistant/conversation-turns")
+      .at(-1)
+    expect(turn?.body.context_snapshot_id).toBeNull()
+    expect(turn?.body.expected_version).toBe(1)
+    reopened.unmount()
+  })
+  it("does not reattach an email whose restore fetch finishes after detach", async () => {
+    const saved = {
+      id: "conversation-1",
+      version: 1,
+      pendingTurn: null,
+      selectionOverride: {
+        threadId: "new-thread",
+        threadVersion: 3,
+        visibleMessageIds: ["new-message"],
+        selectedIds: ["new-message"],
+        targetId: "new-message"
+      }
+    }
+    ;(chrome.storage.session.get as any).mockResolvedValue({
+      "threadlyConversation:1": saved
+    })
+    let finishThread!: (value: any) => void
+    const delayedThread = new Promise<any>((resolve) => {
+      finishThread = resolve
+    })
+    const calls = mock((m) => {
+      if (m.path === "/assistant/conversations/conversation-1")
+        return {
+          conversation_id: "conversation-1",
+          version: 1,
+          history: [],
+          context_snapshot_id: "ctx-old"
+        }
+      if (m.path === "/threads/new-thread") return delayedThread
+      return respond(m)
+    })
+    const { result } = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(calls.some((call) => call.path === "/threads/new-thread")).toBe(
+        true
+      )
+    )
+    await act(async () => {
+      result.current.clearContext()
+    })
+    await act(async () => {
+      finishThread({
+        thread: { thread_id: "new-thread", version: 3, subject: "New receipt" },
+        messages: [{ gmail_msg_id: "new-message" }]
+      })
+      await delayedThread
+    })
+    await waitFor(() => expect(result.current.restoring).toBe(false))
+    expect(result.current.selection).toBeNull()
+    await act(async () => {
+      await result.current.submit("Show me recent emails")
+    })
+    const turn = calls
+      .filter((call) => call.path === "/assistant/conversation-turns")
+      .at(-1)
+    expect(turn?.body.context_snapshot_id).toBeNull()
+  })
+  it("shows restoration in progress until the saved conversation finishes loading", async () => {
+    ;(chrome.storage.session.get as any).mockResolvedValue({
+      "threadlyConversation:1": {
+        id: "conversation-1",
+        version: 1,
+        pendingTurn: null
+      }
+    })
+    let finishConversation!: (value: any) => void
+    const delayedConversation = new Promise<any>((resolve) => {
+      finishConversation = resolve
+    })
+    const calls = mock((m) =>
+      m.path === "/assistant/conversations/conversation-1"
+        ? delayedConversation
+        : respond(m)
+    )
+    const { result } = renderHook(() => useAssistant(user))
+    expect(result.current.restoring).toBe(true)
+    await waitFor(() =>
+      expect(
+        calls.some(
+          (call) => call.path === "/assistant/conversations/conversation-1"
+        )
+      ).toBe(true)
+    )
+    expect(result.current.restoring).toBe(true)
+    await act(async () => {
+      finishConversation({
+        conversation_id: "conversation-1",
+        version: 1,
+        history: [],
+        context_snapshot_id: null
+      })
+      await delayedConversation
+    })
+    await waitFor(() => expect(result.current.restoring).toBe(false))
+  })
+  it("keeps a saved chat after a transient restore failure until an explicit new chat", async () => {
+    const key = "threadlyConversation:1"
+    const pointer = { id: "conversation-1", version: 1, pendingTurn: null }
+    const saved: Record<string, any> = { [key]: pointer }
+    ;(chrome.storage.session.get as any).mockImplementation(
+      async (name: string) => (name in saved ? { [name]: saved[name] } : {})
+    )
+    ;(chrome.storage.session.set as any).mockImplementation(
+      async (values: Record<string, any>) => {
+        Object.assign(saved, values)
+      }
+    )
+    ;(chrome.storage.session.remove as any).mockImplementation(
+      async (name: string) => {
+        delete saved[name]
+      }
+    )
+    vi.mocked(chrome.tabs.query).mockResolvedValue([])
+    const calls: any[] = []
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (
+      m: any
+    ) => {
+      calls.push(m)
+      if (m.path === "/assistant/conversations/conversation-1")
+        return {
+          ok: false,
+          error: {
+            code: "service_unavailable",
+            message: "Try again shortly.",
+            status: 503
+          }
+        }
+      return { ok: true, data: respond(m) }
+    }) as any)
+    const { result } = renderHook(() => useAssistant(user))
+    await waitFor(() => expect(result.current.restoreFailed).toBe(true))
+    expect(result.current.restoring).toBe(false)
+    expect(saved[key]).toEqual(pointer)
+    expect(
+      calls.some((call) => call.path === "/assistant/conversation-turns")
+    ).toBe(false)
+
+    await act(async () => {
+      await result.current.newChat()
+    })
+    expect(result.current.restoreFailed).toBe(false)
+    expect(saved[key]).toBeUndefined()
+  })
+  it("restores a replacement email instead of an older server pin", async () => {
+    const key = "threadlyConversation:1"
+    const saved: Record<string, any> = {
+      [key]: { id: "conversation-1", version: 1, pendingTurn: null }
+    }
+    ;(chrome.storage.session.get as any).mockImplementation(
+      async (name: string) => (name in saved ? { [name]: saved[name] } : {})
+    )
+    ;(chrome.storage.session.set as any).mockImplementation(
+      async (values: Record<string, any>) => {
+        Object.assign(saved, values)
+      }
+    )
+    ;(chrome.storage.session.remove as any).mockImplementation(
+      async (name: string) => {
+        delete saved[name]
+      }
+    )
+    const calls = mock((m) => {
+      if (m.path === "/assistant/conversations/conversation-1")
+        return {
+          conversation_id: "conversation-1",
+          version: 1,
+          history: [{ user: "Read this", assistant: "I found the old email." }],
+          context_snapshot_id: "ctx-old"
+        }
+      if (m.path === "/assistant/context-snapshots/ctx-old")
+        return {
+          thread_id: "old-thread",
+          thread_version: 1,
+          ui_map: {
+            visible_message_ids: ["old-message"],
+            selected_message_ids: ["old-message"]
+          }
+        }
+      if (m.path === "/threads/old-thread")
+        return {
+          thread: { thread_id: "old-thread", version: 1, subject: "Old order" },
+          messages: [{ gmail_msg_id: "old-message" }]
+        }
+      if (m.path === "/threads/new-thread")
+        return {
+          thread: { thread_id: "new-thread", version: 3, subject: "New order" },
+          messages: [{ gmail_msg_id: "new-message" }]
+        }
+      if (m.path === "/assistant/context-snapshots") {
+        expect(m.body.thread_id).toBe("new-thread")
+        return { context_snapshot_id: "ctx-new" }
+      }
+      return respond(m)
+    })
+    const first = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(first.result.current.selection?.thread.subject).toBe("Old order")
+    )
+    await act(async () => {
+      first.result.current.clearContext()
+      await first.result.current.chooseEmail({
+        thread_id: "new-thread",
+        message_id: "new-message"
+      } as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(first.result.current.selection?.thread.subject).toBe("New order")
+    first.unmount()
+
+    const reopened = renderHook(() => useAssistant(user))
+    await waitFor(() =>
+      expect(reopened.result.current.selection?.thread.subject).toBe(
+        "New order"
+      )
+    )
+    expect(reopened.result.current.contextBlocked).toBe(false)
+    await act(async () => {
+      await reopened.result.current.submit("Summarise this new email")
+    })
+    const turn = calls
+      .filter((call) => call.path === "/assistant/conversation-turns")
+      .at(-1)
+    expect(turn?.body.context_snapshot_id).toBe("ctx-new")
+    reopened.unmount()
   })
   it("blocks a restored missing pin until the user explicitly clears it", async () => {
     ;(chrome.storage.session.get as any).mockResolvedValue({
