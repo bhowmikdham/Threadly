@@ -1,9 +1,11 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.1`. Feature switch:
+Implementation release: `contextual-conversation-1.1.2`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. The two-trial synthetic Bedrock evaluation passed **26/26** checks;
-its sanitized receipt is [versioned here](evaluation/contextual-conversation-live-v1.json).
+`c23026e9a039`. The `1.1.2` two-trial synthetic Bedrock evaluation passed
+**26/26** checks; its sanitized receipt is
+[versioned here](evaluation/contextual-conversation-live-v2.json). The prior `1.1.1`
+receipt remains [available](evaluation/contextual-conversation-live-v1.json).
 Unit/integration and synthetic model results are not a general quality guarantee.
 
 ## What changed
@@ -137,6 +139,12 @@ bounded; repeated identical calls are rejected. Per-user active-conversation, re
 retained-turn budgets cap synchronous Bedrock/Gmail fan-out.
 Transient provider failures have bounded retries. Tools do not hold DB locks while waiting
 for Google or Bedrock. Trace metadata contains tool names/statuses, not private arguments.
+Release `1.1.2` masks decoded conversation values and semantic data keys with one
+stable placeholder map, including JSON carried inside a text block. Numeric
+phone/card-like values become quoted placeholders in that JSON. This keeps Unicode
+escapes valid in the Bedrock payload, leaves tool-use IDs intact, and turns
+unexpected mask failures into sanitized conversation errors instead of HTTP 500
+responses.
 
 ## Examples and expected outcomes
 
