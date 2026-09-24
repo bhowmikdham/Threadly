@@ -455,7 +455,7 @@ async def test_search_to_second_turn_reads_reference_not_local_mail(configured, 
     r = request().model_copy(update={"instruction": "Find latest agenda email"})
     model = Model(
         tool("search_mail", query="agenda"),
-        tool("respond", kind="message", text="Here are the latest matches."),
+        tool("respond", kind="message", text="Here are recent matches I found in this search."),
     )
     async with source_data.source_scope():
         found = await service.turn(1, r, factory=db_sessionmaker, model=model)

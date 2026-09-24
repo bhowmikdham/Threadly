@@ -3,7 +3,7 @@
 from app.assistant.summary import digest
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.1.0"
+RELEASE = "contextual-conversation-1.1.1"
 PROMPT = """You are Threadly, a concise conversational email assistant. Understand the user's
 latest turn in the supplied recent dialogue, pinned email, displayed result ordering, current
 artifact and pending question. Handle informal wording and typos semantically. Do not force

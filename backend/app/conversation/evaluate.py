@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app.assistant import inbox_chat
 from app.assistant.summary import digest
 from app.config import get_settings
 from app.conversation import engine
@@ -19,6 +20,7 @@ from app.conversation.runtime import (
     user_recipient_references,
     validate_workflow_bindings,
 )
+from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
 RECEIPT_RELEASE = "contextual-conversation-live-v1"
@@ -131,33 +133,80 @@ CASES = [
 class FixtureRuntime:
     def __init__(self, case, turn=""):
         self.case, self.evidence, self.calls = case, {}, []
+        self.search_page = None
         history = case.get("history", [])
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
+        self.user_text = user_text
         self.instruction = authoritative_user_instruction(turn, history)
         self.recipient_refs = user_recipient_references(user_text)
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
         if name == "search_mail":
-            if args.query.casefold() != "gyg":
+            for value in (args.query, args.date_phrase):
+                if value and value.casefold() not in self.user_text.casefold():
+                    raise ValueError("Search literals must come from user dialogue")
+            if (
+                args.folder != "all_mail"
+                and args.folder.casefold() not in self.user_text.casefold()
+            ):
+                raise ValueError("Folder is not user supplied")
+            start, end = inbox_chat.date_window(
+                args.date_phrase,
+                datetime(2026, 9, 23, 12, tzinfo=UTC),
+                "Australia/Melbourne",
+            )
+            if "gyg" not in args.query.casefold():
                 raise ValueError("Only user's GYG literal is available")
-            return {
+            filters = InboxFilters(
+                schema_version="1.0",
+                query=args.query,
+                folder=args.folder,
+                received_from=start,
+                received_before=end,
+            ).model_dump(mode="json")
+            self.search_page = {
+                "filters": filters,
                 "results": [
                     {
+                        "message_id": "fixture-message-1",
+                        "thread_id": "fixture-thread-1",
                         "reference": "mail-1",
                         "subject": "GYG offers this weekend",
+                        "sender": "offers@example.test",
                         "received_at": "2026-09-23T10:00:00Z",
                         "snippet": "20% off your next purchase",
+                        "flight": None,
                     },
                     {
+                        "message_id": "fixture-message-2",
+                        "thread_id": "fixture-thread-2",
                         "reference": "mail-2",
                         "subject": "GYG order confirmation",
+                        "sender": "orders@example.test",
                         "received_at": "2026-09-22T10:00:00Z",
                         "snippet": "Order 2241 confirmed",
+                        "flight": None,
                     },
                 ],
-                "coverage": {"complete": False, "date_window": "past year"},
-                "has_more": False,
+                "next_cursor": None,
+                "coverage": {
+                    "complete": False,
+                    "page_size": inbox_chat.PAGE_SIZE,
+                    "source": "live_gmail",
+                    "persisted": False,
+                },
+            }
+            observations = [
+                {k: v for k, v in row.items() if k not in {"message_id", "thread_id"}}
+                for row in self.search_page["results"]
+            ]
+            return {
+                "results": observations,
+                "has_more": bool(self.search_page["next_cursor"]),
+                "coverage": self.search_page["coverage"],
+                "date_window": self.search_page["filters"],
+                "displayed_result_order": [row["reference"] for row in observations],
             }
         if name == "read_email":
             sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
@@ -244,6 +293,14 @@ def grade(case, response, calls):
         reads = _tool_inputs(calls, "read_email")
         if not reads or reads[0].get("reference") != "mail-2":
             failures.append("wrong_ordered_reference")
+    elif case_id == "latest_order_not_promotion":
+        if any(
+            step.get("tool") == "search_mail" and step.get("status") != "ok"
+            for step in response.get("trace", [])
+        ):
+            failures.append("invalid_search_request")
+        if engine.overclaims_incomplete_search(text, case["turns"][-1]):
+            failures.append("incomplete_search_overclaim")
     elif case_id == "receipt_advice_followup":
         if not _has_selected_read(calls):
             failures.append("selected_source_not_read")
@@ -390,8 +447,9 @@ async def evaluate(trials):
         "live_gmail": False,
         "external_actions": False,
         "grading": (
-            "Deterministic outcome, source-continuity, constraint, provenance and "
-            "external-action checks; not a general accuracy estimate."
+            "Deterministic outcome, source-continuity, constraint, provenance, "
+            "incomplete-search coverage and external-action checks; not a general "
+            "accuracy estimate."
         ),
     }
 

@@ -60,6 +60,59 @@ def test_receipt_followup_requires_a_grounded_no_reply_recommendation():
     )
 
 
+def test_latest_order_requires_incomplete_search_qualification():
+    calls = [
+        _call("search_mail", query="GYG", date_phrase="", folder="all_mail"),
+        _call("read_email", reference="mail-2"),
+    ]
+    safe = _response("message", "The latest GYG order I found in this search is 2241.")
+    unsafe = _response("message", "Your latest GYG order is 2241.")
+
+    assert evaluate.grade(_case("latest_order_not_promotion"), safe, calls) == []
+    assert "incomplete_search_overclaim" in evaluate.grade(
+        _case("latest_order_not_promotion"), unsafe, calls
+    )
+
+
+async def test_latest_order_fixture_uses_production_search_literal_and_date_rules():
+    from app.schemas.conversation import SearchMail
+
+    case = _case("latest_order_not_promotion")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+    result = await runtime.call("search_mail", SearchMail(query="GYG order"))
+    assert result["coverage"]["complete"] is False
+
+    with pytest.raises(ValueError):
+        await runtime.call("search_mail", SearchMail(query="GYG", date_phrase="past year"))
+    with pytest.raises(ValueError):
+        await runtime.call("search_mail", SearchMail(query="GYG", folder="INBOX"))
+
+
+async def test_latest_order_fixture_separates_raw_page_from_model_observation():
+    from app.schemas.conversation import SearchMail
+
+    case = _case("latest_order_not_promotion")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+
+    observation = await runtime.call("search_mail", SearchMail(query="GYG"))
+
+    assert set(observation) == {
+        "results",
+        "has_more",
+        "coverage",
+        "date_window",
+        "displayed_result_order",
+    }
+    assert observation["has_more"] is False
+    assert observation["displayed_result_order"] == ["mail-1", "mail-2"]
+    assert observation["date_window"] == runtime.search_page["filters"]
+    assert observation["coverage"] == runtime.search_page["coverage"]
+    assert runtime.search_page["next_cursor"] is None
+    assert runtime.search_page["results"][0]["message_id"] == "fixture-message-1"
+    assert "message_id" not in observation["results"][0]
+    assert "thread_id" not in observation["results"][0]
+
+
 def test_monitored_reply_to_keeps_the_selected_source_and_reply_intent():
     good_calls = [
         _call("read_email", reference="selected"),

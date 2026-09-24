@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.0`. Feature switch:
+Implementation release: `contextual-conversation-1.1.1`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
 `c23026e9a039`. The two-trial synthetic Bedrock evaluation passed **26/26** checks;
 its sanitized receipt is [versioned here](evaluation/contextual-conversation-live-v1.json).
@@ -52,6 +52,9 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   match headers as well as message text, and local bounds may leave fewer than five cards.
   The coordinator reads relevant candidates to distinguish an order confirmation from a promotion. It reports limited coverage;
   it must not claim exhaustive mailbox search or a globally latest order without evidence.
+  The response validator returns common unqualified “latest order/email” claims to the
+  model for correction when current or retained search coverage is incomplete. This is
+  a narrow boundary check, not a general semantic verifier.
 - Search defaults to the past year, with an explicit window of at most 366 days. Search
   literals/folder/date wording must come from user dialogue. Provider cursors remain signed
   and account-bound. At most 25 addressable references are retained for one search;

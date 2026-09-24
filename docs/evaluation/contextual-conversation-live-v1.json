@@ -1,12 +1,12 @@
 {
   "receipt_release": "contextual-conversation-live-v1",
-  "release": "contextual-conversation-1.1.0",
+  "release": "contextual-conversation-1.1.1",
   "prompt_hash": "d79d8b74f9d970c364186128dd2a4220e99fea1812939c9b8c2354be7f457732",
   "tools_hash": "c194bf19c175d37d358ec66d758652ddb8907a40d06cb24663a6e37fc566d75d",
   "max_calls": 8,
   "timeout_seconds": 120,
   "cases_hash": "c5ab97b3349a119b1199695748b50dcf2afefe929e4b714966b98e5d147ae5d5",
-  "timestamp": "2026-09-24T01:01:56.442745+00:00",
+  "timestamp": "2026-09-24T02:38:16.896505+00:00",
   "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
   "provider": "bedrock",
   "trials": 2,
@@ -51,8 +51,8 @@
       "kind": "message",
       "tools": [
         "search_mail",
-        "search_mail",
         "read_email",
+        "respond",
         "respond"
       ],
       "failures": []
@@ -196,8 +196,8 @@
       "kind": "message",
       "tools": [
         "search_mail",
-        "search_mail",
         "read_email",
+        "respond",
         "respond"
       ],
       "failures": []
@@ -308,5 +308,5 @@
   "synthetic_mail_tools": true,
   "live_gmail": false,
   "external_actions": false,
-  "grading": "Deterministic outcome, source-continuity, constraint, provenance and external-action checks; not a general accuracy estimate."
+  "grading": "Deterministic outcome, source-continuity, constraint, provenance, incomplete-search coverage and external-action checks; not a general accuracy estimate."
 }

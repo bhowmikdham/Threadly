@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 
 from pydantic import ValidationError
 
@@ -14,6 +15,10 @@ from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_confi
 
 TERMINAL = {"respond", "prepare_workflow", "answer_question", "revise_draft"}
 MAX_CALLS = 8
+
+
+class IncompleteSearchCoverage(ValueError):
+    """A response turns a bounded search result into an unqualified global claim."""
 
 
 async def run(context, runtime, model=None):
@@ -90,18 +95,18 @@ async def run(context, runtime, model=None):
                 for call in requests:
                     calls += 1
                     name, values = call["name"], call["input"]
-                    key = digest({"tool": name, "input": values})
                     try:
                         if name not in TOOLS:
                             raise ValueError("Unknown tool")
                         if name in TERMINAL and len(requests) != 1:
                             raise ValueError("Use a terminal tool alone after observations")
+                        arguments = TOOLS[name][0].model_validate(values)
+                        key = digest({"tool": name, "input": arguments.model_dump(mode="json")})
                         if key in seen:
                             raise ValueError(
                                 "Repeated call; use existing observation or explain limitation"
                             )
                         seen.add(key)
-                        arguments = TOOLS[name][0].model_validate(values)
                         if name == "respond":
                             outcome = validate_response(arguments, runtime)
                         else:
@@ -111,6 +116,19 @@ async def run(context, runtime, model=None):
                             return {**outcome, "release": RELEASE, "trace": trace}
                         result = {"json": outcome}
                         status = "success"
+                    except IncompleteSearchCoverage:
+                        trace.append({"tool": name, "status": "invalid"})
+                        result = {
+                            "json": {
+                                "error": "incomplete_search_coverage",
+                                "message": (
+                                    "Search coverage is incomplete. Say 'the latest I found "
+                                    "in this search/date window', or report the dated result "
+                                    "without claiming it is the user's global latest."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except (ValidationError, ValueError):
                         trace.append(
                             {"tool": name if name in TOOLS else "unknown", "status": "invalid"}
@@ -215,8 +233,68 @@ def validate_response(answer: Respond, runtime):
             raise ValueError("Unverified evidence")
     if runtime.evidence and answer.kind != "clarification" and not answer.evidence:
         raise ValueError("Cite read evidence for source-based advice")
+    coverage = _response_search_coverage(runtime)
+    if coverage.get("complete") is False and overclaims_incomplete_search(answer.text):
+        raise IncompleteSearchCoverage("Qualify recency to the bounded search")
     return {
         "kind": answer.kind,
         "text": answer.text,
         "evidence": [x.model_dump() for x in answer.evidence],
     }
+
+
+_RECENCY = r"(?:latest|newest|most\s+recent)"
+_INBOX_ITEM = (
+    r"(?:e-?mails?|mail|messages?|threads?|orders?|receipts?|invoices?|bookings?|"
+    r"confirmations?|purchases?)"
+)
+_ABSOLUTE_INBOX_RANK = re.compile(
+    rf"\b(?:your|the)\s+{_RECENCY}\s+(?:[\w'-]+\s+){{0,4}}{_INBOX_ITEM}\b|"
+    rf"^\s*{_RECENCY}\s+(?:[\w'-]+\s+){{0,4}}{_INBOX_ITEM}\b",
+    re.I,
+)
+_SEARCH_SCOPE = (
+    r"(?:in|among|from|within|of)\s+(?:this|the|these|those)?\s*"
+    r"(?:search|results?|matches?|date\s+window)|"
+    r"based\s+on\s+(?:this|the|these|those)?\s*(?:search|results?|matches?)|"
+    r"(?:emails?|messages?)\s+(?:(?:i|we)\s+)?"
+    r"(?:returned|reviewed|saw|shown|checked|searched)"
+)
+
+
+def overclaims_incomplete_search(text, user_turn=None):
+    """Reject only unscoped absolute ranking of inbox items."""
+    del user_turn  # Compatibility for the deterministic evaluation helper.
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        claim = _ABSOLUTE_INBOX_RANK.search(sentence)
+        if not claim:
+            continue
+        prefix = sentence[max(0, claim.start() - 120) : claim.start()]
+        if re.search(rf"(?:{_SEARCH_SCOPE})\b.{{0,100}}$", prefix, re.I):
+            continue
+        before_copula = re.split(
+            r"\b(?:is|was|are|were)\b", sentence[claim.start() :], maxsplit=1, flags=re.I
+        )[0]
+        if re.search(
+            r"\b(?:that\s+)?(?:i|we)\s+"
+            r"(?:found|located|saw|could\s+find|can\s+find)\b",
+            before_copula,
+            re.I,
+        ) or re.search(rf"(?:{_SEARCH_SCOPE})\b", before_copula, re.I):
+            continue
+        return True
+    return False
+
+
+def _response_search_coverage(runtime):
+    page = getattr(runtime, "search_page", None)
+    if isinstance(page, dict):
+        return page.get("coverage", {})
+    state = getattr(runtime, "state", {})
+    if not isinstance(state, dict):
+        return {}
+    result_references = set(state.get("result_order", []))
+    if not result_references.intersection(getattr(runtime, "evidence", {})):
+        return {}
+    search = state.get("search", {})
+    return search.get("coverage", {}) if isinstance(search, dict) else {}
