@@ -20,7 +20,7 @@ export function ContextPicker({
         <b>In this conversation</b>
         <button
           className="icon-button"
-          aria-label="Close context"
+          aria-label="Close email details"
           onClick={close}>
           <Icon name="close" />
         </button>

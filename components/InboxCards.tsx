@@ -103,7 +103,12 @@ export function InboxCards({
               style={{ "--card-order": Math.min(i, 4) } as React.CSSProperties}>
               <button
                 className="mail-card-main"
-                disabled={controller.busy}
+                disabled={
+                  controller.busy ||
+                  controller.restoring ||
+                  controller.restoreFailed ||
+                  controller.contextLocked
+                }
                 aria-label={`Use email: ${mail.subject || "No subject"}`}
                 aria-pressed={selected}
                 onClick={() => void controller.chooseEmail(mail)}>
@@ -128,10 +133,11 @@ export function InboxCards({
               </button>
               {mail.flight && <FlightCard flight={mail.flight} />}
               <div className="mail-card-actions">
-                <small>
+                <small className="mail-card-state">
+                  {selected && <Icon name="check" size={12} />}
                   {selected
-                    ? "Attached to this conversation"
-                    : "Choose this email to ask about it"}
+                    ? "In this conversation"
+                    : "Select for this conversation"}
                 </small>
                 <button
                   className="icon-button"

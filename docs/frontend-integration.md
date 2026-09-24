@@ -70,7 +70,10 @@ sequenceDiagram
 - No mailbox cache is written to extension storage. The panel holds loaded email
   text in memory while open. `chrome.storage.session` retains the current
   conversation ID/version and, while a request is uncertain, the exact user
-  instruction and source/task references needed for idempotent retry. Backend
+  instruction and source/task references needed for idempotent retry. It also
+  retains a small marker when the user detaches a pinned email, or provider IDs
+  for an unsent replacement. The next turn commits that choice to the backend;
+  no email body is stored in extension storage. Backend
   conversation history is encrypted and bounded to 12 exchanges with a seven-day
   expiry; answers and short evidence quotes may contain email-derived content.
   Generated task artifacts remain in their existing durable records.
@@ -84,9 +87,15 @@ sequenceDiagram
 - Message numbering follows included sources; excluded messages are not counted.
   The target is independent of the source list. A reply never guesses the last
   message. Ordinals refer to the saved selection, not a later Gmail navigation.
+- The Google permission request is capability-based: initial identity and
+  Gmail read-only scopes, Calendar availability read scopes on reconnect, and
+  narrower send/event scopes only for an explicitly enabled write pilot. The
+  extension does not request Gmail settings, Contacts, Workspace directory or
+  broad Gmail deletion rights.
 - A timed-out chat turn is retried only with its original ID, version and body;
-  another turn is blocked until recovery or a new chat. The sidebar restores
-  backend chat history within the same browser session; search cards are not
+  another turn or email-source change is blocked until recovery or a new chat.
+  The sidebar restores backend chat history within the same browser session;
+  search cards are not
   restored and must be fetched again. Polling pauses with an actionable message
   after repeated task-status errors. Recent work recovers durable backend jobs;
   action references recover pending writes on the same installation. A lost

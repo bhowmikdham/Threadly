@@ -187,6 +187,8 @@ function Assistant({
     scroll = useRef<HTMLDivElement>(null),
     atBottom = useRef(true),
     positionedSearch = useRef<string | null>(null)
+  const startupBusy = c.busy || c.restoring
+  const inputBusy = startupBusy || c.restoreFailed
   useEffect(() => {
     void c.selectActive(true)
     return () => recognition.current?.abort()
@@ -225,7 +227,7 @@ function Assistant({
   }
   const send = (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (c.busy || !message.trim()) return
+    if (inputBusy || !message.trim()) return
     const text = message
     setMessage("")
     setSources(false)
@@ -233,7 +235,7 @@ function Assistant({
     void c.submit(text)
   }
   const suggest = (text: string) => {
-    if (c.busy) return
+    if (inputBusy) return
     atBottom.current = true
     void c.submit(text)
   }
@@ -307,7 +309,7 @@ function Assistant({
           className="icon-button"
           aria-label="New chat"
           title="New chat"
-          disabled={c.busy}
+          disabled={startupBusy}
           onClick={() => void newChat()}>
           <Icon name="edit" />
         </button>
@@ -323,12 +325,12 @@ function Assistant({
               <Icon name="close" />
             </button>
           </div>
-          <button onClick={() => void newChat()} disabled={c.busy}>
+          <button onClick={() => void newChat()} disabled={startupBusy}>
             <Icon name="edit" />
             New conversation
           </button>
           <button
-            disabled={c.busy}
+            disabled={inputBusy}
             onClick={async () => {
               if (
                 window.confirm(
@@ -341,7 +343,7 @@ function Assistant({
             }}>
             Delete this conversation
           </button>
-          <button onClick={() => void historyPage()}>
+          <button disabled={inputBusy} onClick={() => void historyPage()}>
             <Icon name="clock" />
             Recent work
           </button>
@@ -369,20 +371,6 @@ function Assistant({
           atBottom.current =
             !e || e.scrollHeight - e.scrollTop - e.clientHeight < 100
         }}>
-        {contextOpen && c.selection && (
-          <ContextPicker
-            selection={c.selection}
-            onChange={c.setSelection}
-            close={() => setContextOpen(false)}
-            busy={c.busy}
-            rewrite={(id) => {
-              void c.submit(
-                "Rewrite the selected message to be clearer and more concise, preserving its meaning.",
-                id
-              )
-            }}
-          />
-        )}
         {history && (
           <section className="history-surface">
             <div className="card-heading">
@@ -403,6 +391,7 @@ function Assistant({
               <button
                 className="history-row"
                 key={t.task_id}
+                disabled={inputBusy}
                 onClick={() => {
                   void c.loadTask(t)
                   setHistory(null)
@@ -433,21 +422,21 @@ function Assistant({
               {c.selection ? (
                 <>
                   <button
-                    disabled={c.busy}
+                    disabled={inputBusy}
                     onClick={() => suggest("Summarise this thread.")}>
                     <Icon name="sparkle" />
                     Summarise this for me
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
-                    disabled={c.busy}
+                    disabled={inputBusy}
                     onClick={() => suggest("Draft a reply to this thread.")}>
                     <Icon name="edit" />
                     Help me reply
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
-                    disabled={c.busy}
+                    disabled={inputBusy}
                     onClick={() =>
                       suggest("What needs my attention in this email?")
                     }>
@@ -459,13 +448,14 @@ function Assistant({
               ) : (
                 <>
                   <button
-                    disabled={c.busy}
+                    disabled={inputBusy}
                     onClick={() => void c.selectActive()}>
                     <Icon name="mail" />
                     Ask about the open email
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
+                    disabled={inputBusy}
                     onClick={() => {
                       setMessage("Show me emails about ")
                       input.current?.focus()
@@ -476,6 +466,7 @@ function Assistant({
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
+                    disabled={inputBusy}
                     onClick={() => {
                       setMessage("Write an email ")
                       input.current?.focus()
@@ -506,7 +497,33 @@ function Assistant({
         </p>
       )}
       <div className="composer-wrap">
-        {c.contextBlocked && (
+        {c.restoreFailed && (
+          <p className="pending-context-note" role="alert">
+            This conversation could not be loaded. Reopen Threadly to try again,
+            or use New chat to start fresh.
+          </p>
+        )}
+        {c.pendingUsesHiddenEmail && (
+          <p className="pending-context-note" role="status">
+            The unfinished request still includes its original email. Retry it
+            or start a new conversation before changing the source.
+          </p>
+        )}
+        {contextOpen && c.selection && (
+          <ContextPicker
+            selection={c.selection}
+            onChange={c.setSelection}
+            close={() => setContextOpen(false)}
+            busy={inputBusy || c.contextLocked}
+            rewrite={(id) => {
+              void c.submit(
+                "Rewrite the selected message to be clearer and more concise, preserving its meaning.",
+                id
+              )
+            }}
+          />
+        )}
+        {c.contextBlocked && !c.restoreFailed && (
           <div className="context-recovery" role="alert">
             <div>
               <b>Email context needs attention</b>
@@ -516,11 +533,13 @@ function Assistant({
               </span>
             </div>
             <button
-              disabled={c.busy}
+              disabled={inputBusy || c.contextLocked}
               onClick={() => void c.selectActive()}>
               Use open email
             </button>
-            <button disabled={c.busy} onClick={c.clearContext}>
+            <button
+              disabled={inputBusy || c.contextLocked}
+              onClick={c.clearContext}>
               Continue without email
             </button>
           </div>
@@ -528,7 +547,7 @@ function Assistant({
         {sources && (
           <div className="source-menu" aria-label="Add context">
             <button
-              disabled={c.busy}
+              disabled={inputBusy || c.contextLocked}
               onClick={() => {
                 void c.selectActive()
                 setSources(false)
@@ -537,7 +556,7 @@ function Assistant({
               Use open Gmail thread
             </button>
             <button
-              disabled={c.busy}
+              disabled={inputBusy || c.contextLocked}
               onClick={() => {
                 setMessage("Show me emails about ")
                 input.current?.focus()
@@ -549,10 +568,11 @@ function Assistant({
             </button>
             {c.selection && (
               <button
-                disabled={c.busy}
+                disabled={inputBusy || c.contextLocked}
                 onClick={() => {
                   c.setSelection(null)
                   setSources(false)
+                  setContextOpen(false)
                 }}>
                 Remove email context
               </button>
@@ -574,26 +594,43 @@ function Assistant({
             </button>
           </div>
         )}
-        {c.selection && (
-          <button
-            type="button"
-            className="context-chip"
-            disabled={c.busy}
-            title="View email context"
-            aria-label={`Email context: ${c.selection.thread.subject}`}
-            aria-expanded={contextOpen}
-            onClick={() => {
-              setContextOpen(!contextOpen)
-            }}>
-            <Icon name="mail" size={14} />
-            <span>{c.selection.thread.subject}</span>
-            <small>
-              {c.selection.selectedIds.length}{" "}
-              {c.selection.selectedIds.length === 1 ? "message" : "messages"}
-            </small>
-          </button>
-        )}
         <form className="composer" onSubmit={send}>
+          {c.selection && (
+            <div
+              className="composer-context"
+              role="group"
+              aria-label="Attached email">
+              <button
+                type="button"
+                className="context-chip"
+                disabled={c.busy}
+                title="View attached email details"
+                aria-label={`Attached email: ${c.selection.thread.subject}. View details`}
+                aria-expanded={contextOpen}
+                onClick={() => setContextOpen(!contextOpen)}>
+                <Icon name="mail" size={15} />
+                <span>{c.selection.thread.subject}</span>
+              </button>
+              <button
+                type="button"
+                className="context-remove icon-button"
+                disabled={inputBusy || c.contextLocked}
+                aria-label="Detach email context"
+                title={
+                  c.contextLocked
+                    ? "Retry the unfinished message or start a new conversation first"
+                    : "Detach email; the next message clears the saved source"
+                }
+                onClick={() => {
+                  c.clearContext()
+                  setContextOpen(false)
+                  setSources(false)
+                  input.current?.focus()
+                }}>
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          )}
           <textarea
             ref={input}
             aria-label="Your request"
@@ -605,7 +642,7 @@ function Assistant({
             value={message}
             rows={1}
             maxLength={4000}
-            disabled={c.busy}
+            disabled={inputBusy}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
               if (
@@ -625,7 +662,7 @@ function Assistant({
               aria-label="Add context"
               title="Add context"
               aria-expanded={sources}
-              disabled={c.busy}
+              disabled={inputBusy || c.contextLocked}
               onClick={() => setSources(!sources)}>
               <Icon name="plus" />
             </button>
@@ -637,7 +674,7 @@ function Assistant({
               className={`icon-button${recording ? " recording" : ""}`}
               aria-label={recording ? "Stop dictation" : "Dictate request"}
               title="Dictate request"
-              disabled={c.busy}
+              disabled={inputBusy}
               onClick={dictate}>
               <Icon name="mic" size={17} />
             </button>
@@ -654,7 +691,7 @@ function Assistant({
               type="submit"
               title="Send request"
               aria-label="Send request"
-              disabled={c.busy || !message.trim()}>
+              disabled={inputBusy || !message.trim()}>
               <Icon name="send" size={18} />
             </button>
           </div>

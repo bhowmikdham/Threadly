@@ -689,6 +689,44 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   })
   await page.setViewportSize({ width: 420, height: 900 })
 })
+test("an attached email can be detached directly from the composer", async () => {
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await page.getByLabel("Your request").fill("Show me all GYG emails")
+  await page.getByLabel("Your request").press("Enter")
+  const email = page.getByRole("button", {
+    name: "Use email: Test receipt",
+    exact: true
+  })
+  await expect(email).toBeVisible()
+  await email.click()
+  await expect(
+    page.getByRole("button", { name: "Detach email context" })
+  ).toBeVisible()
+  await page.setViewportSize({ width: 320, height: 640 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true)
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "attached-email-narrow.png")
+  })
+  await page.getByRole("button", { name: "Detach email context" }).click()
+  await expect(page.locator(".context-chip")).toHaveCount(0)
+  await expect(email).toHaveAttribute("aria-pressed", "false")
+
+  await page.getByLabel("Your request").fill("hey")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByText("Hey! What can I help you with?", { exact: true })
+  ).toBeVisible()
+  const turn = calls
+    .filter((c) => c.path === "/assistant/conversation-turns")
+    .at(-1)
+  expect(turn?.body).toHaveProperty("context_snapshot_id", null)
+  await page.setViewportSize({ width: 420, height: 900 })
+})
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
   await page

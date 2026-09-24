@@ -42,7 +42,11 @@ not a claim of feature parity or a copy of proprietary assets.
 Navigating to another Gmail page does not silently switch an existing conversation's
 source. Use **+ → Use open Gmail thread**, ask for emails and choose a card, or
 start a new conversation to change it.
-The context chip exposes included messages and an explicit message target. Message
+The email chip sits inside the composer. Its subject opens included-message
+details directly above the composer; its separate remove button detaches the
+email without opening a menu. A detach remains visible if the side panel
+reopens during the same browser session. The next chat turn sends an explicit
+null source so the backend clears the conversation pin. Message
 ordinals preserve the displayed Gmail order. **Rewrite selected message** produces
 a text suggestion through the existing bounded read adapter; it does not send or
 replace the original email.
@@ -88,12 +92,20 @@ flowchart TD
   selected-message rewrite still calls `/assistant/requests` with
   `read_options.transform_text` and exactly one selected message.
 - The sidebar stores only the conversation ID/version and any exact unfinished
-  turn in extension session storage. It reloads encrypted, bounded backend
-  history in the same browser session. Search snippets/cards are not restored;
+  turn, plus a temporary detached-source marker or replacement email identifiers,
+  in extension session storage. It does not store that email's contents there.
+  It reloads encrypted, bounded backend history in the same browser session.
+  Search snippets/cards are not restored;
   ask to search again. **Recent work** lists durable tasks and drafts, not the
   full chat transcript. Deleting a chat keeps those tasks and action records.
+- The composer waits for saved conversation and email-source restoration before
+  it accepts a new turn. A late source fetch cannot reattach an email after the
+  user changes or clears the selection. If restoring the saved chat fails, the
+  panel keeps it intact and asks the user to reopen Threadly or explicitly start
+  a new conversation.
 - An uncertain turn is retried with the identical request ID and body. Another
-  message is blocked until that turn resolves or the user starts a new chat.
+  message and any change to its email source are blocked until that turn resolves
+  or the user starts a new chat.
   A changed or unavailable pinned email asks for an explicit new source or for
   the user to continue without email context.
 - Draft editing preserves immutable revisions, invalidates old outgoing review,
