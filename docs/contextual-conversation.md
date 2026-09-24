@@ -2,10 +2,16 @@
 
 Implementation release: `contextual-conversation-1.1.4`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. The `1.1.3` release has new replay cases for selected-message,
-searched-result and visible-thread summaries. Its two-trial synthetic Bedrock evaluation
-passed **32/32** checks; the sanitized [receipt](evaluation/contextual-conversation-live-v3.json)
-is versioned. The prior `1.1.2` replay passed **26/26** checks
+`c23026e9a039`. Release `1.1.4` adds bounded batch reads and a dense-search case in
+which an order is behind a page of promotions. Its paced, two-trial synthetic Bedrock
+evaluation passed **34/34** checks; the sanitized
+[receipt](evaluation/contextual-conversation-live-v4.json) pins the prompt, tool and
+case hashes. Two earlier unpaced attempts finished **33/34** and **32/34** because of
+intermittent provider availability errors, with no deterministic grading failures
+([attempt 1](evaluation/contextual-conversation-live-v4-attempt1.json),
+[attempt 2](evaluation/contextual-conversation-live-v4-attempt2.json)).
+The `1.1.3` replay passed **32/32** checks
+([receipt](evaluation/contextual-conversation-live-v3.json)). The prior `1.1.2` replay passed **26/26** checks
 ([receipt](evaluation/contextual-conversation-live-v2.json)); the earlier `1.1.1`
 [receipt](evaluation/contextual-conversation-live-v1.json) is also available.
 Unit/integration and synthetic model results are not a general quality guarantee.
@@ -167,8 +173,15 @@ attestation: preflight does not query or disable account logging and cannot prov
 occurred. Read tools are
 bounded; repeated identical calls are rejected. Per-user active-conversation, retained-row and
 retained-turn budgets cap synchronous Bedrock/Gmail fan-out.
-Transient provider failures have bounded retries. Tools do not hold DB locks while waiting
-for Google or Bedrock. Trace metadata contains tool names/statuses, not private arguments.
+Recognized transient Bedrock and transport failures have bounded retries inside the
+120-second turn budget. Internal failure logs contain only normalized error code,
+HTTP status, sanitized AWS request ID, elapsed milliseconds and attempt number;
+public errors remain generic. Access and validation failures do not retry. During the
+unpaced evaluation attempts, account-level CloudWatch metrics showed throttling on
+the selected inference profile. Those metrics cannot attribute individual requests
+to Threadly; the release replay therefore also records a 15-second case delay.
+Tools do not hold DB locks while waiting for Google or Bedrock. Trace metadata
+contains tool names/statuses, not private arguments.
 Release `1.1.2` masks decoded conversation values and semantic data keys with one
 stable placeholder map, including JSON carried inside a text block. Numeric
 phone/card-like values become quoted placeholders in that JSON. This keeps Unicode
@@ -205,8 +218,8 @@ user must review the complete revised subject, body and recipients before any se
   tools, deterministic expected outcomes/quotes/tool choices; no Google access or writes.
 - `tests/test_conversation*.py`: actual PostgreSQL/API state, ownership, leases, privacy,
   adapter failure behavior, reference captures and workflow handoff tests.
-- Run live evaluation explicitly: `python -m app.conversation.evaluate --live --trials 2`.
-  The pinned Australian Haiku profile passed 32/32 synthetic checks on 24 September 2026;
+- Run live evaluation explicitly: `python -m app.conversation.evaluate --live --trials 2 --case-delay-seconds 15`.
+  The pinned Australian Haiku profile passed 34/34 synthetic checks on 24 September 2026;
   the receipt above records release, prompt/tool/case hashes and per-case results without
   input or output content. The account audit found model invocation logging disabled in
   Sydney and account retention mode `inherit`, which follows the model's default rather than
