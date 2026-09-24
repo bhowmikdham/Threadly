@@ -1,5 +1,7 @@
 # Data model — PostgreSQL
 
+> Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
+
 > Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
 > local-search and stored-source assumptions below. Default runtime fetches selected sources
 > from Gmail and stores references only; bulk sync is retired. See that contract before integration.
@@ -35,7 +37,7 @@ of existing messages. Downgrading removes all state in the five new tables.
 
 | Table | Purpose and constraints |
 |---|---|
-| `context_snapshots` | UUID string ID, owner, thread FK, SHA-256 source hash and JSONB immutable excerpt payload. Unique `(id,user_id)` enables owned references. Thread/user deletion cascades. |
+| `context_snapshots` | UUID string ID, owner, thread FK, SHA-256 hash of the validated transient excerpt and JSONB source-reference payload. In on-demand mode the payload stores owner/account version, Gmail thread ID, fingerprint and optional ordered message IDs, not source text. Unique `(id,user_id)` enables owned references. Thread/user deletion cascades. |
 | `assistant_tasks` | UUID ID, owner, request ID/hash, instruction, nullable owned context FK, nullable intent hint/route checkpoint, state, optimistic version, latest event sequence, pinned workflow/prompt/config fingerprints and sanitized error code. Unique `(user_id,request_id)`; index `(user_id,created_at,id)` for history. |
 | `assistant_jobs` | One row per task; owned task FK, queued/running/done, due time, attempts 0–3, lease token/deadline. Checks require both lease fields only while running. Claim index supports polling/recovery. |
 | `task_events` | Append-only composite PK `(task_id,sequence)`, owned task FK, task version, kind, redacted JSONB payload and timestamp. Sequence assigned under the task row lock. |
@@ -53,10 +55,13 @@ deadline and state before atomically publishing artifact + terminal events. A
 crashed worker may repeat inference; the database rejects stale publication. This
 is not an exactly-once guarantee for model calls or a design for external writes.
 
-Snapshots copy only cleaned, bounded text already authorized through sync. They
-do not store raw MIME. Retention/expiry jobs remain future work; currently copies
-remain until their source thread or account is deleted. SQL engine exception
-logging hides bound parameters to avoid dumping these payloads into application logs.
+In current on-demand mode, snapshots copy no source body, subject, address or raw MIME.
+Workers refetch the bounded source from Gmail and compare the account version,
+fingerprint and hash before use. Legacy body-bearing snapshots can exist only on the
+explicit legacy mode/rollback path and are rejected by on-demand readers. Snapshot and
+artifact retention/expiry jobs remain future work; references and generated artifacts
+remain until their owning source/task/account lifecycle removes them. SQL engine exception
+logging hides bound parameters to avoid dumping payloads into application logs.
 
 ## Contextual routing fields (migration `b7a219c40e6d`)
 
@@ -438,3 +443,21 @@ release identifiers. Calendar event actions use existing action/approval/attempt
 tables with `create_event` + `calendar-event-1.0.0`; email approvals cannot authorize
 that schema. New records do not reinterpret historical queued releases. See
 [mappings and lifecycle](mvp-workflow-map.md).
+
+## Conversation state — migration c23026e9a039
+
+`conversations`: UUID primary key, user FK with cascade, account version, monotonic version,
+Fernet `state_enc`, seven-day `expires_at` from creation (extended only to protect an
+acquired turn lease), lease ID/until, unfinished request ID/hash,
+and created/updated timestamps. Indexes on owner and expiry. Encrypted state holds at most
+12 dialogue exchanges plus 12 idempotency receipts, at most 25 ordered search refs,
+pinned context ID, current task/proposal references and crash-recovery result references.
+Search refs include Gmail message/thread IDs and the last filter/cursor; they exclude original
+provider bodies, subjects, snippets and model tool transcripts. Generated assistant text,
+user instructions and minimal citations may contain email-derived information. No new
+embedding or mailbox table is added. Normal turns do not renew the fixed expiry; an active
+lease only prevents cleanup during an in-flight turn. Expired rows are inaccessible and the
+assistant worker purges eligible rows hourly. Browser session storage separately retains the
+full exact unfinished turn for safe retry. Deleting the conversation does not delete existing
+tasks/artifacts/action audit records and does not erase existing backups.
+Downgrade refuses to drop retained conversations; disabling the feature is the safe rollback.

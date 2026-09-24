@@ -1,5 +1,7 @@
 # API contract — v0 DRAFT
 
+> Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
+
 > Current inbox chat: [conversational search and result cards](inbox-chat.md).
 
 > Current selected-thread behavior: [grounded answers and receipt fixes](grounded-thread-fixes.md).
@@ -117,13 +119,15 @@ available; source changes invalidate its cache as described below.
 
 Requires migrations through `e9b7120c4a63` and a separately running assistant worker.
 All routes require JWT authentication and enforce ownership. Context captures
-server-side synced message excerpts; clients cannot upload authoritative mailbox
-text, source IDs, user IDs, job state or generated artifacts through these APIs.
+store server-issued Gmail references in on-demand mode. The response may include
+transient, freshly refetched excerpts, but source body/subject/address data is not
+written to the snapshot row. Clients cannot upload authoritative mailbox text,
+user IDs, job state or generated artifacts through these APIs.
 
 | Method/path | Request | Response |
 |---|---|---|
-| `POST /assistant/context-snapshots` | `{"schema_version":"1.0","thread_id":"<Gmail thread ID>"}` | 201: `context_snapshot_id`, `captured_at`, `source_hash`, scope, captured messages and coverage counts |
-| `GET /assistant/context-snapshots/{id}` | — | Owned immutable excerpt snapshot |
+| `POST /assistant/context-snapshots` | `{"schema_version":"1.0","thread_id":"<Gmail thread ID>"}` | 201: `context_snapshot_id`, `captured_at`, `source_hash`, transient refetched scope/messages/coverage; database payload is reference-only in on-demand mode |
+| `GET /assistant/context-snapshots/{id}` | — | Refetches the owned Gmail reference, verifies account/fingerprint/hash, then returns transient excerpts; no stored-body fallback |
 | `POST /assistant/requests` | Versioned assistant request below | 202: saved task, state, version, event cursor and URLs |
 | `GET /assistant/tasks` | `cursor` (previous page's ID), `page_size` 1–100, optional `state` | `tasks`, `next_cursor`; newest creation time/ID first, owner scoped |
 | `GET /assistant/tasks/{id}` | — | Task state, version, latest sequence, snapshot/artifact references, release fingerprint, error code and timestamps |
@@ -321,7 +325,8 @@ endpoints remain pending.
 | POST   | `/voice/speak`      | `{"text": "..."}`     | audio stream (`audio/mpeg`) |
 
 Voice keys never reach the extension; the api proxies ElevenLabs (module 9) and
-masks PII before any cloud egress.
+masks supported email/phone/card-like identifiers before cloud egress. This seed
+masker is not full anonymisation.
 
 ## Open questions (settle before W2)
 
@@ -743,3 +748,49 @@ release (six route checks, summary, reply, present/absent factual answers and tw
 compose checks); it is not a mailbox-wide or external-write acceptance claim.
 Pending jobs pinned to an unavailable older release fail closed and must be
 resubmitted. Completed artifacts remain readable.
+
+## Contextual conversation API (feature-gated)
+
+`POST /assistant/conversation-turns`: `{conversation_id, request_id, expected_version,
+instruction, timezone, context_snapshot_id?, active_task_id?}`. IDs are client UUIDs;
+new conversations use expected version 0. Omitted source preserves the pin; explicit null
+clears it. Explicit null `active_task_id` clears prior task context. All references are
+checked for current-user ownership. No client transcript is accepted.
+
+The 200 response always includes `conversation_id`, the incremented `version`, `kind`,
+`text` and `latency_ms`. Normal model-driven completion also includes `release` and
+`trace:[{tool,status}]`; recovery from a previously checkpointed durable task/proposal may
+return the durable reference without replaying model trace metadata. Optional result fields are:
+
+| Field | Shape and meaning |
+|---|---|
+| `evidence` | Array of `{reference,quote}` exact-source citations on grounded message/recommendation answers; absent on task/proposal results. |
+| `search` | One transient page: `filters`, up to five `results` (`message_id`, `thread_id`, `subject`, `sender`, `received_at`, `snippet`, optional literal `flight` preview), signed `next_cursor`, and incomplete `coverage`. Cards are not replayed from conversation storage. |
+| `task_id`, `task` | Existing durable task ID and full task view (`state`, optimistic `version`, question/artifact/event references, release and timestamps). Poll through the existing task APIs. |
+| `proposal_id`, `proposal` | Existing command-plan ID and full reviewable proposal. Confirmation is a separate typed endpoint and is not implied by chat. |
+| `artifacts` | Immediate full artifact views when the turn creates a draft revision. The durable task's `artifact_id` is authoritative for later fetch/retry. |
+| `notice` | Recovery note, currently used when an idempotent replay cannot restore transient search cards. |
+
+`kind` is message, recommendation, clarification, task or proposal. Task/proposal IDs reuse
+existing polling, typed inputs, review and confirmation endpoints. Neither the request nor
+response is execution approval. Ordinary follow-up text uses another turn with the returned
+version. A retry must reuse identical request ID and the complete input, including whether
+optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
+
+`GET /assistant/conversations/{id}` returns `{conversation_id,version,history,expires_at,
+active_task_id,active_proposal_id,proposal,pending_request_id,context_snapshot_id}`. Each
+history item is `{user,assistant,kind,task_id,proposal_id,request_id}`; older rows may lack
+the newer identifiers. It does not include model tool transcripts or search cards.
+`DELETE` returns `{deleted:true,tasks_retained:true}` and is owner-scoped and idempotent;
+existing tasks and action records are retained. Deletion returns 409 `conversation_busy`
+while that conversation has an active turn lease. Requires bearer auth. Conversation turn
+processing requires `CONVERSATION_ENABLED=true`; otherwise 503 `conversation_disabled`.
+
+All failures use `{"error":{"code":"<machine code>","message":"<safe text>","detail":null}}`
+(validation failures use a sanitized `detail` array). Relevant stable codes include
+422 `conversation_tool_limit`/`conversation_limit`, 404 `conversation_not_found`, 409
+`conversation_version_conflict`, `conversation_busy`, `conversation_retry_required`,
+`conversation_account_changed`, 429 `conversation_capacity`/`conversation_history_limit`/
+`conversation_turn_limit`, and 503 `conversation_disabled`,
+`conversation_provider_unavailable` or `conversation_unavailable`. The public provider code
+is generic; SDK exception text, Bedrock error type and raw email bodies are not returned.

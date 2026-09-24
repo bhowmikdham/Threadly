@@ -15,7 +15,7 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "b17026e9a038"
+HEAD = "c23026e9a039"
 NEW_TABLES = {
     "mail_sync_jobs",
     "mail_sync_stage",
@@ -41,6 +41,7 @@ NEW_TABLES = {
     "action_approvals",
     "action_attempts",
     "action_jobs",
+    "conversations",
 }
 
 

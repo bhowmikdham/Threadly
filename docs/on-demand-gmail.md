@@ -1,5 +1,7 @@
 # On-demand Gmail architecture
 
+> Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
+
 This corrects the mailbox-replication design. The default is `GMAIL_SOURCE_MODE=on_demand`.
 The legacy sync implementation exists only for compatibility tests/explicit rollback;
 it is not part of the normal staging deployment. Calendar remains direct bounded reads.

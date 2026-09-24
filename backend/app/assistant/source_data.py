@@ -17,6 +17,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.db.models import ContextSnapshot, Thread, User
 from app.mail import live
+from app.schemas.ui_context import UIMessageMap
 
 STORAGE = "gmail-reference-1.0"
 _cache = ContextVar("gmail_request_sources", default=None)
@@ -142,9 +143,11 @@ async def prefetch(owner, references):
             materialize(ref, source)
 
 
-async def capture(session, owner, thread_id, ui_map=None):
+async def capture(session, owner, thread_id, ui_map=None, *, message_id=None):
     # Route prefetches before opening its transaction. No emails enter ORM rows.
     source = source_for(owner, thread_id)
+    if ui_map and message_id:
+        raise ValueError("Choose either a UI map or one backend message reference")
     user = await session.get(User, owner, with_for_update=True)
     if (
         not user
@@ -180,6 +183,17 @@ async def capture(session, owner, thread_id, ui_map=None):
         thread.version += 1
     if ui_map and ui_map.thread_version != thread.version:
         raise ApiError(409, "ui_context_changed", "Thread changed; capture its current version.")
+    if message_id:
+        if not any(message["gmail_msg_id"] == message_id for message in source["messages"]):
+            raise ApiError(404, "ui_reference_not_found", "That email is no longer available.")
+        ui_map = UIMessageMap(
+            schema_version="1.0",
+            surface="gmail_thread",
+            thread_version=thread.version,
+            captured_at=datetime.now(UTC).isoformat(),
+            visible_message_ids=[message_id],
+            selected_message_ids=[message_id],
+        )
     thread.last_msg_id = source["messages"][-1]["gmail_msg_id"]
     # Thread row holds source IDs/version only, never subject/body/addresses.
     ref = {

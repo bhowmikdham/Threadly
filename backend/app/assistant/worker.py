@@ -289,10 +289,17 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
 async def serve(once: bool = False):
     from app.operations.health import pulse
 
+    last_purge = 0.0
     try:
         while True:
             pulse("assistant")
             try:
+                import time
+                if time.monotonic() - last_purge > 3600:
+                    from app.conversation.store import purge
+                    async with get_session_factory().begin() as session:
+                        await purge(session)
+                    last_purge = time.monotonic()
                 worked = await run_once()
             except Exception as exc:
                 log.error(

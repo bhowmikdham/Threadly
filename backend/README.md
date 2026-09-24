@@ -1,26 +1,29 @@
 # backend/ — the `api` container
 
-FastAPI app. One folder per box in the architecture diagram — if you're unsure
-where code goes, `docs/architecture.md` has the module map (box #, folder, week).
+FastAPI app for the authenticated conversation, on-demand Gmail, Calendar and
+reviewed-action services. Use `docs/architecture.md` for the current topology and
+`docs/contextual-conversation.md` for the feature-gated conversation contract.
 
 ## Layout
 
 ```
 app/
-├── main.py            app factory, router registration, error handlers
-├── config.py          all settings, read from env (.env at repo root)
-├── api/               1  routes/, JWT dep, error envelope (R18)
-├── auth/              2  oauth exchange/refresh, Fernet token crypto
-├── sync/              3  gmail client + sync worker (paginate ALL pages)
-├── planner/           4  rules-first intent planning, 2b JSON fallback
-├── orchestrator/      5  dispatch by intent — structured data AROUND the LLM
-├── extractor/         6  tier1 regex, tier2 LLM residue, dedupe
-├── rag/               7  sent-mail embeddings in chroma, retrieve w/ char cap
-├── model_client/      8  ollama(mac) -> openrouter fallback chain
-├── voice/             9  ElevenLabs STT/TTS proxy (keys server-side)
-├── pii/               9  masking middleware for ALL cloud egress
-├── db/                engine/session, 7 table models, repositories
-└── schemas/           pydantic contracts — mirror docs/api-contract.md
+├── main.py            app factory, router registration and error handlers
+├── config.py          typed environment settings and safe defaults
+├── api/               authenticated REST/SSE routes and error envelope
+├── auth/              Google OAuth, Fernet token encryption and session JWT
+├── conversation/      encrypted bounded dialogue, Bedrock tool loop and evaluation
+├── assistant/         durable tasks, workflow proposals, source references and worker
+├── actions/           exact-payload approval, execution and reconciliation worker
+├── calendar/          preferences, free/busy reads, slots and event-action support
+├── mail/              live bounded Gmail reads/search and write adapters
+├── capabilities/      granted-scope and server-control readiness
+├── workflows/         versioned native/auxiliary workflow assets and registry
+├── model_client/      Bedrock adapters plus isolated legacy compatibility clients
+├── pii/               reversible direct-identifier masking for model transport
+├── db/                SQLAlchemy models and session lifecycle
+├── schemas/           strict API/model contracts mirrored in docs/api-contract.md
+└── sync/              retired mailbox-sync compatibility code; not normal staging
 ```
 
 ## Run
@@ -38,17 +41,20 @@ uvicorn app.main:app --reload    # http://localhost:8000/healthz
 
 - Every non-2xx response uses the error envelope — raise `ApiError`, never bare HTTPException.
 - Heavy SDK imports (google, chromadb) stay INSIDE functions — startup and tests must not need them.
-- Endpoints not built yet return 501 `not_implemented`, so the frontend can integrate against real shapes early.
+- Keep Gmail/Calendar provider calls outside database transactions and hydrate source
+  references only within request/attempt scope.
 - Schema change = model change + `make db-revision m="..."` + `docs/data-model.md` update, one PR.
 
-## Status (W1 shipped)
+## Current status
 
-Live: auth (OAuth exchange/refresh, Fernet-encrypted tokens, session JWT),
-sync (full-mailbox backfill paginating ALL pages, history-cursor incremental,
-body cleaning), model client (ollama-over-tailscale primary, openrouter
-fallback via 2s probe, PII-masked cloud egress, thinking OFF), /summary SSE
-with the (thread_id, last_msg_id) cache, /threads from postgres.
-Stubbed for W2/W3: extractor, entities/commitments, RAG, draft, voice, planner.
+Implemented source includes OAuth/capability handling, live on-demand Gmail reads,
+durable summary/draft/plan/scheduling workflows, exact email/Calendar action review,
+workers and the feature-gated Bedrock conversation coordinator. Mailbox import is
+retired in staging. `CONVERSATION_ENABLED` defaults false; enabling it requires the
+reviewed Haiku inference-profile configuration and an operator cloud-processing
+attestation. External email and Calendar writes remain controlled by separate server
+flags, pilot allowlists, exact approval and reconciliation. Source presence or a healthy
+container is not evidence that the live provider/evaluation gates passed.
 
 ## Tests
 

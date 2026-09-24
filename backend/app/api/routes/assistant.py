@@ -46,6 +46,7 @@ from app.schemas.assistant import (
 from app.schemas.command_plan import CommandPlanRequest, ConfirmCommandPlan
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
+from app.schemas.conversation import ConversationTurn
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.inbox_chat import InboxChatRequest, InboxPageRequest
@@ -72,6 +73,27 @@ async def search_mail(request: MailSearchRequest, user_id: CurrentUser, session:
     result = await mail_search.search(session, user_id, request)
     await session.commit()  # Release the sync fence and transaction-local timeouts.
     return result
+
+
+@router.post("/conversation-turns")
+async def conversation_turn(request: ConversationTurn, user_id: CurrentUser):
+    from app.conversation import service
+
+    return await service.turn(user_id, request)
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str, user_id: CurrentUser):
+    from app.conversation import service
+
+    return await service.get(user_id, conversation_id)
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str, user_id: CurrentUser):
+    from app.conversation import service
+
+    return await service.remove(user_id, conversation_id)
 
 
 @router.post("/inbox-chat")
