@@ -1,13 +1,12 @@
 """Separate Converse tool adapter; strict text-only workflows remain unchanged."""
 
 import asyncio
-import json
 from contextlib import suppress
 
 from app.config import get_settings
 from app.model_client.bedrock import _runtime_client
 from app.model_client.providers import ProviderError
-from app.pii.masking import mask, unmask
+from app.pii.masking import mask_structure, unmask
 
 
 class ConversationProviderError(ProviderError):
@@ -26,12 +25,12 @@ class ConversationModel:
             raise ProviderError("Conversation requires configured Bedrock")
         if not settings.bedrock_mail_processing_acknowledged:
             raise ProviderError("Bedrock mail processing is not acknowledged")
-        # Mask all model-visible data in one pass so placeholders are consistent.
-        # Tool IDs/name/schema contain no user data; restore transport IDs on return.
-        packed, mapping = mask(json.dumps({"system": system, "messages": messages}))
-        masked = json.loads(packed)
         client = None
         try:
+            # Mask decoded values instead of serialized JSON, which may contain
+            # Unicode escapes that a phone-like match would corrupt. The map is
+            # shared across system, history, and nested tool observations.
+            masked, mapping = mask_structure({"system": system, "messages": messages})
             client = self.factory()
             result = client.converse(
                 modelId=settings.bedrock_model_id,
@@ -52,11 +51,13 @@ class ConversationModel:
                 if isinstance(value, list):
                     return [restore(v) for v in value]
                 if isinstance(value, dict):
-                    return {k: restore(v) for k, v in value.items()}
+                    return {
+                        unmask(k, mapping) if isinstance(k, str) else k: restore(v)
+                        for k, v in value.items()
+                    }
                 return value
 
-            restored = restore(message)
-            calls = [b["toolUse"] for b in restored["content"] if "toolUse" in b]
+            calls = [b["toolUse"] for b in message["content"] if "toolUse" in b]
             if not 1 <= len(calls) <= 4:
                 raise ProviderError("Invalid tool count")
             for c in calls:
@@ -69,8 +70,14 @@ class ConversationModel:
                     raise ProviderError("Invalid tool request")
                 if not isinstance(c["toolUseId"], str) or len(c["toolUseId"]) > 200:
                     raise ProviderError("Invalid tool identity")
-            # Do not relay speculative assistant text; only validated tool outcomes reach UI.
-            return {"role": "assistant", "content": [{"toolUse": c} for c in calls]}
+            # Tool IDs/names are provider transport values. Only semantic tool
+            # arguments can contain placeholders to restore.
+            return {
+                "role": "assistant",
+                "content": [
+                    {"toolUse": {**call, "input": restore(call["input"])}} for call in calls
+                ],
+            }
         except ProviderError:
             raise
         except Exception as exc:
