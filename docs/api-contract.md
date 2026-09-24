@@ -777,6 +777,19 @@ response is execution approval. Ordinary follow-up text uses another turn with t
 version. A retry must reuse identical request ID and the complete input, including whether
 optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
 
+For `prepare_workflow(intent=summarise, reference=selected|mail-N)`, the backend requires
+that reference to have been read and creates a typed `operations:["summary"]` task with
+the user-authored instruction. `source_scope` defaults to `selected_message`; its saved
+source contains only that message, even when the original UI capture displayed others.
+`source_scope=visible_thread` requires an owned pinned `selected` context and a prior
+`read_email(scope=visible_thread)`; it uses the captured visible messages, never a searched
+result's entire Gmail thread. An older full-thread capture without a UI map has thread scope
+by default. Compound work must retain one source scope for all requested operations.
+Task creation remains idempotent with the conversation turn request ID; it does not send mail.
+Source-linked compose with a user-authored `to` recipient also uses the typed `draft_new`
+workflow over that bound source. Missing-recipient and source-free compose requests keep
+their existing task routing behavior.
+
 `GET /assistant/conversations/{id}` returns `{conversation_id,version,history,expires_at,
 active_task_id,active_proposal_id,proposal,pending_request_id,context_snapshot_id}`. Each
 history item is `{user,assistant,kind,task_id,proposal_id,request_id}`; older rows may lack

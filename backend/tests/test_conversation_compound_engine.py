@@ -139,3 +139,62 @@ async def test_conflicting_source_references_fail_closed_and_return_to_model():
         "one source reference" in item["toolResult"]["content"][0]["json"]["message"]
         for item in feedback
     )
+
+
+async def test_provider_split_compound_cannot_widen_a_summary_to_visible_thread():
+    runtime = Runtime()
+    model = Model(
+        decision(
+            (
+                "prepare_workflow",
+                {
+                    "intent": "summarise",
+                    "reference": "selected",
+                    "source_scope": "visible_thread",
+                },
+            ),
+            ("prepare_workflow", {"intent": "reply", "reference": "selected"}),
+        ),
+        decision(
+            ("respond", {"kind": "clarification", "text": "Please request these separately."})
+        ),
+    )
+
+    result = await engine.run({}, runtime, model)
+
+    assert result["kind"] == "clarification"
+    assert result["trace"][0] == {"tool": "prepare_workflow", "status": "invalid"}
+    assert runtime.calls == []
+
+
+async def test_provider_split_compound_keeps_consistent_visible_thread_scope():
+    runtime = Runtime()
+    model = Model(
+        decision(
+            (
+                "prepare_workflow",
+                {
+                    "intent": "summarise",
+                    "reference": "selected",
+                    "source_scope": "visible_thread",
+                },
+            ),
+            (
+                "prepare_workflow",
+                {
+                    "intent": "reply",
+                    "reference": "selected",
+                    "source_scope": "visible_thread",
+                },
+            ),
+        ),
+    )
+
+    result = await engine.run({}, runtime, model)
+
+    assert result["kind"] == "proposal"
+    assert len(runtime.calls) == 1
+    args = runtime.calls[0][1]
+    assert args.compound is True
+    assert args.reference == "selected"
+    assert args.source_scope == "visible_thread"

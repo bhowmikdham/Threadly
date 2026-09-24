@@ -25,6 +25,7 @@ from app.schemas.continuation import TaskInputRequest
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import DraftRecipients, EditDraftRequest
 from app.schemas.inbox_chat import InboxFilters
+from app.schemas.workflow import WorkflowRequest
 
 SEARCH_REFERENCE_LIMIT = 25
 WORKFLOW_BINDING_ERROR = "workflow_binding_invalid"
@@ -159,9 +160,15 @@ def authorize_workflow(instruction, intent, compound):
             r"\b(?:draft|write|prepare|compose|create)\b.{0,80}\b(?:email|e-mail|message|note)\b",
             value,
         )
-        or re.search(r"\b(?:write|compose|email)\b.{0,80}\b\S+@\S+", value)
+        or re.search(r"\b(?:write|compose)\b.{0,80}\b\S+@\S+", value)
         or re.search(
-            r"\b(?:write|email|message|compose)\s+(?:an?\s+)?(?:to\s+)?"
+            r"\b(?:write|message|compose)\s+(?:an?\s+)?(?:to\s+)?"
+            r"(?:customer\s+support|support|[a-z][\w.-]{1,60})\b",
+            value,
+        )
+        or re.search(
+            r"(?:^|[.!?]\s*|\b(?:can|could|would|will) you\s+)"
+            r"(?:please\s+)?email\s+(?:an?\s+)?(?:to\s+)?"
             r"(?:customer\s+support|support|[a-z][\w.-]{1,60})\b",
             value,
         )
@@ -183,6 +190,11 @@ def authorize_workflow(instruction, intent, compound):
     if re.search(r"\b(?:plan|action items?|tasks?|commitments?)\b", value):
         operations.add("other")
 
+    # A read-only single summary may be phrased semantically (for example,
+    # "give me a rundown"). Keep the stricter lexical gate for every other
+    # workflow and for compound work.
+    if intent == "summarise" and not compound and not operations:
+        return
     if intent not in operations:
         raise ValueError("The user did not request this workflow intent")
     multi = len(operations & {"summarise", "reply", "compose", "plan_schedule", "other"}) > 1
@@ -196,7 +208,7 @@ class Runtime:
     def __init__(self, owner, request, state, factory, lease=None):
         self.owner, self.request, self.state, self.factory = owner, request, state, factory
         self.lease = lease
-        self.evidence, self.loaded = {}, {}
+        self.evidence, self.loaded, self.read_scopes = {}, {}, {}
         self.search_page = None
         self.active = self.artifact = None
         # Addresses are exposed as backend-issued references, not writable model strings.
@@ -240,12 +252,16 @@ class Runtime:
                     )
                     if not context:
                         raise ApiError(404, "context_not_found", "Select an accessible email.")
-                    selected = (context.payload.get("ui_map") or {}).get("selected_message_ids", [])
-                    self.state["refs"]["selected"] = {
-                        "message_id": selected[0] if len(selected) == 1 else None,
-                        "context_id": context.id,
-                        "thread_id": context.payload["thread_id"],
-                    }
+                    ui_map = context.payload.get("ui_map")
+                    selected = (ui_map or {}).get("selected_message_ids", [])
+                    if ui_map is None or len(selected) == 1:
+                        self.state["refs"]["selected"] = {
+                            "message_id": selected[0] if selected else None,
+                            "context_id": context.id,
+                            "thread_id": context.payload["thread_id"],
+                        }
+                    else:
+                        self.state["refs"].pop("selected", None)
             else:
                 self.state["refs"].pop("selected", None)
         if "active_task_id" in self.request.model_fields_set:
@@ -299,6 +315,13 @@ class Runtime:
             "user_turn": self.request.instruction,
             "user_recipient_refs": self.recipients,
             "selected_reference": "selected" if "selected" in self.state["refs"] else None,
+            "selected_source_scopes": (
+                ["selected_message", "visible_thread"]
+                if self.state["refs"].get("selected", {}).get("message_id")
+                else ["visible_thread"]
+                if "selected" in self.state["refs"]
+                else []
+            ),
             "displayed_result_order": self.state.get("result_order", []),
             "active_work": task_context,
             "capabilities": caps,
@@ -312,7 +335,7 @@ class Runtime:
         if name in {"search_mail", "more_mail"}:
             return await self.search(args if name == "search_mail" else None)
         if name == "read_email":
-            return await self.read(args.reference)
+            return await self.read(args.reference, args.scope)
         if name == "prepare_workflow":
             return await self.workflow(args)
         if name == "answer_question":
@@ -356,6 +379,7 @@ class Runtime:
         if args is not None:
             self.evidence = {k: v for k, v in self.evidence.items() if k == "selected"}
             self.loaded = {k: v for k, v in self.loaded.items() if k == "selected"}
+            self.read_scopes = {k: v for k, v in self.read_scopes.items() if k == "selected"}
             self.state["refs"] = {k: v for k, v in self.state["refs"].items() if k == "selected"}
             self.state["result_order"] = []
         observations = []
@@ -397,11 +421,14 @@ class Runtime:
             "displayed_result_order": self.state["result_order"],
         }
 
-    async def read(self, reference):
+    async def read(self, reference, scope="selected_message"):
         ref = self.state["refs"].get(reference)
         if not ref:
             raise ValueError("Unknown source reference")
+        if scope == "visible_thread" and (reference != "selected" or not ref.get("context_id")):
+            raise ValueError("Visible thread requires an owned pinned capture")
         source = await source_data.fetch(self.owner, ref["thread_id"])
+        captured_messages = None
         if ref.get("context_id"):
             async with self.factory() as session:
                 context = await session.scalar(
@@ -413,12 +440,34 @@ class Runtime:
                 if not context:
                     raise ApiError(404, "context_not_found", "Select that email again.")
                 payload = source_data.context_data(context)
-                mids = {m["message_id"] for m in payload["messages"]}
+                message_id = ref.get("message_id")
+                available = {m["message_id"] for m in payload["messages"]}
+                if scope == "visible_thread":
+                    mids = available
+                    captured_messages = payload["messages"]
+                elif message_id:
+                    if message_id not in available:
+                        raise ApiError(
+                            404, "ui_reference_not_found", "Select one accessible email."
+                        )
+                    mids = {message_id}
+                elif "ui_map" not in payload:
+                    mids = available  # Legacy full-thread capture has no selected message.
+                    scope = "visible_thread"
+                    captured_messages = payload["messages"]
+                else:
+                    raise ApiError(404, "ui_reference_not_found", "Select one accessible email.")
         else:
             mids = {ref["message_id"]}
         messages = [m for m in source["messages"] if m["gmail_msg_id"] in mids]
         if not messages or not mids.issubset({m["gmail_msg_id"] for m in messages}):
             raise ApiError(404, "gmail_source_missing", "That email is no longer available.")
+        if captured_messages is not None:
+            by_id = {m["gmail_msg_id"]: m for m in messages}
+            messages = [by_id[m["message_id"]] for m in captured_messages]
+            captured_bodies = {m["message_id"]: m["body"] for m in captured_messages}
+        else:
+            captured_bodies = {}
         budget = 12000 // len(messages)
         output = [
             {
@@ -427,8 +476,9 @@ class Runtime:
                 "sent_at": m["sent_at"],
                 "received_at": m["received_at"],
                 "reply_to": m["reply_metadata"].get("headers", {}).get("reply-to", []),
-                "body": m["body_clean"][:budget],
-                "truncated": len(m["body_clean"]) > budget,
+                "body": captured_bodies.get(m["gmail_msg_id"], m["body_clean"][:budget]),
+                "truncated": len(m["body_clean"])
+                > len(captured_bodies.get(m["gmail_msg_id"], m["body_clean"][:budget])),
             }
             for m in messages
         ]
@@ -436,37 +486,60 @@ class Runtime:
             str(m.get(k) or "") for m in output for k in ("subject", "sender", "reply_to", "body")
         )
         self.loaded[reference] = source
+        self.read_scopes.setdefault(reference, set()).add(scope)
         return {
             "reference": reference,
             "messages": output,
             "untrusted_source": True,
-            "coverage": "selected messages only",
+            "coverage": (
+                "captured thread messages" if scope == "visible_thread" else "selected message only"
+            ),
             "fetched_at": datetime.now(UTC).isoformat(),
         }
 
-    async def capture(self, reference):
+    async def capture(self, reference, *, scope="selected_message"):
         if reference is None:
             return None, None
         if reference not in self.loaded:
             raise ValueError("Read this email before preparing work")
         ref = self.state["refs"][reference]
-        if ref.get("context_id"):
-            return ref["context_id"], ref.get("message_id")
+        if scope == "visible_thread":
+            if reference != "selected" or not ref.get("context_id"):
+                raise ValueError("Visible thread requires an owned pinned capture")
+            return ref["context_id"], None
+        message_id = ref.get("message_id")
+        if not message_id:
+            if ref.get("context_id") and "visible_thread" in self.read_scopes.get(reference, set()):
+                return ref["context_id"], None
+            raise ValueError("Select one email before preparing work")
         async with self.factory.begin() as session:
             context = await source_data.capture(
                 session,
                 self.owner,
                 ref["thread_id"],
-                message_id=ref.get("message_id"),
+                message_id=message_id,
             )
-        return context.id, ref.get("message_id")
+        return context.id, message_id
 
     async def workflow(self, args):
         instruction = self.authoritative_instruction()
         authorize_workflow(instruction, args.intent, args.compound)
         validate_workflow_bindings(args, set(self.loaded), set(self.recipients))
-        context_id, mid = await self.capture(args.reference)
+        scope = args.source_scope
+        if scope == "visible_thread" and args.reference != "selected":
+            raise ValueError("Visible thread requires an owned pinned reference")
+        ref = self.state["refs"].get(args.reference, {})
+        if scope == "selected_message" and not ref.get("message_id"):
+            if ref.get("context_id") and "visible_thread" in self.read_scopes.get(
+                args.reference, set()
+            ):
+                scope = "visible_thread"
+        if args.reference and scope not in self.read_scopes.get(args.reference, set()):
+            raise ValueError("Read the requested source scope before preparing work")
+        context_id, mid = await self.capture(args.reference, scope=scope)
         provenance = self.conversation_provenance(instruction)
+        if args.reference:
+            provenance["source_scope"] = scope
         draft = DraftOptions(reply_message_id=mid) if args.intent == "reply" and mid else None
         roles = {role: getattr(args, role + "_refs") for role in ("to", "cc", "bcc")}
         if any(roles.values()):
@@ -516,17 +589,42 @@ class Runtime:
                 "proposal": proposal,
                 "proposal_id": row.id,
             }
-        request = AssistantRequest(
-            schema_version="1.0",
-            request_id=key,
-            instruction=instruction,
-            intent_hint=args.intent,
-            context_snapshot_id=context_id,
-            continuation=None,
-            draft_options=draft,
+        operation = (
+            "summary"
+            if args.intent == "summarise"
+            else "draft_new"
+            if args.intent == "compose" and context_id and draft and draft.to
+            else None
+        )
+        workflow = (
+            WorkflowRequest(
+                schema_version="1.0",
+                request_id=key,
+                instruction=instruction,
+                context_snapshot_id=context_id,
+                operations=[operation],
+                draft_options=draft if operation == "draft_new" else None,
+            )
+            if operation
+            else None
+        )
+        request = (
+            workflow.as_request()
+            if workflow
+            else AssistantRequest(
+                schema_version="1.0",
+                request_id=key,
+                instruction=instruction,
+                intent_hint=args.intent,
+                context_snapshot_id=context_id,
+                continuation=None,
+                draft_options=draft,
+            )
         )
         async with self.factory.begin() as session:
-            task = await tasks.submit(session, self.owner, request, provenance=provenance)
+            task = await tasks.submit(
+                session, self.owner, request, workflow=workflow, provenance=provenance
+            )
             view = await task_view(session, task)
             self.state["active_task_id"] = task.id
             self.state.pop("proposal_id", None)

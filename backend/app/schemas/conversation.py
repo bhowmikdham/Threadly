@@ -34,6 +34,7 @@ class MoreMail(StrictModel):
 
 class ReadEmail(StrictModel):
     reference: str = Field(min_length=1, max_length=40)
+    scope: Literal["selected_message", "visible_thread"] = "selected_message"
 
 
 class Evidence(StrictModel):
@@ -51,6 +52,7 @@ class PrepareWorkflow(StrictModel):
     intent: Literal["summarise", "reply", "compose", "plan_schedule", "other"]
     reference: str | None = Field(default=None, max_length=40)
     compound: bool = False
+    source_scope: Literal["selected_message", "visible_thread"] = "selected_message"
     to_refs: list[str] = Field(default_factory=list, max_length=20)
     cc_refs: list[str] = Field(default_factory=list, max_length=20)
     bcc_refs: list[str] = Field(default_factory=list, max_length=20)
@@ -82,14 +84,19 @@ TOOLS = {
         ReadEmail,
         (
             "Read a selected source or a returned mail reference before answering "
-            "about it or preparing a reply. Only backend-issued references are valid."
+            "about it or preparing a workflow. A selected_message read returns one "
+            "selected or searched email; visible_thread reads the owned pinned capture. "
+            "Only backend-issued references are valid."
         ),
     ),
     "prepare_workflow": (
         PrepareWorkflow,
         (
             "Prepare a summary, draft, plan or scheduling proposal using existing "
-            "workflows. Use compound=true for multiple dependent operations. Never "
+            "workflows. The default selected_message source_scope binds one email; "
+            "visible_thread is only for an explicitly requested workflow over the "
+            "owned pinned capture and requires a matching read. Use compound=true "
+            "for multiple dependent operations. Never "
             "sends mail or books events. Terminal for this turn; execution status "
             "arrives later."
         ),
