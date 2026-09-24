@@ -10,7 +10,8 @@ INSTANCE_PROFILE="${THREADLY_INSTANCE_PROFILE:-}"
 AUTO_STOP_HOURS="${THREADLY_AUTO_STOP_HOURS:-8}"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-[[ "$REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]] || die "Invalid AWS region."
+[[ "$REGION" == "ap-southeast-2" || "$REGION" == "ap-southeast-4" ]] || \
+    die "Use the supported AU Bedrock regions ap-southeast-2 or ap-southeast-4."
 [[ "$STACK" =~ ^[A-Za-z][A-Za-z0-9-]{0,127}$ ]] || die "Invalid stack name."
 [[ "$INSTANCE_TYPE" == t3.large || "$INSTANCE_TYPE" == t3.medium ]] || die "Use t3.large or t3.medium."
 [[ "$INSTANCE_PROFILE" =~ ^[A-Za-z0-9+=,.@_-]*$ ]] || die "Invalid instance profile name."

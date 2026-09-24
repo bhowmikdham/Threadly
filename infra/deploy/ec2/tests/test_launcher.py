@@ -152,6 +152,7 @@ class LauncherTests(unittest.TestCase):
 
     def test_reject_invalid_input_before_aws_calls(self):
         for overrides in [
+            {"THREADLY_REGION": "us-east-1"},
             {"THREADLY_STACK": "bad;command"},
             {"THREADLY_AUTO_STOP_HOURS": "0"},
             {"THREADLY_AUTO_STOP_HOURS": "13"},
@@ -184,6 +185,45 @@ class LauncherTests(unittest.TestCase):
             + body
             + (ROOT / "launcher-suffix.sh").read_text(),
         )
+
+    def test_instance_role_pins_selected_inference_profile_and_destinations(self):
+        spec = importlib.util.spec_from_file_location("ec2_render", ROOT / "render.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        statements = module.template()["Resources"]["InstanceRole"]["Properties"][
+            "Policies"
+        ][0]["PolicyDocument"]["Statement"]
+        invoke = [
+            statement
+            for statement in statements
+            if "bedrock:InvokeModel" in statement.get("Action", [])
+        ]
+        self.assertEqual(len(invoke), 2)
+        profile = invoke[0]["Resource"]["Fn::Sub"]
+        self.assertIn("inference-profile/" + module.BEDROCK_PROFILE, profile)
+        destinations = [item["Fn::Sub"] for item in invoke[1]["Resource"]]
+        self.assertEqual(
+            {
+                region
+                for region in ("ap-southeast-2", "ap-southeast-4")
+                if any(f"bedrock:{region}:" in value for value in destinations)
+            },
+            {"ap-southeast-2", "ap-southeast-4"},
+        )
+        self.assertEqual(
+            set(module.SUPPORTED_BEDROCK_REGIONS),
+            {"ap-southeast-2", "ap-southeast-4"},
+        )
+        self.assertTrue(
+            all(
+                value.endswith("foundation-model/" + module.BEDROCK_MODEL)
+                for value in destinations
+            )
+        )
+        condition = invoke[1]["Condition"]["StringEquals"][
+            "bedrock:InferenceProfileArn"
+        ]
+        self.assertEqual(condition["Fn::Sub"], profile)
 
 
 if __name__ == "__main__":

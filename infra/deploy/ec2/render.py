@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+BEDROCK_PROFILE = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
+BEDROCK_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
+SUPPORTED_BEDROCK_REGIONS = ("ap-southeast-2", "ap-southeast-4")
 
 
 def ref(name):
@@ -181,10 +184,38 @@ def template():
                                 "Action": [
                                     "bedrock:InvokeModel",
                                     "bedrock:InvokeModelWithResponseStream",
+                                    "bedrock:GetInferenceProfile",
                                 ],
                                 "Resource": sub(
-                                    "arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/*"
+                                    "arn:${AWS::Partition}:bedrock:${AWS::Region}:"
+                                    "${AWS::AccountId}:inference-profile/"
+                                    + BEDROCK_PROFILE
                                 ),
+                            },
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "bedrock:InvokeModel",
+                                    "bedrock:InvokeModelWithResponseStream",
+                                ],
+                                "Resource": [
+                                    sub(
+                                        "arn:${AWS::Partition}:bedrock:"
+                                        + region
+                                        + "::foundation-model/"
+                                        + BEDROCK_MODEL
+                                    )
+                                    for region in SUPPORTED_BEDROCK_REGIONS
+                                ],
+                                "Condition": {
+                                    "StringEquals": {
+                                        "bedrock:InferenceProfileArn": sub(
+                                            "arn:${AWS::Partition}:bedrock:${AWS::Region}:"
+                                            "${AWS::AccountId}:inference-profile/"
+                                            + BEDROCK_PROFILE
+                                        )
+                                    }
+                                },
                             },
                             {
                                 "Effect": "Allow",

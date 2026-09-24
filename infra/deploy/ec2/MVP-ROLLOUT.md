@@ -6,7 +6,7 @@ EC2 does not track GitHub automatically.
 
 ## Before deployment
 
-- Confirm exact-head CI and merge the integration PR into `codex/assistant-intent-routing`.
+- Confirm exact-head CI and merge the reviewed integration PR into its target branch.
 - Record the full resulting merge SHA and the SHA-256 of that commit's
   `infra/deploy/ec2/deploy-app.sh`. Download from that pinned raw GitHub URL, verify
   checksum, then run with `sudo bash /tmp/threadly-deploy.sh <full-merge-sha>` **inside
@@ -24,9 +24,15 @@ EC2 does not track GitHub automatically.
   `GMAIL_SOURCE_MODE=on_demand`, `MAILBOX_BACKGROUND_SYNC_ENABLED=false`.
   These source settings are required by production preflight; mailbox sync is retired.
   Keep API and all workers on the same configuration and application release.
+- Contextual chat remains off unless `CONVERSATION_ENABLED=true`. Enabling it also requires
+  `BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true` after the separate account logging/content
+  audit and `BEDROCK_MODEL_ID` set to the exact reviewed Australian Claude Haiku 4.5
+  inference-profile ARN in `BEDROCK_REGION`. Preflight validates configuration shape only;
+  it neither calls Bedrock nor verifies the operator's logging audit.
 
-The script stops API and all three workers, creates a pre-migration PostgreSQL dump,
-applies Alembic through `b17026e9a038`, and starts API, assistant-worker, action-worker
+The script stops API, assistant-worker, action-worker and any retired sync worker,
+creates a pre-migration PostgreSQL dump, applies Alembic through `c23026e9a039`,
+and starts API, assistant-worker and action-worker
 from the same image. The old sync worker stays stopped; its Compose service is behind
 the `retired-mailbox-sync` profile. It checks API readiness and active worker heartbeats.
 The host remains domain-free, API bound to loopback, with SSM forwarding for access.

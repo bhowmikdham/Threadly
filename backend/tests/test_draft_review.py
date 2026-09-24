@@ -113,6 +113,38 @@ async def test_revision_api_preserves_original_and_exposes_latest(
 
 
 @needs_pg
+async def test_ai_revision_is_unverified_instead_of_inheriting_source_evidence(
+    db_sessionmaker, mailbox
+):
+    first = await generated(db_sessionmaker, mailbox[0])
+    async with db_sessionmaker.begin() as session:
+        _, revised = await draft_review.edit(
+            session,
+            mailbox[0],
+            first.task_id,
+            edit_request(),
+            author="conversation_model",
+            author_provenance={
+                "source": "conversation_user_turns",
+                "authority": "user_dialogue_only",
+                "conversation_id": "conversation-test",
+                "turn_request_id": "turn-test",
+                "instruction_hash": "i" * 64,
+                "provider": "bedrock",
+                "model_id": "test-profile",
+                "release": "contextual-conversation-test",
+                "prompt_hash": "p" * 64,
+                "tools_hash": "t" * 64,
+            },
+        )
+    assert revised.payload["content"]["fact_ref_ids"] == ["ai-revision"]
+    assert [e["ref_id"] for e in revised.payload["evidence"]] == ["ai-revision"]
+    assert "not revalidated" in revised.payload["assumptions"][0]
+    assert revised.provenance["conversation"]["prompt_hash"] == "p" * 64
+    assert revised.provenance["conversation"]["tools_hash"] == "t" * 64
+
+
+@needs_pg
 async def test_exact_review_is_idempotent_and_edit_invalidates_it(
     db_sessionmaker, mailbox, db_client, auth_headers
 ):

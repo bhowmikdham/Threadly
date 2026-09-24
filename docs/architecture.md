@@ -1,25 +1,65 @@
 # Architecture — what runs where
 
+> Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
+
 > Current inbox chat: [conversational search and result cards](inbox-chat.md).
 
 > Current selected-thread behavior: [grounded answers and receipt fixes](grounded-thread-fixes.md).
 
-> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,
-> local-search and stored-source assumptions below. Default runtime fetches selected sources
-> from Gmail and stores references only; bulk sync is retired. See that contract before integration.
+> Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the historical
+> mailbox-sync, local-search and stored-source sections retained later in this document.
 
-Source of truth for the system topology. Mirrors the "MailMind — Dockerised
-Backend Topology" diagram from the project docs (the PDF lives in the team's
-Claude project / drive). Every box below maps to exactly one folder in this repo.
+This opening section is the source of truth for the current topology. Later dated
+sections record earlier implementation slices and remain useful for compatibility,
+but do not override this topology.
 
 ## Topology
 
-Implementation update (13 September 2026): [ADR 003](decisions/003-bedrock-migration.md)
-supersedes the inference placement below. `INFERENCE_PROVIDER=bedrock` routes
-generation through the new Bedrock Converse adapter. `legacy` retains the
-original topology during migration. Durable contextual requests now use a
-separate native backend worker and PostgreSQL state; Bedrock Flow invocation
-remains planned in the [implementation playbook](implementation-playbook/README.md).
+The extension is a thin conversational client. The authenticated backend owns
+conversation memory, source references, capability checks, workflow state and
+all write approvals. Bedrock decides which bounded read or workflow tool is useful;
+it never receives a send/book/approve tool. Gmail is queried on demand and message
+bodies are not imported into PostgreSQL.
+
+```mermaid
+flowchart LR
+  UI[Edge extension sidebar] -->|JWT + turn + references| API[FastAPI on EC2]
+  API --> C[Conversation coordinator]
+  C -->|structured tool loop| B[Amazon Bedrock Converse]
+  C -->|bounded on-demand reads| GM[Google Gmail API]
+  C -->|prepare durable work| W[Assistant and action workers]
+  C <--> DB[(PostgreSQL encrypted state)]
+  W <--> DB
+  W -->|availability reads| CAL[Google Calendar API]
+  W -->|Gmail source revalidation| GM
+  W -->|only after exact review + server gates| GM
+  W -->|only after exact review + server gates| CAL
+  API --> UI
+```
+
+Runtime invariants:
+
+- Browser code sends the actual user turn and backend-issued references; it does
+  not classify intents or concatenate synthetic prompts.
+- The coordinator reconstructs recent dialogue, the pinned message, ordered search
+  results, active task/question, current artifact and live capabilities.
+- Bedrock Flow assets remain specialist prompt experiments. The production master
+  conversation loop uses the Converse tool-use API and invokes existing durable
+  workflow services behind validated tools.
+- Gmail reads are request-scoped. Search cards and raw tool observations are transient;
+  encrypted conversation state retains bounded dialogue and provider references.
+- Email send and Calendar booking use their existing exact-payload review, approval,
+  execution and reconciliation lifecycles. Conversation text cannot authorize them.
+- `INFERENCE_PROVIDER=bedrock` is required for this release. The feature remains
+  gated until the operator reviews the cloud-processing boundary and separately audits
+  model invocation logging for the configured account and region. The acknowledgement
+  environment flag records that manual decision; preflight does not perform the audit.
+
+## Historical deployment baseline
+
+The following diagram describes the original MailMind deployment and is retained
+to explain legacy modules and releases. Ollama/OpenRouter placement, bulk mailbox
+sync and the week-based build plan are not the current conversation architecture.
 
 ```
 Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.small+, Elastic IP)
@@ -38,7 +78,7 @@ Chrome extension (frontend/) ──HTTPS 443, REST + SSE──▶ AWS EC2 (t3.sm
   │  caddy_data (certs)                                        │
   └────────────────────────────────────────────────────────────┘
           │ Tailscale (private) :11434         │ HTTPS
-          ▼ PII-MASKED payloads                ▼
+          ▼ direct identifiers masked         ▼
   Mac M4 16GB — Ollama                  OpenRouter (fallback when Mac down,
   qwen3.5:4b + LoRA (PRIMARY)           long-thread summaries, ablation Tier-1)
   qwen3.5:2b (voice/planner)
@@ -50,7 +90,8 @@ Rules encoded by this topology:
 
 - Legacy inference runs on the Mac/OpenRouter; Bedrock mode uses AWS managed
   inference (decisions/003). The EC2 box orchestrates in both modes.
-- Anything leaving the box for a cloud model or SaaS goes through PII masking first.
+- Cloud-model input masks email/phone/card-like tokens first. This is not full
+  anonymisation: configured providers still process the remaining requested content.
 - Data stores are off-the-shelf containers; we own the schema, not the images.
 - Voice/API keys live server-side only. The extension holds a session JWT, nothing else.
 

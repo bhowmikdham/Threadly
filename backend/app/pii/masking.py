@@ -1,15 +1,14 @@
-"""Module 9 — PII MASKING (build: W3, hardened W4).
+"""Reversible masking of three direct identifier patterns before cloud egress.
 
-Applied to EVERY payload leaving the box for a cloud service (OpenRouter,
-ElevenLabs). Local/tailscale inference sees unmasked text; cloud never does.
-
-mask() must be deterministic and reversible per-request (placeholder map), so
-model output referencing <EMAIL_1> can be re-hydrated before display.
-Golden tests cover this module — it's a freeze gate (W4).
+This seed policy covers email addresses, phone-like strings and long card-like
+numbers. It is not full de-identification: names, postal addresses, order IDs,
+dates and message content may remain. Product/operator privacy controls must
+treat a configured cloud model as a processor of the remaining content.
 """
+
 import re
 
-# v0 seed patterns — W3/W4 extends this list (addresses, calendar links, names via classifier)
+# Seed patterns. Keep documentation explicit when this list changes.
 _PATTERNS: dict[str, re.Pattern] = {
     "EMAIL": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
     "PHONE": re.compile(r"(?:\+?\d{1,3}[ .-]?)?(?:\(?\d{2,4}\)?[ .-]?)?\d{3,4}[ .-]?\d{3,4}\b"),
@@ -18,7 +17,7 @@ _PATTERNS: dict[str, re.Pattern] = {
 
 
 def mask(text: str) -> tuple[str, dict[str, str]]:
-    """Replace PII with stable placeholders. Returns (masked_text, placeholder_map)."""
+    """Replace supported identifiers with stable per-request placeholders."""
     mapping: dict[str, str] = {}
     masked = text
     for label, pattern in _PATTERNS.items():

@@ -170,9 +170,45 @@ async def artifact_view(session, task, artifact, current=None):
     }
 
 
-async def edit(session, user_id, task_id, request: EditDraftRequest):
+async def edit(
+    session,
+    user_id,
+    task_id,
+    request: EditDraftRequest,
+    *,
+    author="user_edit",
+    author_provenance=None,
+):
+    if author not in {"user_edit", "conversation_model"}:
+        raise ValueError("Unknown draft author")
+    if author == "conversation_model" and not author_provenance:
+        raise ValueError("Conversation model revisions require release provenance")
+    required_provenance = {
+        "source",
+        "authority",
+        "conversation_id",
+        "turn_request_id",
+        "instruction_hash",
+        "provider",
+        "model_id",
+        "release",
+        "prompt_hash",
+        "tools_hash",
+    }
+    if author == "conversation_model" and not required_provenance.issubset(author_provenance):
+        raise ValueError("Conversation model revision provenance is incomplete")
+    if author != "conversation_model" and author_provenance is not None:
+        raise ValueError("User edits cannot carry model provenance")
     task = await tasks.owned_task(session, user_id, task_id, lock=True)
-    hashed = digest(request.model_dump())
+    hashed = digest(
+        {
+            "request": request.model_dump(),
+            "author": author,
+            "author_provenance": author_provenance,
+        }
+        if author_provenance is not None
+        else request.model_dump()
+    )
     previous = await session.scalar(
         select(ArtifactRevision).where(
             ArtifactRevision.task_id == task.id,
@@ -223,6 +259,21 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
         "Stored in Threadly only; review does not authorize sending or editor insertion.",
         "Original plan/Calendar source bindings are retained; user edits require review.",
     ]
+    if author == "conversation_model":
+        payload["evidence"] = [
+            {
+                "ref_id": "ai-revision",
+                "source_kind": "user_input",
+                "source_id": artifact_id,
+                "source_version": hashed,
+                "quote": None,
+            }
+        ]
+        content["fact_ref_ids"] = ["ai-revision"]
+        payload["assumptions"] = [
+            "AI-revised wording; source facts were not revalidated and must be reviewed.",
+            "No email sent. Previous review and approval are superseded.",
+        ]
     artifact = ArtifactRevision(
         id=artifact_id,
         task_id=task.id,
@@ -233,7 +284,12 @@ async def edit(session, user_id, task_id, request: EditDraftRequest):
         draft_envelope=envelope,
         edit_request_id=request.request_id,
         edit_request_hash=hashed,
-        provenance={"source": "user_edit", "policy": POLICY, "parent_artifact_id": current.id},
+        provenance={
+            "source": author,
+            "policy": POLICY,
+            "parent_artifact_id": current.id,
+            **({"conversation": author_provenance} if author_provenance is not None else {}),
+        },
     )
     task.version += 1
     await supersede_for_edit(session, task, current.id)

@@ -127,6 +127,7 @@ release Compose configuration first; older scripts do not stop that service.
 Preserve unknown attempts and all action history. No destructive downgrade or resend
 is part of rollback. [Recovery runbook](../../../docs/email-actions.md).
 
-For the combined MVP, use [MVP-ROLLOUT.md](MVP-ROLLOUT.md). It adds the sync worker,
-worker heartbeat checks and explicit per-user pilot gates; the historical B06
-compiled-gate description above no longer describes current pilot enablement.
+For the combined MVP, use [MVP-ROLLOUT.md](MVP-ROLLOUT.md). It keeps mailbox sync
+retired, checks the assistant/action workers and documents explicit per-user pilot
+gates plus the contextual-conversation feature gate; the historical B06 compiled-gate
+description above no longer describes current pilot enablement.

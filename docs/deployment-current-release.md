@@ -1,46 +1,44 @@
 # Current EC2 deployment handoff
 
-PR #23 deployment is confirmed by user-provided host output: commit
-`954b4926d5e0c4928ebecde06f2f67e918d5be06`, migration `c8291e4a6f03`, healthy API,
-PostgreSQL, Chroma and worker. Its backup was recorded at
-`predeploy-20260915T141644Z-954b4926d5e0c4928ebecde06f2f67e918d5be06.sql.gz`.
-Bedrock model selection and Google OAuth remain explicitly pending.
+Repository history is not proof of the release currently running on EC2. The source of
+truth is the protected host record at `/srv/threadly-data/deployment/current-commit`,
+the live Alembic head and the running container image IDs. Older PR-specific commands
+and checksums have been removed because using them would deliberately deploy stale code.
 
-PR #28 is merged at **fd0eaeac94422832d8d644e342edfd36c12945bd**. The command
-below upgrades to the reviewed B05 worker code, including auth, action storage,
-exact previews and approval/stop decisions. Deployment is unconfirmed. This merged
-release does not start the action worker in staging. B06 recovery and staging worker
-wiring are on the current feature branch and excluded; sending remains disabled.
-OAuth exchange now requires state/PKCE: see [client compatibility](google-capabilities.md).
-
-Use the **existing EC2 Session Manager terminal**, not CloudShell. The deployment
-script requires `/opt/threadly/BOOTSTRAP_READY` on the application host. The known
-host is `i-09a783f8a5b22df7f` in `ap-southeast-2`.
+The known staging host identifier is `i-09a783f8a5b22df7f` in `ap-southeast-2`.
+Connect through Session Manager, then record the current state before changing it:
 
 ```bash
-curl -fsSL 'https://raw.githubusercontent.com/bhowmikdham/Threadly/fd0eaeac94422832d8d644e342edfd36c12945bd/infra/deploy/ec2/deploy-app.sh' -o /tmp/threadly-deploy.sh &&
-printf '%s\n' '9204da17a8776e6d9134def735ab0cf54834443809bf47c71de1bbc3608442f5  /tmp/threadly-deploy.sh' | sha256sum -c - &&
-sudo bash /tmp/threadly-deploy.sh fd0eaeac94422832d8d644e342edfd36c12945bd
+sudo cat /srv/threadly-data/deployment/current-commit
+curl --fail http://127.0.0.1:8000/healthz
+curl --fail http://127.0.0.1:8000/readyz
+sudo docker ps --filter label=com.docker.compose.project=threadly
+sudo docker exec threadly-api-1 alembic current
 ```
 
-The script checksum was verified against the merged Git object. It backs up the
-existing database, stops API/worker, upgrades schema, restarts matching services
-and checks health. It preserves environment files and volumes. Do not use volume
-removal or manual destructive database cleanup for this deployment.
+Do not paste environment files, tokens, OAuth codes, private logs or database dumps into
+GitHub. Healthy containers prove local process/dependency readiness only. They do not prove
+Bedrock access, Google OAuth scopes, model quality, Gmail/Calendar behavior or write recovery.
 
-Expected success marker:
+## Next deployment
+
+Deploy only a reviewed, merged 40-character commit whose exact-head CI passed. From that
+immutable commit, download `infra/deploy/ec2/deploy-app.sh`, verify its separately recorded
+SHA-256 and run it inside the EC2 Session Manager shell:
 
 ```text
-DEPLOYMENT_READY commit=fd0eaeac94422832d8d644e342edfd36c12945bd
+sudo bash /tmp/threadly-deploy.sh <reviewed-full-commit>
 ```
 
-Expected migration head: `a0426e9bc731`. Preserve the actual script output, health
-results and provider-configuration warnings. A healthy API/worker/database does not
-prove Bedrock or Google connectivity. The last user-confirmed deployment is PR #23; its output still reports missing
-Bedrock model selection and Google OAuth configuration. Live model/read tests remain pending until these are configured.
+Follow [the combined rollout](../infra/deploy/ec2/MVP-ROLLOUT.md) for the protected
+environment gates and [the application deployment runbook](../infra/deploy/ec2/APP-DEPLOYMENT.md)
+for backup, migration, health and rollback steps. The current schema head for the
+contextual-conversation release is `c23026e9a039`; always confirm the deployed commit's
+actual Alembic head rather than copying this value into a command.
 
-No automatic Git-to-server synchronization is established by this command. It
-pins one release. B02 action storage, B01 Google metadata/state and B04 decision receipt migrations are included. Guarded downgrade
-refuses if action history exists; do not remove history to force rollback. No sender
-is enabled or booking executor installed. B05 worker code is included but staging
-startup/recovery wiring is deferred to B06. Frontend work remains deferred.
+Initial contextual-chat rollout keeps `EMAIL_WRITES_ENABLED=false` and
+`CALENDAR_WRITES_ENABLED=false`. Set `CONVERSATION_ENABLED=true` only with the exact reviewed
+Haiku inference-profile ARN and after the separate account logging/content-boundary audit;
+the acknowledgement flag is not a technical verification. Run the live conversation
+evaluation and save a sanitized receipt only after those checks. No automatic Git-to-server
+synchronization is established: merging or pushing a branch never changes EC2.

@@ -60,11 +60,16 @@ role; do not create root access keys.
 | Cost guard | Systemd timer stops EC2 after eight hours; resets on boot or timer restart |
 | Secrets skeleton | Root-only `/srv/threadly-data/secrets/threadly.env`; generated app/database keys |
 
-The new instance role allows SSM, invoking foundation models in the chosen region,
-and reading/writing this stack's backup bucket. It does not permit infrastructure
-administration. Cross-region inference profiles, application inference profiles
-and Bedrock Flows need additional, specifically scoped permissions when selected.
-Model access or marketplace prerequisites still need checking for the chosen model.
+The new instance role allows SSM, only the Australian Claude Haiku 4.5 inference
+profile `au.anthropic.claude-haiku-4-5-20251001-v1:0` in the stack region, and only
+its pinned `anthropic.claude-haiku-4-5-20251001-v1:0` foundation-model destinations
+in Sydney (`ap-southeast-2`) and Melbourne (`ap-southeast-4`), plus this stack's
+backup bucket. The destination grants are conditioned on that exact profile ARN.
+When conversation is enabled, preflight requires `BEDROCK_MODEL_ID` to be the full
+ARN for that exact profile in `BEDROCK_REGION`; a bare model ID or another profile fails.
+It does not permit infrastructure administration. A different inference profile,
+model or Bedrock Flow needs a reviewed policy change. Model access or marketplace
+prerequisites still need checking for the selected model.
 All containers capable of accessing instance metadata can potentially use the
 instance role; hop limit 2 supports container credentials and is not per-container
 IAM isolation. Keep the host restricted to trusted workloads.

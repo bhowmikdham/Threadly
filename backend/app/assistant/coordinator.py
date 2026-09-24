@@ -73,8 +73,13 @@ async def owned(session, owner, identifier, *, lock=False):
     return row
 
 
-async def reserve(session, owner, request):
-    value, hashed = request.model_dump(), digest(request.model_dump())
+async def reserve(session, owner, request, *, provenance=None):
+    value = request.model_dump()
+    hashed = digest(
+        {"request": value, "conversation_provenance": provenance}
+        if provenance is not None
+        else value
+    )
     old = await session.scalar(
         select(CommandPlan).where(
             CommandPlan.user_id == owner, CommandPlan.request_id == request.request_id
@@ -103,6 +108,7 @@ async def reserve(session, owner, request):
     identifier = str(uuid4())
     manifest = {
         **release(),
+        **({"conversation": provenance} if provenance is not None else {}),
         "binding": binding,
         "compound_execution": {
             template: command_plans.execution_release(context, template)
@@ -133,7 +139,7 @@ async def reserve(session, owner, request):
     )
     if inserted:
         return await owned(session, owner, identifier), True
-    return await reserve(session, owner, request)
+    return await reserve(session, owner, request, provenance=provenance)
 
 
 def parse(text, instruction):
@@ -392,17 +398,34 @@ async def confirm(session, owner, identifier, confirmation):
     if (digest(context_data(context)) if context else None) != row.source_hash:
         raise ApiError(409, "command_source_changed", "Capture current source and replan.")
     value = result["compiled_request"]
+    provenance = row.release.get("conversation")
     if result["kernel"] == "workflow":
         workflow = WorkflowRequest.model_validate(value)
-        task = await tasks.submit(session, owner, workflow.as_request(), workflow=workflow)
+        task = await tasks.submit(
+            session,
+            owner,
+            workflow.as_request(),
+            workflow=workflow,
+            provenance=provenance,
+        )
     elif result["kernel"] == "scheduling":
         schedule = SchedulingRequest.model_validate(value)
         binding = {**row.release["binding"], "request": schedule.model_dump()}
         task = await tasks.submit(
-            session, owner, schedule.as_request(), schedule=schedule, schedule_binding=binding
+            session,
+            owner,
+            schedule.as_request(),
+            schedule=schedule,
+            schedule_binding=binding,
+            provenance=provenance,
         )
     elif result["kernel"] in {"read", "assistant"}:
-        task = await tasks.submit(session, owner, AssistantRequest.model_validate(value))
+        task = await tasks.submit(
+            session,
+            owner,
+            AssistantRequest.model_validate(value),
+            provenance=provenance,
+        )
     else:
         compound = (
             LookupDraftRequest if value["template"].startswith("lookup") else CompoundRequest
@@ -413,7 +436,13 @@ async def confirm(session, owner, identifier, confirmation):
             raise ApiError(
                 409, "release_unavailable", "Replan with the current compound configuration."
             )
-        task = await tasks.submit(session, owner, compound.as_request(), compound=compound)
+        task = await tasks.submit(
+            session,
+            owner,
+            compound.as_request(),
+            compound=compound,
+            provenance=provenance,
+        )
     row.state, row.task_id = "consumed", task.id
     await session.flush()
     return task

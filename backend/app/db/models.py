@@ -1059,3 +1059,23 @@ class MailSyncStage(Base):
     message_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     user_id: Mapped[int]
     payload: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+
+
+class Conversation(TimestampMixin, Base):
+    """Seven-day encrypted dialogue; no copied provider bodies or tool transcripts."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (
+        CheckConstraint("version >= 0", name="ck_conversation_version"),
+        Index("ix_conversations_expiry", "expires_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(server_default="0")
+    account_version: Mapped[int]
+    state_enc: Mapped[bytes] = mapped_column(LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lease_id: Mapped[str | None] = mapped_column(String(36))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pending_request_id: Mapped[str | None] = mapped_column(String(36))
+    pending_hash: Mapped[str | None] = mapped_column(String(64))

@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     bedrock_read_timeout_s: int = Field(default=90, ge=1, le=300)
 
     # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
+    conversation_enabled: bool = False
+    conversation_max_active_per_user: int = Field(default=2, ge=1, le=8)
+    conversation_max_rows_per_user: int = Field(default=50, ge=5, le=500)
+    conversation_max_retained_turns: int = Field(default=250, ge=20, le=5000)
+    bedrock_mail_processing_acknowledged: bool = False
     assistant_workflow_manifest: str = ""
     assistant_auxiliary_workflow_manifest: str = ""
 

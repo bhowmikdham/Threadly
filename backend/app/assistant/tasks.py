@@ -56,6 +56,7 @@ async def submit(
     schedule=None,
     schedule_binding=None,
     workflow=None,
+    provenance=None,
 ) -> AssistantTask:
     value = request.model_dump()
     if request.draft_options is None:
@@ -74,6 +75,8 @@ async def submit(
         value["schedule_binding"] = schedule_binding
     if workflow is not None:
         value["workflow_input"] = workflow.model_dump()
+    if provenance is not None:
+        value["conversation_provenance"] = provenance
     request_hash = digest(value)
     existing = (
         await session.execute(
@@ -197,7 +200,10 @@ async def submit(
             sequence=1,
             task_version=1,
             kind="task.accepted",
-            payload={"state": "queued"},
+            payload={
+                "state": "queued",
+                **({"conversation_provenance": provenance} if provenance is not None else {}),
+            },
         )
     )
     await session.flush()
