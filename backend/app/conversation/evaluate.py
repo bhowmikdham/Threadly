@@ -23,7 +23,7 @@ from app.conversation.runtime import (
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
-RECEIPT_RELEASE = "contextual-conversation-live-v2"
+RECEIPT_RELEASE = "contextual-conversation-live-v4"
 CASES = [
     {
         "id": "social_typo",
@@ -48,7 +48,17 @@ CASES = [
         "turns": ["can you fetch me latest GYG order"],
         "search": True,
         "kinds": ["message"],
-        "required": ["search_mail", "read_email"],
+        "required": ["search_mail"],
+        "words": ["2241"],
+        "forbid": ["prepare_workflow"],
+    },
+    {
+        "id": "dense_latest_order_second_page",
+        "turns": ["Can you find my latest GYG order?"],
+        "search": True,
+        "dense_search": True,
+        "kinds": ["message"],
+        "required": ["search_mail", "more_mail"],
         "words": ["2241"],
         "forbid": ["prepare_workflow"],
     },
@@ -57,7 +67,6 @@ CASES = [
         "turns": ["what does the second one say?"],
         "order": ["mail-1", "mail-2"],
         "kinds": ["message"],
-        "required": ["read_email"],
         "words": ["2241"],
     },
     {
@@ -73,7 +82,7 @@ CASES = [
         "turns": ["Find GYG and summarise the second email briefly for me."],
         "search": True,
         "kinds": ["task", "message"],
-        "required": ["search_mail", "read_email"],
+        "required": ["search_mail"],
     },
     {
         "id": "visible_thread_summary",
@@ -157,62 +166,141 @@ class FixtureRuntime:
     def __init__(self, case, turn=""):
         self.case, self.evidence, self.calls, self.read_scopes = case, {}, [], {}
         self.search_page = None
+        self.search_page_index = -1
+        self.result_order = list(case.get("order", []))
         history = case.get("history", [])
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
         self.user_text = user_text
         self.instruction = authoritative_user_instruction(turn, history)
         self.recipient_refs = user_recipient_references(user_text)
 
-    async def call(self, name, args):
-        self.calls.append({"name": name, "input": args.model_dump()})
-        if name == "search_mail":
-            for value in (args.query, args.date_phrase):
-                if value and value.casefold() not in self.user_text.casefold():
-                    raise ValueError("Search literals must come from user dialogue")
-            if (
-                args.folder != "all_mail"
-                and args.folder.casefold() not in self.user_text.casefold()
-            ):
-                raise ValueError("Folder is not user supplied")
-            start, end = inbox_chat.date_window(
-                args.date_phrase,
-                datetime(2026, 9, 23, 12, tzinfo=UTC),
-                "Australia/Melbourne",
-            )
-            if "gyg" not in args.query.casefold():
-                raise ValueError("Only user's GYG literal is available")
-            filters = InboxFilters(
-                schema_version="1.0",
-                query=args.query,
-                folder=args.folder,
-                received_from=start,
-                received_before=end,
-            ).model_dump(mode="json")
-            self.search_page = {
-                "filters": filters,
-                "results": [
+    def _source_text(self, reference):
+        sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
+        if self.case.get("dense_search"):
+            sources = {
+                f"mail-{number}": f"GYG promotion {number}: save on your next order."
+                for number in range(1, 6)
+            }
+            sources["mail-6"] = RECEIPT
+        if self.case.get("selected"):
+            sources["selected"] = self.case["selected"]
+        text = sources.get(reference)
+        if not text:
+            raise ValueError("Unknown reference")
+        if reference.startswith("mail-") and reference not in self.result_order:
+            raise ValueError("Reference has not been returned by this search")
+        return text
+
+    def _read_source(self, reference, scope="selected_message"):
+        if scope == "visible_thread" and reference != "selected":
+            raise ValueError("Visible thread requires the pinned reference")
+        text = self._source_text(reference)
+        self.evidence[reference] = text
+        self.read_scopes.setdefault(reference, set()).add(scope)
+        return text
+
+    def _search_rows(self):
+        if self.case.get("dense_search"):
+            if self.search_page_index == 0:
+                return [
                     {
-                        "message_id": "fixture-message-1",
-                        "thread_id": "fixture-thread-1",
-                        "reference": "mail-1",
-                        "subject": "GYG offers this weekend",
+                        "message_id": f"fixture-message-{number}",
+                        "thread_id": f"fixture-thread-{number}",
+                        "reference": f"mail-{number}",
+                        "subject": f"GYG offer {number}",
                         "sender": "offers@example.test",
-                        "received_at": "2026-09-23T10:00:00Z",
-                        "snippet": "20% off your next purchase",
+                        "received_at": f"2026-09-{24 - number:02d}T10:00:00Z",
+                        "snippet": f"Promotion {number}: save on your next order",
                         "flight": None,
-                    },
+                    }
+                    for number in range(1, 6)
+                ]
+            if self.search_page_index == 1:
+                return [
                     {
-                        "message_id": "fixture-message-2",
-                        "thread_id": "fixture-thread-2",
-                        "reference": "mail-2",
+                        "message_id": "fixture-message-6",
+                        "thread_id": "fixture-thread-6",
+                        "reference": "mail-6",
                         "subject": "GYG order confirmation",
                         "sender": "orders@example.test",
-                        "received_at": "2026-09-22T10:00:00Z",
+                        "received_at": "2026-09-17T10:00:00Z",
                         "snippet": "Order 2241 confirmed",
                         "flight": None,
-                    },
-                ],
-                "next_cursor": None,
+                    }
+                ]
+            raise ValueError("Search exhausted")
+        return [
+            {
+                "message_id": "fixture-message-1",
+                "thread_id": "fixture-thread-1",
+                "reference": "mail-1",
+                "subject": "GYG offers this weekend",
+                "sender": "offers@example.test",
+                "received_at": "2026-09-23T10:00:00Z",
+                "snippet": "20% off your next purchase",
+                "flight": None,
+            },
+            {
+                "message_id": "fixture-message-2",
+                "thread_id": "fixture-thread-2",
+                "reference": "mail-2",
+                "subject": "GYG order confirmation",
+                "sender": "orders@example.test",
+                "received_at": "2026-09-22T10:00:00Z",
+                "snippet": "Order 2241 confirmed",
+                "flight": None,
+            },
+        ]
+
+    async def call(self, name, args):
+        self.calls.append({"name": name, "input": args.model_dump()})
+        if name in {"search_mail", "more_mail"}:
+            if name == "search_mail":
+                for value in (args.query, args.date_phrase):
+                    if value and value.casefold() not in self.user_text.casefold():
+                        raise ValueError("Search literals must come from user dialogue")
+                if (
+                    args.folder != "all_mail"
+                    and args.folder.casefold() not in self.user_text.casefold()
+                ):
+                    raise ValueError("Folder is not user supplied")
+                start, end = inbox_chat.date_window(
+                    args.date_phrase,
+                    datetime(2026, 9, 23, 12, tzinfo=UTC),
+                    "Australia/Melbourne",
+                )
+                if "gyg" not in args.query.casefold():
+                    raise ValueError("Only user's GYG literal is available")
+                filters = InboxFilters(
+                    schema_version="1.0",
+                    query=args.query,
+                    folder=args.folder,
+                    received_from=start,
+                    received_before=end,
+                ).model_dump(mode="json")
+                self.search_page_index = 0
+                self.result_order = []
+                self.evidence = {
+                    key: value for key, value in self.evidence.items() if key == "selected"
+                }
+                self.read_scopes = {
+                    key: value for key, value in self.read_scopes.items() if key == "selected"
+                }
+            else:
+                if not self.search_page or not self.search_page["next_cursor"]:
+                    raise ValueError("Search exhausted")
+                filters = self.search_page["filters"]
+                self.search_page_index += 1
+            rows = self._search_rows()
+            self.result_order.extend(row["reference"] for row in rows)
+            self.search_page = {
+                "filters": filters,
+                "results": rows,
+                "next_cursor": (
+                    "fixture-page-2"
+                    if self.case.get("dense_search") and self.search_page_index == 0
+                    else None
+                ),
                 "coverage": {
                     "complete": False,
                     "page_size": inbox_chat.PAGE_SIZE,
@@ -229,20 +317,33 @@ class FixtureRuntime:
                 "has_more": bool(self.search_page["next_cursor"]),
                 "coverage": self.search_page["coverage"],
                 "date_window": self.search_page["filters"],
-                "displayed_result_order": [row["reference"] for row in observations],
+                "displayed_result_order": list(self.result_order),
             }
         if name == "read_email":
-            if args.scope == "visible_thread" and args.reference != "selected":
-                raise ValueError("Visible thread requires the pinned reference")
-            sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
-            if self.case.get("selected"):
-                sources["selected"] = self.case["selected"]
-            text = sources.get(args.reference)
-            if not text:
-                raise ValueError("Unknown reference")
-            self.evidence[args.reference] = text
-            self.read_scopes.setdefault(args.reference, set()).add(args.scope)
+            text = self._read_source(args.reference, args.scope)
             return {"reference": args.reference, "body": text, "untrusted_source": True}
+        if name == "read_search_results":
+            if not 1 <= len(args.references) <= 5 or len(set(args.references)) != len(
+                args.references
+            ):
+                raise ValueError("Choose one to five distinct search references")
+            if not self.search_page:
+                raise ValueError("Search first")
+            texts = {}
+            for reference in args.references:
+                if not re.fullmatch(r"mail-[1-9][0-9]*", reference):
+                    raise ValueError("Only searched email references can be read in a batch")
+                texts[reference] = self._source_text(reference)
+            results = []
+            for reference, text in texts.items():
+                self.evidence[reference] = text
+                self.read_scopes.setdefault(reference, set()).add("selected_message")
+                results.append({"reference": reference, "messages": [{"body": text}]})
+            return {
+                "results": results,
+                "untrusted_source": True,
+                "coverage": "selected searched messages only",
+            }
         if name == "prepare_workflow":
             authorize_workflow(self.instruction, args.intent, args.compound)
             validate_workflow_bindings(args, set(self.evidence), set(self.recipient_refs))
@@ -269,6 +370,16 @@ def _tool_inputs(calls, name):
 def _workflow_input(calls):
     workflows = _tool_inputs(calls, "prepare_workflow")
     return workflows[-1] if workflows else {}
+
+
+def _read_references(calls):
+    references = []
+    for call in calls:
+        if call["name"] == "read_email":
+            references.append(call["input"].get("reference"))
+        elif call["name"] == "read_search_results":
+            references.extend(call["input"].get("references", []))
+    return references
 
 
 def _has_selected_read(calls):
@@ -322,15 +433,65 @@ def grade(case, response, calls):
     case_id = case["id"]
     workflow = _workflow_input(calls)
     if case_id == "ordered_reference":
-        reads = _tool_inputs(calls, "read_email")
-        if not reads or reads[0].get("reference") != "mail-2":
+        reads = _read_references(calls)
+        if "mail-2" not in reads:
             failures.append("wrong_ordered_reference")
+        if not any(
+            evidence.get("reference") == "mail-2" for evidence in response.get("evidence", [])
+        ):
+            failures.append("ordered_reference_missing_citation")
     elif case_id == "latest_order_not_promotion":
+        if "mail-2" not in _read_references(calls):
+            failures.append("order_source_not_read")
         if any(
-            step.get("tool") == "search_mail" and step.get("status") != "ok"
+            step.get("tool") in {"search_mail", "read_email", "read_search_results"}
+            and step.get("status") != "ok"
             for step in response.get("trace", [])
         ):
-            failures.append("invalid_search_request")
+            failures.append("invalid_search_path")
+        if engine.overclaims_incomplete_search(text, case["turns"][-1]):
+            failures.append("incomplete_search_overclaim")
+    elif case_id == "dense_latest_order_second_page":
+        search_index = next(
+            (index for index, call in enumerate(calls) if call["name"] == "search_mail"), None
+        )
+        page_index = next(
+            (index for index, call in enumerate(calls) if call["name"] == "more_mail"), None
+        )
+        if search_index is None or page_index is None or search_index >= page_index:
+            failures.append("search_pagination_order")
+        if len(calls) > engine.MAX_CALLS or any(
+            call["name"] == "read_search_results"
+            and (
+                not 1 <= len(call["input"].get("references", [])) <= 5
+                or len(set(call["input"].get("references", [])))
+                != len(call["input"].get("references", []))
+            )
+            for call in calls
+        ):
+            failures.append("unbounded_search_work")
+        if not any(
+            (call["name"] == "read_email" and call["input"].get("reference") == "mail-6")
+            or (
+                call["name"] == "read_search_results"
+                and "mail-6" in call["input"].get("references", [])
+            )
+            for call in (calls[page_index + 1 :] if page_index is not None else [])
+        ):
+            failures.append("second_page_order_not_read")
+        if not any(
+            evidence.get("reference") == "mail-6"
+            and " ".join(evidence.get("quote", "").split()) in " ".join(RECEIPT.split())
+            and evidence.get("quote")
+            for evidence in response.get("evidence", [])
+        ):
+            failures.append("order_missing_cited_evidence")
+        if any(
+            step.get("tool") in {"search_mail", "more_mail", "read_email", "read_search_results"}
+            and step.get("status") != "ok"
+            for step in response.get("trace", [])
+        ):
+            failures.append("invalid_dense_search_path")
         if engine.overclaims_incomplete_search(text, case["turns"][-1]):
             failures.append("incomplete_search_overclaim")
     elif case_id == "receipt_advice_followup":
@@ -346,10 +507,19 @@ def grade(case, response, calls):
         reference = "mail-2" if case_id == "searched_result_summary" else "selected"
         scope = "visible_thread" if case_id == "visible_thread_summary" else "selected_message"
         reads = _tool_inputs(calls, "read_email")
-        if not any(
+        direct_read = any(
             item.get("reference") == reference and item.get("scope", "selected_message") == scope
             for item in reads
-        ):
+        )
+        batch_read = (
+            scope == "selected_message"
+            and reference != "selected"
+            and any(
+                reference in item.get("references", [])
+                for item in _tool_inputs(calls, "read_search_results")
+            )
+        )
+        if not direct_read and not batch_read:
             failures.append("summary_source_not_read")
         if any(
             item.get("reference") == reference and item.get("scope", "selected_message") != scope
@@ -433,6 +603,13 @@ def compact_receipt(result):
         }
         if item.get("error"):
             compact["error"] = item["error"]
+            compact["failure_category"] = (
+                "availability"
+                if item["error"] == "conversation_provider_unavailable"
+                else "execution"
+            )
+        elif not item["passed"]:
+            compact["failure_category"] = "quality"
         cases.append(compact)
     return {
         "receipt_release": RECEIPT_RELEASE,
@@ -441,9 +618,14 @@ def compact_receipt(result):
         "timestamp": result["timestamp"],
         "model": result["model"],
         "provider": "bedrock",
+        "case_delay_seconds": result.get("case_delay_seconds", 0),
         "trials": max((case["trial"] for case in cases), default=0),
         "passed": result["passed"],
         "total": result["total"],
+        "availability_failures": sum(
+            case.get("failure_category") == "availability" for case in cases
+        ),
+        "quality_failures": sum(case.get("failure_category") == "quality" for case in cases),
         "cases": cases,
         "real_model": result["real_model"],
         "synthetic_mail_tools": result["synthetic_mail_tools"],
@@ -453,10 +635,12 @@ def compact_receipt(result):
     }
 
 
-async def evaluate(trials):
+async def evaluate(trials, *, case_delay_seconds=0):
     results = []
     for trial in range(trials):
         for case in CASES:
+            if results and case_delay_seconds:
+                await asyncio.sleep(case_delay_seconds)
             print(f"REPLAY {trial + 1} {case['id']}", file=sys.stderr, flush=True)
             history = deepcopy(case.get("history", []))
             for turn in case["turns"]:
@@ -499,6 +683,7 @@ async def evaluate(trials):
         **assets(),
         "cases_hash": digest(CASES),
         "timestamp": datetime.now(UTC).isoformat(),
+        "case_delay_seconds": case_delay_seconds,
         "results": results,
         "passed": sum(r["passed"] for r in results),
         "total": len(results),
@@ -535,11 +720,19 @@ def main():
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--trials", type=int, choices=[1, 2, 3], default=2)
     parser.add_argument(
+        "--case-delay-seconds",
+        type=float,
+        default=0,
+        help="Pause between live cases to avoid bursting a low-quota Bedrock profile.",
+    )
+    parser.add_argument(
         "--receipt-output",
         type=Path,
         help="Write the compact sanitized receipt to this existing directory.",
     )
     args = parser.parse_args()
+    if not 0 <= args.case_delay_seconds <= 30:
+        raise SystemExit("--case-delay-seconds must be between 0 and 30")
     if not args.live:
         print(
             json.dumps(
@@ -553,7 +746,7 @@ def main():
         return
     s = get_settings()
     validate_live_preflight(s)
-    result = asyncio.run(evaluate(args.trials))
+    result = asyncio.run(evaluate(args.trials, case_delay_seconds=args.case_delay_seconds))
     receipt = compact_receipt(result)
     if args.receipt_output:
         if not args.receipt_output.parent.is_dir():

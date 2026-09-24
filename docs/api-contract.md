@@ -765,7 +765,7 @@ return the durable reference without replaying model trace metadata. Optional re
 | Field | Shape and meaning |
 |---|---|
 | `evidence` | Array of `{reference,quote}` exact-source citations on grounded message/recommendation answers; absent on task/proposal results. |
-| `search` | One transient page: `filters`, up to five `results` (`message_id`, `thread_id`, `subject`, `sender`, `received_at`, `snippet`, optional literal `flight` preview), signed `next_cursor`, and incomplete `coverage`. Cards are not replayed from conversation storage. |
+| `search` | Transient current-turn cards: each Gmail page contributes up to five `results` (`message_id`, `thread_id`, `subject`, `sender`, `received_at`, `snippet`, optional literal `flight` preview). If the model reads multiple pages in one turn, the response aggregates their cards in addressable `mail-N` order, up to 25. `next_cursor` and incomplete `coverage` describe the last page. A new search resets the aggregate. Cards are not replayed from conversation storage. |
 | `task_id`, `task` | Existing durable task ID and full task view (`state`, optimistic `version`, question/artifact/event references, release and timestamps). Poll through the existing task APIs. |
 | `proposal_id`, `proposal` | Existing command-plan ID and full reviewable proposal. Confirmation is a separate typed endpoint and is not implied by chat. |
 | `artifacts` | Immediate full artifact views when the turn creates a draft revision. The durable task's `artifact_id` is authoritative for later fetch/retry. |
@@ -798,6 +798,14 @@ the newer identifiers. It does not include model tool transcripts or search card
 existing tasks and action records are retained. Deletion returns 409 `conversation_busy`
 while that conversation has an active turn lease. Requires bearer auth. Conversation turn
 processing requires `CONVERSATION_ENABLED=true`; otherwise 503 `conversation_disabled`.
+
+`read_search_results(references:["mail-1",...])` can inspect one to five distinct,
+currently displayed search references in one tool call. It returns selected-message
+excerpts capped at 2,000 body characters per reference; only returned text can support
+answer citations. Pinned `selected` references and stale/search-invented references are
+rejected. When a search has produced cards but the finite tool budget is reached, the
+turn completes with those cards and a limited-coverage message, without asserting an
+unverified answer.
 
 All failures use `{"error":{"code":"<machine code>","message":"<safe text>","detail":null}}`
 (validation failures use a sanitized `detail` array). Relevant stable codes include

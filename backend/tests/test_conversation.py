@@ -96,6 +96,38 @@ async def test_read_before_advice_and_quote_validation():
     assert [t["tool"] for t in result["trace"]] == ["read_email", "respond"]
 
 
+async def test_batch_search_read_can_support_one_cited_answer():
+    class BatchRuntime(Runtime):
+        async def call(self, name, arguments):
+            if name == "read_search_results":
+                assert arguments.references == ["mail-1", "mail-2"]
+                self.calls.append(name)
+                self.evidence["mail-1"] = "GYG weekend promotion"
+                self.evidence["mail-2"] = "Order 2241 confirmed"
+                return {
+                    "results": [
+                        {"reference": "mail-1", "body": "GYG weekend promotion"},
+                        {"reference": "mail-2", "body": "Order 2241 confirmed"},
+                    ]
+                }
+            return await super().call(name, arguments)
+
+    runtime = BatchRuntime()
+    model = Model(
+        tool("read_search_results", references=["mail-1", "mail-2"]),
+        tool(
+            "respond",
+            kind="message",
+            text="Order 2241 was confirmed in the checked emails.",
+            evidence=[{"reference": "mail-2", "quote": "Order 2241 confirmed"}],
+        ),
+    )
+    result = await engine.run({}, runtime, model)
+    assert result["kind"] == "message"
+    assert result["evidence"][0]["reference"] == "mail-2"
+    assert [step["tool"] for step in result["trace"]] == ["read_search_results", "respond"]
+
+
 async def test_invented_quote_rejected_and_recoverable():
     model = Model(
         tool("read_email", reference="selected"),
@@ -143,6 +175,42 @@ async def test_budget_exhaustion_is_explicit():
     with pytest.raises(ApiError) as exc:
         await engine.run({}, Runtime(), Model(*(tool("missing" + str(i)) for i in range(8))))
     assert exc.value.code == "conversation_tool_limit"
+
+
+async def test_search_budget_preserves_cards_without_inventing_an_order():
+    class SearchRuntime(Runtime):
+        search_page = None
+
+        async def call(self, name, arguments):
+            result = await super().call(name, arguments)
+            if name == "search_mail":
+                self.search_page = {"results": [{"reference": "mail-1"}]}
+            return result
+
+    runtime = SearchRuntime()
+    model = Model(
+        tool("search_mail", query="GYG"),
+        *(tool("missing" + str(i)) for i in range(7)),
+    )
+    result = await engine.run({"user_turn": "Find my latest GYG order"}, runtime, model)
+    assert result["kind"] == "message"
+    assert result["evidence"] == []
+    assert "couldn't finish checking" in result["text"]
+    assert "latest order" not in result["text"]
+    assert [step["tool"] for step in result["trace"]][0] == "search_mail"
+    assert len(result["trace"]) == engine.MAX_CALLS
+
+
+async def test_search_budget_with_no_cards_does_not_claim_any_match():
+    class EmptySearchRuntime(Runtime):
+        search_page = {"results": []}
+
+    result = await engine.run(
+        {}, EmptySearchRuntime(), Model(*(tool("missing" + str(i)) for i in range(8)))
+    )
+    assert result["kind"] == "message"
+    assert "matching emails" not in result["text"]
+    assert result["evidence"] == []
 
 
 async def test_provider_code_is_not_exposed_in_public_error():

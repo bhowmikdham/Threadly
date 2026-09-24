@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.3`. Feature switch:
+Implementation release: `contextual-conversation-1.1.4`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
 `c23026e9a039`. The `1.1.3` release has new replay cases for selected-message,
 searched-result and visible-thread summaries. Its two-trial synthetic Bedrock evaluation
@@ -54,7 +54,11 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   control for a different visible email.
 - Each search page returns up to five candidates from one bounded Gmail query. Gmail may
   match headers as well as message text, and local bounds may leave fewer than five cards.
-  The coordinator reads relevant candidates to distinguish an order confirmation from a promotion. It reports limited coverage;
+  The coordinator can inspect up to five current `mail-N` candidates in one bounded
+  `read_search_results` call, or read one candidate more fully. The batch returns at most
+  2,000 body characters per message, cites only returned text and never widens a search
+  result to its whole thread. It can compare order confirmations with promotions without
+  spending one model decision per candidate. It reports limited coverage;
   it must not claim exhaustive mailbox search or a globally latest order without evidence.
   The response validator returns common unqualified “latest order/email” claims to the
   model for correction when current or retained search coverage is incomplete. This is
@@ -62,7 +66,14 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
 - Search defaults to the past year, with an explicit window of at most 366 days. Search
   literals/folder/date wording must come from user dialogue. Provider cursors remain signed
   and account-bound. At most 25 addressable references are retained for one search;
-  pagination stops at that boundary.
+  pagination stops at that boundary. If the model checks more than one five-result page
+  during one turn, the API returns all cards from those pages in their `mail-N` order (up
+  to 25) so a later “second one” refers to a card the user actually saw. A new search
+  resets the card list; card text is not stored in conversation state.
+- If the model reaches its tool/transcript budget after a search, the API returns the
+  current bounded search cards with a limited-coverage explanation instead of losing
+  them to `conversation_tool_limit`. It never invents an order or claims a complete search.
+  A tool-limit error can still occur when no search results are available to present.
 - `mail-1`, `mail-2`, etc. preserve displayed search order. Tools accept these references,
   not model-invented provider IDs. A new search replaces the old result set.
 - When a searched result enters a workflow, the backend creates a one-message UI capture.
