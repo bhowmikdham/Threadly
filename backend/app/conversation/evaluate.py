@@ -23,7 +23,7 @@ from app.conversation.runtime import (
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
-RECEIPT_RELEASE = "contextual-conversation-live-v1"
+RECEIPT_RELEASE = "contextual-conversation-live-v2"
 CASES = [
     {
         "id": "social_typo",
@@ -59,6 +59,29 @@ CASES = [
         "kinds": ["message"],
         "required": ["read_email"],
         "words": ["2241"],
+    },
+    {
+        "id": "selected_brief_summary",
+        "turns": ["Summarise this selected email briefly for me."],
+        "selected": RECEIPT,
+        "kinds": ["task", "message"],
+        "required": ["read_email"],
+        "forbid": ["search_mail"],
+    },
+    {
+        "id": "searched_result_summary",
+        "turns": ["Find GYG and summarise the second email briefly for me."],
+        "search": True,
+        "kinds": ["task", "message"],
+        "required": ["search_mail", "read_email"],
+    },
+    {
+        "id": "visible_thread_summary",
+        "turns": ["Summarise this thread."],
+        "selected": RECEIPT + " A later message asks for Friday's agenda.",
+        "kinds": ["task", "message"],
+        "required": ["read_email"],
+        "forbid": ["search_mail"],
     },
     {
         "id": "missing_item",
@@ -132,7 +155,7 @@ CASES = [
 
 class FixtureRuntime:
     def __init__(self, case, turn=""):
-        self.case, self.evidence, self.calls = case, {}, []
+        self.case, self.evidence, self.calls, self.read_scopes = case, {}, [], {}
         self.search_page = None
         history = case.get("history", [])
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
@@ -209,6 +232,8 @@ class FixtureRuntime:
                 "displayed_result_order": [row["reference"] for row in observations],
             }
         if name == "read_email":
+            if args.scope == "visible_thread" and args.reference != "selected":
+                raise ValueError("Visible thread requires the pinned reference")
             sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
             if self.case.get("selected"):
                 sources["selected"] = self.case["selected"]
@@ -216,12 +241,19 @@ class FixtureRuntime:
             if not text:
                 raise ValueError("Unknown reference")
             self.evidence[args.reference] = text
+            self.read_scopes.setdefault(args.reference, set()).add(args.scope)
             return {"reference": args.reference, "body": text, "untrusted_source": True}
         if name == "prepare_workflow":
             authorize_workflow(self.instruction, args.intent, args.compound)
             validate_workflow_bindings(args, set(self.evidence), set(self.recipient_refs))
+            if args.source_scope == "visible_thread" and args.reference != "selected":
+                raise ValueError("Visible thread requires the pinned reference")
             if args.intent != "compose" and args.reference not in self.evidence:
                 raise ValueError("Read source first")
+            if args.reference and args.source_scope not in self.read_scopes.get(
+                args.reference, set()
+            ):
+                raise ValueError("Read the requested source scope first")
             kind = "proposal" if args.compound or args.intent == "plan_schedule" else "task"
             return {
                 "kind": kind,
@@ -306,6 +338,35 @@ def grade(case, response, calls):
             failures.append("selected_source_not_read")
         if not _advises_no_reply(text):
             failures.append("did_not_recommend_no_reply")
+    elif case_id in {
+        "selected_brief_summary",
+        "searched_result_summary",
+        "visible_thread_summary",
+    }:
+        reference = "mail-2" if case_id == "searched_result_summary" else "selected"
+        scope = "visible_thread" if case_id == "visible_thread_summary" else "selected_message"
+        reads = _tool_inputs(calls, "read_email")
+        if not any(
+            item.get("reference") == reference and item.get("scope", "selected_message") == scope
+            for item in reads
+        ):
+            failures.append("summary_source_not_read")
+        if any(
+            item.get("reference") == reference and item.get("scope", "selected_message") != scope
+            for item in reads
+        ):
+            failures.append("summary_scope_mismatch")
+        if response.get("kind") == "task":
+            if workflow.get("reference") != reference:
+                failures.append("summary_lost_source")
+            if workflow.get("intent") != "summarise" or workflow.get("compound"):
+                failures.append("summary_wrong_workflow")
+            if workflow.get("source_scope", "selected_message") != scope:
+                failures.append("summary_scope_mismatch")
+        elif response.get("kind") == "message" and not any(
+            item.get("reference") == reference for item in response.get("evidence", [])
+        ):
+            failures.append("summary_missing_evidence")
     elif case_id == "monitored_reply_to":
         if not _has_selected_read(calls):
             failures.append("selected_source_not_read")

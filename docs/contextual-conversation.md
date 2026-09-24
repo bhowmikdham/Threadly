@@ -1,11 +1,13 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.2`. Feature switch:
+Implementation release: `contextual-conversation-1.1.3`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. The `1.1.2` two-trial synthetic Bedrock evaluation passed
-**26/26** checks; its sanitized receipt is
-[versioned here](evaluation/contextual-conversation-live-v2.json). The prior `1.1.1`
-receipt remains [available](evaluation/contextual-conversation-live-v1.json).
+`c23026e9a039`. The `1.1.3` release has new replay cases for selected-message,
+searched-result and visible-thread summaries. Its two-trial synthetic Bedrock evaluation
+passed **32/32** checks; the sanitized [receipt](evaluation/contextual-conversation-live-v3.json)
+is versioned. The prior `1.1.2` replay passed **26/26** checks
+([receipt](evaluation/contextual-conversation-live-v2.json)); the earlier `1.1.1`
+[receipt](evaluation/contextual-conversation-live-v1.json) is also available.
 Unit/integration and synthetic model results are not a general quality guarantee.
 
 ## What changed
@@ -65,6 +67,23 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   not model-invented provider IDs. A new search replaces the old result set.
 - When a searched result enters a workflow, the backend creates a one-message UI capture.
   It never widens that result to the other messages in the Gmail thread.
+- Selected and searched one-email summaries enter the typed `summary` workflow with the
+  original user-authored instruction. The default `selected_message` scope recaptures exactly
+  the referenced message, even when the selected UI snapshot contains other visible messages.
+  This narrowing also applies to draft/proposal work from a selected-message read. A selected
+  UI reference is available only when exactly one message is selected.
+- Source-linked compose requests with a user-authored recipient enter the typed `draft_new`
+  workflow, so natural wording does not depend on the legacy UI phrase matcher. The draft
+  remains unreviewed and cannot send mail. Compose requests without a bound recipient keep
+  the existing task route and its current recipient handling.
+- A workflow may explicitly use `visible_thread` to cover the owned pinned capture.
+  The model must read that scope first; `mail-N` references cannot expand to a thread.
+  An older full-thread capture without a UI map remains addressable as a thread. Compound
+  work keeps the same source scope across all requested operations. Both summary paths use
+  the normal source-linked summary validator. The lexical authorization checks for reply,
+  compose, scheduling and compound work remain and can reject some uncommon phrasing;
+  single read-only summaries accept a semantic model choice when no other requested
+  operation is detected.
 - Actual email bodies, subjects and search snippets are transient tool observations.
   Conversation storage retains Gmail message/thread IDs, snapshot references and the last
   search's filter/cursor state so later turns can address displayed results.
@@ -176,7 +195,7 @@ user must review the complete revised subject, body and recipients before any se
 - `tests/test_conversation*.py`: actual PostgreSQL/API state, ownership, leases, privacy,
   adapter failure behavior, reference captures and workflow handoff tests.
 - Run live evaluation explicitly: `python -m app.conversation.evaluate --live --trials 2`.
-  The pinned Australian Haiku profile passed 26/26 synthetic checks on 24 September 2026;
+  The pinned Australian Haiku profile passed 32/32 synthetic checks on 24 September 2026;
   the receipt above records release, prompt/tool/case hashes and per-case results without
   input or output content. The account audit found model invocation logging disabled in
   Sydney and account retention mode `inherit`, which follows the model's default rather than

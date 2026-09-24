@@ -74,6 +74,49 @@ def test_latest_order_requires_incomplete_search_qualification():
     )
 
 
+@pytest.mark.parametrize(
+    ("case_id", "reference", "scope"),
+    [
+        ("selected_brief_summary", "selected", "selected_message"),
+        ("searched_result_summary", "mail-2", "selected_message"),
+        ("visible_thread_summary", "selected", "visible_thread"),
+    ],
+)
+def test_summary_replay_requires_the_exact_read_reference_and_intent(case_id, reference, scope):
+    reads = [_call("read_email", reference=reference, scope=scope)]
+    if case_id == "searched_result_summary":
+        reads.insert(0, _call("search_mail", query="GYG"))
+    good = reads + [
+        _call("prepare_workflow", intent="summarise", reference=reference, source_scope=scope)
+    ]
+    wrong = reads + [
+        _call("prepare_workflow", intent="summarise", reference="mail-1", source_scope=scope)
+    ]
+
+    assert evaluate.grade(_case(case_id), _response("task"), good) == []
+    assert "summary_lost_source" in evaluate.grade(_case(case_id), _response("task"), wrong)
+    assert (
+        evaluate.grade(
+            _case(case_id),
+            _response(
+                "message", evidence=[{"reference": reference, "quote": "Order 2241 confirmed"}]
+            ),
+            reads,
+        )
+        == []
+    )
+    assert "summary_missing_evidence" in evaluate.grade(_case(case_id), _response("message"), reads)
+    widened = reads + [
+        _call(
+            "prepare_workflow",
+            intent="summarise",
+            reference=reference,
+            source_scope=("visible_thread" if scope == "selected_message" else "selected_message"),
+        )
+    ]
+    assert "summary_scope_mismatch" in evaluate.grade(_case(case_id), _response("task"), widened)
+
+
 async def test_latest_order_fixture_uses_production_search_literal_and_date_rules():
     from app.schemas.conversation import SearchMail
 

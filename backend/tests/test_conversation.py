@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -6,7 +7,8 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.errors import ApiError
-from app.assistant import source_data
+from app.assistant import coordinator, source_data, worker, workflows
+from app.assistant.summary import digest
 from app.config import get_settings
 from app.conversation import engine, service, store
 from app.conversation.runtime import (
@@ -15,12 +17,26 @@ from app.conversation.runtime import (
     validate_clarification,
     validate_workflow_bindings,
 )
-from app.db.models import AssistantTask, CommandPlan, Conversation, Message, TaskEvent, User
+from app.db.models import (
+    ArtifactRevision,
+    AssistantTask,
+    CommandPlan,
+    ContextSnapshot,
+    Conversation,
+    Message,
+    TaskEvent,
+    User,
+)
+from app.mail import live
 from app.model_client.conversation import ConversationProviderError
 from app.model_client.providers import ProviderError
 from app.schemas.continuation import ClarificationAnswer
 from app.schemas.conversation import ConversationTurn, PrepareWorkflow
 from tests.test_on_demand_gmail import MID, TEXT, TID, setup  # noqa: F401
+from tests.test_on_demand_gmail import Model as SummaryModel
+
+SECOND_MID = "def457"
+SECOND_TEXT = "A separate message asks for a private budget review. OTHER-MESSAGE-MARKER"
 
 
 def tool(name, **values):
@@ -159,6 +175,25 @@ def request(**values):
     )
 
 
+@pytest.fixture()
+def two_message_thread(configured, monkeypatch):
+    """Keep a second message in the Gmail thread to detect scope expansion."""
+
+    original = live.thread
+
+    async def fetch(owner, thread_id):
+        source = await original(owner, thread_id)
+        other = deepcopy(source["messages"][0])
+        other["gmail_msg_id"] = SECOND_MID
+        other["body_clean"] = SECOND_TEXT
+        source["messages"].append(other)
+        source["fingerprint"] = digest(source["messages"])
+        return source
+
+    monkeypatch.setattr(live, "thread", fetch)
+    return configured
+
+
 def test_turn_hash_distinguishes_omitted_source_from_explicit_clear():
     omitted = request()
     cleared = omitted.model_copy(update={"context_snapshot_id": None})
@@ -252,6 +287,10 @@ def test_explicit_short_draft_is_not_bound_to_unrelated_previous_turn():
     [
         ("Draft an email about free fries", "compose", False),
         ("Summarise the meeting email", "summarise", False),
+        ("Give me a quick rundown of this email", "summarise", False),
+        ("Summarise this selected email briefly for me.", "summarise", False),
+        ("Summarise the email from alex@example.test", "summarise", False),
+        ("Email Alex about the meeting", "compose", False),
         ("Write to customer support about my missing item", "compose", False),
         ("Can you help me respond confirming attendance?", "reply", False),
         ("Write back to them confirming Tuesday", "reply", False),
@@ -569,8 +608,11 @@ async def test_source_compose_keeps_provenance_and_rejects_source_recipient(
         "workflow_binding_invalid",
         "ok",
     ]
-    assert result["task"]["context_snapshot_id"] == context.id
+    assert result["task"]["context_snapshot_id"] != context.id
     assert result["task"]["draft_input"] is None
+    async with db_sessionmaker() as session:
+        source = await session.get(ContextSnapshot, result["task"]["context_snapshot_id"])
+        assert source.payload["ui_map"]["visible_message_ids"] == [MID]
 
 
 def test_api_context_ownership_and_feature_gate(configured, db_client, auth_headers, monkeypatch):
@@ -670,8 +712,9 @@ async def test_selected_source_is_owner_checked_before_model(configured, db_sess
     assert model.contexts == []
 
 
-async def test_search_read_then_summary_uses_reference_capture(configured, db_sessionmaker):
-    r = request().model_copy(update={"instruction": "Find agenda and summarise it"})
+async def test_search_read_then_summary_uses_reference_capture(two_message_thread, db_sessionmaker):
+    instruction = "Find agenda and summarise the result briefly for me."
+    r = request().model_copy(update={"instruction": instruction})
     model = Model(
         tool("search_mail", query="agenda"),
         tool("read_email", reference="mail-1"),
@@ -684,7 +727,9 @@ async def test_search_read_then_summary_uses_reference_capture(configured, db_se
     async with source_data.source_scope():
         result = await service.turn(1, r, factory=db_sessionmaker, model=model)
     assert result["task"]["context_snapshot_id"] is not None
-    from app.db.models import ContextSnapshot
+    assert result["task"]["instruction"] == instruction
+    assert result["task"]["release"]["workflow"] == workflows.RELEASE
+    assert result["task"]["workflow"]["operations"] == ["summary"]
 
     async with db_sessionmaker() as session:
         capture = await session.get(ContextSnapshot, result["task"]["context_snapshot_id"])
@@ -693,6 +738,267 @@ async def test_search_read_then_summary_uses_reference_capture(configured, db_se
         assert capture.payload["ui_map"]["selected_message_ids"] == [MID]
         assert TEXT not in json.dumps(capture.payload)
         assert await session.scalar(select(func.count()).select_from(Message)) == 0
+
+    generator = SummaryModel()
+    assert await worker.run_once(db_sessionmaker, generator)
+    assert len(generator.calls) == 1
+    assert instruction in generator.calls[0]
+    assert TEXT in generator.calls[0]
+    assert SECOND_TEXT not in generator.calls[0]
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, result["task_id"])
+        artifact = await session.get(ArtifactRevision, task.final_artifact_id)
+        assert task.state == "succeeded"
+        assert [e["source_id"] for e in artifact.payload["evidence"]] == [MID]
+
+
+async def test_selected_email_summary_uses_typed_single_message_workflow(
+    two_message_thread, db_sessionmaker, db_client, auth_headers
+):
+    instruction = "Summarise this selected email briefly for me."
+    snapshot = db_client.post(
+        "/assistant/context-snapshots",
+        headers=auth_headers(1),
+        json={
+            "schema_version": "1.1",
+            "thread_id": TID,
+            "ui_map": {
+                "schema_version": "1.0",
+                "surface": "gmail_thread",
+                "thread_version": 1,
+                "captured_at": datetime.now(UTC).isoformat(),
+                "visible_message_ids": [MID, SECOND_MID],
+                "selected_message_ids": [SECOND_MID],
+            },
+        },
+    )
+    assert snapshot.status_code == 201, snapshot.text
+    assert len(snapshot.json()["messages"]) == 2
+    r = request(context_snapshot_id=snapshot.json()["context_snapshot_id"]).model_copy(
+        update={"instruction": instruction}
+    )
+    model = Model(
+        tool("read_email", reference="selected"),
+        tool("prepare_workflow", intent="summarise", reference="selected"),
+    )
+    async with source_data.source_scope():
+        result = await service.turn(1, r, factory=db_sessionmaker, model=model)
+        replay = await service.turn(1, r, factory=db_sessionmaker, model=Model())
+    assert result["kind"] == "task"
+    assert replay["task_id"] == result["task_id"]
+    assert result["task"]["instruction"] == instruction
+    assert result["task"]["release"]["workflow"] == workflows.RELEASE
+    assert result["task"]["workflow"]["operations"] == ["summary"]
+    assert result["task"]["context_snapshot_id"] != snapshot.json()["context_snapshot_id"]
+    assert model.contexts[0]["selected_reference"] == "selected"
+    async with db_sessionmaker() as session:
+        capture = await session.get(ContextSnapshot, result["task"]["context_snapshot_id"])
+        assert capture.payload["ui_map"]["visible_message_ids"] == [SECOND_MID]
+        assert capture.payload["ui_map"]["selected_message_ids"] == [SECOND_MID]
+        assert SECOND_TEXT not in json.dumps(capture.payload)
+        event = await session.scalar(
+            select(TaskEvent).where(
+                TaskEvent.task_id == result["task_id"], TaskEvent.kind == "task.accepted"
+            )
+        )
+        assert event.payload["conversation_provenance"]["source"] == "conversation_user_turns"
+
+    generator = SummaryModel()
+    assert await worker.run_once(db_sessionmaker, generator)
+    assert len(generator.calls) == 1
+    assert instruction in generator.calls[0]
+    assert SECOND_TEXT in generator.calls[0]
+    assert TEXT not in generator.calls[0]
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, result["task_id"])
+        artifact = await session.get(ArtifactRevision, task.final_artifact_id)
+        assert task.state == "succeeded"
+    assert [e["source_id"] for e in artifact.payload["evidence"]] == [SECOND_MID]
+    assert all(call.method == "GET" for call in two_message_thread.calls)
+
+
+@pytest.mark.parametrize("ui_capture", [False, True], ids=["full-thread", "visible-thread"])
+async def test_thread_summary_keeps_owned_captured_thread_scope(
+    two_message_thread, db_sessionmaker, db_client, auth_headers, ui_capture
+):
+    instruction = "Summarise this thread."
+    body = {"schema_version": "1.0", "thread_id": TID}
+    if ui_capture:
+        body = {
+            "schema_version": "1.1",
+            "thread_id": TID,
+            "ui_map": {
+                "schema_version": "1.0",
+                "surface": "gmail_thread",
+                "thread_version": 1,
+                "captured_at": datetime.now(UTC).isoformat(),
+                "visible_message_ids": [SECOND_MID, MID],
+                "selected_message_ids": [SECOND_MID],
+            },
+        }
+    snapshot = db_client.post("/assistant/context-snapshots", headers=auth_headers(1), json=body)
+    assert snapshot.status_code == 201, snapshot.text
+    context_id = snapshot.json()["context_snapshot_id"]
+    r = request(context_snapshot_id=context_id).model_copy(update={"instruction": instruction})
+
+    class ObservingModel(Model):
+        read_messages = None
+
+        async def decide(self, system, messages, tools):
+            if len(messages) >= 3:
+                result = messages[-1]["content"][0].get("toolResult")
+                if result and result["status"] == "success":
+                    self.read_messages = result["content"][0]["json"].get("messages")
+            return await super().decide(system, messages, tools)
+
+    model = ObservingModel(
+        tool("read_email", reference="selected", scope="visible_thread"),
+        tool(
+            "prepare_workflow",
+            intent="summarise",
+            reference="selected",
+            source_scope="visible_thread",
+        ),
+    )
+    async with source_data.source_scope():
+        result = await service.turn(1, r, factory=db_sessionmaker, model=model)
+    assert result["task"]["context_snapshot_id"] == context_id
+    assert result["task"]["workflow"]["operations"] == ["summary"]
+    expected_texts = [SECOND_TEXT, TEXT] if ui_capture else [TEXT, SECOND_TEXT]
+    assert [m["body"] for m in model.read_messages] == expected_texts
+    generator = SummaryModel()
+    assert await worker.run_once(db_sessionmaker, generator)
+    assert TEXT in generator.calls[0] and SECOND_TEXT in generator.calls[0]
+    if ui_capture:
+        assert generator.calls[0].index(SECOND_TEXT) < generator.calls[0].index(TEXT)
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, result["task_id"])
+        artifact = await session.get(ArtifactRevision, task.final_artifact_id)
+        assert task.state == "succeeded"
+        assert [e["source_id"] for e in artifact.payload["evidence"]] == (
+            [SECOND_MID, MID] if ui_capture else [MID, SECOND_MID]
+        )
+
+
+async def test_compound_visible_thread_binds_one_owned_context(
+    two_message_thread, db_sessionmaker, db_client, auth_headers, monkeypatch
+):
+    snapshot = db_client.post(
+        "/assistant/context-snapshots",
+        headers=auth_headers(1),
+        json={
+            "schema_version": "1.1",
+            "thread_id": TID,
+            "ui_map": {
+                "schema_version": "1.0",
+                "surface": "gmail_thread",
+                "thread_version": 1,
+                "captured_at": datetime.now(UTC).isoformat(),
+                "visible_message_ids": [MID, SECOND_MID],
+                "selected_message_ids": [SECOND_MID],
+            },
+        },
+    )
+    assert snapshot.status_code == 201, snapshot.text
+    context_id = snapshot.json()["context_snapshot_id"]
+    instruction = (
+        "Summarise this thread, suggest three meeting slots tomorrow, "
+        "and draft a reply to alex@example.test."
+    )
+
+    async def no_generation(_row):
+        return "failed", {"reason": "synthetic_no_generation"}
+
+    monkeypatch.setattr(coordinator, "interpret", no_generation)
+    r = request(context_snapshot_id=context_id).model_copy(update={"instruction": instruction})
+    model = Model(
+        tool("read_email", reference="selected", scope="visible_thread"),
+        tool(
+            "prepare_workflow",
+            intent="plan_schedule",
+            reference="selected",
+            source_scope="visible_thread",
+            compound=True,
+            to_refs=["recipient-1"],
+        ),
+    )
+    async with source_data.source_scope():
+        result = await service.turn(1, r, factory=db_sessionmaker, model=model)
+        replay = await service.turn(1, r, factory=db_sessionmaker, model=Model())
+    assert result["kind"] == "proposal" and replay["proposal_id"] == result["proposal_id"]
+    assert result["trace"] == [
+        {"tool": "read_email", "status": "ok"},
+        {"tool": "prepare_workflow", "status": "ok"},
+    ]
+    async with db_sessionmaker() as session:
+        proposal = await session.get(CommandPlan, result["proposal_id"])
+        assert proposal.context_snapshot_id == context_id
+        assert proposal.release["conversation"]["source_scope"] == "visible_thread"
+        assert proposal.request["instruction"] == instruction
+        context = await session.get(ContextSnapshot, proposal.context_snapshot_id)
+        assert context.payload["ui_map"]["visible_message_ids"] == [MID, SECOND_MID]
+
+
+async def test_search_result_cannot_expand_to_visible_thread(two_message_thread, db_sessionmaker):
+    r = request().model_copy(update={"instruction": "Find agenda and summarise that email"})
+    model = Model(
+        tool("search_mail", query="agenda"),
+        tool("read_email", reference="mail-1"),
+        tool(
+            "prepare_workflow",
+            intent="summarise",
+            reference="mail-1",
+            source_scope="visible_thread",
+        ),
+        tool("respond", kind="clarification", text="Please select an accessible thread."),
+    )
+    async with source_data.source_scope():
+        result = await service.turn(1, r, factory=db_sessionmaker, model=model)
+    assert result["trace"][2] == {"tool": "prepare_workflow", "status": "invalid"}
+    assert result["kind"] == "clarification"
+    async with db_sessionmaker() as session:
+        assert await session.scalar(select(func.count()).select_from(AssistantTask)) == 0
+
+
+async def test_selected_compose_cannot_expand_read_to_other_visible_email(
+    two_message_thread, db_sessionmaker, db_client, auth_headers
+):
+    snapshot = db_client.post(
+        "/assistant/context-snapshots",
+        headers=auth_headers(1),
+        json={
+            "schema_version": "1.1",
+            "thread_id": TID,
+            "ui_map": {
+                "schema_version": "1.0",
+                "surface": "gmail_thread",
+                "thread_version": 1,
+                "captured_at": datetime.now(UTC).isoformat(),
+                "visible_message_ids": [MID, SECOND_MID],
+                "selected_message_ids": [MID],
+            },
+        },
+    )
+    assert snapshot.status_code == 201, snapshot.text
+    r = request(context_snapshot_id=snapshot.json()["context_snapshot_id"]).model_copy(
+        update={"instruction": "Compose an email to alex@example.test about this selected email"}
+    )
+    model = Model(
+        tool("read_email", reference="selected"),
+        tool("prepare_workflow", intent="compose", reference="selected", to_refs=["recipient-1"]),
+    )
+    async with source_data.source_scope():
+        result = await service.turn(1, r, factory=db_sessionmaker, model=model)
+    assert result["task"]["context_snapshot_id"] != snapshot.json()["context_snapshot_id"]
+    async with db_sessionmaker() as session:
+        source = await session.get(ContextSnapshot, result["task"]["context_snapshot_id"])
+        assert source.payload["ui_map"]["visible_message_ids"] == [MID]
+    generator = SummaryModel()
+    assert await worker.run_once(db_sessionmaker, generator)
+    async with db_sessionmaker() as session:
+        task = await session.get(AssistantTask, result["task_id"])
+        assert task.state == "succeeded", (task.error_code, task.release)
+    assert TEXT in generator.calls[0] and SECOND_TEXT not in generator.calls[0]
 
 
 async def test_context_clear_does_not_reuse_previous_pin(configured, db_sessionmaker):
