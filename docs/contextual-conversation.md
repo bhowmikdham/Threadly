@@ -1,9 +1,10 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.0.0`. Feature switch:
+Implementation release: `contextual-conversation-1.1.0`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. The live two-trial Bedrock evaluation and its sanitized receipt are
-**pending**; unit/integration results are not a general quality guarantee.
+`c23026e9a039`. The two-trial synthetic Bedrock evaluation passed **26/26** checks;
+its sanitized receipt is [versioned here](evaluation/contextual-conversation-live-v1.json).
+Unit/integration and synthetic model results are not a general quality guarantee.
 
 ## What changed
 
@@ -111,6 +112,11 @@ without asking the model to generate another task. A proposal still in `planning
 from its stored request. Expired leases permit retry of the same unfinished request; a
 new message cannot silently detach it. The UI offers Retry response and blocks a different
 turn until the uncertain request is resolved or the user starts a new conversation.
+If a provider splits one compound request into several terminal workflow calls, the engine
+executes none of the partial calls. Calls with one consistent source and recipient-role
+binding are collapsed into one `compound=true` proposal; conflicting bindings return to the
+model for clarification. The runtime still authorizes that proposal against user-authored
+turns before reserving any work.
 Explicit null source clears the current pin; omitted source preserves it. A concrete task
 reference selects that task, while a null task reference clears a stale task without erasing
 an active reviewed proposal. Deletion is idempotent, but returns `conversation_busy` while another panel owns
@@ -159,9 +165,13 @@ user must review the complete revised subject, body and recipients before any se
 - `tests/test_conversation*.py`: actual PostgreSQL/API state, ownership, leases, privacy,
   adapter failure behavior, reference captures and workflow handoff tests.
 - Run live evaluation explicitly: `python -m app.conversation.evaluate --live --trials 2`.
-  The live evaluation and sanitized receipt are pending. Do not add a receipt until this exact
-  command succeeds against the reviewed account/profile. A fixture/model replay is not a live
-  Gmail test or proof of general reasoning accuracy.
+  The pinned Australian Haiku profile passed 26/26 synthetic checks on 24 September 2026;
+  the receipt above records release, prompt/tool/case hashes and per-case results without
+  input or output content. The account audit found model invocation logging disabled in
+  Sydney and account retention mode `inherit`, which follows the model's default rather than
+  promising zero retention. The processing acknowledgement was set only for this synthetic
+  test command; staging remains off by default. A fixture/model replay is not a live Gmail
+  test or proof of general reasoning accuracy.
 
 Known limits: only 12 exchanges, one active task and one search result set are in working
 context; arbitrary long-running autonomous planning is not implemented. Only existing

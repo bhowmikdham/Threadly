@@ -10,7 +10,7 @@ from app.assistant.summary import digest
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
-from app.schemas.conversation import TOOLS, Respond, tool_config
+from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_config
 
 TERMINAL = {"respond", "prepare_workflow", "answer_question", "revise_draft"}
 MAX_CALLS = 8
@@ -46,6 +46,46 @@ async def run(context, runtime, model=None):
                 if not requests or len(requests) > MAX_CALLS - calls:
                     break
                 messages.append(message)
+                if len(requests) > 1 and all(
+                    call.get("name") == "prepare_workflow" for call in requests
+                ):
+                    # Some providers split one compound user request into several
+                    # terminal workflow calls. Execute none of those partial plans.
+                    # Merge only model-selected references; Runtime still binds the
+                    # durable instruction to user-authored turns and authorizes every
+                    # requested operation before reserving a proposal.
+                    calls += len(requests)
+                    try:
+                        arguments = _merge_prepare_workflows(requests)
+                        key = digest({"tool": "prepare_workflow", "input": arguments.model_dump()})
+                        if key in seen:
+                            raise ValueError("Repeated compound workflow call")
+                        seen.add(key)
+                        outcome = await runtime.call("prepare_workflow", arguments)
+                        trace.append({"tool": "prepare_workflow", "status": "ok"})
+                        return {**outcome, "release": RELEASE, "trace": trace}
+                    except (ValidationError, ValueError):
+                        trace.append({"tool": "prepare_workflow", "status": "invalid"})
+                        message = (
+                            "Combine every requested operation into one prepare_workflow "
+                            "call with compound=true. Use intent=plan_schedule when "
+                            "scheduling is included, and bind the plan to one source "
+                            "reference with non-conflicting recipient roles."
+                        )
+                        results = [
+                            _tool_error(call["toolUseId"], "invalid_tool_input", message)
+                            for call in requests
+                        ]
+                    except ApiError as exc:
+                        trace.append({"tool": "prepare_workflow", "status": exc.code})
+                        results = [
+                            _tool_error(call["toolUseId"], exc.code, exc.message)
+                            for call in requests
+                        ]
+                    messages.append({"role": "user", "content": results})
+                    if len(json.dumps(messages)) > 85000:
+                        break
+                    continue
                 results = []
                 for call in requests:
                     calls += 1
@@ -116,6 +156,56 @@ async def run(context, runtime, model=None):
         "conversation_tool_limit",
         "I reached the limit for this request. Try a smaller question.",
     )
+
+
+def _merge_prepare_workflows(requests):
+    """Collapse provider-split terminal calls without granting new authority."""
+    workflows = [PrepareWorkflow.model_validate(call["input"]) for call in requests]
+    references = {workflow.reference for workflow in workflows if workflow.reference is not None}
+    if len(references) > 1:
+        raise ValueError("A compound workflow must use one source reference")
+
+    roles = {"to": [], "cc": [], "bcc": []}
+    membership = {}
+    for role in roles:
+        field = role + "_refs"
+        for workflow in workflows:
+            for reference in getattr(workflow, field):
+                previous = membership.setdefault(reference, role)
+                if previous != role:
+                    raise ValueError("A recipient reference cannot have conflicting roles")
+                if reference not in roles[role]:
+                    roles[role].append(reference)
+
+    intents = [workflow.intent for workflow in workflows]
+    # Scheduling owns the compound coordinator route. For non-calendar compounds,
+    # retain a draft-producing intent where present so reply/compose bindings survive.
+    intent = next(
+        (
+            candidate
+            for candidate in ("plan_schedule", "reply", "compose", "other", "summarise")
+            if candidate in intents
+        ),
+        intents[0],
+    )
+    return PrepareWorkflow(
+        intent=intent,
+        reference=next(iter(references), None),
+        compound=True,
+        to_refs=roles["to"],
+        cc_refs=roles["cc"],
+        bcc_refs=roles["bcc"],
+    )
+
+
+def _tool_error(tool_use_id, code, message):
+    return {
+        "toolResult": {
+            "toolUseId": tool_use_id,
+            "content": [{"json": {"error": code, "message": message}}],
+            "status": "error",
+        }
+    }
 
 
 def validate_response(answer: Respond, runtime):

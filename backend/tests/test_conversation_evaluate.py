@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,32 @@ def _call(name, **values):
 
 def _response(kind="message", text="Ready.", **values):
     return {"kind": kind, "text": text, "evidence": [], **values}
+
+
+def test_live_cli_requires_mail_processing_acknowledgement_before_replay(monkeypatch):
+    replay_started = False
+
+    async def forbidden_replay(_trials):
+        nonlocal replay_started
+        replay_started = True
+
+    monkeypatch.setattr(
+        evaluate,
+        "get_settings",
+        lambda: SimpleNamespace(
+            inference_provider="bedrock",
+            bedrock_mail_processing_acknowledged=False,
+            email_writes_enabled=False,
+            calendar_writes_enabled=False,
+        ),
+    )
+    monkeypatch.setattr(evaluate, "evaluate", forbidden_replay)
+    monkeypatch.setattr(evaluate.sys, "argv", ["conversation-evaluate", "--live"])
+
+    with pytest.raises(SystemExit, match="BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true"):
+        evaluate.main()
+
+    assert replay_started is False
 
 
 def test_receipt_followup_requires_a_grounded_no_reply_recommendation():

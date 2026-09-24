@@ -13,6 +13,12 @@ from app.assistant.summary import digest
 from app.config import get_settings
 from app.conversation import engine
 from app.conversation.prompt import assets
+from app.conversation.runtime import (
+    authoritative_user_instruction,
+    authorize_workflow,
+    user_recipient_references,
+    validate_workflow_bindings,
+)
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
 RECEIPT_RELEASE = "contextual-conversation-live-v1"
@@ -123,8 +129,12 @@ CASES = [
 
 
 class FixtureRuntime:
-    def __init__(self, case):
+    def __init__(self, case, turn=""):
         self.case, self.evidence, self.calls = case, {}, []
+        history = case.get("history", [])
+        user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
+        self.instruction = authoritative_user_instruction(turn, history)
+        self.recipient_refs = user_recipient_references(user_text)
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
@@ -159,6 +169,8 @@ class FixtureRuntime:
             self.evidence[args.reference] = text
             return {"reference": args.reference, "body": text, "untrusted_source": True}
         if name == "prepare_workflow":
+            authorize_workflow(self.instruction, args.intent, args.compound)
+            validate_workflow_bindings(args, set(self.evidence), set(self.recipient_refs))
             if args.intent != "compose" and args.reference not in self.evidence:
                 raise ValueError("Read source first")
             kind = "proposal" if args.compound or args.intent == "plan_schedule" else "task"
@@ -330,13 +342,14 @@ async def evaluate(trials):
             print(f"REPLAY {trial + 1} {case['id']}", file=sys.stderr, flush=True)
             history = deepcopy(case.get("history", []))
             for turn in case["turns"]:
-                runtime = FixtureRuntime(case)
+                runtime = FixtureRuntime(case, turn)
                 context = {
                     "user_turn": turn,
                     "recent_dialogue": history,
                     "selected_reference": "selected" if case.get("selected") else None,
                     "displayed_result_order": case.get("order", []),
                     "active_work": None,
+                    "user_recipient_refs": runtime.recipient_refs,
                     "capabilities": {"gmail_read": True, "calendar_read": True, "send": False},
                     "now": "2026-09-23T12:00:00Z",
                     "timezone": "Australia/Melbourne",
@@ -383,6 +396,21 @@ async def evaluate(trials):
     }
 
 
+def validate_live_preflight(settings):
+    """Reject unsafe or incomplete live-evaluation configuration before replay."""
+
+    if settings.inference_provider != "bedrock":
+        raise SystemExit("Live conversation evaluation requires INFERENCE_PROVIDER=bedrock")
+    if not settings.bedrock_mail_processing_acknowledged:
+        raise SystemExit(
+            "Live conversation evaluation requires "
+            "BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true after the Bedrock "
+            "logging and mail-content boundary has been reviewed"
+        )
+    if settings.email_writes_enabled or settings.calendar_writes_enabled:
+        raise SystemExit("Live conversation evaluation requires external writes disabled")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
@@ -405,8 +433,7 @@ def main():
         )
         return
     s = get_settings()
-    if s.inference_provider != "bedrock" or s.email_writes_enabled or s.calendar_writes_enabled:
-        raise SystemExit("Bedrock and disabled external writes required")
+    validate_live_preflight(s)
     result = asyncio.run(evaluate(args.trials))
     receipt = compact_receipt(result)
     if args.receipt_output:

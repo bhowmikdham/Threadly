@@ -13,12 +13,13 @@ from app.conversation.runtime import (
     _is_contextual_followup,
     authorize_workflow,
     validate_clarification,
+    validate_workflow_bindings,
 )
 from app.db.models import AssistantTask, CommandPlan, Conversation, Message, TaskEvent, User
 from app.model_client.conversation import ConversationProviderError
 from app.model_client.providers import ProviderError
 from app.schemas.continuation import ClarificationAnswer
-from app.schemas.conversation import ConversationTurn
+from app.schemas.conversation import ConversationTurn, PrepareWorkflow
 from tests.test_on_demand_gmail import MID, TEXT, TID, setup  # noqa: F401
 
 
@@ -288,6 +289,39 @@ def test_workflow_authorization_rejects_topic_words_and_incomplete_selection(
         authorize_workflow(text, intent, compound)
 
 
+def test_workflow_bindings_keep_read_source_and_user_recipient_authority():
+    with pytest.raises(ApiError) as missing_source:
+        validate_workflow_bindings(
+            PrepareWorkflow(intent="compose"),
+            {"selected"},
+            set(),
+        )
+    assert missing_source.value.code == "workflow_binding_invalid"
+
+    with pytest.raises(ApiError) as source_recipient:
+        validate_workflow_bindings(
+            PrepareWorkflow(
+                intent="compose",
+                reference="selected",
+                to_refs=["recipient-1"],
+            ),
+            {"selected"},
+            set(),
+        )
+    assert source_recipient.value.code == "workflow_binding_invalid"
+
+    validate_workflow_bindings(
+        PrepareWorkflow(intent="compose", reference="selected"),
+        {"selected"},
+        set(),
+    )
+    validate_workflow_bindings(
+        PrepareWorkflow(intent="compose", to_refs=["recipient-1"]),
+        set(),
+        {"recipient-1"},
+    )
+
+
 async def test_persistent_dialogue_encrypted_replay_no_duplicate_model(configured, db_sessionmaker):
     r = request()
     model = Model(tool("respond", kind="message", text="Hey!"))
@@ -493,6 +527,50 @@ async def test_source_cannot_authorize_a_workflow_the_user_only_asked_about(
     assert result["kind"] == "recommendation"
     async with db_sessionmaker() as session:
         assert await session.scalar(select(func.count()).select_from(AssistantTask)) == 0
+
+
+async def test_source_compose_keeps_provenance_and_rejects_source_recipient(
+    configured, db_sessionmaker
+):
+    configured.text = (
+        "Order 2241 confirmed. One item is missing. Contact support@example.test for help."
+    )
+    async with source_data.source_scope():
+        await source_data.fetch(1, TID)
+        async with db_sessionmaker.begin() as session:
+            context = await source_data.capture(session, 1, TID, message_id=MID)
+        r = request(context_snapshot_id=context.id).model_copy(
+            update={
+                "instruction": (
+                    "One item is missing. Draft a message to customer support asking for help."
+                )
+            }
+        )
+        result = await service.turn(
+            1,
+            r,
+            factory=db_sessionmaker,
+            model=Model(
+                tool("read_email", reference="selected"),
+                tool("prepare_workflow", intent="compose"),
+                tool(
+                    "prepare_workflow",
+                    intent="compose",
+                    reference="selected",
+                    to_refs=["recipient-1"],
+                ),
+                tool("prepare_workflow", intent="compose", reference="selected"),
+            ),
+        )
+
+    assert [step["status"] for step in result["trace"]] == [
+        "ok",
+        "workflow_binding_invalid",
+        "workflow_binding_invalid",
+        "ok",
+    ]
+    assert result["task"]["context_snapshot_id"] == context.id
+    assert result["task"]["draft_input"] is None
 
 
 def test_api_context_ownership_and_feature_gate(configured, db_client, auth_headers, monkeypatch):

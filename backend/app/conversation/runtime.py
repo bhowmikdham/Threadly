@@ -27,10 +27,47 @@ from app.schemas.draft_review import DraftRecipients, EditDraftRequest
 from app.schemas.inbox_chat import InboxFilters
 
 SEARCH_REFERENCE_LIMIT = 25
+WORKFLOW_BINDING_ERROR = "workflow_binding_invalid"
 
 
 def _normalise_words(value):
     return " ".join(value.casefold().split())
+
+
+def user_recipient_references(user_text):
+    """Issue recipient handles only for addresses written by the user."""
+
+    addresses = list(
+        dict.fromkeys(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", user_text))
+    )[:20]
+    return {f"recipient-{i + 1}": address for i, address in enumerate(addresses)}
+
+
+def validate_workflow_bindings(args, loaded_references, recipient_references):
+    """Keep source provenance and recipient authority at the deterministic boundary."""
+
+    if args.reference is not None and args.reference not in loaded_references:
+        raise ApiError(
+            422,
+            WORKFLOW_BINDING_ERROR,
+            "Read the email reference before preparing work from it.",
+        )
+    if args.reference is None and (loaded_references or args.intent in {"summarise", "reply"}):
+        raise ApiError(
+            422,
+            WORKFLOW_BINDING_ERROR,
+            "Keep the reference of the email read for this workflow.",
+        )
+    roles = (args.to_refs, args.cc_refs, args.bcc_refs)
+    if any(ref not in recipient_references for refs in roles for ref in refs):
+        raise ApiError(
+            422,
+            WORKFLOW_BINDING_ERROR,
+            (
+                "Use recipient references only from user_recipient_refs. "
+                "Omit recipient references when the user supplied no address."
+            ),
+        )
 
 
 def _duration_values(value):
@@ -90,6 +127,17 @@ def _is_contextual_followup(value):
             re.I,
         )
     )
+
+
+def authoritative_user_instruction(latest_turn, history):
+    """Resolve bounded follow-ups using user-authored dialogue only."""
+
+    latest = latest_turn.strip()
+    previous = [entry.get("user", "").strip() for entry in history]
+    previous = [value for value in previous if value]
+    if previous and _is_contextual_followup(latest):
+        return previous[-1] + "\nUser follow-up: " + latest
+    return latest
 
 
 def authorize_workflow(instruction, intent, compound):
@@ -153,10 +201,7 @@ class Runtime:
         self.active = self.artifact = None
         # Addresses are exposed as backend-issued references, not writable model strings.
         user_text = "\n".join([h["user"] for h in state["history"]] + [request.instruction])
-        addresses = list(
-            dict.fromkeys(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", user_text))
-        )[:20]
-        self.recipients = {f"recipient-{i + 1}": a for i, a in enumerate(addresses)}
+        self.recipients = user_recipient_references(user_text)
 
     def authoritative_instruction(self):
         """Build workflow input exclusively from bounded user-authored turns.
@@ -166,14 +211,7 @@ class Runtime:
         user turn so downstream planners can resolve "draft that" without granting
         a source email authority over the request.
         """
-        latest = self.request.instruction.strip()
-        previous = [entry.get("user", "").strip() for entry in self.state["history"]]
-        previous = [value for value in previous if value]
-        if previous and _is_contextual_followup(latest):
-            value = previous[-1] + "\nUser follow-up: " + latest
-        else:
-            value = latest
-        return value
+        return authoritative_user_instruction(self.request.instruction, self.state["history"])
 
     def conversation_provenance(self, instruction):
         from app.conversation.prompt import assets
@@ -426,13 +464,12 @@ class Runtime:
     async def workflow(self, args):
         instruction = self.authoritative_instruction()
         authorize_workflow(instruction, args.intent, args.compound)
+        validate_workflow_bindings(args, set(self.loaded), set(self.recipients))
         context_id, mid = await self.capture(args.reference)
         provenance = self.conversation_provenance(instruction)
         draft = DraftOptions(reply_message_id=mid) if args.intent == "reply" and mid else None
         roles = {role: getattr(args, role + "_refs") for role in ("to", "cc", "bcc")}
         if any(roles.values()):
-            if any(ref not in self.recipients for refs in roles.values() for ref in refs):
-                raise ValueError("Unknown recipient reference")
             draft = DraftOptions(
                 reply_message_id=mid if args.intent == "reply" else None,
                 **{role: [self.recipients[ref] for ref in refs] for role, refs in roles.items()},
