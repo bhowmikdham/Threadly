@@ -14,11 +14,12 @@ log = logging.getLogger("threadly")
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, detail=None):
+    def __init__(self, status: int, code: str, message: str, detail=None, headers=None):
         self.status = status
         self.code = code
         self.message = message
         self.detail = detail
+        self.headers = headers
 
 
 def envelope(code: str, message: str, detail=None) -> dict:
@@ -38,7 +39,9 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(request: Request, exc: ApiError):
         return JSONResponse(
-            status_code=exc.status, content=envelope(exc.code, exc.message, exc.detail)
+            status_code=exc.status,
+            content=envelope(exc.code, exc.message, exc.detail),
+            headers=exc.headers,
         )
 
     @app.exception_handler(StarletteHTTPException)

@@ -97,7 +97,7 @@ async def begin(
     # Bounded opportunistic cleanup; no credential or raw callback data in logs.
     old = (
         select(GoogleOAuthSession.state_hash)
-        .where(GoogleOAuthSession.expires_at < now - timedelta(days=1))
+        .where(GoogleOAuthSession.expires_at < now)
         .order_by(GoogleOAuthSession.expires_at)
         .limit(100)
     )

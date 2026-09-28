@@ -648,6 +648,21 @@ class GoogleOAuthSession(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class OAuthRateLimit(Base):
+    """Small, shared fixed-window counters for unauthenticated OAuth entry points."""
+
+    __tablename__ = "oauth_rate_limits"
+    __table_args__ = (
+        CheckConstraint("request_count >= 1", name="ck_oauth_rate_count"),
+        Index("ix_oauth_rate_expiry", "expires_at"),
+    )
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    request_count: Mapped[int] = mapped_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ActionDecision(Base):
     """Immutable reject/cancel request receipt, including requests after dispatch cutoff."""
 

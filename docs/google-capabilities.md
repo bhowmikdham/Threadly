@@ -196,6 +196,23 @@ Google consent, callback, grant reduction, reconnect and refresh smoke tests rem
 required with the team's configured test account. Frontend wiring is a separate
 later gate. Neither local mocks nor healthy EC2 services prove live OAuth works.
 
+For public use, apply migration `c33026e9a040` before updating API workers.
+Its shared counters limit unauthenticated begin/exchange calls per observed peer
+and globally (default 20/30 and 300 per minute). Raw forwarded headers are not
+trusted by the application. Verify that the ingress presents a trustworthy client
+address to the API; otherwise many users behind one proxy share a single limit.
+Uvicorn is explicitly started with proxy-header trust disabled so a client cannot
+choose its own rate key using a forwarded header. The current Caddy-to-Uvicorn
+Docker topology has no verified client-address handoff, so it may present Caddy's
+container address to every API worker. Do not
+open public ingress until that handoff is configured with an explicitly trusted
+proxy and load-tested from separate external clients; accepting an arbitrary
+client-supplied forwarding header would bypass the per-peer limit.
+The API returns 429 with `Retry-After`, rejects bodies above 8 KiB with 413, and
+returns 503 if the limiter's database is unavailable. The limiter is an abuse
+control, not a substitute for Google publishing, domain/TLS or external perimeter
+controls.
+
 ## Provider references and evidence
 
 Implementation checked against Google's [server-side OAuth lifecycle](https://developers.google.com/identity/protocols/oauth2/web-server),

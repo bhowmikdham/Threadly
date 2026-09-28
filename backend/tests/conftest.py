@@ -95,8 +95,9 @@ def client() -> TestClient:
 
 
 @pytest.fixture()
-def db_client(db_sessionmaker) -> TestClient:
+def db_client(db_sessionmaker, monkeypatch) -> TestClient:
     """App wired to the test database."""
+    from app.auth import limits
     from app.db.engine import get_session
     from app.main import create_app
 
@@ -108,12 +109,14 @@ def db_client(db_sessionmaker) -> TestClient:
 
     app.dependency_overrides[get_session] = override
     app.dependency_overrides[get_current_user_id] = _synthetic_current_user_id
+    monkeypatch.setattr(limits, "get_session_factory", lambda: db_sessionmaker)
     return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture()
-def secure_db_client(db_sessionmaker) -> TestClient:
+def secure_db_client(db_sessionmaker, monkeypatch) -> TestClient:
     """Exercise real JWT generation checks against the isolated test database."""
+    from app.auth import limits
     from app.db.engine import get_session
     from app.main import create_app
 
@@ -124,6 +127,7 @@ def secure_db_client(db_sessionmaker) -> TestClient:
             yield session
 
     app.dependency_overrides[get_session] = override
+    monkeypatch.setattr(limits, "get_session_factory", lambda: db_sessionmaker)
     return TestClient(app, raise_server_exceptions=False)
 
 

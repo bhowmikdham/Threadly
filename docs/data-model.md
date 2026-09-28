@@ -281,6 +281,18 @@ rotate `SECRET_KEY` while issuance is stopped, then set both
 for the offline Alembic downgrade. The flags record an operator assertion;
 they do not verify shutdown or key rotation.
 
+## OAuth ingress counters (`c33026e9a040`)
+
+Parent `f28026e9a040`. `oauth_rate_limits` holds one-minute fixed-window counters
+for Google begin/exchange per observed peer and per route globally. Its primary key
+is a keyed SHA-256 digest; no raw IP, Google code, email or OAuth state is stored.
+The API deletes expired rows in batches before each attempt, and saturated counters
+stop growing until their window resets. The counter transaction commits independently
+before OAuth state consumption, so rejected and provider-failed attempts still count.
+Missing schema or database access closes public sign-in with a 503 response.
+Successful begins also prune up to 100 expired OAuth states per call; missing or
+expired state remains invalid for exchange.
+
 ## Email action payload `email-mime-1.0.0` (B03, no DDL)
 
 Existing `assistant_actions.payload` stores `preview`, `mime_base64url` and
