@@ -155,6 +155,7 @@ test.beforeAll(async () => {
         capabilities: [
           { id: "gmail_read", ready: true },
           { id: "calendar_read", ready: true },
+          { id: "calendar_list", ready: true },
           { id: "gmail_send", ready: false, status: "disabled" }
         ]
       }
@@ -755,6 +756,12 @@ test("an attached email can be detached directly from the composer", async () =>
 })
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
+  await page.setViewportSize({ width: 360, height: 900 })
+  expect(
+    await page
+      .locator(".threadly")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth)
+  ).toBe(true)
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
@@ -774,13 +781,21 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
     .click()
+  await page
+    .getByRole("heading", { name: "See upcoming events" })
+    .scrollIntoViewIfNeeded()
+  expect(
+    await page
+      .locator(".threadly")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth)
+  ).toBe(true)
   await expect(page.getByLabel("Timezone", { exact: true })).toHaveValue(
     "Australia/Melbourne"
   )
   await page
     .getByRole("button", { name: "Save scheduling preferences" })
     .click()
-  await expect(page.getByText("Scheduling preferences saved.")).toBeVisible()
+  await expect(page.getByText(/Scheduling preferences saved/)).toBeVisible()
   expect(
     calls.find((c) => c.path === "/calendar/preferences" && c.body)?.body
       .expected_version
@@ -795,6 +810,7 @@ test("settings use real capability and versioned preference contracts; history s
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
   ).toBeVisible()
+  await page.setViewportSize({ width: 420, height: 900 })
 })
 
 test("disconnected backend gives actionable login recovery without opening Google", async () => {

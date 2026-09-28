@@ -7,6 +7,11 @@ import { GmailIcon, Icon } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
+import {
+  calendarReadReady,
+  schedulingReadiness,
+  type PreferencesState
+} from "./lib/scheduling-readiness"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -17,19 +22,45 @@ export default function SidePanel() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
-    [dark, setDark] = useState(true)
+    [dark, setDark] = useState(true),
+    [preferencesState, setPreferencesState] =
+      useState<PreferencesState>("loading")
+  const authEpoch = useRef(0)
   const refresh = async () => {
+    const epoch = ++authEpoch.current
     const s = await bridge<any>({ type: "STATUS" })
+    if (epoch !== authEpoch.current) return
     setUser(s.user)
     if (s.user) {
       try {
         const c = await api("/assistant/capabilities")
+        if (epoch !== authEpoch.current) return
         setCapabilities(c.capabilities)
+        if (!calendarReadReady(c.capabilities)) {
+          setPreferencesState("missing")
+          return
+        }
+        setPreferencesState("loading")
+        try {
+          await api("/calendar/preferences")
+          if (epoch === authEpoch.current) setPreferencesState("ready")
+        } catch (e) {
+          if (epoch === authEpoch.current)
+            setPreferencesState(
+              e?.code === "calendar_preferences_missing"
+                ? "missing"
+                : "unavailable"
+            )
+        }
       } catch (e) {
+        if (epoch !== authEpoch.current) return
         if (e.status === 401) setUser(null)
         throw e
       }
-    } else setCapabilities([])
+    } else {
+      setCapabilities([])
+      setPreferencesState("missing")
+    }
   }
   useEffect(() => {
     void refresh()
@@ -44,8 +75,10 @@ export default function SidePanel() {
         changes.threadlySession &&
         !changes.threadlySession.newValue
       ) {
+        authEpoch.current++
         setUser(null)
         setCapabilities([])
+        setPreferencesState("missing")
       }
     }
     chrome.storage.onChanged.addListener(changed)
@@ -64,9 +97,11 @@ export default function SidePanel() {
     }
   }
   const logout = async () => {
+    authEpoch.current++
     await bridge({ type: "LOGOUT" })
     setUser(null)
     setCapabilities([])
+    setPreferencesState("missing")
     setSettings(false)
     setError("")
   }
@@ -99,11 +134,15 @@ export default function SidePanel() {
         <>
           {settings && (
             <Settings
+              key={user?.id ?? "guest"}
               user={user}
               capabilities={capabilities}
+              preferencesState={preferencesState}
               onAuth={refresh}
               onClose={() => setSettings(false)}
-              onPreferences={() => {}}
+              onPreferences={(value) =>
+                setPreferencesState(value ? "ready" : "missing")
+              }
             />
           )}
           {user && (
@@ -111,6 +150,10 @@ export default function SidePanel() {
               <Assistant
                 key={user.id}
                 user={user}
+                calendarStatus={schedulingReadiness(
+                  capabilities,
+                  preferencesState
+                )}
                 openSettings={() => setSettings(true)}
                 logout={logout}
                 theme={theme}
@@ -161,12 +204,14 @@ export default function SidePanel() {
 }
 function Assistant({
   user,
+  calendarStatus,
   openSettings,
   logout,
   theme,
   dark
 }: {
   user: User
+  calendarStatus: ReturnType<typeof schedulingReadiness>
   openSettings: () => void
   logout: () => void
   theme: () => void
@@ -314,6 +359,20 @@ function Assistant({
           <Icon name="edit" />
         </button>
       </header>
+      <div
+        className={`calendar-status calendar-status-${calendarStatus.state}`}
+        role="status">
+        <Icon name="calendar" size={16} />
+        <span>
+          <b>{calendarStatus.label}</b>
+          {calendarStatus.state !== "ready" && (
+            <small>{calendarStatus.detail}</small>
+          )}
+        </span>
+        {calendarStatus.action && (
+          <button onClick={openSettings}>{calendarStatus.action}</button>
+        )}
+      </div>
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
           <div className="drawer-title">
@@ -481,7 +540,11 @@ function Assistant({
           </section>
         )}
         {c.entries.map((entry) => (
-          <TaskCard key={entry.id} entry={entry} controller={c} />
+          <TaskCard
+            key={entry.id}
+            entry={entry}
+            controller={{ ...c, openCalendarSetup: openSettings }}
+          />
         ))}
         <div ref={last} />
       </div>

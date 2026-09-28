@@ -751,7 +751,8 @@ export function useAssistant(user: User) {
     } catch (e) {
       if (!rewriteMessageId && retryTurn.current?.id === id)
         await reconcileTurnError(id, e)
-      else update(id, { error: errorText(e), pending: false })
+      else
+        update(id, { error: errorText(e), errorCode: e?.code, pending: false })
     } finally {
       submitting.current = false
       if (mounted.current) setBusy(false)
@@ -785,7 +786,8 @@ export function useAssistant(user: User) {
       evidence: turn.evidence,
       artifacts: turn.artifacts,
       conversationVersion: turn.version,
-      error: undefined
+      error: undefined,
+      errorCode: undefined
     })
     try {
       await saveConversation(null)
@@ -812,7 +814,11 @@ export function useAssistant(user: User) {
             null
           )
         } catch (e) {
-          update(id, { error: errorText(e), pending: false })
+          update(id, {
+            error: errorText(e),
+            errorCode: e?.code,
+            pending: false
+          })
         }
       })
     }
@@ -892,13 +898,13 @@ export function useAssistant(user: User) {
         message += ` Browser storage could not be updated. ${errorText(e)}`
       }
     }
-    update(id, { error: message, pending: false })
+    update(id, { error: message, errorCode: failure?.code, pending: false })
   }
   const retry = async (entry: Entry) => {
     if (submitting.current || retryTurn.current?.id !== entry.id) return
     submitting.current = true
     setBusy(true)
-    update(entry.id, { pending: true, error: undefined })
+    update(entry.id, { pending: true, error: undefined, errorCode: undefined })
     try {
       await saveConversation(retryTurn.current)
       await sendTurn(entry.id, retryTurn.current.body)
@@ -983,7 +989,7 @@ export function useAssistant(user: User) {
     if (submitting.current) return
     submitting.current = true
     setBusy(true)
-    update(entry.id, { pending: true, error: undefined })
+    update(entry.id, { pending: true, error: undefined, errorCode: undefined })
     try {
       const task = await api<Task>(
         `/assistant/workflow-proposals/${entry.proposal.plan_id}/confirm`,
@@ -992,7 +998,11 @@ export function useAssistant(user: User) {
       update(entry.id, { proposal: { ...entry.proposal, state: "consumed" } })
       await watch(entry.id, task)
     } catch (e) {
-      update(entry.id, { pending: false, error: errorText(e) })
+      update(entry.id, {
+        pending: false,
+        error: errorText(e),
+        errorCode: e?.code
+      })
     } finally {
       submitting.current = false
       if (mounted.current) setBusy(false)
@@ -1000,10 +1010,10 @@ export function useAssistant(user: User) {
   }
   const resume = async (entry: Entry) => {
     try {
-      update(entry.id, { error: undefined })
+      update(entry.id, { error: undefined, errorCode: undefined })
       await watch(entry.id, await api(`/assistant/tasks/${entry.task.task_id}`))
     } catch (e) {
-      update(entry.id, { error: errorText(e) })
+      update(entry.id, { error: errorText(e), errorCode: e?.code })
     }
   }
   const cancel = async (entry: Entry) => {
@@ -1014,12 +1024,12 @@ export function useAssistant(user: User) {
       )
       update(entry.id, { task })
     } catch (e) {
-      update(entry.id, { error: errorText(e) })
+      update(entry.id, { error: errorText(e), errorCode: e?.code })
     }
   }
   const answer = async (entry: Entry, values: Record<string, any>) => {
     setBusy(true)
-    update(entry.id, { pending: true, error: undefined })
+    update(entry.id, { pending: true, error: undefined, errorCode: undefined })
     try {
       if (values.context_snapshot_id) {
         if (!selection) throw new Error("Select a thread first.")
@@ -1049,7 +1059,11 @@ export function useAssistant(user: User) {
         entry.recipe?.draft || null
       )
     } catch (e) {
-      update(entry.id, { pending: false, error: errorText(e) })
+      update(entry.id, {
+        pending: false,
+        error: errorText(e),
+        errorCode: e?.code
+      })
     } finally {
       if (mounted.current) setBusy(false)
     }

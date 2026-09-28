@@ -15,7 +15,8 @@ const paths = {
   search: "M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
   chevron: "m8 5 7 7-7 7",
   check: "m5 12 4 4L19 6",
-  clock: "M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"
+  clock: "M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+  calendar: "M4 5h16v16H4zM4 10h16M8 3v4M16 3v4"
 }
 export function Icon({
   name,

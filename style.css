@@ -938,6 +938,206 @@ summary:focus-visible {
   }
 }
 
+/* Account-specific Calendar readiness stays visible without interrupting chat. */
+.calendar-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 14px 4px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: linear-gradient(115deg, #a58fe014, transparent 72%),
+    var(--surface);
+  font-size: 11px;
+  flex: none;
+}
+.calendar-status > svg {
+  color: var(--accent);
+  flex: none;
+}
+.calendar-status > span {
+  min-width: 0;
+  flex: 1;
+}
+.calendar-status b {
+  display: block;
+  font-weight: 600;
+}
+.calendar-status small {
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.calendar-status button {
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 9px;
+  padding: 6px 8px;
+}
+.calendar-status-ready {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.calendar-status-ready button {
+  border: 0;
+  background: transparent;
+}
+.calendar-setup {
+  margin: 16px 0 20px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(140deg, #a58fe019, transparent 50%),
+    var(--surface);
+}
+.calendar-setup-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.calendar-setup-heading h3 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+.calendar-setup-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  flex: none;
+  border-radius: 11px;
+  color: var(--accent);
+  background: var(--soft);
+}
+.setup-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.calendar-setup > .muted {
+  margin: 12px 0 16px;
+}
+.calendar-setup .connection-state,
+.settings-section .connection-state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.calendar-setup .connection-state svg {
+  color: var(--accent);
+}
+.calendar-preferences {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+}
+.calendar-preferences h4 {
+  margin: 17px 0 3px;
+  font-size: 12px;
+}
+.calendar-preferences .muted {
+  margin: 2px 0 12px;
+}
+.calendar-preferences .check,
+.working-day .check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+}
+.calendar-preferences .working-day {
+  padding: 3px 0;
+}
+.working-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.working-times label {
+  margin: 0;
+}
+.calendar-advanced {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+.calendar-preferences > .primary {
+  width: 100%;
+  padding: 10px 12px;
+}
+.setup-message {
+  color: var(--accent);
+  font-size: 12px;
+}
+.calendar-agenda {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.calendar-agenda h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+.calendar-agenda .muted {
+  margin: 4px 0 12px;
+}
+.calendar-agenda > button {
+  margin: 8px 0;
+}
+.agenda-results {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg);
+}
+.agenda-results > p {
+  margin: 0 0 10px;
+  font-size: 11px;
+}
+.agenda-event {
+  display: grid;
+  gap: 3px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.agenda-event strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.agenda-event small {
+  color: var(--muted);
+}
+.settings-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.settings-section h3 {
+  margin: 0 0 8px;
+}
+.calendar-recovery {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.calendar-recovery p {
+  margin: 0;
+}
+
 /* Inbox conversation: translucent surfaces, compact controls, grounded rich cards. */
 .threadly {
   background: radial-gradient(ellipse at 85% 100%, #ded8f128, transparent 65%),
