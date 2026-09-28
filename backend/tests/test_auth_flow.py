@@ -87,13 +87,16 @@ async def test_second_login_without_refresh_token_keeps_old_one(db_sessionmaker)
 
 @pytest.mark.asyncio
 async def test_two_google_subjects_get_separate_accounts_and_calendar_settings(
-    db_sessionmaker, db_client
+    db_sessionmaker, db_client, monkeypatch
 ):
     from sqlalchemy import select
 
     from app.auth import crypto, service
+    from app.calendar import service as calendar_service
     from app.db.models import CalendarPreference, User
     from app.schemas.calendar import POLICY_VERSION
+
+    monkeypatch.setattr(calendar_service, "get_session_factory", lambda: db_sessionmaker)
 
     grants = (
         "https://www.googleapis.com/auth/gmail.readonly "

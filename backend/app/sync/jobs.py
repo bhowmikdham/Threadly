@@ -325,11 +325,10 @@ async def failure(factory, claim, error):
             row.full, row.phase, row.cursor, row.resets = True, "start", {}, row.resets + 1
             row.attempts = 0
             await session.execute(delete(MailSyncStage).where(MailSyncStage.job_id == row.id))
+        available_at = await session.scalar(select(func.clock_timestamp())) + timedelta(seconds=30)
         row.state = "failed" if row.attempts >= 5 else "queued"
         row.error_code = "mailbox_sync_unavailable"
-        row.available_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
-            seconds=30
-        )
+        row.available_at = available_at
         row.lease_token, row.lease_expires_at = None, None
 
 
