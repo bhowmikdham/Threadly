@@ -119,9 +119,11 @@ async def claim(factory):
             row.state, row.error_code = "failed", "sync_retry_budget_exhausted"
             row.lease_token, row.lease_expires_at = None, None
             return None
-        row.state, row.lease_token = "running", str(uuid4())
-        row.lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
+        lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
             seconds=180
+        )
+        row.state, row.lease_token, row.lease_expires_at = (
+            "running", str(uuid4()), lease_expires_at
         )
         row.attempts += 1
         return row

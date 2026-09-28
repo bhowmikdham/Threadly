@@ -126,7 +126,17 @@ async def test_two_google_subjects_get_separate_accounts_and_calendar_settings(
                     version=1,
                     account_version=user.google_account_version,
                     policy_version=POLICY_VERSION,
-                    preferences={"timezone": "Australia/Melbourne", "calendar_ids": [calendar_id]},
+                    preferences={
+                        "timezone": "Australia/Melbourne",
+                        "calendar_ids": [calendar_id],
+                        "working_periods": [
+                            {"weekday": 0, "start_minute": 540, "end_minute": 1020}
+                        ],
+                        "buffer_before_minutes": 0,
+                        "buffer_after_minutes": 0,
+                        "minimum_notice_minutes": 60,
+                        "default_duration_minutes": 30,
+                    },
                 )
             )
 

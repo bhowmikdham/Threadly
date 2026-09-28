@@ -430,7 +430,7 @@ def agenda_db(db_sessionmaker, monkeypatch):
 
     async def seed():
         async with db_sessionmaker.begin() as session:
-            for uid, calendar_id in ((1, "calendar-a"), (2, "calendar-b")):
+            for uid in (1, 2):
                 session.add(User(
                     id=uid, google_sub=f"agenda-{uid}", email=f"owner{uid}@example.test",
                     google_connected=True, google_email_verified=True,
@@ -438,9 +438,21 @@ def agenda_db(db_sessionmaker, monkeypatch):
                     access_token_enc=crypto.encrypt_token(f"fixture-{uid}"),
                     access_token_expires_at=datetime.now(UTC) + timedelta(hours=1),
                 ))
+            await session.flush()
+            for uid, calendar_id in ((1, "calendar-a"), (2, "calendar-b")):
                 session.add(CalendarPreference(
                     user_id=uid, version=1, account_version=1, policy_version=POLICY_VERSION,
-                    preferences={"timezone": "Australia/Melbourne", "calendar_ids": [calendar_id]},
+                    preferences={
+                        "timezone": "Australia/Melbourne",
+                        "calendar_ids": [calendar_id],
+                        "working_periods": [
+                            {"weekday": 0, "start_minute": 540, "end_minute": 1020}
+                        ],
+                        "buffer_before_minutes": 0,
+                        "buffer_after_minutes": 0,
+                        "minimum_notice_minutes": 60,
+                        "default_duration_minutes": 30,
+                    },
                 ))
 
     asyncio.run(seed())

@@ -44,9 +44,11 @@ async def claim_one(factory, *, transport=None):
         ):
             worker.close_job(job, "held")
             return None
-        job.state, job.lease_token = "running", claim.lease_token
-        job.lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
+        lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
             seconds=120
+        )
+        job.state, job.lease_token, job.lease_expires_at = (
+            "running", claim.lease_token, lease_expires_at
         )
         job.attempts += 1
         return claim
@@ -216,9 +218,11 @@ async def reconcile_one(factory, *, transport=None, token_loader=None):
             **(attempt.evidence or {}),
             "calendar_read_rounds": (attempt.evidence or {}).get("calendar_read_rounds", 0) + 1,
         }
-        job.state, job.lease_token = "running", claim.lease_token
-        job.lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
+        lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
             seconds=120
+        )
+        job.state, job.lease_token, job.lease_expires_at = (
+            "running", claim.lease_token, lease_expires_at
         )
         dispatch = worker.Dispatch(claim, attempt.id, action.version, executor.frozen(action))
         expected_identity = action.source_versions["google_subject"]
