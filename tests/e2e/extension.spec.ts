@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { createServer, type Server } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -464,6 +464,13 @@ test.beforeAll(async () => {
   origin = `http://127.0.0.1:${(server.address() as any).port}`
   profile = await mkdtemp(path.join(tmpdir(), "threadly-extension-test-"))
   const extension = path.resolve("build/chrome-mv3-prod")
+  const manifest = JSON.parse(
+    await readFile(path.join(extension, "manifest.json"), "utf8")
+  )
+  expect(
+    manifest.permissions,
+    "The built extension must request the storage permission"
+  ).toContain("storage")
   context = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
     headless: true,
@@ -472,15 +479,38 @@ test.beforeAll(async () => {
       `--load-extension=${extension}`
     ]
   })
-  let worker =
-    context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"))
+  const worker =
+    context
+      .serviceWorkers()
+      .find((candidate) => candidate.url().startsWith("chrome-extension://")) ||
+    (await context.waitForEvent("serviceworker", {
+      predicate: (candidate) =>
+        candidate.url().startsWith("chrome-extension://")
+    }))
+  const extensionId = new URL(worker.url()).host
+  page = await context.newPage()
+  await page.setViewportSize({ width: 420, height: 900 })
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`)
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => ({
+          local: typeof globalThis.chrome?.storage?.local?.set,
+          session: typeof globalThis.chrome?.storage?.session?.set
+        })),
+      {
+        message: `Extension storage APIs unavailable in ${page.url()} (worker: ${worker.url()}, permissions: ${JSON.stringify(manifest.permissions)})`,
+        timeout: 10000
+      }
+    )
+    .toEqual({ local: "function", session: "function" })
   const jwt =
     "header." +
     Buffer.from(
       JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
     ).toString("base64url") +
     ".signature"
-  await worker.evaluate(
+  await page.evaluate(
     async ({ origin, jwt, user }) => {
       await chrome.storage.local.set({ backendOrigin: origin })
       await chrome.storage.session.set({
@@ -489,11 +519,7 @@ test.beforeAll(async () => {
     },
     { origin, jwt, user }
   )
-  page = await context.newPage()
-  await page.setViewportSize({ width: 420, height: 900 })
-  await page.goto(
-    `chrome-extension://${worker.url().split("/")[2]}/sidepanel.html`
-  )
+  await page.reload()
 })
 test.afterAll(async () => {
   await context?.close()
