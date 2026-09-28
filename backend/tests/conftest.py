@@ -21,10 +21,13 @@ os.environ["DATABASE_URL"] = os.environ.get(
 
 import jwt as pyjwt  # noqa: E402
 import pytest  # noqa: E402
+from fastapi import Header  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
 
+from app.api.deps import get_current_user_id  # noqa: E402
+from app.api.errors import ApiError  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db.models import Base  # noqa: E402
 
@@ -84,7 +87,11 @@ def db_sessionmaker(db_engine):
 def client() -> TestClient:
     from app.main import create_app
 
-    return TestClient(create_app(), raise_server_exceptions=False)
+    app = create_app()
+    # Most route tests use synthetic subject-only JWTs to exercise ownership.
+    # Session validity is exercised separately by secure_db_client below.
+    app.dependency_overrides[get_current_user_id] = _synthetic_current_user_id
+    return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture()
@@ -100,7 +107,43 @@ def db_client(db_sessionmaker) -> TestClient:
             yield session
 
     app.dependency_overrides[get_session] = override
+    app.dependency_overrides[get_current_user_id] = _synthetic_current_user_id
     return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture()
+def secure_db_client(db_sessionmaker) -> TestClient:
+    """Exercise real JWT generation checks against the isolated test database."""
+    from app.db.engine import get_session
+    from app.main import create_app
+
+    app = create_app()
+
+    async def override():
+        async with db_sessionmaker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override
+    return TestClient(app, raise_server_exceptions=False)
+
+
+async def _synthetic_current_user_id(authorization: str | None = Header(default=None)) -> int:
+    """Owner-test seam only; never installed by the runtime application."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise ApiError(401, "unauthorized", "Missing bearer token.")
+    settings = get_settings()
+    try:
+        payload = pyjwt.decode(
+            authorization.removeprefix("Bearer ").strip(),
+            settings.secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+        user_id = int(payload["sub"])
+        if user_id <= 0:
+            raise ValueError
+    except (pyjwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        raise ApiError(401, "unauthorized", "Invalid token.") from None
+    return user_id
 
 
 def make_jwt(user_id: int) -> str:

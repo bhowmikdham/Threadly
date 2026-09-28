@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentSession
+from app.api.errors import ApiError
 from app.auth import flow, service
 from app.db.engine import get_session
 
@@ -35,9 +36,7 @@ class ReconnectIn(BeginIn):
             "gmail_send",
             "calendar_write",
         ]
-    ] = (
-        Field(default_factory=list, max_length=5)
-    )
+    ] = Field(default_factory=list, max_length=5)
 
 
 class BeginOut(BaseModel):
@@ -78,12 +77,14 @@ async def google_begin(body: BeginIn, session: DB):
 
 
 @router.post("/google/reconnect", response_model=BeginOut)
-async def google_reconnect(body: ReconnectIn, user_id: CurrentUser, session: DB):
+async def google_reconnect(body: ReconnectIn, authenticated: CurrentSession, session: DB):
     result = await flow.begin(
         session,
         body.redirect_uri,
         body.code_challenge,
-        user_id=user_id,
+        user_id=authenticated.user_id,
+        expected_account_version=authenticated.account_version,
+        expected_session_version=authenticated.session_version,
         calendar_read="calendar_read" in body.capabilities,
         calendar_events_read="calendar_events_read" in body.capabilities,
         gmail_send="gmail_send" in body.capabilities,
@@ -95,7 +96,9 @@ async def google_reconnect(body: ReconnectIn, user_id: CurrentUser, session: DB)
 
 @router.post("/google/exchange", response_model=ExchangeOut)
 async def google_exchange(body: ExchangeIn, session: DB) -> ExchangeOut:
-    owner, version = await flow.consume(body.state, body.redirect_uri, body.code_verifier)
+    owner, version, session_version = await flow.consume(
+        body.state, body.redirect_uri, body.code_verifier
+    )
     token, user = await service.exchange_code(
         session,
         body.code,
@@ -103,6 +106,7 @@ async def google_exchange(body: ExchangeIn, session: DB) -> ExchangeOut:
         code_verifier=body.code_verifier,
         expected_user_id=owner,
         expected_version=version,
+        expected_session_version=session_version,
     )
     await session.commit()
     return ExchangeOut(
@@ -111,8 +115,14 @@ async def google_exchange(body: ExchangeIn, session: DB) -> ExchangeOut:
 
 
 @router.post("/google/disconnect", response_model=DisconnectOut)
-async def google_disconnect(user_id: CurrentUser):
-    await service.disconnect_google_account(user_id)
+async def google_disconnect(authenticated: CurrentSession):
+    disconnected = await service.disconnect_google_account(
+        authenticated.user_id,
+        expected_version=authenticated.account_version,
+        expected_session_version=authenticated.session_version,
+    )
+    if not disconnected:
+        raise ApiError(409, "google_connection_changed", "Google connection changed; retry.")
     return {"connected": False, "provider_revocation": "not_requested"}
 
 
@@ -120,6 +130,29 @@ class RefreshOut(BaseModel):
     jwt: str
 
 
+class LogoutOut(BaseModel):
+    signed_out: bool
+    scope: Literal["all_sessions"]
+
+
+@router.post("/logout", response_model=LogoutOut)
+async def logout(authenticated: CurrentSession, session: DB) -> LogoutOut:
+    await service.logout_threadly_session(
+        session,
+        user_id=authenticated.user_id,
+        expected_account_version=authenticated.account_version,
+        expected_session_version=authenticated.session_version,
+    )
+    return LogoutOut(signed_out=True, scope="all_sessions")
+
+
 @router.post("/refresh", response_model=RefreshOut)
-async def refresh(user_id: CurrentUser) -> RefreshOut:
-    return RefreshOut(jwt=service.issue_session_jwt(user_id))
+async def refresh(authenticated: CurrentSession, session: DB) -> RefreshOut:
+    return RefreshOut(
+        jwt=await service.refresh_session_jwt(
+            session,
+            user_id=authenticated.user_id,
+            expected_account_version=authenticated.account_version,
+            expected_session_version=authenticated.session_version,
+        )
+    )

@@ -27,8 +27,9 @@ Google OAuth is not configured on the last confirmed staging deployment.
 | `POST /auth/google/reconnect` | Existing JWT; same request plus optional `capabilities` | Same result, bound to the current user and account version |
 | `POST /auth/google/exchange` | `code`, `redirect_uri`, returned `state`, original `code_verifier` | Existing `{jwt,user:{id,email,name}}` response |
 | `POST /auth/google/disconnect` | Existing JWT; no body | `{connected:false,provider_revocation:"not_requested"}` |
+| `POST /auth/logout` | Existing JWT; no body | `{signed_out:true,scope:"all_sessions"}`; Google grant remains connected |
 | `GET /assistant/capabilities` | Existing JWT; no user ID input | Owned account, capability list and reconnect contract |
-| `POST /auth/refresh` | Existing JWT | Threadly JWT renewal; does not refresh Google grants |
+| `POST /auth/refresh` | Live, generation-bound JWT | Threadly JWT renewal after a locked account check; does not refresh Google grants |
 
 For each login, a future client generates a random RFC 7636 verifier (43–128 valid
 characters), keeps it private and sends its base64url SHA-256 challenge to `begin`.
@@ -121,10 +122,48 @@ recheck the exact action source/capability before approval/dispatch.
 - Refresh `invalid_grant` disconnects locally with version fencing. Transient network,
   malformed response, `invalid_client` and service errors do not erase valid credentials.
   Errors omit provider bodies/tokens. Provider status alone is not revocation proof.
-- Disconnect clears local Google tokens. It does not revoke the provider grant,
-  delete cached mailbox data, invalidate Threadly JWTs or cancel a request already
-  sent to Google. Those are distinct lifecycle actions. Future action workers must
-  recheck version/connection immediately before dispatch and reconcile any uncertainty.
+- Disconnect clears local Google tokens and advances `google_account_version`.
+  Every protected request now checks the JWT's account and Threadly session generations against the
+  connected user row. Existing bearers, including recently renewed ones, return
+  401 `reauth_required` after disconnect. A reconnect/login issues a new bearer;
+  it never revives an older generation. `/auth/refresh` checks again under the
+  user row lock, so it cannot mint a usable token after disconnect commits.
+  In-flight requests that passed authentication before the commit can still run;
+  external actions must keep their own dispatch-time account/version fences.
+- Provider grant revocation is **not** requested by this endpoint. A best-effort
+  revoke after clearing local credentials could race a new login and invalidate
+  its grant. Provider revocation needs a separately fenced lifecycle. Disconnect
+  also does not delete retained artifacts or cancel a request already sent to Google.
+- `POST /auth/logout` changes only `threadly_session_version`. It signs out all
+  Threadly sessions for that user, even across devices, without clearing the
+  Google grant or invalidating Calendar preferences/action account versions.
+  It removes pending owned reconnect states. A reconnect that consumed state
+  before logout but exchanges afterward fails the generation fence; begin
+  checks the caller's session generation while holding the user row lock.
+  Clients should call this endpoint before clearing local session storage.
+  An unreachable backend cannot certify server-side sign-out, even if the
+  client clears its local copy of the bearer.
+
+## Session generation rollout
+
+New Threadly JWTs include positive integers `av` and `sv`, the issuing user's
+`google_account_version` and `threadly_session_version`. JWTs issued before this
+change have no `sv` and return
+401 `reauth_required` on every protected endpoint, including `/auth/refresh`.
+Users must sign in with Google once after deployment. This intentionally avoids
+accepting old unrevocable bearers until their previous 24-hour TTL expires.
+Unknown, deleted, disconnected or version-mismatched users also return 401.
+The ordinary Google access-token refresh increments `google_token_version` only,
+so it does not expire the Threadly session. All protected requests now perform
+one owner-specific database read; database unavailability cannot silently fall
+back to signature-only authentication.
+Migration `f28026e9a040` adds the positive session generation with default 1 to
+existing users. Its downgrade refuses by default because signature-only rollback
+code could accept old bearers even for disconnected or deleted users. Rotate
+only after stopping every API instance and auth issuer. Then set
+`THREADLY_AUTH_SERVICES_STOPPED=1` and `THREADLY_SESSION_SIGNING_KEY_ROTATED=1`
+for the offline Alembic downgrade, and start the rollback code with the rotated
+key. These flags are operator assertions, not an automated shutdown/key check.
 
 Future action code must call token retrieval **outside** task/action/user locks,
 then recheck its own source/account preconditions under the normal lock order.

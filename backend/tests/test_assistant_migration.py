@@ -72,7 +72,12 @@ def test_migration_installs_and_preserves_existing_mailbox():
         result = subprocess.run(
             [sys.executable, "-m", "alembic", *args],
             cwd=Path(__file__).resolve().parents[1],
-            env={**os.environ, "DATABASE_URL": test_url.render_as_string(hide_password=False)},
+            env={
+                **os.environ,
+                "THREADLY_AUTH_SERVICES_STOPPED": "1",
+                "THREADLY_SESSION_SIGNING_KEY_ROTATED": "1",
+                "DATABASE_URL": test_url.render_as_string(hide_password=False),
+            },
             capture_output=True,
             text=True,
             timeout=30,

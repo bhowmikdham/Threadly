@@ -263,6 +263,24 @@ cascades login state; action retention rules are unchanged. No raw state/code/ve
 is stored. Downgrade refuses when action history exists and otherwise invalidates
 pending sign-ins while preserving legacy tokens. See [Google lifecycle](google-capabilities.md).
 
+`users.google_account_version` is the Google connection generation. A
+login/reconnect or disconnect changes it; ordinary Google token renewal does not.
+Migration `f28026e9a040` adds positive `users.threadly_session_version` (default 1)
+as a separate sign-out generation. Owned `google_oauth_sessions` also store this
+generation; migration discards legacy owned OAuth states so they cannot mint a
+new bearer from an older JWT. `POST /auth/logout` increments it under a user
+row lock, leaving Google credentials, Calendar preferences and action account
+versions intact, and deletes pending owned OAuth states. An in-flight consumed
+state still fails the generation check at code exchange. Every protected request reads the connected user and both
+generations from PostgreSQL and rejects a stale or pre-generation bearer. The
+migration downgrade refuses by default even when all users are disconnected:
+signature-only rollback code could accept an old bearer for a disconnected or
+deleted user. For manual rollback, stop every API instance and auth issuer first,
+rotate `SECRET_KEY` while issuance is stopped, then set both
+`THREADLY_AUTH_SERVICES_STOPPED=1` and `THREADLY_SESSION_SIGNING_KEY_ROTATED=1`
+for the offline Alembic downgrade. The flags record an operator assertion;
+they do not verify shutdown or key rotation.
+
 ## Email action payload `email-mime-1.0.0` (B03, no DDL)
 
 Existing `assistant_actions.payload` stores `preview`, `mime_base64url` and
