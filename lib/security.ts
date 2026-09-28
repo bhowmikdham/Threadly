@@ -1,4 +1,3 @@
-export const DEFAULT_BACKEND = "http://127.0.0.1:8000"
 export function backendOrigin(value: string): string {
   const url = new URL(value)
   if (
@@ -21,6 +20,11 @@ export function backendOrigin(value: string): string {
     throw new Error("Use HTTPS, or a localhost tunnel for development.")
   return url.origin
 }
+// Plasmo inlines public variables when packaging the extension. This is only an
+// API origin; OAuth client secrets and Google tokens remain server-side.
+export const DEFAULT_BACKEND = backendOrigin(
+  process.env.PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN || "http://127.0.0.1:8000"
+)
 export function allowedPath(path: string) {
   if (
     !/^\/(auth|assistant|calendar|threads|commitments)(\/|\?|$)/.test(path) &&

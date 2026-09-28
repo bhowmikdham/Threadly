@@ -1,7 +1,7 @@
 import { useState } from "react"
 
 import type { Entry, InboxResult } from "../lib/types"
-import { Icon } from "./Icon"
+import { GmailIcon, Icon } from "./Icon"
 
 const VISIBLE_MAIL_BATCH = 5
 
@@ -113,7 +113,7 @@ export function InboxCards({
                 aria-pressed={selected}
                 onClick={() => void controller.chooseEmail(mail)}>
                 <span className="mail-card-icon">
-                  <Icon name="mail" size={19} />
+                  <GmailIcon size={21} />
                 </span>
                 <span className="mail-card-content">
                   <span className="mail-card-meta">

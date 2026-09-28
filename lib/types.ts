@@ -100,6 +100,7 @@ export interface Entry {
   proposal?: any
   artifacts?: Artifact[]
   error?: string
+  errorCode?: string
   notice?: string
   pending?: boolean
 }

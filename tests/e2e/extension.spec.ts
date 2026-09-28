@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { createServer, type Server } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -155,6 +155,7 @@ test.beforeAll(async () => {
         capabilities: [
           { id: "gmail_read", ready: true },
           { id: "calendar_read", ready: true },
+          { id: "calendar_list", ready: true },
           { id: "gmail_send", ready: false, status: "disabled" }
         ]
       }
@@ -464,6 +465,13 @@ test.beforeAll(async () => {
   origin = `http://127.0.0.1:${(server.address() as any).port}`
   profile = await mkdtemp(path.join(tmpdir(), "threadly-extension-test-"))
   const extension = path.resolve("build/chrome-mv3-prod")
+  const manifest = JSON.parse(
+    await readFile(path.join(extension, "manifest.json"), "utf8")
+  )
+  expect(
+    manifest.permissions,
+    "The built extension must request the storage permission"
+  ).toContain("storage")
   context = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
     headless: true,
@@ -472,15 +480,38 @@ test.beforeAll(async () => {
       `--load-extension=${extension}`
     ]
   })
-  let worker =
-    context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"))
+  const worker =
+    context
+      .serviceWorkers()
+      .find((candidate) => candidate.url().startsWith("chrome-extension://")) ||
+    (await context.waitForEvent("serviceworker", {
+      predicate: (candidate) =>
+        candidate.url().startsWith("chrome-extension://")
+    }))
+  const extensionId = new URL(worker.url()).host
+  page = await context.newPage()
+  await page.setViewportSize({ width: 420, height: 900 })
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`)
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => ({
+          local: typeof globalThis.chrome?.storage?.local?.set,
+          session: typeof globalThis.chrome?.storage?.session?.set
+        })),
+      {
+        message: `Extension storage APIs unavailable in ${page.url()} (worker: ${worker.url()}, permissions: ${JSON.stringify(manifest.permissions)})`,
+        timeout: 10000
+      }
+    )
+    .toEqual({ local: "function", session: "function" })
   const jwt =
     "header." +
     Buffer.from(
       JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
     ).toString("base64url") +
     ".signature"
-  await worker.evaluate(
+  await page.evaluate(
     async ({ origin, jwt, user }) => {
       await chrome.storage.local.set({ backendOrigin: origin })
       await chrome.storage.session.set({
@@ -489,11 +520,7 @@ test.beforeAll(async () => {
     },
     { origin, jwt, user }
   )
-  page = await context.newPage()
-  await page.setViewportSize({ width: 420, height: 900 })
-  await page.goto(
-    `chrome-extension://${worker.url().split("/")[2]}/sidepanel.html`
-  )
+  await page.reload()
 })
 test.afterAll(async () => {
   await context?.close()
@@ -729,6 +756,12 @@ test("an attached email can be detached directly from the composer", async () =>
 })
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
+  await page.setViewportSize({ width: 360, height: 900 })
+  expect(
+    await page
+      .locator(".threadly")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth)
+  ).toBe(true)
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
@@ -748,13 +781,21 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
     .click()
+  await page
+    .getByRole("heading", { name: "See upcoming events" })
+    .scrollIntoViewIfNeeded()
+  expect(
+    await page
+      .locator(".threadly")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth)
+  ).toBe(true)
   await expect(page.getByLabel("Timezone", { exact: true })).toHaveValue(
     "Australia/Melbourne"
   )
   await page
     .getByRole("button", { name: "Save scheduling preferences" })
     .click()
-  await expect(page.getByText("Scheduling preferences saved.")).toBeVisible()
+  await expect(page.getByText(/Scheduling preferences saved/)).toBeVisible()
   expect(
     calls.find((c) => c.path === "/calendar/preferences" && c.body)?.body
       .expected_version
@@ -769,6 +810,7 @@ test("settings use real capability and versioned preference contracts; history s
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
   ).toBeVisible()
+  await page.setViewportSize({ width: 420, height: 900 })
 })
 
 test("disconnected backend gives actionable login recovery without opening Google", async () => {
