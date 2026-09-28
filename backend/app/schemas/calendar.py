@@ -143,3 +143,36 @@ class CalendarListOut(StrictModel):
     account_version: int
     checked_at: datetime
     calendars: list[CalendarListItem]
+
+
+AgendaPeriod = Literal["today", "tomorrow", "this_week", "next_7_days"]
+
+
+class AgendaEvent(StrictModel):
+    summary: str = Field(max_length=320)
+    start: str
+    end: str
+    all_day: bool
+    redacted: bool
+    location: str | None = Field(default=None, max_length=300)
+
+
+class AgendaCalendar(StrictModel):
+    calendar_id: CalendarId
+    name: str = Field(max_length=1024)
+    status: Literal["known", "partial", "unknown"]
+    reason: Literal["not_accessible", "provider_error", "malformed", "result_limit"] | None
+    events: list[AgendaEvent] = Field(max_length=25)
+
+
+class AgendaOut(StrictModel):
+    period: AgendaPeriod
+    timezone: str
+    start: datetime
+    end: datetime
+    checked_at: datetime
+    account_version: int
+    preferences_version: int
+    coverage: Literal["complete", "partial", "unknown"]
+    calendars: list[AgendaCalendar] = Field(max_length=MAX_CALENDARS)
+    total_returned: int = Field(ge=0, le=50)

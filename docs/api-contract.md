@@ -833,3 +833,21 @@ All failures use `{"error":{"code":"<machine code>","message":"<safe text>","det
 `conversation_turn_limit`, and 503 `conversation_disabled`,
 `conversation_provider_unavailable` or `conversation_unavailable`. The public provider code
 is generic; SDK exception text, Bedrock error type and raw email bodies are not returned.
+
+## On-demand Calendar agenda and per-account consent (2026-09-28)
+
+Google sign-in creates or resumes a Threadly user from the verified Google subject;
+there is no application email allowlist. A signed-in user's
+`POST /auth/google/reconnect` may request `calendar_events_read` in addition to
+the existing Calendar free/busy grant. The granted scope and owner-bound account
+version, not the requested scope, determine readiness. The OAuth account chooser
+is shown at sign-in; reconnect still refuses a different Google subject.
+
+Authenticated `GET /calendar/agenda?period=today|tomorrow|this_week|next_7_days`
+reads only the owner's explicitly selected calendars in a bounded time window.
+The result has per-calendar `known`, `partial` or `unknown` coverage and at most
+50 event previews. Private event titles/locations are redacted. No background
+Calendar import or event cache is introduced. `read_calendar` can provide a
+deterministic agenda answer in `/assistant/conversation-turns`, while the existing
+reviewed scheduling/slot/booking routes remain the authority for availability
+and external actions. See [the detailed agenda contract](calendar-agenda.md).

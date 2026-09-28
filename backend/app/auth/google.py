@@ -14,6 +14,7 @@ CALENDAR_SCOPES = [
     "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     "https://www.googleapis.com/auth/calendar.events.freebusy",
 ]
+CALENDAR_EVENTS_READ_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
 
 
 class GoogleAuthError(Exception):

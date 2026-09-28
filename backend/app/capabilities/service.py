@@ -29,6 +29,12 @@ CALENDAR_LIST_SCOPES = {
     "https://www.googleapis.com/auth/calendar.readonly",
     "https://www.googleapis.com/auth/calendar",
 }
+CALENDAR_EVENTS_READ_SCOPES = {
+    "https://www.googleapis.com/auth/calendar.events.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/calendar",
+}
 CALENDAR_WRITE_SCOPES = {
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/calendar",
@@ -97,6 +103,14 @@ def build_capabilities(user: User) -> dict[str, Any]:
                 required_scopes=CALENDAR_LIST_SCOPES,
             ),
             _capability(
+                "calendar_events_read",
+                implemented=True,
+                enabled=True,
+                connected=verified_connection,
+                scopes=scopes,
+                required_scopes=CALENDAR_EVENTS_READ_SCOPES,
+            ),
+            _capability(
                 "calendar_write",
                 implemented=True,
                 enabled=settings.calendar_writes_enabled and pilot,
@@ -108,7 +122,7 @@ def build_capabilities(user: User) -> dict[str, Any]:
         "reconnect": {
             "available": True,
             "method": "POST /auth/google/reconnect",
-            "requestable_capabilities": ["gmail_read", "calendar_read"]
+            "requestable_capabilities": ["gmail_read", "calendar_read", "calendar_events_read"]
             + (["gmail_send", "calendar_write"] if pilot else []),
             "state_pkce_required": True,
         },

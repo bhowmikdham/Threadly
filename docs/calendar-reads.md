@@ -198,3 +198,7 @@ complete evidence, resolve time with original request/context anchors, apply the
 preferences and calculate deterministic slots (including DST tests). B14/B15 add
 negotiation and exact approved event execution/recovery. Scheduling and Calendar
 multi-intent templates must remain unsupported until those handlers exist.
+
+The later [on-demand agenda read](calendar-agenda.md) adds an optional event-read
+grant and bounded event previews. It does not change free/busy evidence semantics,
+selected-calendar authority, or the exact approval required for booking.
