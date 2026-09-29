@@ -417,134 +417,147 @@ function DraftCard({
         "superseded",
         "invalidated"
       ].includes(action.state))
+  const copyDraft = () =>
+    run(async () => {
+      await navigator.clipboard.writeText(body)
+      setNotice("Copied. Nothing was sent.")
+    })
+  // The draft reads as the reply itself: its text, with Insert and Copy.
+  // Editing, revisions and the send review stay one tap away underneath.
   return (
-    <section className="artifact">
-      <div className="card-heading">
-        <strong>
-          {c.mode === "reply" ? "Reply draft" : "New email draft"}
-        </strong>
-        <span className="muted">Revision {value.revision}</span>
-      </div>
-      {!editing && (
-        <div className="draft-reading">
-          <p className="draft-envelope">
-            <span>To</span> {to}
+    <section className="artifact draft-card" aria-label="draft result">
+      <div className="draft-box">
+        {!envelope?.reply && !editing && (
+          <p className="draft-meta">
+            <span>To {to || "—"}</span>
+            {subject && <span>{subject}</span>}
           </p>
-          <p className="draft-subject">{subject}</p>
-          <p className="prose draft-body">{body}</p>
+        )}
+        {!editing && <p className="prose draft-body">{body}</p>}
+        <div hidden={!editing}>
+          <label>
+            To
+            <input
+              value={to}
+              disabled={locked}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </label>
+          <details>
+            <summary>Cc and Bcc</summary>
+            <label>
+              Cc
+              <input
+                value={cc}
+                disabled={locked}
+                onChange={(e) => setCc(e.target.value)}
+              />
+            </label>
+            <label>
+              Bcc
+              <input
+                value={bcc}
+                disabled={locked}
+                onChange={(e) => setBcc(e.target.value)}
+              />
+            </label>
+          </details>
+          <label>
+            Subject
+            <input
+              value={subject}
+              disabled={locked || !!envelope?.reply}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </label>
+          <label>
+            Message
+            <textarea
+              aria-label="Message"
+              rows={7}
+              value={body}
+              disabled={locked}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </label>
         </div>
-      )}
-      <div hidden={!editing}>
-        <label>
-          To
-          <input
-            value={to}
-            disabled={locked}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
-        <details>
-          <summary>Cc and Bcc</summary>
-          <label>
-            Cc
-            <input
-              value={cc}
-              disabled={locked}
-              onChange={(e) => setCc(e.target.value)}
-            />
-          </label>
-          <label>
-            Bcc
-            <input
-              value={bcc}
-              disabled={locked}
-              onChange={(e) => setBcc(e.target.value)}
-            />
-          </label>
-        </details>
-        <label>
-          Subject
-          <input
-            value={subject}
-            disabled={locked || !!envelope?.reply}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-        </label>
-        <label>
-          Message
-          <textarea
-            aria-label="Message"
-            rows={7}
-            value={body}
-            disabled={locked}
-            onChange={(e) => setBody(e.target.value)}
-          />
-        </label>
+        {c.unresolved_fields?.length > 0 && (
+          <div className="warning">
+            <b>Needs your input</b>
+            <ul>
+              {c.unresolved_fields.map((x: string) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={resolved}
+                disabled={locked}
+                onChange={(e) => setResolved(e.target.checked)}
+              />
+              I filled in all missing details in this draft.
+            </label>
+          </div>
+        )}
+        <div className="draft-actions">
+          {editing ? (
+            <>
+              <button
+                disabled={!dirty || locked || !value.is_latest}
+                onClick={save}>
+                Save edits
+              </button>
+              <button disabled={busy} onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {envelope?.reply && (
+                <button disabled={busy || dirty} onClick={insert}>
+                  Insert
+                </button>
+              )}
+              <button disabled={busy} onClick={copyDraft}>
+                Copy
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      {c.unresolved_fields?.length > 0 && (
-        <div className="warning">
-          <b>Needs your input</b>
-          <ul>
-            {c.unresolved_fields.map((x: string) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ul>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={resolved}
-              disabled={locked}
-              onChange={(e) => setResolved(e.target.checked)}
-            />
-            I filled in all missing details in this draft.
-          </label>
-        </div>
-      )}
-      <div className="button-row">
-        {!editing ? (
+      <div className="draft-footer">
+        {!editing && (
           <button
+            className="icon-button"
+            aria-label="Edit draft"
+            title="Edit draft"
             disabled={locked || !value.is_latest}
             onClick={() => setEditing(true)}>
-            <Icon name="edit" size={14} />
-            Edit draft
-          </button>
-        ) : (
-          <button
-            disabled={!dirty || locked || !value.is_latest}
-            onClick={save}>
-            <Icon name="check" size={14} />
-            Save edits
+            <Icon name="edit" size={15} />
           </button>
         )}
         <button
-          disabled={busy}
-          onClick={() =>
-            run(async () => {
-              await navigator.clipboard.writeText(body)
-              setNotice("Copied. Nothing was sent.")
-            })
-          }>
-          <Icon name="copy" size={14} />
-          Copy
-        </button>
-        {envelope?.reply && (
-          <button disabled={busy || dirty} onClick={insert}>
-            <Icon name="mail" size={14} />
-            Insert body
-          </button>
-        )}
-        <button
+          className="icon-button"
+          aria-label="Review outgoing email"
+          title="Review and send"
           disabled={
             locked ||
             dirty ||
             !value.is_latest ||
             !!value.review?.blockers?.length
           }
-          className="review-button"
           onClick={prepare}>
-          <Icon name="shield" size={14} />
-          Review outgoing email
+          <Icon name="shield" size={15} />
         </button>
+        {value.revision > 1 && (
+          <small className="draft-revision">Revision {value.revision}</small>
+        )}
+        {notice && (
+          <small className="draft-notice" role="status">
+            {notice}
+          </small>
+        )}
       </div>
       {value.review?.blockers?.length > 0 && (
         <p className="warning">
@@ -564,26 +577,31 @@ function DraftCard({
           Load latest revision
         </button>
       )}
-      <details
-        onToggle={(e) => {
-          if (e.currentTarget.open)
-            void api(`/assistant/tasks/${value.task_id}/draft-revisions`)
-              .then((r) => setHistory(r.revisions))
-              .catch((e) => setNotice(errorText(e)))
-        }}>
-        <summary>Revision history</summary>
-        {history.map((h) => (
-          <button
-            key={h.artifact_id}
-            onClick={() =>
-              run(async () =>
-                replace(await api(`/assistant/artifacts/${h.artifact_id}`))
-              )
-            }>
-            Revision {h.revision}
-          </button>
-        ))}
-      </details>
+      {editing && (
+        <>
+          <details
+            onToggle={(e) => {
+              if (e.currentTarget.open)
+                void api(`/assistant/tasks/${value.task_id}/draft-revisions`)
+                  .then((r) => setHistory(r.revisions))
+                  .catch((e) => setNotice(errorText(e)))
+            }}>
+            <summary>Revision history</summary>
+            {history.map((h) => (
+              <button
+                key={h.artifact_id}
+                onClick={() =>
+                  run(async () =>
+                    replace(await api(`/assistant/artifacts/${h.artifact_id}`))
+                  )
+                }>
+                Revision {h.revision}
+              </button>
+            ))}
+          </details>
+          <Evidence value={value} />
+        </>
+      )}
       {action && (
         <div className="approval">
           <b>Exact outgoing email</b>
@@ -676,8 +694,6 @@ function DraftCard({
             ))}
         </div>
       )}
-      <Evidence value={value} />
-      {notice && <p role="status">{notice}</p>}
     </section>
   )
 }

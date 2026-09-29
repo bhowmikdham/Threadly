@@ -1663,3 +1663,80 @@ summary:focus-visible {
 .suggestions button:disabled {
   opacity: 0.55;
 }
+
+/* Draft: the reply itself in one aligned box, with Insert and Copy. */
+.artifact.draft-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.draft-box {
+  padding: 14px 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.threadly:not(.dark) .draft-box {
+  border-color: #e4e1ec;
+  box-shadow: 0 1px 2px #2d24550a;
+}
+.draft-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.draft-meta span + span {
+  color: var(--text);
+  font-weight: 550;
+}
+.draft-card .draft-body {
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.draft-actions {
+  display: flex;
+  gap: 8px;
+}
+.draft-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.draft-actions button:first-child:not(:disabled) {
+  background: var(--soft);
+}
+.draft-actions button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.draft-footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 0 0 -6px;
+  color: var(--muted);
+}
+.draft-footer .icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+.draft-revision,
+.draft-notice {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+/* The reply's time sits on the same quiet row as its Edit and Review icons. */
+.draft-card + .response-footer {
+  margin-top: -35px;
+  margin-left: 62px;
+}

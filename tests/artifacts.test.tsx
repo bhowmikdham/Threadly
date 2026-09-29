@@ -60,7 +60,9 @@ describe("reviewed draft integration", () => {
     })
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
     expect(calls).toHaveLength(0)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("Approve and send")
     expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
     expect(
@@ -86,22 +88,30 @@ describe("reviewed draft integration", () => {
           }
     )
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("email writes disabled")
     expect(screen.queryByText("Approve and send")).toBeNull()
   })
   it("invalidates a displayed preview immediately when the body is edited", async () => {
     mockApi((m) => (m.path.endsWith("/review") ? draft : action))
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("Approve and send")
-    fireEvent.click(screen.getByText("Edit draft"))
+    fireEvent.click(screen.getByRole("button", { name: "Edit draft" }))
     fireEvent.change(screen.getByLabelText("Message"), {
       target: { value: "Changed content" }
     })
     expect(screen.queryByText("Approve and send")).toBeNull()
     expect(
-      (screen.getByText("Review outgoing email") as HTMLButtonElement).disabled
+      (
+        screen.getByRole("button", {
+          name: "Review outgoing email"
+        }) as HTMLButtonElement
+      ).disabled
     ).toBe(true)
   })
   it("saves a revision with exact edited recipients and does not send", async () => {
@@ -112,7 +122,7 @@ describe("reviewed draft integration", () => {
     })
     const replace = vi.fn()
     render(<ArtifactCard value={draft} replace={replace} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Edit draft"))
+    fireEvent.click(screen.getByRole("button", { name: "Edit draft" }))
     fireEvent.change(screen.getByLabelText("To"), {
       target: { value: "new@example.test" }
     })
