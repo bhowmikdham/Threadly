@@ -1,0 +1,31 @@
+{
+  "release": "calendar-day-answer-1.0.0",
+  "evidence": "Synthetic replay through the real conversation runtime; Google preferences and freebusy are fixture adapters. No model call or live Google read.",
+  "anchor": "2026-09-29T10:56:00+00:00",
+  "timezone": "Australia/Melbourne",
+  "cases": [
+    {
+      "id": "misspelled_thursday_this_week",
+      "user_turn": "can you tell me if i am free on the thurday this week",
+      "expected_kind": "message",
+      "expected_text": "Thursday, 1 October 2026"
+    },
+    {
+      "id": "confirmed_thursday_retains_user_request",
+      "user_turn": "yes",
+      "history": [{
+        "user": "can you tell me if i am free on the thurday this week",
+        "assistant": "I can check your calendar for Thursday this week, but I need to confirm: do you want me to check your availability on Thursday, 1 October?",
+        "kind": "clarification"
+      }],
+      "expected_kind": "message",
+      "expected_text": "no busy time recorded"
+    },
+    {
+      "id": "today_only_claims_remaining_hours",
+      "user_turn": "Am I free today?",
+      "expected_kind": "message",
+      "expected_text": "the rest of Tuesday, 29 September 2026"
+    }
+  ]
+}

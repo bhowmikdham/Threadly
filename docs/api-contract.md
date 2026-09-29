@@ -926,3 +926,29 @@ Calendar import or event cache is introduced. `read_calendar` can provide a
 deterministic agenda answer in `/assistant/conversation-turns`, while the existing
 reviewed scheduling/slot/booking routes remain the authority for availability
 and external actions. See [the detailed agenda contract](calendar-agenda.md).
+
+## Direct day availability in conversation (2026-09-29)
+
+Conversation release `contextual-conversation-1.2.4` checks standalone self-availability
+questions such as “Am I free Thursday this week?” directly through the existing owned
+Calendar free/busy service. This read runs before model inference and requires neither
+an email source nor a meeting duration. The backend resolves today, tomorrow, ISO dates,
+and weekday names against the saved Calendar timezone; “this week” uses Monday–Sunday.
+A bare weekday means its next occurrence, including today. A bare confirmation after the
+question retains the user-authored request, without trusting an assistant's proposed date.
+The common `thurday` typo is supported. Compound requests, specific clock times, ambiguous
+“next Thursday”, other people's availability and slot offers retain the coordinator path.
+
+The response uses the existing `kind=message`/`text` contract and adds ephemeral
+`calendar_availability` metadata: `date`, `timezone`, `start`, `end`, `coverage`,
+`checked_at`, `expires_at`, and owned `evidence_id`. A complete empty free/busy read is
+reported as “no busy time recorded on your selected calendars”; partial/unknown coverage
+never establishes availability. Busy periods are merged and clipped to the checked day.
+Today covers only the remaining hours and says so. Past/invalid dates produce clarification.
+Missing access or preferences produce actionable recovery text with a safe `error_code`.
+Existing account, scope, ACL, preference version and evidence-expiry fences still apply.
+
+Conversation history retains the displayed answer, but raw availability metadata is not
+copied into turn receipts; previous Calendar answers are withheld from model history as
+fresh evidence. The free/busy evidence uses the existing storage/expiry policy. No new
+endpoint, migration, approval or external-write capability is introduced.

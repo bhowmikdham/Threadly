@@ -76,6 +76,20 @@ async def run(context, runtime, model=None):
     last_verified_evidence = []
     try:
         async with asyncio.timeout(120) as turn_timeout:
+            day_check = getattr(runtime, "try_day_availability", None)
+            if day_check is not None:
+                outcome = await day_check()
+                if outcome is not None:
+                    return {
+                        **outcome,
+                        "release": RELEASE,
+                        "trace": [
+                            {
+                                "tool": "check_day_availability",
+                                "status": outcome.get("error_code", "ok"),
+                            }
+                        ],
+                    }
             while calls < MAX_CALLS:
                 for attempt in range(3):
                     try:

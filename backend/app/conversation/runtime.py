@@ -359,9 +359,9 @@ def model_history(history):
     return [
         {
             **entry,
-            "assistant": "Calendar agenda was shown. Read Calendar again for current details.",
+            "assistant": "Calendar results were shown. Read Calendar again for current details.",
         }
-        if entry.get("source") == "calendar_agenda"
+        if entry.get("source") in {"calendar_agenda", "calendar_availability"}
         else entry
         for entry in history
     ]
@@ -689,6 +689,16 @@ class Runtime:
                 "until user changes it."
             ),
         }
+
+    async def try_day_availability(self):
+        from app.calendar.day_availability import CONFIRMATION, answer
+
+        # Typed active work owns short confirmations; a fresh day question may still read.
+        if CONFIRMATION.fullmatch(self.request.instruction.strip()) and (
+            self.state.get("active_task_id") or self.state.get("proposal_id")
+        ):
+            return None
+        return await answer(self.owner, self.authoritative_instruction())
 
     async def call(self, name, args):
         if name in {"search_mail", "more_mail"}:

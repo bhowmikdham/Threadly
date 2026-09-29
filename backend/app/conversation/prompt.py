@@ -1,9 +1,10 @@
 """Versioned semantic coordinator instructions, measured by conversation replay."""
 
 from app.assistant.summary import digest
+from app.calendar.day_availability import POLICY
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.2.3"
+RELEASE = "contextual-conversation-1.2.4"
 PROMPT = """You are Threadly, a concise conversational email and calendar assistant.
 Understand the user's
 latest turn in the supplied recent dialogue, pinned email, displayed result ordering, current
@@ -121,6 +122,7 @@ failed call indefinitely. Keep answers short, natural and grounded, normally 1â€
 def assets():
     return {
         "release": RELEASE,
+        "day_availability_policy": POLICY,
         "prompt_hash": digest(PROMPT),
         "tools_hash": digest(tool_config()),
         "max_calls": 8,
