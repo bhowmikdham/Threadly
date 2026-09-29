@@ -367,7 +367,7 @@ test("an attached email can be detached directly from the composer", async () =>
   expect(turn?.body).toHaveProperty("context_snapshot_id", null)
   await page.setViewportSize({ width: 420, height: 900 })
 })
-test("the mic opens the voice orb, which hands what was said to the chat box", async () => {
+test("voice mode is a spoken back-and-forth that also lands in the chat", async () => {
   await page.evaluate(() => {
     class FakeRecognition {
       onresult: any
@@ -377,13 +377,27 @@ test("the mic opens the voice orb, which hands what was said to the chat box", a
         ;(window as any).fakeRecognizer = this
       }
       stop() {}
+      abort() {}
     }
     ;(window as any).SpeechRecognition = FakeRecognition
     ;(window as any).webkitSpeechRecognition = FakeRecognition
+    ;(window as any).spoken = []
+    // Speaking takes a moment, so the "Speaking…" state can be seen.
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        getVoices: () => [],
+        cancel() {},
+        speak(u: any) {
+          ;(window as any).spoken.push(u.text)
+          u.onstart?.()
+          setTimeout(() => u.onend?.(), 1500)
+        }
+      }
+    })
   })
-  await page.getByLabel("Your request").fill("")
-  await page.getByRole("button", { name: "Dictate request" }).click()
-  const dialog = page.getByRole("dialog", { name: "Voice input" })
+  await page.getByRole("button", { name: "Talk to Threadly" }).click()
+  const dialog = page.getByRole("dialog", { name: "Voice conversation" })
   await expect(dialog).toBeVisible()
   expect(
     await page.evaluate(
@@ -393,24 +407,31 @@ test("the mic opens the voice orb, which hands what was said to the chat box", a
           ?.getContext("webgl")
     )
   ).toBe(true)
+  await expect(dialog.getByRole("status")).toHaveText("Listening…")
+  await page.waitForTimeout(600)
+  await page.screenshot({
+    path: path.join("test-results", "voice-listening.png")
+  })
   await page.evaluate(() =>
     (window as any).fakeRecognizer.onresult({
-      results: [
-        Object.assign([{ transcript: "Summarise this thread" }], {
-          isFinal: true
-        })
-      ]
+      results: [Object.assign([{ transcript: "hey" }], { isFinal: true })]
     })
   )
-  await expect(dialog.getByText("Summarise this thread")).toBeVisible()
-  await page.waitForTimeout(600)
-  await page.screenshot({ path: path.join("test-results", "voice-orb.png") })
-  await page.getByRole("button", { name: "Close voice input" }).click()
+  // What was said is not shown on the orb screen.
+  await expect(dialog.getByText("hey", { exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole("status")).toHaveText("Speaking…")
+  await page.screenshot({
+    path: path.join("test-results", "voice-speaking.png")
+  })
+  expect(await page.evaluate(() => (window as any).spoken)).toEqual([
+    "Hey! What can I help you with?"
+  ])
+  await expect(dialog.getByRole("status")).toHaveText("Listening…")
+  await page.getByRole("button", { name: "Close voice conversation" }).click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByLabel("Your request")).toHaveValue(
-    "Summarise this thread"
-  )
-  await page.getByLabel("Your request").fill("")
+  await expect(
+    page.getByText("Hey! What can I help you with?", { exact: true }).last()
+  ).toBeVisible()
 })
 test("a missing connector offers Connect in the menu, not only in Settings", async () => {
   control.calendarConnected = false
