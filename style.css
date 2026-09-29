@@ -1615,3 +1615,611 @@ summary:focus-visible {
     transition: none;
   }
 }
+
+/* Result actions: glass pills in the same family as the composer and chips. */
+.artifact .button-row button,
+.artifact > button,
+.approval button:not(.primary),
+.proposal button:not(.primary),
+.clarification > button,
+.slot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ffffff10, transparent 70%),
+    var(--surface);
+  box-shadow: inset 0 1px #ffffff10;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.artifact .button-row button svg,
+.artifact > button svg {
+  color: var(--muted);
+  flex: none;
+}
+.artifact .button-row button:hover:not(:disabled),
+.artifact > button:hover:not(:disabled),
+.approval button:not(.primary):hover:not(:disabled),
+.proposal button:not(.primary):hover:not(:disabled),
+.clarification > button:hover:not(:disabled),
+.slot button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, #ffffff14, transparent 70%), var(--hover);
+}
+.artifact .button-row button:active:not(:disabled),
+.artifact > button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.artifact .button-row .review-button {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+.artifact .button-row .review-button svg {
+  color: var(--accent);
+}
+.artifact .button-row .review-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+.threadly:not(.dark) .artifact .button-row button,
+.threadly:not(.dark) .artifact > button,
+.threadly:not(.dark) .approval button:not(.primary),
+.threadly:not(.dark) .proposal button:not(.primary),
+.threadly:not(.dark) .clarification > button,
+.threadly:not(.dark) .slot button {
+  border-color: #e0dce9;
+  background: linear-gradient(145deg, #ffffff, #f8f7fb);
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 2px 6px -3px #3d2f8a26;
+}
+.threadly:not(.dark) .artifact .button-row .review-button {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, #ffffff);
+}
+
+/* Drawer: brand, conversations, connectors and an account card. */
+.panel-menu {
+  gap: 2px;
+  padding: 20px 14px 14px;
+  overflow-y: auto;
+}
+.panel-menu .drawer-title {
+  margin: 0 0 14px 4px;
+}
+.drawer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.threadly-logo {
+  flex: none;
+  color: var(--text);
+}
+.panel-menu > .drawer-new-chat {
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ffffff10, transparent 70%),
+    var(--surface);
+  box-shadow: inset 0 1px #ffffff10;
+  font-weight: 550;
+}
+.panel-menu > .drawer-new-chat:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.threadly:not(.dark) .panel-menu > .drawer-new-chat {
+  background: linear-gradient(145deg, #ffffff, #f8f7fb);
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 2px 6px -3px #3d2f8a26;
+}
+.drawer-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 6px 4px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.panel-menu > .drawer-row {
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+.panel-menu > .drawer-row svg {
+  color: var(--muted);
+}
+.panel-menu > .drawer-danger:hover:not(:disabled),
+.panel-menu > .drawer-danger:hover:not(:disabled) svg {
+  color: #d9534a;
+}
+.connector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.connector-list li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.connector-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+}
+.connector-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connector-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.connector-connect {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 550;
+}
+.connector-connect:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.connector-error {
+  margin: 6px 8px 0;
+  font-size: 11.5px;
+  color: var(--danger, #c5221f);
+}
+.connector-status.is-on {
+  color: var(--text);
+}
+.connector-status.is-on::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3fbf8f;
+  box-shadow: 0 0 0 3px #3fbf8f26;
+}
+.panel-menu .menu-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--soft);
+}
+.menu-account .avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.menu-account-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.menu-account-name b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.menu-account-name b,
+.menu-account-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-account-name small {
+  font-size: 11px;
+}
+.menu-account-actions {
+  display: flex;
+  flex: none;
+  gap: 0;
+}
+.menu-account-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+}
+.menu-account-actions .icon-button:last-child:hover {
+  color: #d9534a;
+}
+
+/* A shortcut that needs an open email stays visible but greyed out. */
+.suggestions button:disabled {
+  opacity: 0.55;
+}
+
+/* Draft: the reply itself in one aligned box, with Insert and Copy. */
+.artifact.draft-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.draft-box {
+  padding: 14px 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.threadly:not(.dark) .draft-box {
+  border-color: #e4e1ec;
+  box-shadow: 0 1px 2px #2d24550a;
+}
+.draft-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.draft-meta span + span {
+  color: var(--text);
+  font-weight: 550;
+}
+.draft-box .draft-to {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.draft-box .draft-to input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.draft-subject {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.draft-card .draft-body {
+  display: block;
+  width: 100%;
+  min-height: 4lh;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+  outline: none;
+}
+.draft-box .draft-to:focus-within {
+  border-bottom-color: var(--muted);
+}
+.draft-actions {
+  display: flex;
+  gap: 8px;
+}
+.draft-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.draft-actions button:first-child:not(:disabled) {
+  background: var(--soft);
+}
+.draft-actions button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.draft-footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 0 0 -6px;
+  color: var(--muted);
+}
+.draft-footer .icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+.draft-notice {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+/* The reply's time sits on the same quiet row as its Edit and Review icons. */
+.draft-card + .response-footer {
+  margin-top: -35px;
+  margin-left: 32px;
+}
+
+/* Recent chats: the email's subject, with the latest request beneath it. */
+.history-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+/* The attached-email chip shows the start of the subject; hover shows it all. */
+.composer-context .context-chip > span {
+  max-width: 22ch;
+}
+/* In this conversation: just the subject and who it came from. */
+.context-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.context-from svg {
+  flex: none;
+}
+.context-from span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.context-from small {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+}
+.context-picker .context-title {
+  margin: 2px 0 4px;
+  font-size: 14px;
+}
+
+/* The sign-in screen carries the Threadly logo in ink, not the accent. */
+.welcome-logo {
+  color: var(--text);
+}
+
+/* Account: one profile row; clicking it opens a small card above it. */
+.panel-menu .menu-account {
+  position: relative;
+  display: block;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.panel-menu .avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.account-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 13.5px;
+  text-align: left;
+}
+.account-button b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.account-button > svg {
+  flex: none;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.18s;
+}
+.account-button[aria-expanded="true"] > svg {
+  transform: rotate(90deg);
+}
+.account-button:hover:not(:disabled),
+.account-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.account-card {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 2;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow:
+    0 2px 6px #1d1a2e0f,
+    0 16px 36px -14px #3d2f8a59;
+  animation: account-in 0.16s ease-out both;
+}
+@keyframes account-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.account-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 8px 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.account-card button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 450;
+  text-align: left;
+}
+.account-card button svg {
+  color: var(--muted);
+}
+.account-card button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.account-card .account-signout:hover:not(:disabled),
+.account-card .account-signout:hover:not(:disabled) svg {
+  color: #d9534a;
+}
+.dark .account-card {
+  box-shadow:
+    0 2px 6px #0000004d,
+    0 18px 40px -14px #000000b3;
+}
+
+/* Voice mode: the orb fills the panel while Threadly listens. */
+.voice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 42%, #efe7ff 0%, transparent 60%),
+    var(--bg);
+  animation: voice-in 0.22s ease-out;
+}
+.threadly.dark .voice-overlay {
+  background: radial-gradient(circle at 50% 42%, #2a2140 0%, transparent 60%),
+    var(--bg);
+}
+.voice-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.voice-orb {
+  width: min(260px, 70vw);
+  aspect-ratio: 1;
+}
+.voice-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.voice-transcript {
+  max-width: 320px;
+  min-height: 3lh;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text);
+}
+.voice-transcript span {
+  color: var(--muted);
+}
+@keyframes voice-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-overlay {
+    animation: none;
+  }
+}

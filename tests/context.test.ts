@@ -75,3 +75,18 @@ describe("reference-only source capture", () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 })
+
+describe("open-email detection from the Gmail URL", async () => {
+  const { gmailUrlShowsEmail } = await import("../lib/gmail-context")
+  it("is true only when a single thread is open", () => {
+    const base = "https://mail.google.com/mail/u/0/"
+    expect(gmailUrlShowsEmail(base + "#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(true)
+    expect(gmailUrlShowsEmail(base + "#label/Work/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(true)
+    expect(gmailUrlShowsEmail(base + "#search/receipt/18c2f1a9b7d4e6f0")).toBe(true)
+    expect(gmailUrlShowsEmail(base + "#inbox")).toBe(false)
+    expect(gmailUrlShowsEmail(base + "#label/Work")).toBe(false)
+    expect(gmailUrlShowsEmail(base + "#search/receipt")).toBe(false)
+    expect(gmailUrlShowsEmail("https://example.com/#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(false)
+    expect(gmailUrlShowsEmail(undefined)).toBe(false)
+  })
+})

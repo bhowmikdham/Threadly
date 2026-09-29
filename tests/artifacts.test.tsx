@@ -60,7 +60,9 @@ describe("reviewed draft integration", () => {
     })
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
     expect(calls).toHaveLength(0)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("Approve and send")
     expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
     expect(
@@ -86,41 +88,80 @@ describe("reviewed draft integration", () => {
           }
     )
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("email writes disabled")
     expect(screen.queryByText("Approve and send")).toBeNull()
   })
-  it("invalidates a displayed preview immediately when the body is edited", async () => {
+  it("drops a displayed preview as soon as a revised draft arrives from chat", async () => {
     mockApi((m) => (m.path.endsWith("/review") ? draft : action))
-    render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Review outgoing email"))
+    const { rerender } = render(
+      <ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />
+    )
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review outgoing email" })
+    )
     await screen.findByText("Approve and send")
-    fireEvent.click(screen.getByText("Edit draft"))
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Changed content" }
-    })
+    const revised = {
+      ...draft,
+      artifact_id: "a2",
+      revision: 2,
+      artifact: {
+        ...draft.artifact,
+        content: { ...draft.artifact.content, body: "Changed content" }
+      }
+    }
+    rerender(
+      <ArtifactCard value={revised} replace={vi.fn()} report={vi.fn()} />
+    )
     expect(screen.queryByText("Approve and send")).toBeNull()
-    expect(
-      (screen.getByText("Review outgoing email") as HTMLButtonElement).disabled
-    ).toBe(true)
+    expect(screen.getByText("Changed content")).toBeTruthy()
   })
-  it("saves a revision with exact edited recipients and does not send", async () => {
+  it("edits To and the message in place and saves only on request", async () => {
     const calls: any[] = []
+    const replace = vi.fn()
     mockApi((m) => {
       calls.push(m)
-      return { ...draft, revision: 2, artifact_id: "a2" }
+      return { ...draft, artifact_id: "a2", revision: 2 }
     })
-    const replace = vi.fn()
     render(<ArtifactCard value={draft} replace={replace} report={vi.fn()} />)
-    fireEvent.click(screen.getByText("Edit draft"))
+    expect(screen.queryByText("Cc and Bcc")).toBeNull()
     fireEvent.change(screen.getByLabelText("To"), {
       target: { value: "new@example.test" }
     })
-    fireEvent.click(screen.getByText("Save edits"))
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Edited body" }
+    })
+    expect(calls.length).toBe(0)
+    expect(
+      (screen.getByLabelText("Review outgoing email") as HTMLButtonElement)
+        .disabled
+    ).toBe(true)
+    fireEvent.click(screen.getByText("Save changes"))
     await waitFor(() => expect(replace).toHaveBeenCalled())
+    expect(calls[0].path).toBe("/assistant/tasks/t1/draft-revisions")
     expect(calls[0].body.recipients.to).toEqual(["new@example.test"])
+    expect(calls[0].body.body).toBe("Edited body")
+    expect(calls[0].body.subject).toBe("Update")
     expect(calls[0].body.expected_revision).toBe(1)
-    expect(calls).toHaveLength(1)
+  })
+  it("undo puts the draft back without saving", () => {
+    const calls: any[] = []
+    mockApi((m) => {
+      calls.push(m)
+      return null
+    })
+    render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Something else" }
+    })
+    fireEvent.click(screen.getByText("Undo"))
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).value
+    ).toBe("I will review it tomorrow.")
+    expect(screen.getByText("Copy")).toBeTruthy()
+    expect(calls.some((c) => c.path?.includes("draft-revisions"))).toBe(false)
   })
   it("renders grounded answers safely as text", () => {
     const a: any = {

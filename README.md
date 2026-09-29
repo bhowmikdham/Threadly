@@ -145,6 +145,25 @@ PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.example.test npx playwright te
 Replace the example host with the actual HTTPS API. This checks the pinned
 server and public Settings without contacting Google or the API.
 
+### Offline preview (no backend, no Google sign-in)
+
+To click through the real side panel without the EC2 backend:
+
+```sh
+npm run build
+npm run preview        # or: npm run preview:dev for live reload while editing
+```
+
+This opens a separate, throwaway Chromium window with the built extension, a
+local mock API on `127.0.0.1:8787` (the same fixtures as `test:e2e`), and a
+synthetic signed-in session. A second tab is a stand-in open email at a
+`mail.google.com` address (served locally, never from Google): click the Threadly
+button on its right edge to open the real side panel with that email attached,
+including a reply box for "Insert body". It never touches your own Chrome profile, Gmail,
+Google OAuth or AWS, and nothing from it ships in the extension. The terminal
+lists the prompts the fixtures understand (for example `Show me all GYG emails`,
+`Summarise this thread.`, `Draft a reply to this thread.`).
+
 For the opt-in **live** check, first perform the existing laptop OAuth login and
 open the tunnel. The helper reads your private `~/.threadly-staging/session.json`
 without printing it, then uses an isolated, deleted-after-run Chrome profile:

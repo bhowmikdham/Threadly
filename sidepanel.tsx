@@ -3,11 +3,13 @@ import { useEffect, useRef, useState } from "react"
 import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
-import { GmailIcon, Icon } from "./components/Icon"
+import { GmailIcon, GoogleCalendarIcon, Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
+import { VoiceOrb } from "./components/VoiceOrb"
 import { api, bridge, errorText } from "./lib/api"
 import { requestBackendAccess } from "./lib/backend-access"
+import { gmailUrlShowsEmail } from "./lib/gmail-context"
 import {
   calendarReadReady,
   schedulingReadiness,
@@ -25,7 +27,7 @@ export default function SidePanel() {
     [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
-    [dark, setDark] = useState(true),
+    [dark, setDark] = useState(false),
     [preferencesState, setPreferencesState] =
       useState<PreferencesState>("loading")
   const authEpoch = useRef(0)
@@ -72,7 +74,7 @@ export default function SidePanel() {
       .finally(() => setReady(true))
     void chrome.storage.local
       .get("darkMode")
-      .then((s) => setDark(s.darkMode !== false))
+      .then((s) => setDark(s.darkMode === true))
     const changed = (changes: any, area: string) => {
       if (
         area === "session" &&
@@ -133,18 +135,17 @@ export default function SidePanel() {
   }
   return (
     <main className={dark ? "threadly dark" : "threadly"}>
-      {(!user || settings) && (
+      {/* Sign-in screen only: Chrome's panel header shows the name, and the
+          Settings page has its own heading and Back to chat. */}
+      {!user && !settings && (
         <header className="app-header">
-          <span className="wordmark">
-            <Icon name="sparkle" />
-            Threadly
-          </span>
+          <span className="wordmark" />
           <button
             className="icon-button"
-            aria-label={settings ? "Close settings" : "Settings"}
-            title={settings ? "Close settings" : "Settings"}
-            onClick={() => setSettings(!settings)}>
-            <Icon name={settings ? "close" : "menu"} />
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => setSettings(true)}>
+            <Icon name="menu" />
           </button>
         </header>
       )}
@@ -172,11 +173,13 @@ export default function SidePanel() {
               <Assistant
                 key={user.id}
                 user={user}
+                capabilities={capabilities}
                 calendarStatus={schedulingReadiness(
                   capabilities,
                   preferencesState
                 )}
                 openSettings={() => setSettings(true)}
+                onAuth={refresh}
                 logout={logout}
                 theme={theme}
                 dark={dark}
@@ -186,8 +189,8 @@ export default function SidePanel() {
           {!user && !settings && (
             <section className="welcome">
               <div>
-                <span className="welcome-mark">
-                  <Icon name="sparkle" size={32} />
+                <span className="welcome-mark welcome-logo">
+                  <Logo height={20} />
                 </span>
                 <h1>
                   A little less work.
@@ -228,17 +231,26 @@ export default function SidePanel() {
     </main>
   )
 }
+// Friendly names for the services behind the backend capability ids.
+const connectorNames: Record<string, string> = {
+  gmail: "Gmail",
+  calendar: "Google Calendar"
+}
 function Assistant({
   user,
+  capabilities,
   calendarStatus,
   openSettings,
+  onAuth,
   logout,
   theme,
   dark
 }: {
   user: User
+  capabilities: Capability[]
   calendarStatus: ReturnType<typeof schedulingReadiness>
   openSettings: () => void
+  onAuth: () => Promise<void>
   logout: () => void
   theme: () => void
   dark: boolean
@@ -246,14 +258,18 @@ function Assistant({
   const c = useAssistant(user),
     [message, setMessage] = useState(""),
     [menu, setMenu] = useState(false),
+    [account, setAccount] = useState(false),
     [sources, setSources] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
     [history, setHistory] = useState<any>(null),
+    [subjects, setSubjects] = useState<Record<string, string>>({}),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
-    [approvalInfo, setApprovalInfo] = useState(false)
-  const recognition = useRef<any>(null),
-    last = useRef<HTMLDivElement>(null),
+    [openEmail, setOpenEmail] = useState(false),
+    [approvalInfo, setApprovalInfo] = useState(false),
+    [connecting, setConnecting] = useState(""),
+    [connectError, setConnectError] = useState("")
+  const last = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     atBottom = useRef(true),
@@ -262,7 +278,26 @@ function Assistant({
   const inputBusy = startupBusy || c.restoreFailed
   useEffect(() => {
     void c.selectActive(true)
-    return () => recognition.current?.abort()
+  }, [])
+  // "Ask about the open email" only makes sense while Gmail is showing an email.
+  useEffect(() => {
+    const check = () =>
+      void chrome.tabs
+        ?.query({ active: true, lastFocusedWindow: true })
+        .then((tabs) => setOpenEmail(gmailUrlShowsEmail(tabs[0]?.url)))
+        .catch(() => setOpenEmail(false))
+    const changed = (_id: number, info: { url?: string }) => {
+      if (info.url) check()
+    }
+    check()
+    chrome.tabs?.onActivated?.addListener(check)
+    chrome.tabs?.onUpdated?.addListener(changed)
+    chrome.windows?.onFocusChanged?.addListener(check)
+    return () => {
+      chrome.tabs?.onActivated?.removeListener(check)
+      chrome.tabs?.onUpdated?.removeListener(changed)
+      chrome.windows?.onFocusChanged?.removeListener(check)
+    }
   }, [])
   useEffect(() => {
     const newest = c.entries.at(-1)
@@ -281,6 +316,24 @@ function Assistant({
       input.current.style.height = `${Math.min(input.current.scrollHeight, 150)}px`
     }
   }, [message])
+  useEffect(() => {
+    const ids = [
+      ...new Set(
+        (history || [])
+          .map(
+            (t: any) => t.effective_context_snapshot_id || t.context_snapshot_id
+          )
+          .filter(Boolean)
+      )
+    ].filter((id: string) => !(id in subjects)) as string[]
+    for (const id of ids)
+      void api(`/assistant/context-snapshots/${encodeURIComponent(id)}`)
+        .then((snap) => api(`/threads/${encodeURIComponent(snap.thread_id)}`))
+        .then((t) =>
+          setSubjects((s) => ({ ...s, [id]: t.thread.subject || "" }))
+        )
+        .catch(() => setSubjects((s) => ({ ...s, [id]: "" })))
+  }, [history])
   const historyPage = async (more = false) => {
     try {
       const r = await api(
@@ -310,43 +363,14 @@ function Assistant({
     atBottom.current = true
     void c.submit(text)
   }
-  const dictate = () => {
-    if (recording) {
-      recognition.current?.stop()
-      return
-    }
-    const Recognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
-    if (!Recognition) {
-      c.setError(
-        "Dictation isn’t available in this browser. You can type your request."
-      )
-      return
-    }
-    const r = new Recognition()
-    recognition.current = r
-    r.lang = navigator.language
-    r.interimResults = false
-    r.continuous = false
-    r.onresult = (e: any) =>
-      setMessage(
-        (old) => `${old}${old ? " " : ""}${e.results[0][0].transcript}`
-      )
-    r.onerror = () => {
-      c.setError(
-        "Couldn’t start dictation. Check microphone access or type your request."
-      )
-      setRecording(false)
-    }
-    r.onend = () => setRecording(false)
-    try {
-      r.start()
-      setRecording(true)
-    } catch {
-      c.setError("Couldn’t start the microphone.")
-      setRecording(false)
-    }
+  // The mic opens voice mode: the orb fills the panel while Threadly listens,
+  // and closing it puts what was said into the chat box.
+  const dictate = () => setRecording(true)
+  const voiceDone = (transcript: string, error?: string) => {
+    setRecording(false)
+    if (error) c.setError(error)
+    if (transcript) setMessage((old) => `${old}${old ? " " : ""}${transcript}`)
+    input.current?.focus()
   }
   const newChat = async () => {
     await c.newChat()
@@ -360,7 +384,73 @@ function Assistant({
       ? "New conversation"
       : c.entries[0].instruction
     : "New conversation"
+  // Sending is an approval step, not a connector, so it isn't listed here.
+  // One row per service (gmail_read, calendar_read, calendar_list… become
+  // Gmail and Google Calendar); read access decides the status.
+  const connectors = Object.values(
+    capabilities
+      .filter((tool) => !tool.id.endsWith("_send"))
+      .reduce<Record<string, Capability>>((services, tool) => {
+        const service = tool.id.split("_")[0]
+        if (!services[service] || tool.id === `${service}_read`)
+          services[service] = {
+            ...tool,
+            id: service,
+            // Calendar counts as connected only with both grants it needs.
+            ...(service === "calendar"
+              ? { ready: calendarReadReady(capabilities) }
+              : {})
+          }
+        return services
+      }, {})
+  )
+  // Connect straight from the list, with the same Google permission request
+  // Settings uses; the rows update once the backend reports the new access.
+  const connect = async (service: string) => {
+    setConnecting(service)
+    setConnectError("")
+    try {
+      await bridge({
+        type: "LOGIN",
+        capabilities: [service === "calendar" ? "calendar_read" : "gmail_read"]
+      })
+      await onAuth()
+    } catch (e) {
+      setConnectError(errorText(e))
+    } finally {
+      setConnecting("")
+    }
+  }
+  // Recent chats: one row per email (labelled by its subject), leaving out
+  // what is already open here. Requests without an email stay one per ask.
+  const openTasks = new Set(c.entries.map((e) => e.task?.task_id))
+  const contextOf = (t: any): string =>
+    t.effective_context_snapshot_id || t.context_snapshot_id || ""
+  const newestFirst = [...(history || [])].sort(
+    (a: any, b: any) =>
+      Date.parse(b.created_at || b.updated_at || "") -
+        Date.parse(a.created_at || a.updated_at || "") || 0
+  )
+  const recent: { key: string; context: string; latest: any; count: number }[] =
+    []
+  for (const t of newestFirst) {
+    if (openTasks.has(t.task_id)) continue
+    const key =
+      contextOf(t) || `ask:${t.instruction?.trim().toLowerCase() || t.task_id}`
+    const group = recent.find((g) => g.key === key)
+    if (group) group.count += 1
+    else recent.push({ key, context: contextOf(t), latest: t, count: 1 })
+  }
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
+  const displayName = user.name?.trim() || user.email.split("@")[0]
+  const initials =
+    (user.name || user.email)
+      .trim()
+      .split(/[\s@._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "T"
   const latest = c.entries.at(-1)
   return (
     <>
@@ -370,7 +460,10 @@ function Assistant({
           aria-label="Conversation menu"
           title="Conversation menu"
           aria-expanded={menu}
-          onClick={() => setMenu(!menu)}>
+          onClick={() => {
+            setMenu(!menu)
+            setAccount(false)
+          }}>
           <Icon name="menu" />
         </button>
         <span className="chat-title" title={title}>
@@ -385,24 +478,43 @@ function Assistant({
           <Icon name="edit" />
         </button>
       </header>
-      <div
-        className={`calendar-status calendar-status-${calendarStatus.state}`}
-        role="status">
-        <Icon name="calendar" size={16} />
-        <span>
-          <b>{calendarStatus.label}</b>
-          {calendarStatus.state !== "ready" && (
+      {/* Only shown when Calendar needs something; a ready Calendar stays quiet. */}
+      {calendarStatus.state !== "ready" && (
+        <div
+          className={`calendar-status calendar-status-${calendarStatus.state}`}
+          role="status">
+          <Icon name="calendar" size={16} />
+          <span>
+            <b>{calendarStatus.label}</b>
             <small>{calendarStatus.detail}</small>
+            {connectError && !menu && (
+              <small className="connector-error" role="alert">
+                {connectError}
+              </small>
+            )}
+          </span>
+          {calendarStatus.action && (
+            <button
+              disabled={!!connecting}
+              onClick={() =>
+                calendarStatus.state === "connect"
+                  ? void connect("calendar")
+                  : openSettings()
+              }>
+              {connecting === "calendar"
+                ? "Connecting…"
+                : calendarStatus.action}
+            </button>
           )}
-        </span>
-        {calendarStatus.action && (
-          <button onClick={openSettings}>{calendarStatus.action}</button>
-        )}
-      </div>
+        </div>
+      )}
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
           <div className="drawer-title">
-            <span>Threadly</span>
+            <span className="drawer-brand">
+              <Logo height={15} />
+              Threadly
+            </span>
             <button
               className="icon-button"
               aria-label="Close conversation menu"
@@ -410,41 +522,129 @@ function Assistant({
               <Icon name="close" />
             </button>
           </div>
-          <button onClick={() => void newChat()} disabled={startupBusy}>
-            <Icon name="edit" />
+          <button
+            className="drawer-new-chat"
+            onClick={() => void newChat()}
+            disabled={startupBusy}>
+            <Icon name="edit" size={16} />
             New conversation
           </button>
+          <p className="drawer-section">Conversations</p>
           <button
+            className="drawer-row"
+            disabled={inputBusy}
+            onClick={() => void historyPage()}>
+            <Icon name="clock" size={16} />
+            Recent chats
+          </button>
+          <button
+            className="drawer-row drawer-danger"
             disabled={inputBusy}
             onClick={async () => {
               if (
                 window.confirm(
-                  "Delete this conversation? Existing tasks and drafts will remain in Recent work."
+                  "Delete this conversation? Existing tasks and drafts will remain in Recent chats."
                 )
               ) {
                 await c.deleteChat()
                 setMenu(false)
               }
             }}>
+            <Icon name="trash" size={16} />
             Delete this conversation
           </button>
-          <button disabled={inputBusy} onClick={() => void historyPage()}>
-            <Icon name="clock" />
-            Recent work
-          </button>
-          <button
-            onClick={() => {
-              openSettings()
-              setMenu(false)
-            }}>
-            Settings
-          </button>
-          <button onClick={theme}>
-            {dark ? "Switch to light appearance" : "Switch to dark appearance"}
-          </button>
+          {connectors.length > 0 && (
+            <>
+              <p className="drawer-section">Connectors</p>
+              <ul className="connector-list">
+                {connectors.map((tool) => (
+                  <li key={tool.id}>
+                    <span className="connector-icon">
+                      {tool.id === "gmail" ? (
+                        <GmailIcon size={15} />
+                      ) : (
+                        <GoogleCalendarIcon size={15} />
+                      )}
+                    </span>
+                    <span className="connector-name">
+                      {connectorNames[tool.id] || tool.id.replaceAll("_", " ")}
+                    </span>
+                    {tool.ready || tool.status === "disabled" ? (
+                      <span
+                        className={`connector-status${tool.ready ? " is-on" : ""}`}>
+                        {tool.ready ? "Connected" : "Off"}
+                      </span>
+                    ) : (
+                      <button
+                        className="connector-connect"
+                        disabled={!!connecting}
+                        aria-label={`Connect ${connectorNames[tool.id] || tool.id}`}
+                        onClick={() => void connect(tool.id)}>
+                        {connecting === tool.id ? "Connecting…" : "Connect"}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {connectError && (
+                <p className="connector-error" role="alert">
+                  {connectError}
+                </p>
+              )}
+            </>
+          )}
           <div className="menu-account">
-            <small>{user.email}</small>
-            <button onClick={logout}>Sign out</button>
+            {account && (
+              <div className="account-card" role="group" aria-label="Account">
+                <div className="account-card-head">
+                  <span className="avatar" aria-hidden="true">
+                    {initials}
+                  </span>
+                  <span className="menu-account-name">
+                    <b>{displayName}</b>
+                    <small title={user.email}>{user.email}</small>
+                  </span>
+                </div>
+                <button
+                  aria-label="Settings"
+                  onClick={() => {
+                    openSettings()
+                    setAccount(false)
+                    setMenu(false)
+                  }}>
+                  <Icon name="settings" size={16} />
+                  Settings
+                </button>
+                <button
+                  aria-label={
+                    dark
+                      ? "Switch to light appearance"
+                      : "Switch to dark appearance"
+                  }
+                  onClick={theme}>
+                  <Icon name={dark ? "sun" : "moon"} size={16} />
+                  {dark ? "Light mode" : "Dark mode"}
+                </button>
+                <button
+                  className="account-signout"
+                  aria-label="Sign out"
+                  onClick={logout}>
+                  <Icon name="signout" size={16} />
+                  Sign out
+                </button>
+              </div>
+            )}
+            <button
+              className="account-button"
+              aria-label="Account menu"
+              aria-expanded={account}
+              onClick={() => setAccount(!account)}>
+              <span className="avatar" aria-hidden="true">
+                {initials}
+              </span>
+              <b>{displayName}</b>
+              <Icon name="chevron" size={14} />
+            </button>
           </div>
         </nav>
       )}
@@ -459,7 +659,7 @@ function Assistant({
         {history && (
           <section className="history-surface">
             <div className="card-heading">
-              <h2>Recent work</h2>
+              <h2>Recent chats</h2>
               <button
                 className="icon-button"
                 aria-label="Close history"
@@ -467,21 +667,29 @@ function Assistant({
                 <Icon name="close" />
               </button>
             </div>
-            {history.length === 0 && (
-              <p>
-                Your generated drafts, summaries and plans will appear here.
-              </p>
-            )}
-            {history.map((t) => (
+            {recent.length === 0 && <p>Your earlier chats will appear here.</p>}
+            {recent.map(({ key, context, latest: t, count }) => (
               <button
                 className="history-row"
-                key={t.task_id}
+                key={key}
                 disabled={inputBusy}
                 onClick={() => {
                   void c.loadTask(t)
                   setHistory(null)
                 }}>
-                <span>{t.instruction}</span>
+                <span className="history-text">
+                  <span className="history-title">
+                    {context
+                      ? subjects[context] || "Email conversation"
+                      : t.instruction}
+                  </span>
+                  {context && (
+                    <small>
+                      {count > 1 ? `${count} requests · ` : ""}
+                      {t.instruction}
+                    </small>
+                  )}
+                </span>
                 <Icon name="chevron" size={14} />
               </button>
             ))}
@@ -510,30 +718,21 @@ function Assistant({
                     disabled={inputBusy}
                     onClick={() => suggest("Summarise this thread.")}>
                     <Icon name="sparkle" />
-                    Summarise this for me
+                    Summarise this thread
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
                     disabled={inputBusy}
                     onClick={() => suggest("Draft a reply to this thread.")}>
                     <Icon name="edit" />
-                    Help me reply
-                    <Icon name="chevron" size={14} />
-                  </button>
-                  <button
-                    disabled={inputBusy}
-                    onClick={() =>
-                      suggest("What needs my attention in this email?")
-                    }>
-                    <Icon name="check" />
-                    What needs my attention?
+                    Draft a reply to this thread
                     <Icon name="chevron" size={14} />
                   </button>
                 </>
               ) : (
                 <>
                   <button
-                    disabled={inputBusy}
+                    disabled={inputBusy || !openEmail}
                     onClick={() => void c.selectActive()}>
                     <GmailIcon />
                     Ask about the open email
@@ -542,7 +741,7 @@ function Assistant({
                   <button
                     disabled={inputBusy}
                     onClick={() => {
-                      setMessage("Show me emails about ")
+                      setMessage("Find an email about ")
                       input.current?.focus()
                       setSources(false)
                     }}>
@@ -557,7 +756,7 @@ function Assistant({
                       input.current?.focus()
                     }}>
                     <Icon name="edit" />
-                    Find the right words
+                    Write an email
                     <Icon name="chevron" size={14} />
                   </button>
                 </>
@@ -601,15 +800,7 @@ function Assistant({
         {contextOpen && c.selection && (
           <ContextPicker
             selection={c.selection}
-            onChange={c.setSelection}
             close={() => setContextOpen(false)}
-            busy={inputBusy || c.contextLocked}
-            rewrite={(id) => {
-              void c.submit(
-                "Rewrite the selected message to be clearer and more concise, preserving its meaning.",
-                id
-              )
-            }}
           />
         )}
         {c.contextBlocked && !c.restoreFailed && (
@@ -647,7 +838,7 @@ function Assistant({
             <button
               disabled={inputBusy || c.contextLocked}
               onClick={() => {
-                setMessage("Show me emails about ")
+                setMessage("Find an email about ")
                 input.current?.focus()
                 setSources(false)
                 setContextOpen(false)
@@ -693,7 +884,14 @@ function Assistant({
                 type="button"
                 className="context-chip"
                 disabled={c.busy}
-                title="View attached email details"
+                title={[
+                  c.selection.thread.subject,
+                  c.selection.messages.find(
+                    (m) => m.gmail_msg_id === c.selection.targetId
+                  )?.from_addr || c.selection.messages[0]?.from_addr
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 aria-label={`Attached email: ${c.selection.thread.subject}. View details`}
                 aria-expanded={contextOpen}
                 onClick={() => setContextOpen(!contextOpen)}>
@@ -726,7 +924,9 @@ function Assistant({
             placeholder={
               latest?.task?.state === "needs_clarification"
                 ? "Reply or ask a follow-up…"
-                : "Ask your inbox…"
+                : latest?.artifacts?.some((a) => a.artifact.kind === "draft")
+                  ? "Edit the reply or ask a question…"
+                  : "Ask your inbox…"
             }
             value={message}
             rows={1}
@@ -789,6 +989,7 @@ function Assistant({
           Threadly can make mistakes. Review important details.
         </p>
       </div>
+      {recording && <VoiceOrb onClose={voiceDone} />}
     </>
   )
 }

@@ -1,0 +1,107 @@
+<!doctype html>
+<!--
+  Stand-in for an open Gmail thread, served only inside `npm run preview` at a
+  mail.google.com URL so the extension's content script and side panel behave
+  as they do on real Gmail. It carries the same markers the content script
+  reads (lib/gmail-context.ts) and the fixture thread from tests/e2e/mock-backend.ts.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Review the new panel · Threadly preview</title>
+    <style>
+      body {
+        margin: 0;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #202124;
+        background: #f6f8fc;
+      }
+      .preview-bar {
+        padding: 10px 20px;
+        background: #1b2135;
+        color: #efebe3;
+        font-size: 12.5px;
+      }
+      .preview-bar b {
+        color: #d9a53f;
+      }
+      .account {
+        float: right;
+        opacity: 0.75;
+      }
+      [role="main"] {
+        max-width: 760px;
+        margin: 28px auto;
+        padding: 28px 32px;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px #0000001a;
+      }
+      h2.hP {
+        margin: 0 0 22px;
+        font-size: 22px;
+        font-weight: 400;
+      }
+      .message {
+        padding-top: 18px;
+        border-top: 1px solid #e9eaed;
+      }
+      .from {
+        font-weight: 600;
+      }
+      .when {
+        color: #5f6368;
+        font-size: 12px;
+      }
+      .reply {
+        margin-top: 28px;
+        padding: 14px 16px;
+        min-height: 90px;
+        border: 1px solid #dadce0;
+        border-radius: 12px;
+        outline: none;
+      }
+      .reply[hidden] {
+        display: none;
+      }
+      .reply-button {
+        margin-top: 24px;
+        padding: 8px 18px;
+        border: 1px solid #dadce0;
+        border-radius: 999px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      .reply:empty::before {
+        content: "Reply box. Threadly's Insert body puts the draft here.";
+        color: #9aa0a6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview-bar">
+      <b>Threadly preview</b> · stand-in email page with sample data, not real Gmail.
+      Open Threadly with the button on the right edge; press Reply to try Insert.
+      <span class="account" aria-label="Google Account: Tester (tester@example.test)"
+        >tester@example.test</span
+      >
+    </div>
+    <div role="main">
+      <h2 class="hP" data-legacy-thread-id="b7e2a9">Can you review the new Threadly panel?</h2>
+      <div class="message" data-legacy-message-id="c41d07" aria-expanded="true">
+        <div class="from">Bhowmik Dham &lt;bhowmik@example.test&gt;</div>
+        <div class="when">29 Sept 2026, 9:15 am · to me</div>
+        <p>Hey,</p>
+        <p>
+          I've pushed the new conversation panel to the frontend branch. Could you
+          go through the inbox cards and the reply flow and let me know by Thursday
+          if anything needs changing? We're demoing it to the team on Friday.
+        </p>
+        <p>Cheers,<br />Bhowmik</p>
+        <button class="reply-button" type="button" onclick="document.querySelector('.reply').hidden = false; document.querySelector('.reply').focus(); this.hidden = true">Reply</button>
+        <div class="reply" contenteditable="true" role="textbox" aria-label="Reply" hidden></div>
+      </div>
+    </div>
+  </body>
+</html>

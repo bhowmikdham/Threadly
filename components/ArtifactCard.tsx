@@ -9,6 +9,7 @@ import {
 } from "../lib/api"
 import type { Artifact, EmailAction } from "../lib/types"
 import { Booking } from "./Booking"
+import { Icon } from "./Icon"
 
 const display = (x: any): string =>
   typeof x === "string" ? x : x?.text || x?.question || x?.description || ""
@@ -132,6 +133,7 @@ export function ArtifactCard({
       <Evidence value={value} />
       {(c.text || c.overview) && (
         <button disabled={busy} onClick={copy}>
+          <Icon name="copy" size={14} />
           Copy
         </button>
       )}
@@ -243,44 +245,27 @@ function DraftCard({
 }) {
   const c = value.artifact.content,
     envelope = value.draft_envelope
-  const [body, setBody] = useState(c.body),
-    [subject, setSubject] = useState(c.subject),
-    [to, setTo] = useState(envelope?.to?.join(", ") || ""),
-    [cc, setCc] = useState(envelope?.cc?.join(", ") || ""),
-    [bcc, setBcc] = useState(envelope?.bcc?.join(", ") || "")
-  const [busy, setBusy] = useState(false),
+  // Two editable boxes, who it goes to and the message itself; anything else
+  // is asked for in the chat and arrives from the backend as a new revision.
+  const savedTo = (envelope?.to || []).join(", ")
+  const [to, setTo] = useState(savedTo),
+    [body, setBody] = useState(c.body),
+    [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<EmailAction | null>(null),
     [confirmed, setConfirmed] = useState(false),
-    [history, setHistory] = useState<any[]>([]),
-    [editing, setEditing] = useState(false)
-  const [resolved, setResolved] = useState(false),
-    key = useRef(requestId()),
+    [replyOpen, setReplyOpen] = useState(false)
+  const key = useRef(requestId()),
     decisionKey = useRef(requestId())
-  const dirty =
-    body !== c.body ||
-    subject !== c.subject ||
-    to !== (envelope?.to || []).join(", ") ||
-    cc !== (envelope?.cc || []).join(", ") ||
-    bcc !== (envelope?.bcc || []).join(", ") ||
-    resolved
+  const dirty = to !== savedTo || body !== c.body
   useEffect(() => {
+    setTo(savedTo)
     setBody(c.body)
-    setSubject(c.subject)
-    setTo((envelope?.to || []).join(", "))
-    setCc((envelope?.cc || []).join(", "))
-    setBcc((envelope?.bcc || []).join(", "))
     setAction(null)
     setConfirmed(false)
-    setResolved(false)
     key.current = requestId()
   }, [value.artifact_id])
   useEffect(() => {
-    setAction(null)
-    setConfirmed(false)
-  }, [body, subject, to, cc, bcc, resolved])
-  useEffect(() => {
-    if (dirty) return
     let current = true
     void actionReference(value.artifact_id, "email")
       .then(async (id) => (id ? api(`/assistant/actions/${id}`) : null))
@@ -293,7 +278,7 @@ function DraftCard({
     return () => {
       current = false
     }
-  }, [value.artifact_id, dirty])
+  }, [value.artifact_id])
   useEffect(() => {
     if (
       !action ||
@@ -327,6 +312,37 @@ function DraftCard({
       clearInterval(timer)
     }
   }, [action?.action_id, action?.state])
+  // Insert is only offered while Gmail shows a reply box for this thread.
+  useEffect(() => {
+    const threadId = envelope?.reply?.gmail_thread_id
+    if (!threadId || !chrome.tabs?.query) return
+    let active = true
+    const check = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true
+        })
+        const open =
+          !!tab?.id &&
+          !!tab.url?.startsWith("https://mail.google.com/") &&
+          (await chrome.tabs
+            .sendMessage(tab.id, { action: "THREADLY_SELECTION" })
+            .then(
+              (s: any) => s?.replyEditorOpen === true && s.threadId === threadId
+            ))
+        if (active) setReplyOpen(open)
+      } catch {
+        if (active) setReplyOpen(false)
+      }
+    }
+    void check()
+    const timer = setInterval(check, 1500)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [envelope?.reply?.gmail_thread_id])
   const run = async (fn: () => Promise<void>) => {
     if (busy) return
     setBusy(true)
@@ -346,24 +362,26 @@ function DraftCard({
         {
           request_id: requestId(),
           expected_revision: value.revision,
-          subject,
+          subject: c.subject,
           body,
           recipients: {
             to: addresses(to),
-            cc: addresses(cc),
-            bcc: addresses(bcc)
+            cc: envelope?.cc || [],
+            bcc: envelope?.bcc || []
           },
-          unresolved_fields: resolved ? [] : c.unresolved_fields
+          unresolved_fields: c.unresolved_fields
         }
       )
       replace(result)
-      setEditing(false)
       setNotice("Changes saved.")
     })
+  const discard = () => {
+    setTo(savedTo)
+    setBody(c.body)
+    setNotice("")
+  }
   const prepare = () =>
     run(async () => {
-      if (dirty)
-        throw new Error("Save your edits before reviewing the outgoing email.")
       const reviewed = await api(
         `/assistant/artifacts/${value.artifact_id}/review`,
         {
@@ -384,7 +402,6 @@ function DraftCard({
     })
   const insert = () =>
     run(async () => {
-      if (dirty) throw new Error("Save your edits before inserting this draft.")
       const [tab] = await chrome.tabs.query({
         active: true,
         lastFocusedWindow: true
@@ -415,127 +432,89 @@ function DraftCard({
         "superseded",
         "invalidated"
       ].includes(action.state))
+  const copyDraft = () =>
+    run(async () => {
+      await navigator.clipboard.writeText(body)
+      setNotice("Copied. Nothing was sent.")
+    })
+  // The draft reads as the email itself: who it goes to and the message, both
+  // editable in place, with Insert and Copy. The send review sits underneath.
   return (
-    <section className="artifact">
-      <div className="card-heading">
-        <strong>
-          {c.mode === "reply" ? "Reply draft" : "New email draft"}
-        </strong>
-        <span className="muted">Revision {value.revision}</span>
-      </div>
-      {!editing && (
-        <div className="draft-reading">
-          <p className="draft-envelope">
-            <span>To</span> {to}
-          </p>
-          <p className="draft-subject">{subject}</p>
-          <p className="prose draft-body">{body}</p>
-        </div>
-      )}
-      <div hidden={!editing}>
-        <label>
-          To
+    <section className="artifact draft-card" aria-label="draft result">
+      <div className="draft-box">
+        <label className="draft-to">
+          <span>To</span>
           <input
             value={to}
             disabled={locked}
+            placeholder="name@example.com"
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
-        <details>
-          <summary>Cc and Bcc</summary>
-          <label>
-            Cc
-            <input
-              value={cc}
-              disabled={locked}
-              onChange={(e) => setCc(e.target.value)}
-            />
-          </label>
-          <label>
-            Bcc
-            <input
-              value={bcc}
-              disabled={locked}
-              onChange={(e) => setBcc(e.target.value)}
-            />
-          </label>
-        </details>
-        <label>
-          Subject
-          <input
-            value={subject}
-            disabled={locked || !!envelope?.reply}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-        </label>
-        <label>
-          Message
-          <textarea
-            aria-label="Message"
-            rows={7}
-            value={body}
-            disabled={locked}
-            onChange={(e) => setBody(e.target.value)}
-          />
-        </label>
-      </div>
-      {c.unresolved_fields?.length > 0 && (
-        <div className="warning">
-          <b>Needs your input</b>
-          <ul>
-            {c.unresolved_fields.map((x: string) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ul>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={resolved}
-              disabled={locked}
-              onChange={(e) => setResolved(e.target.checked)}
-            />
-            I filled in all missing details in this draft.
-          </label>
+        {!envelope?.reply && c.subject && (
+          <p className="draft-subject">{c.subject}</p>
+        )}
+        <textarea
+          className="draft-body"
+          aria-label="Message"
+          value={body}
+          disabled={locked}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        {c.unresolved_fields?.length > 0 && (
+          <div className="warning">
+            <b>Needs your input</b>
+            <ul>
+              {c.unresolved_fields.map((x: string) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+            <p>Tell Threadly the missing details in the chat.</p>
+          </div>
+        )}
+        <div className="draft-actions">
+          {dirty ? (
+            <>
+              <button disabled={busy || !body.trim()} onClick={save}>
+                Save changes
+              </button>
+              <button disabled={busy} onClick={discard}>
+                Undo
+              </button>
+            </>
+          ) : (
+            <>
+          {envelope?.reply && (
+            // Ready once Gmail's reply box is open for this thread.
+            <button disabled={busy || !replyOpen} onClick={insert}>
+              Insert
+            </button>
+          )}
+          <button disabled={busy} onClick={copyDraft}>
+            Copy
+          </button>
+            </>
+          )}
         </div>
-      )}
-      <div className="button-row">
-        {!editing ? (
-          <button
-            disabled={locked || !value.is_latest}
-            onClick={() => setEditing(true)}>
-            Edit draft
-          </button>
-        ) : (
-          <button
-            disabled={!dirty || locked || !value.is_latest}
-            onClick={save}>
-            Save edits
-          </button>
+        {notice && (
+          <p className="draft-notice" role="status">
+            {notice}
+          </p>
         )}
+      </div>
+      <div className="draft-footer">
         <button
-          disabled={busy}
-          onClick={() =>
-            run(async () => {
-              await navigator.clipboard.writeText(body)
-              setNotice("Copied. Nothing was sent.")
-            })
-          }>
-          Copy
-        </button>
-        {envelope?.reply && (
-          <button disabled={busy || dirty} onClick={insert}>
-            Insert body
-          </button>
-        )}
-        <button
+          className="icon-button"
+          aria-label="Review outgoing email"
+          title="Review and send"
           disabled={
-            locked ||
             dirty ||
+            locked ||
             !value.is_latest ||
             !!value.review?.blockers?.length
           }
           onClick={prepare}>
-          Review outgoing email
+          <Icon name="shield" size={15} />
         </button>
       </div>
       {value.review?.blockers?.length > 0 && (
@@ -556,26 +535,6 @@ function DraftCard({
           Load latest revision
         </button>
       )}
-      <details
-        onToggle={(e) => {
-          if (e.currentTarget.open)
-            void api(`/assistant/tasks/${value.task_id}/draft-revisions`)
-              .then((r) => setHistory(r.revisions))
-              .catch((e) => setNotice(errorText(e)))
-        }}>
-        <summary>Revision history</summary>
-        {history.map((h) => (
-          <button
-            key={h.artifact_id}
-            onClick={() =>
-              run(async () =>
-                replace(await api(`/assistant/artifacts/${h.artifact_id}`))
-              )
-            }>
-            Revision {h.revision}
-          </button>
-        ))}
-      </details>
       {action && (
         <div className="approval">
           <b>Exact outgoing email</b>
@@ -668,8 +627,6 @@ function DraftCard({
             ))}
         </div>
       )}
-      <Evidence value={value} />
-      {notice && <p role="status">{notice}</p>}
     </section>
   )
 }

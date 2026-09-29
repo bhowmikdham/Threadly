@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "preview": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/preview.mjs",
+    "preview:dev": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/preview.mjs --dev",
     "format": "prettier --write background.ts content.ts popup.tsx sidepanel.tsx lib components tests style.css"
   },
   "dependencies": {

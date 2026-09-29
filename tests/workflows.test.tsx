@@ -244,3 +244,64 @@ describe("workflow continuation and scheduling", () => {
     expect(chrome.permissions.request).not.toHaveBeenCalled()
   })
 })
+
+describe("reply details already known from the attached email", () => {
+  const replyQuestion = (fields: string[], intent = "reply"): any => ({
+    id: "entry",
+    instruction: "Draft a reply to this thread.",
+    task: {
+      task_id: "t",
+      state: "needs_clarification",
+      version: 2,
+      route: { decision: { intent } },
+      question: { question_id: "q", expected_version: 2, fields }
+    }
+  })
+  const opened: any = {
+    thread: { thread_id: "def456", subject: "Test receipt" },
+    messages: [
+      { gmail_msg_id: "abc123", from_addr: "Supplier <supplier@example.test>" },
+      { gmail_msg_id: "msg9", from_addr: "other@example.test" }
+    ],
+    selectedIds: ["abc123", "msg9"],
+    targetId: "abc123"
+  }
+  it("continues straight away with the opened message and its sender", async () => {
+    const answer = vi.fn()
+    render(
+      <TaskCard
+        entry={replyQuestion(["reply_message_id", "recipients"])}
+        controller={{ answer, selection: opened }}
+      />
+    )
+    await waitFor(() => expect(answer).toHaveBeenCalledTimes(1))
+    expect(answer.mock.calls[0][1]).toEqual({
+      reply_message_id: "abc123",
+      recipients: ["supplier@example.test"]
+    })
+    expect(screen.queryByText("Continue request")).toBeNull()
+    expect(screen.queryByText("One more thing")).toBeNull()
+  })
+  it("still asks when no single message is open in the thread", () => {
+    const answer = vi.fn()
+    render(
+      <TaskCard
+        entry={replyQuestion(["reply_message_id", "recipients"])}
+        controller={{ answer, selection: { ...opened, targetId: null } }}
+      />
+    )
+    expect(screen.getByText("Continue request")).toBeTruthy()
+    expect(answer).not.toHaveBeenCalled()
+  })
+  it("still asks who a new email should go to", () => {
+    const answer = vi.fn()
+    render(
+      <TaskCard
+        entry={replyQuestion(["recipients"], "compose")}
+        controller={{ answer, selection: opened }}
+      />
+    )
+    expect(screen.getByText("Who should this go to?")).toBeTruthy()
+    expect(answer).not.toHaveBeenCalled()
+  })
+})

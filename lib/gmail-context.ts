@@ -3,6 +3,22 @@ export function gmailId(value?: string | null): string | null {
   if (!value) return null
   return /^[a-f0-9]{1,32}$/i.test(value) ? value.toLowerCase() : null
 }
+/** Put a draft into a reply editor as plain text, one line break per newline. */
+export function fillReplyEditor(editor: HTMLElement, body: string) {
+  const nodes: Node[] = []
+  body.split("\n").forEach((line, i) => {
+    if (i) nodes.push(editor.ownerDocument.createElement("br"))
+    if (line) nodes.push(editor.ownerDocument.createTextNode(line))
+  })
+  editor.replaceChildren(...nodes)
+}
+/** True when a Gmail URL is showing one email thread rather than a list. */
+export function gmailUrlShowsEmail(href?: string | null): boolean {
+  if (!href?.startsWith("https://mail.google.com/")) return false
+  const parts = new URL(href).hash.replace(/^#/, "").split("/")
+  // Lists look like #inbox or #label/Work; an open thread adds its id: #inbox/FMfcgz…
+  return parts.length >= 2 && /^[A-Za-z0-9_-]{16,}$/.test(parts.at(-1)!)
+}
 export function readGmailSelection(doc: Document, href: string) {
   const heading = doc.querySelector("h2.hP")
   const main =
@@ -37,11 +53,18 @@ export function readGmailSelection(doc: Document, href: string) {
       .querySelector('[aria-label*="Google Account:"]')
       ?.getAttribute("aria-label")
       ?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null
+  // Only whether a reply box is showing; its contents are never read.
+  const replyEditorOpen = rows.some((r) =>
+    Array.from(
+      r.querySelectorAll('[contenteditable="true"][role="textbox"]')
+    ).some((el) => el.getClientRects().length > 0)
+  )
   return {
     threadId,
     messageIds,
     selectedMessageId: selected,
     subject: heading?.textContent?.trim() || null,
-    accountEmail: account
+    accountEmail: account,
+    replyEditorOpen
   }
 }
