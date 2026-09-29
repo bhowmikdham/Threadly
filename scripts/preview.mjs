@@ -124,21 +124,22 @@ Threadly offline preview
   extension     ${path.relative(process.cwd(), extension)}${dev ? "  (live reload)" : ""}
   signed in as  ${user.email}  (synthetic local session)
 
-Scripted prompts the fixture understands:
+With Bhowmik's email open in the side panel, try:
+  Summarise this thread                summary with the action and deadline
+  Draft a reply to this thread         a ready reply; Insert unlocks once Reply is open
+  Also mention I'll test dark mode     edits the reply in the chat
+  When is the demo?                    a short answer from the email
+
+Anywhere, the fixture also understands:
   hey                                  plain chat reply
   Show me all GYG emails               inbox cards, flight card, "show more"
   Find an email about GYG              the same search, from the "Find an email" shortcut
-  (then click a card to attach it)
-  Summarise this thread.               summary result
-  Make it shorter                      refinement of the active task
-  How much did I pay?                  answer card
-  Draft a reply to this thread.        editable draft (with an email attached, no questions)
   Write an email thanking Alex …       recipient question; answer alex@example.test
   Find a meeting time tomorrow.        multi-step proposal and slot picker
-  Menu (top left) → Recent work, Settings, appearance, Sign out
+  Menu (top left)                      Recent chats, connectors, settings, sign out
 
 Two tabs are open:
-  Test receipt           a stand-in open email. Click the Threadly button on the
+  Review the new panel   a stand-in open email from Bhowmik. Click the Threadly button on the
                          right edge (or the toolbar icon) to open the real side
                          panel with that email attached.
   Threadly side panel    the panel on its own, with no email open.

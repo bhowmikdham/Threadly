@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import { addresses } from "../lib/api"
-import { gmailId, readGmailSelection } from "../lib/gmail-context"
+import {
+  fillReplyEditor,
+  gmailId,
+  readGmailSelection
+} from "../lib/gmail-context"
 import {
   allowedPath,
   allowedRequest,
@@ -142,6 +146,18 @@ describe("selected Gmail references", () => {
     const s = readGmailSelection(document, href)
     expect(s.replyEditorOpen).toBe(true)
     expect(JSON.stringify(s)).not.toContain("PRIVATE_DRAFT")
+  })
+  it("inserts a reply as plain text lines, keeping its paragraphs", () => {
+    const editor = document.createElement("div")
+    fillReplyEditor(
+      editor,
+      "Hi Bhowmik,\n\nSounds good. <img src=x onerror=alert(1)>\n\nCheers"
+    )
+    expect(editor.querySelectorAll("br")).toHaveLength(4)
+    expect(editor.querySelector("img")).toBeNull()
+    expect(editor.textContent).toBe(
+      "Hi Bhowmik,Sounds good. <img src=x onerror=alert(1)>Cheers"
+    )
   })
   it("requires explicit target when multiple messages are expanded", () => {
     document.body.innerHTML =

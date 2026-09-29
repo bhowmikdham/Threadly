@@ -427,8 +427,9 @@ function DraftCard({
           </div>
         )}
         <div className="draft-actions">
-          {envelope?.reply && replyOpen && (
-            <button disabled={busy} onClick={insert}>
+          {envelope?.reply && (
+            // Ready once Gmail's reply box is open for this thread.
+            <button disabled={busy || !replyOpen} onClick={insert}>
               Insert
             </button>
           )}

@@ -1,6 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { readGmailSelection } from "./lib/gmail-context"
+import { fillReplyEditor, readGmailSelection } from "./lib/gmail-context"
 
 export const config: PlasmoCSConfig = { matches: ["https://mail.google.com/*"] }
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
@@ -52,7 +52,7 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
       return false
     }
     editors[0].focus()
-    editors[0].textContent = request.body
+    fillReplyEditor(editors[0], request.body)
     editors[0].dispatchEvent(
       new InputEvent("input", {
         bubbles: true,

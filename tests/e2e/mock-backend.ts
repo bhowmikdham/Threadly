@@ -12,6 +12,22 @@ export const target = "abc123",
   thread = "def456"
 export const user = { id: 1, email: "tester@example.test", name: "Tester" }
 
+// A realistic thread for `npm run preview`'s stand-in email. The e2e suite
+// keeps using the receipt fixture above, so its assertions are unaffected.
+export const previewThread = {
+  thread: "b7e2a9",
+  message: "c41d07",
+  from: "Bhowmik Dham <bhowmik@example.test>",
+  subject: "Can you review the new Threadly panel?",
+  body: "Hey, I've pushed the new conversation panel to the frontend branch. Could you go through the inbox cards and the reply flow and let me know by Thursday if anything needs changing? We're demoing it to the team on Friday. Cheers, Bhowmik",
+  sentAt: "2026-09-28T23:15:00Z"
+}
+const previewReply = [
+  "Hi Bhowmik,",
+  "Thanks for pushing the panel changes. I'll go through the inbox cards and the reply flow and send you any feedback by Thursday, so we're set for Friday's demo.",
+  "Cheers"
+]
+
 export type Call = { path: string; body: any }
 export type MockBackend = { server: Server; calls: Call[] }
 // Contract checks the fixture makes about incoming requests. The e2e suite
@@ -25,6 +41,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
   let lastAction: any = null,
     number = 0
   function resultTask(body: any, kind: string) {
+    const preview = body.context_snapshot_id === "ctx-2"
     const id = `task-${++number}`,
       aid = `artifact-${number}`
     const task = {
@@ -42,19 +59,41 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     tasks.set(id, task)
     const content =
       kind === "summary"
-        ? {
-            overview: "Order 7842 totals $18.60. Pickup is at 6:20 PM.",
-            actions: [],
-            decisions: [],
-            open_questions: []
-          }
+        ? preview
+          ? {
+              overview:
+                "Bhowmik has pushed the new conversation panel to the frontend branch and wants your review before Friday's team demo.",
+              actions: [
+                {
+                  text: "Review the inbox cards and reply flow, and send feedback",
+                  owner: "You",
+                  due_date: "Thursday"
+                }
+              ],
+              decisions: [],
+              open_questions: [
+                { text: "Does anything need changing before the demo?" }
+              ]
+            }
+          : {
+              overview: "Order 7842 totals $18.60. Pickup is at 6:20 PM.",
+              actions: [],
+              decisions: [],
+              open_questions: []
+            }
         : kind === "draft"
           ? {
               mode: body.draft_options?.reply_message_id ? "reply" : "new",
               subject: body.draft_options?.reply_message_id
-                ? "Re: Test receipt"
+                ? preview
+                  ? `Re: ${previewThread.subject}`
+                  : "Re: Test receipt"
                 : "Project update",
-              body: body.draft_body || "Thank you for the update.",
+              body:
+                body.draft_body ||
+                (preview
+                  ? previewReply.join("\n\n")
+                  : "Thank you for the update."),
               unresolved_fields: []
             }
           : kind === "schedule_options"
@@ -71,7 +110,12 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
                 expires_at: "2030-09-24T00:00:00Z",
                 slot_request_id: "slot-request-1"
               }
-            : { text: "$18.60", found: true }
+            : preview
+              ? {
+                  text: "He'd like your feedback by Thursday; the team demo is on Friday.",
+                  found: true
+                }
+              : { text: "$18.60", found: true }
     artifacts.set(aid, {
       artifact_id: aid,
       task_id: id,
@@ -84,8 +128,10 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
           {
             ref_id: "source-1",
             source_kind: "message",
-            source_id: target,
-            quote: "Order 7842 totals $18.60."
+            source_id: preview ? previewThread.message : target,
+            quote: preview
+              ? "let me know by Thursday if anything needs changing"
+              : "Order 7842 totals $18.60."
           }
         ],
         assumptions: [],
@@ -98,11 +144,17 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
               cc: [],
               bcc: [],
               reply: body.draft_options?.reply_message_id
-                ? {
-                    subject: "Re: Test receipt",
-                    gmail_message_id: target,
-                    gmail_thread_id: thread
-                  }
+                ? preview
+                  ? {
+                      subject: `Re: ${previewThread.subject}`,
+                      gmail_message_id: previewThread.message,
+                      gmail_thread_id: previewThread.thread
+                    }
+                  : {
+                      subject: "Re: Test receipt",
+                      gmail_message_id: target,
+                      gmail_thread_id: thread
+                    }
                 : null
             }
           : null,
@@ -167,13 +219,20 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
             body.instruction
           )
         ) {
-          const change = body.instruction.trim().replace(/[.!?]*$/, ".")
+          const change = body.instruction
+            .trim()
+            .replace(/^(also |and )?(mention|add|say|include)( that)? /i, "")
+            .replace(/[.!?]*$/, ".")
           body.intent_hint = draft.draft_envelope.reply ? "reply" : "compose"
           body.draft_options = {
             to: draft.draft_envelope.to,
             reply_message_id: draft.draft_envelope.reply?.gmail_message_id
           }
-          body.draft_body = `Thank you for the update. ${change[0].toUpperCase()}${change.slice(1)}`
+          const line = `${change[0].toUpperCase()}${change.slice(1)}`
+          const current = draft.artifact.content.body as string
+          body.draft_body = current.endsWith("\n\nCheers")
+            ? current.replace(/\n\nCheers$/, `\n\n${line}\n\nCheers`)
+            : `Thank you for the update. ${line}`
           body.draft_revision = draft.revision + 1
         }
       }
@@ -294,6 +353,41 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
             sent_at: "2026-09-22T03:00:00Z"
           }
         ]
+      }
+    else if (p === `/threads/${previewThread.thread}`)
+      data = {
+        thread: {
+          thread_id: previewThread.thread,
+          version: 1,
+          subject: previewThread.subject
+        },
+        messages: [
+          {
+            gmail_msg_id: previewThread.message,
+            from_addr: previewThread.from,
+            subject: previewThread.subject,
+            body_clean: previewThread.body,
+            sent_at: previewThread.sentAt
+          }
+        ]
+      }
+    else if (
+      p === "/assistant/context-snapshots" &&
+      body.thread_id === previewThread.thread
+    )
+      data = {
+        context_snapshot_id: "ctx-2",
+        thread_id: previewThread.thread,
+        thread_version: 1
+      }
+    else if (p === "/assistant/context-snapshots/ctx-2")
+      data = {
+        thread_id: previewThread.thread,
+        thread_version: 1,
+        ui_map: {
+          visible_message_ids: [previewThread.message],
+          selected_message_ids: [previewThread.message]
+        }
       }
     else if (p === "/assistant/context-snapshots") {
       verify(

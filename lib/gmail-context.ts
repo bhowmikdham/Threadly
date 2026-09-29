@@ -3,6 +3,15 @@ export function gmailId(value?: string | null): string | null {
   if (!value) return null
   return /^[a-f0-9]{1,32}$/i.test(value) ? value.toLowerCase() : null
 }
+/** Put a draft into a reply editor as plain text, one line break per newline. */
+export function fillReplyEditor(editor: HTMLElement, body: string) {
+  const nodes: Node[] = []
+  body.split("\n").forEach((line, i) => {
+    if (i) nodes.push(editor.ownerDocument.createElement("br"))
+    if (line) nodes.push(editor.ownerDocument.createTextNode(line))
+  })
+  editor.replaceChildren(...nodes)
+}
 /** True when a Gmail URL is showing one email thread rather than a list. */
 export function gmailUrlShowsEmail(href?: string | null): boolean {
   if (!href?.startsWith("https://mail.google.com/")) return false
