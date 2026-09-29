@@ -10,14 +10,18 @@ export const config: PlasmoCSConfig = {
 
 // The tab starts sliding out once the pointer is in the right 40% of Gmail.
 const REVEAL_FROM = 0.6
-const TAB = 44
+// Small and quiet at rest; full size with a soft blue tint on hover.
+const REST = { width: 30, height: 34, logo: 8 }
+const OPEN = { width: 44, height: 44, logo: 10 }
 
 const palettes = {
   light: {
     background: "#ffffff",
     border: "#e3e2e8",
     ink: "#1b2135",
-    hover: "#f4f3f8",
+    hover: "#eef3fe",
+    hoverBorder: "#b9cdf7",
+    ring: "#1a73e8",
     tip: "#1f1f23",
     tipInk: "#ffffff",
     shadow: "0 1px 2px #1b213514, 0 8px 24px -8px #1b213540"
@@ -26,7 +30,9 @@ const palettes = {
     background: "#2b2b2f",
     border: "#3d3d42",
     ink: "#efebe3",
-    hover: "#34343a",
+    hover: "#2c3447",
+    hoverBorder: "#4d628f",
+    ring: "#8ab4f8",
     tip: "#efebe3",
     tipInk: "#1b2135",
     shadow: "0 1px 2px #00000066, 0 10px 28px -8px #000000aa"
@@ -48,6 +54,7 @@ function gmailIsDark() {
 const HoverTrigger = () => {
   const [reveal, setReveal] = useState(0),
     [open, setOpen] = useState(false),
+    [keyboard, setKeyboard] = useState(false),
     [dark, setDark] = useState(false),
     [calm, setCalm] = useState(false)
 
@@ -70,9 +77,11 @@ const HoverTrigger = () => {
   }, [])
 
   const c = dark ? palettes.dark : palettes.light
-  // At rest the tab is slightly tucked in and slides fully out as the pointer
-  // approaches. It never changes size; hover or focus shows a label beside it.
-  const tucked = open ? 0 : 6 * (1 - reveal)
+  // At rest the tab is small, colourless and slightly tucked in; it slides out
+  // as the pointer approaches, and grows with a soft blue tint and a label on
+  // hover or keyboard focus.
+  const tucked = open ? 0 : 5 * (1 - reveal)
+  const size = open ? OPEN : REST
   const motion = (value: string) => (calm ? "none" : value)
 
   return (
@@ -125,32 +134,46 @@ const HoverTrigger = () => {
         aria-describedby="threadly-launcher-tip"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={() => chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" })}
+        onFocus={(e) => {
+          // Only keyboard focus opens it; a mouse click leaves no focus state.
+          const visible = e.currentTarget.matches(":focus-visible")
+          setKeyboard(visible)
+          if (visible) setOpen(true)
+        }}
+        onBlur={() => {
+          setKeyboard(false)
+          setOpen(false)
+        }}
+        onClick={(e) => {
+          chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" })
+          e.currentTarget.blur()
+          setOpen(false)
+        }}
         style={{
           display: "grid",
           placeItems: "center",
-          width: TAB,
-          height: TAB,
+          width: size.width,
+          height: size.height,
           padding: 0,
-          border: `1px solid ${c.border}`,
+          border: `1px solid ${open ? c.hoverBorder : c.border}`,
           borderRight: 0,
-          borderRadius: "12px 0 0 12px",
+          borderRadius: "11px 0 0 11px",
           background: open ? c.hover : c.background,
           color: c.ink,
           boxShadow: c.shadow,
           cursor: "pointer",
+          outline: keyboard ? `2px solid ${c.ring}` : "none",
           outlineOffset: 2,
-          transition: motion("background 0.15s")
+          transition: motion(
+            "width 0.2s cubic-bezier(0.22, 1, 0.36, 1), height 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s, border-color 0.15s"
+          )
         }}>
         <span
           style={{
             display: "flex",
-            transform: open ? "scale(1.08)" : "scale(1)",
             transition: motion("transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)")
           }}>
-          <Logo height={10} />
+          <Logo height={size.logo} />
         </span>
       </button>
     </div>
