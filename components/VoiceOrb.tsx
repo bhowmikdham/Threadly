@@ -169,25 +169,83 @@ function Orb({ level }: { level: React.MutableRefObject<number> }) {
   return <canvas ref={canvas} className="voice-orb" aria-hidden="true" />
 }
 
-// Voice mode: the orb fills the panel while Threadly listens. Words are
-// transcribed live; closing hands them to the chat box for the user to send.
+type Phase = "listening" | "thinking" | "speaking"
+const labels: Record<Phase, string> = {
+  listening: "Listening…",
+  thinking: "Thinking…",
+  speaking: "Speaking…"
+}
+// How long a pause ends what the user is saying.
+const PAUSE_MS = 1200
+
+// Threadly's voice. Kept on its own so a server voice (for example ElevenLabs
+// behind the backend's /voice/speak) can replace the browser's later.
+function pickVoice() {
+  const voices = window.speechSynthesis?.getVoices() || []
+  const lang = navigator.language.slice(0, 2)
+  const local = voices.filter((v) => v.lang.startsWith(lang))
+  return (
+    local.find((v) => /natural|google|samantha|karen|daniel/i.test(v.name)) ||
+    local[0] ||
+    null
+  )
+}
+export function speak(text: string, onLevel: (level: number) => void) {
+  return new Promise<void>((resolve) => {
+    const synth = window.speechSynthesis
+    if (!synth || !text) return resolve()
+    synth.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = navigator.language
+    const voice = pickVoice()
+    if (voice) u.voice = voice
+    let timer: ReturnType<typeof setInterval> | undefined
+    // Browser speech has no volume feed, so the orb follows a speaking rhythm
+    // and swells on each word.
+    u.onstart = () => {
+      let t = 0
+      timer = setInterval(() => {
+        t += 0.05
+        onLevel(0.3 + 0.25 * Math.abs(Math.sin(t * 7)))
+      }, 50)
+    }
+    u.onboundary = () => onLevel(0.75)
+    const done = () => {
+      clearInterval(timer)
+      onLevel(0)
+      resolve()
+    }
+    u.onend = done
+    u.onerror = done
+    synth.speak(u)
+  })
+}
+
+// Voice mode: a spoken back-and-forth with Threadly. The orb listens, thinks
+// and answers aloud, then listens again, until the user closes it. Requests
+// and replies also land in the chat, where drafts and approvals are handled.
 export function VoiceOrb({
+  respond,
   onClose
 }: {
-  onClose: (transcript: string, error?: string) => void
+  respond: (said: string) => Promise<string>
+  onClose: (error?: string) => void
 }) {
   const level = useRef(0)
-  const [heard, setHeard] = useState(""),
-    [live, setLive] = useState(""),
-    [status, setStatus] = useState("Listening…")
-  const text = useRef("")
+  const [phase, setPhase] = useState<Phase>("listening"),
+    [notice, setNotice] = useState("")
+  const phaseRef = useRef<Phase>("listening")
   const closed = useRef(false)
   const stop = useRef<() => void>(() => {})
+  const move = (next: Phase) => {
+    phaseRef.current = next
+    setPhase(next)
+  }
   const finish = (error?: string) => {
     if (closed.current) return
     closed.current = true
     stop.current()
-    onClose(text.current.trim(), error)
+    onClose(error)
   }
   useEffect(() => {
     const Recognition =
@@ -195,30 +253,56 @@ export function VoiceOrb({
       (window as any).webkitSpeechRecognition
     if (!Recognition) {
       finish(
-        "Dictation isn’t available in this browser. You can type your request."
+        "Voice isn’t available in this browser. You can type your request."
       )
       return
     }
     let stream: MediaStream | null = null,
       audio: AudioContext | null = null,
-      meter = 0,
-      ended = false,
+      frame = 0,
+      silence: ReturnType<typeof setTimeout> | undefined,
+      heard = "",
       broken = false
+    const mic = { level: 0 },
+      voice = { level: 0 }
     const r = new Recognition()
     r.lang = navigator.language
     r.interimResults = true
     r.continuous = true
-    r.onresult = (e: any) => {
-      let final = "",
-        interim = ""
-      for (let i = 0; i < e.results.length; i++) {
-        const piece = e.results[i][0].transcript
-        if (e.results[i].isFinal) final += piece
-        else interim += piece
+    const listen = () => {
+      if (closed.current || broken) return
+      heard = ""
+      move("listening")
+      try {
+        r.start()
+      } catch {}
+    }
+    const reply = async (said: string) => {
+      move("thinking")
+      try {
+        r.stop()
+      } catch {}
+      let answer: string
+      try {
+        answer = await respond(said)
+      } catch {
+        answer = "Sorry, something went wrong. Try again."
       }
-      text.current = `${final}${interim}`.replace(/\s+/g, " ")
-      setHeard(final)
-      setLive(interim)
+      if (closed.current) return
+      move("speaking")
+      await speak(answer, (value) => (voice.level = value))
+      if (!closed.current) listen()
+    }
+    r.onresult = (e: any) => {
+      if (phaseRef.current !== "listening") return
+      let text = ""
+      for (let i = 0; i < e.results.length; i++)
+        text += e.results[i][0].transcript
+      heard = text.replace(/\s+/g, " ").trim()
+      clearTimeout(silence)
+      silence = setTimeout(() => {
+        if (heard && phaseRef.current === "listening") void reply(heard)
+      }, PAUSE_MS)
     }
     r.onerror = (e: any) => {
       if (e?.error === "no-speech" || e?.error === "aborted") return
@@ -228,45 +312,49 @@ export function VoiceOrb({
         )
       ) {
         finish(
-          "Couldn’t start dictation. Check microphone access or type your request."
+          "Couldn’t start voice. Check microphone access or type your request."
         )
         return
       }
       // Speech service trouble: stay open and say so rather than vanish.
       broken = true
-      setStatus("Dictation isn’t working right now. Close and type instead.")
+      setNotice("Voice isn’t working right now. Close and type instead.")
     }
-    // Chrome ends recognition after a long pause; keep listening until the
-    // user closes the orb.
+    // Chrome ends recognition after a long pause; keep listening while it is
+    // the user's turn.
     r.onend = () => {
-      if (!ended && !broken && !closed.current)
-        try {
-          r.start()
-        } catch {
-          setStatus("Paused")
-        }
+      if (phaseRef.current === "listening") listen()
     }
+    // The orb follows the user's voice while listening, Threadly's while
+    // speaking, and a soft pulse while thinking.
+    const animate = (now: number) => {
+      const p = phaseRef.current
+      level.current =
+        p === "listening"
+          ? mic.level
+          : p === "speaking"
+            ? voice.level
+            : 0.12 + 0.08 * Math.sin(now / 160)
+      frame = requestAnimationFrame(animate)
+    }
+    frame = requestAnimationFrame(animate)
     stop.current = () => {
-      ended = true
-      cancelAnimationFrame(meter)
+      clearTimeout(silence)
+      cancelAnimationFrame(frame)
       try {
-        r.stop()
+        r.abort()
       } catch {}
+      window.speechSynthesis?.cancel()
       stream?.getTracks().forEach((t) => t.stop())
       void audio?.close()
     }
-    try {
-      r.start()
-    } catch {
-      finish("Couldn’t start the microphone.")
-      return
-    }
-    // A second, read-only tap on the microphone drives the orb's size. If it
-    // is refused, the orb still breathes and dictation carries on.
+    listen()
+    // A read-only tap on the microphone measures how loudly the user speaks.
+    // If it is refused, the orb still breathes and the conversation carries on.
     void navigator.mediaDevices
       ?.getUserMedia({ audio: true })
       .then((s) => {
-        if (ended) {
+        if (closed.current) {
           s.getTracks().forEach((t) => t.stop())
           return
         }
@@ -277,12 +365,12 @@ export function VoiceOrb({
         audio.createMediaStreamSource(s).connect(analyser)
         const samples = new Uint8Array(analyser.fftSize)
         const tick = () => {
+          if (closed.current) return
           analyser.getByteTimeDomainData(samples)
           let sum = 0
           for (const v of samples) sum += ((v - 128) / 128) ** 2
-          const rms = Math.sqrt(sum / samples.length)
-          level.current = Math.min(1, rms * 6)
-          meter = requestAnimationFrame(tick)
+          mic.level = Math.min(1, Math.sqrt(sum / samples.length) * 6)
+          requestAnimationFrame(tick)
         }
         tick()
       })
@@ -293,6 +381,7 @@ export function VoiceOrb({
     addEventListener("keydown", key)
     return () => {
       removeEventListener("keydown", key)
+      closed.current = true
       stop.current()
     }
   }, [])
@@ -301,21 +390,17 @@ export function VoiceOrb({
       className="voice-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Voice input">
+      aria-label="Voice conversation">
       <button
         className="icon-button voice-close"
-        aria-label="Close voice input"
+        aria-label="Close voice conversation"
         autoFocus
         onClick={() => finish()}>
         <Icon name="close" />
       </button>
       <Orb level={level} />
       <p className="voice-status" role="status">
-        {status}
-      </p>
-      <p className="voice-transcript">
-        {heard}
-        <span>{live}</span>
+        {notice || labels[phase]}
       </p>
     </div>
   )

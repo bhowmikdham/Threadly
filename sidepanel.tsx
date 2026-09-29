@@ -15,6 +15,7 @@ import {
   schedulingReadiness,
   type PreferencesState
 } from "./lib/scheduling-readiness"
+import { spokenReply } from "./lib/spoken-reply"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -363,13 +364,33 @@ function Assistant({
     atBottom.current = true
     void c.submit(text)
   }
-  // The mic opens voice mode: the orb fills the panel while Threadly listens,
-  // and closing it puts what was said into the chat box.
+  // The mic opens voice mode: a spoken back-and-forth. Each thing the user
+  // says is sent like a typed request, and Threadly's reply is read aloud.
   const dictate = () => setRecording(true)
-  const voiceDone = (transcript: string, error?: string) => {
+  const entriesNow = useRef(c.entries)
+  entriesNow.current = c.entries
+  const busyNow = useRef(inputBusy)
+  busyNow.current = inputBusy || c.busy
+  const voiceRespond = async (said: string) => {
+    if (busyNow.current)
+      return "I'm still finishing the last request. Give me a moment."
+    const before = entriesNow.current.length
+    atBottom.current = true
+    void c.submit(said)
+    const deadline = Date.now() + 90_000
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 400))
+      const entry = entriesNow.current
+        .slice(before)
+        .find((e) => e.instruction === said)
+      const reply = spokenReply(entry)
+      if (reply) return reply
+    }
+    return "That's taking a while. I'll keep working on it in the chat."
+  }
+  const voiceDone = (error?: string) => {
     setRecording(false)
     if (error) c.setError(error)
-    if (transcript) setMessage((old) => `${old}${old ? " " : ""}${transcript}`)
     input.current?.focus()
   }
   const newChat = async () => {
@@ -961,8 +982,8 @@ function Assistant({
             <button
               type="button"
               className={`icon-button${recording ? " recording" : ""}`}
-              aria-label={recording ? "Stop dictation" : "Dictate request"}
-              title="Dictate request"
+              aria-label="Talk to Threadly"
+              title="Talk to Threadly"
               disabled={inputBusy}
               onClick={dictate}>
               <Icon name="mic" size={17} />
@@ -989,7 +1010,7 @@ function Assistant({
           Threadly can make mistakes. Review important details.
         </p>
       </div>
-      {recording && <VoiceOrb onClose={voiceDone} />}
+      {recording && <VoiceOrb respond={voiceRespond} onClose={voiceDone} />}
     </>
   )
 }
