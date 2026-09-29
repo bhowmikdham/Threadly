@@ -124,6 +124,22 @@ npx playwright install chromium
 npm run test:e2e                # real packaged extension + deterministic local API
 ```
 
+### Offline preview (no backend, no Google sign-in)
+
+To click through the real side panel without the EC2 backend:
+
+```sh
+npm run build
+npm run preview        # or: npm run preview:dev for live reload while editing
+```
+
+This opens a separate, throwaway Chromium window with the built extension, a
+local mock API on `127.0.0.1:8787` (the same fixtures as `test:e2e`), and a
+synthetic signed-in session. It never touches your own Chrome profile, Gmail,
+Google OAuth or AWS, and nothing from it ships in the extension. The terminal
+lists the prompts the fixtures understand (for example `Show me all GYG emails`,
+`Summarise this thread.`, `Draft a reply to this thread.`).
+
 For the opt-in **live** check, first perform the existing laptop OAuth login and
 open the tunnel. The helper reads your private `~/.threadly-staging/session.json`
 without printing it, then uses an isolated, deleted-after-run Chrome profile:

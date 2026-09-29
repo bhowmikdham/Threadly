@@ -9,6 +9,7 @@ import {
 } from "../lib/api"
 import type { Artifact, EmailAction } from "../lib/types"
 import { Booking } from "./Booking"
+import { Icon } from "./Icon"
 
 const display = (x: any): string =>
   typeof x === "string" ? x : x?.text || x?.question || x?.description || ""
@@ -132,6 +133,7 @@ export function ArtifactCard({
       <Evidence value={value} />
       {(c.text || c.overview) && (
         <button disabled={busy} onClick={copy}>
+          <Icon name="copy" size={14} />
           Copy
         </button>
       )}
@@ -503,12 +505,14 @@ function DraftCard({
           <button
             disabled={locked || !value.is_latest}
             onClick={() => setEditing(true)}>
+            <Icon name="edit" size={14} />
             Edit draft
           </button>
         ) : (
           <button
             disabled={!dirty || locked || !value.is_latest}
             onClick={save}>
+            <Icon name="check" size={14} />
             Save edits
           </button>
         )}
@@ -520,10 +524,12 @@ function DraftCard({
               setNotice("Copied. Nothing was sent.")
             })
           }>
+          <Icon name="copy" size={14} />
           Copy
         </button>
         {envelope?.reply && (
           <button disabled={busy || dirty} onClick={insert}>
+            <Icon name="mail" size={14} />
             Insert body
           </button>
         )}
@@ -534,7 +540,9 @@ function DraftCard({
             !value.is_latest ||
             !!value.review?.blockers?.length
           }
+          className="review-button"
           onClick={prepare}>
+          <Icon name="shield" size={14} />
           Review outgoing email
         </button>
       </div>

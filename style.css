@@ -1416,3 +1416,245 @@ summary:focus-visible {
     transition: none;
   }
 }
+
+/* Result actions: glass pills in the same family as the composer and chips. */
+.artifact .button-row button,
+.artifact > button,
+.approval button:not(.primary),
+.proposal button:not(.primary),
+.clarification > button,
+.slot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ffffff10, transparent 70%),
+    var(--surface);
+  box-shadow: inset 0 1px #ffffff10;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.artifact .button-row button svg,
+.artifact > button svg {
+  color: var(--muted);
+  flex: none;
+}
+.artifact .button-row button:hover:not(:disabled),
+.artifact > button:hover:not(:disabled),
+.approval button:not(.primary):hover:not(:disabled),
+.proposal button:not(.primary):hover:not(:disabled),
+.clarification > button:hover:not(:disabled),
+.slot button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, #ffffff14, transparent 70%),
+    var(--hover);
+}
+.artifact .button-row button:active:not(:disabled),
+.artifact > button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.artifact .button-row .review-button {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+.artifact .button-row .review-button svg {
+  color: var(--accent);
+}
+.artifact .button-row .review-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+.threadly:not(.dark) .artifact .button-row button,
+.threadly:not(.dark) .artifact > button,
+.threadly:not(.dark) .approval button:not(.primary),
+.threadly:not(.dark) .proposal button:not(.primary),
+.threadly:not(.dark) .clarification > button,
+.threadly:not(.dark) .slot button {
+  border-color: #e0dce9;
+  background: linear-gradient(145deg, #ffffff, #f8f7fb);
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 2px 6px -3px #3d2f8a26;
+}
+.threadly:not(.dark) .artifact .button-row .review-button {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, #ffffff);
+}
+
+/* Drawer: brand, conversations, connectors and an account card. */
+.panel-menu {
+  gap: 2px;
+  padding: 20px 14px 14px;
+  overflow-y: auto;
+}
+.panel-menu .drawer-title {
+  margin: 0 0 14px 4px;
+}
+.drawer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.threadly-logo {
+  flex: none;
+  color: var(--text);
+}
+.panel-menu > .drawer-new-chat {
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ffffff10, transparent 70%),
+    var(--surface);
+  box-shadow: inset 0 1px #ffffff10;
+  font-weight: 550;
+}
+.panel-menu > .drawer-new-chat:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.threadly:not(.dark) .panel-menu > .drawer-new-chat {
+  background: linear-gradient(145deg, #ffffff, #f8f7fb);
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 2px 6px -3px #3d2f8a26;
+}
+.drawer-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 6px 4px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.panel-menu > .drawer-row {
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+.panel-menu > .drawer-row svg {
+  color: var(--muted);
+}
+.panel-menu > .drawer-danger:hover:not(:disabled),
+.panel-menu > .drawer-danger:hover:not(:disabled) svg {
+  color: #d9534a;
+}
+.connector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.connector-list li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.connector-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+}
+.connector-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connector-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.connector-status.is-on {
+  color: var(--text);
+}
+.connector-status.is-on::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3fbf8f;
+  box-shadow: 0 0 0 3px #3fbf8f26;
+}
+.panel-menu .menu-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--soft);
+}
+.menu-account .avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--accent), #9d8ce0);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+}
+.menu-account-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.menu-account-name b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.menu-account-name b,
+.menu-account-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-account-name small {
+  font-size: 11px;
+}
+.menu-account-actions {
+  display: flex;
+  flex: none;
+  gap: 0;
+}
+.menu-account-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+}
+.menu-account-actions .icon-button:last-child:hover {
+  color: #d9534a;
+}

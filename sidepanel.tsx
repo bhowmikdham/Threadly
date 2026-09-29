@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
-import { Icon } from "./components/Icon"
+import { Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
@@ -111,6 +111,7 @@ export default function SidePanel() {
               <Assistant
                 key={user.id}
                 user={user}
+                capabilities={capabilities}
                 openSettings={() => setSettings(true)}
                 logout={logout}
                 theme={theme}
@@ -159,14 +160,22 @@ export default function SidePanel() {
     </main>
   )
 }
+// Friendly names for the backend capability ids shown as connectors.
+const connectorNames: Record<string, string> = {
+  gmail_read: "Gmail",
+  calendar_read: "Google Calendar",
+  calendar_write: "Calendar booking"
+}
 function Assistant({
   user,
+  capabilities,
   openSettings,
   logout,
   theme,
   dark
 }: {
   user: User
+  capabilities: Capability[]
   openSettings: () => void
   logout: () => void
   theme: () => void
@@ -289,7 +298,17 @@ function Assistant({
       ? "New conversation"
       : c.entries[0].instruction
     : "New conversation"
+  // Sending is an approval step, not a connector, so it isn't listed here.
+  const connectors = capabilities.filter((tool) => !tool.id.endsWith("_send"))
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
+  const initials =
+    (user.name || user.email)
+      .trim()
+      .split(/[\s@._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "T"
   const latest = c.entries.at(-1)
   return (
     <>
@@ -317,7 +336,10 @@ function Assistant({
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
           <div className="drawer-title">
-            <span>Threadly</span>
+            <span className="drawer-brand">
+              <Logo height={15} />
+              Threadly
+            </span>
             <button
               className="icon-button"
               aria-label="Close conversation menu"
@@ -325,11 +347,23 @@ function Assistant({
               <Icon name="close" />
             </button>
           </div>
-          <button onClick={() => void newChat()} disabled={startupBusy}>
-            <Icon name="edit" />
+          <button
+            className="drawer-new-chat"
+            onClick={() => void newChat()}
+            disabled={startupBusy}>
+            <Icon name="edit" size={16} />
             New conversation
           </button>
+          <p className="drawer-section">Conversations</p>
           <button
+            className="drawer-row"
+            disabled={inputBusy}
+            onClick={() => void historyPage()}>
+            <Icon name="clock" size={16} />
+            Recent work
+          </button>
+          <button
+            className="drawer-row drawer-danger"
             disabled={inputBusy}
             onClick={async () => {
               if (
@@ -341,25 +375,80 @@ function Assistant({
                 setMenu(false)
               }
             }}>
+            <Icon name="trash" size={16} />
             Delete this conversation
           </button>
-          <button disabled={inputBusy} onClick={() => void historyPage()}>
-            <Icon name="clock" />
-            Recent work
-          </button>
-          <button
-            onClick={() => {
-              openSettings()
-              setMenu(false)
-            }}>
-            Settings
-          </button>
-          <button onClick={theme}>
-            {dark ? "Switch to light appearance" : "Switch to dark appearance"}
-          </button>
+          {connectors.length > 0 && (
+            <>
+              <p className="drawer-section">Connectors</p>
+              <ul className="connector-list">
+                {connectors.map((tool) => (
+                  <li key={tool.id}>
+                    <span className="connector-icon">
+                      <Icon
+                        name={
+                          tool.id.startsWith("calendar")
+                            ? "calendar"
+                            : tool.id.endsWith("send")
+                              ? "send"
+                              : "mail"
+                        }
+                        size={15}
+                      />
+                    </span>
+                    <span className="connector-name">
+                      {connectorNames[tool.id] ||
+                        tool.id.replaceAll("_", " ")}
+                    </span>
+                    <span
+                      className={`connector-status${tool.ready ? " is-on" : ""}`}>
+                      {tool.ready
+                        ? "Connected"
+                        : tool.status === "disabled"
+                          ? "Off"
+                          : "Not connected"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="menu-account">
-            <small>{user.email}</small>
-            <button onClick={logout}>Sign out</button>
+            <span className="avatar" aria-hidden="true">
+              {initials}
+            </span>
+            <span className="menu-account-name">
+              <b>{user.name || user.email.split("@")[0]}</b>
+              <small>{user.email}</small>
+            </span>
+            <span className="menu-account-actions">
+              <button
+                className="icon-button"
+                aria-label={
+                  dark ? "Switch to light appearance" : "Switch to dark appearance"
+                }
+                title={dark ? "Light appearance" : "Dark appearance"}
+                onClick={theme}>
+                <Icon name={dark ? "sun" : "moon"} size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Settings"
+                title="Settings"
+                onClick={() => {
+                  openSettings()
+                  setMenu(false)
+                }}>
+                <Icon name="settings" size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Sign out"
+                title="Sign out"
+                onClick={logout}>
+                <Icon name="signout" size={16} />
+              </button>
+            </span>
           </div>
         </nav>
       )}
