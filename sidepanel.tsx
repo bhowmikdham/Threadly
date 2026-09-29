@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react"
 import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
-import { GmailIcon, Icon, Logo } from "./components/Icon"
+import { GmailIcon, GoogleCalendarIcon, Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
-import { gmailUrlShowsEmail } from "./lib/gmail-context"
 import { requestBackendAccess } from "./lib/backend-access"
+import { gmailUrlShowsEmail } from "./lib/gmail-context"
 import {
   calendarReadReady,
   schedulingReadiness,
@@ -479,20 +479,21 @@ function Assistant({
           <Icon name="edit" />
         </button>
       </header>
-      <div
-        className={`calendar-status calendar-status-${calendarStatus.state}`}
-        role="status">
-        <Icon name="calendar" size={16} />
-        <span>
-          <b>{calendarStatus.label}</b>
-          {calendarStatus.state !== "ready" && (
+      {/* Only shown when Calendar needs something; a ready Calendar stays quiet. */}
+      {calendarStatus.state !== "ready" && (
+        <div
+          className={`calendar-status calendar-status-${calendarStatus.state}`}
+          role="status">
+          <Icon name="calendar" size={16} />
+          <span>
+            <b>{calendarStatus.label}</b>
             <small>{calendarStatus.detail}</small>
+          </span>
+          {calendarStatus.action && (
+            <button onClick={openSettings}>{calendarStatus.action}</button>
           )}
-        </span>
-        {calendarStatus.action && (
-          <button onClick={openSettings}>{calendarStatus.action}</button>
-        )}
-      </div>
+        </div>
+      )}
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
           <div className="drawer-title">
@@ -548,12 +549,7 @@ function Assistant({
                       {tool.id === "gmail" ? (
                         <GmailIcon size={15} />
                       ) : (
-                        <Icon
-                          name={
-                            tool.id.startsWith("calendar") ? "calendar" : "mail"
-                          }
-                          size={15}
-                        />
+                        <GoogleCalendarIcon size={15} />
                       )}
                     </span>
                     <span className="connector-name">

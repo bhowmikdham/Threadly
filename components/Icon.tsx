@@ -201,3 +201,48 @@ export function GmailIcon({
     </svg>
   )
 }
+
+// Google Calendar's own mark for the Calendar connector, like GmailIcon.
+export function GoogleCalendarIcon({
+  size = 18,
+  style
+}: {
+  size?: number
+  style?: CSSProperties
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      aria-hidden="true"
+      style={style}>
+      <path fill="#fff" d="M152.6 47.4H47.4v105.2h105.2z" />
+      <path fill="#EA4335" d="M152.6 200 200 152.6h-47.4z" />
+      <path fill="#FBBC04" d="M200 47.4h-47.4v105.2H200z" />
+      <path fill="#34A853" d="M152.6 152.6H47.4V200h105.2z" />
+      <path
+        fill="#188038"
+        d="M0 152.6v31.6C0 192.9 7.1 200 15.8 200h31.6v-47.4z"
+      />
+      <path
+        fill="#1967D2"
+        d="M200 47.4V15.8C200 7.1 192.9 0 184.2 0h-31.6v47.4z"
+      />
+      <path
+        fill="#4285F4"
+        d="M152.6 0H15.8C7.1 0 0 7.1 0 15.8v136.8h47.4V47.4h105.2z"
+      />
+      <text
+        x="100"
+        y="133"
+        fill="#4285F4"
+        fontFamily="'Google Sans', Roboto, Arial, sans-serif"
+        fontSize="78"
+        fontWeight="700"
+        textAnchor="middle">
+        31
+      </text>
+    </svg>
+  )
+}
