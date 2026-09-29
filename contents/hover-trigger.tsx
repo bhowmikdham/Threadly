@@ -10,20 +10,25 @@ export const config: PlasmoCSConfig = {
 
 // The tab starts sliding out once the pointer is in the right 40% of Gmail.
 const REVEAL_FROM = 0.6
-const TAB = 46
-const OPEN = 118
+const TAB = 44
 
 const palettes = {
   light: {
     background: "#ffffff",
     border: "#e3e2e8",
     ink: "#1b2135",
+    hover: "#f4f3f8",
+    tip: "#1f1f23",
+    tipInk: "#ffffff",
     shadow: "0 1px 2px #1b213514, 0 8px 24px -8px #1b213540"
   },
   dark: {
     background: "#2b2b2f",
     border: "#3d3d42",
     ink: "#efebe3",
+    hover: "#34343a",
+    tip: "#efebe3",
+    tipInk: "#1b2135",
     shadow: "0 1px 2px #00000066, 0 10px 28px -8px #000000aa"
   }
 }
@@ -65,20 +70,13 @@ const HoverTrigger = () => {
   }, [])
 
   const c = dark ? palettes.dark : palettes.light
-  // At rest the tab is partly tucked in; it slides fully out as the pointer
-  // approaches, and widens to show its name on hover or keyboard focus.
+  // At rest the tab is slightly tucked in and slides fully out as the pointer
+  // approaches. It never changes size; hover or focus shows a label beside it.
   const tucked = open ? 0 : 6 * (1 - reveal)
+  const motion = (value: string) => (calm ? "none" : value)
 
   return (
-    <button
-      type="button"
-      aria-label="Open Threadly"
-      title="Open Threadly"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      onClick={() => chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" })}
+    <div
       style={{
         position: "fixed",
         top: "50%",
@@ -86,38 +84,76 @@ const HoverTrigger = () => {
         zIndex: 999999,
         display: "flex",
         alignItems: "center",
-        gap: 9,
-        width: open ? OPEN : TAB,
-        height: 40,
-        padding: "0 0 0 12px",
-        overflow: "hidden",
-        border: `1px solid ${c.border}`,
-        borderRight: 0,
-        borderRadius: "12px 0 0 12px",
-        background: c.background,
-        color: c.ink,
-        boxShadow: c.shadow,
-        cursor: "pointer",
-        outlineOffset: 2,
-        font: "600 13px/1 -apple-system, BlinkMacSystemFont, 'Google Sans', 'Segoe UI', Roboto, sans-serif",
-        letterSpacing: "-0.01em",
-        whiteSpace: "nowrap",
         transform: `translate(${tucked}px, -50%)`,
-        transition: calm
-          ? "none"
-          : "width 0.22s cubic-bezier(0.22, 1, 0.36, 1), transform 0.18s ease-out"
+        transition: motion("transform 0.18s ease-out")
       }}>
-      <span style={{ display: "flex", flex: "none" }}>
-        <Logo height={10} />
-      </span>
       <span
+        role="tooltip"
+        id="threadly-launcher-tip"
         style={{
+          position: "relative",
+          marginRight: 12,
+          padding: "7px 11px",
+          borderRadius: 8,
+          background: c.tip,
+          color: c.tipInk,
+          font: "500 13px/1.2 -apple-system, BlinkMacSystemFont, 'Google Sans', 'Segoe UI', Roboto, sans-serif",
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
           opacity: open ? 1 : 0,
-          transition: calm ? "none" : "opacity 0.15s"
+          transform: open ? "translateX(0)" : "translateX(4px)",
+          transition: motion("opacity 0.15s ease-out, transform 0.15s ease-out")
         }}>
-        Threadly
+        Open Threadly
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: -4,
+            width: 8,
+            height: 8,
+            background: c.tip,
+            transform: "translateY(-50%) rotate(45deg)",
+            borderRadius: 1
+          }}
+        />
       </span>
-    </button>
+      <button
+        type="button"
+        aria-label="Open Threadly"
+        aria-describedby="threadly-launcher-tip"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" })}
+        style={{
+          display: "grid",
+          placeItems: "center",
+          width: TAB,
+          height: TAB,
+          padding: 0,
+          border: `1px solid ${c.border}`,
+          borderRight: 0,
+          borderRadius: "12px 0 0 12px",
+          background: open ? c.hover : c.background,
+          color: c.ink,
+          boxShadow: c.shadow,
+          cursor: "pointer",
+          outlineOffset: 2,
+          transition: motion("background 0.15s")
+        }}>
+        <span
+          style={{
+            display: "flex",
+            transform: open ? "scale(1.08)" : "scale(1)",
+            transition: motion("transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)")
+          }}>
+          <Logo height={10} />
+        </span>
+      </button>
+    </div>
   )
 }
 
