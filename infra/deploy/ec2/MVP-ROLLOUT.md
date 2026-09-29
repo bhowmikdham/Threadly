@@ -31,11 +31,13 @@ EC2 does not track GitHub automatically.
   it neither calls Bedrock nor verifies the operator's logging audit.
 
 The script stops API, assistant-worker, action-worker and any retired sync worker,
-creates a pre-migration PostgreSQL dump, applies Alembic through `c23026e9a039`,
+creates a pre-migration PostgreSQL dump, applies Alembic through the release's head,
 and starts API, assistant-worker and action-worker
 from the same image. The old sync worker stays stopped; its Compose service is behind
 the `retired-mailbox-sync` profile. It checks API readiness and active worker heartbeats.
-The host remains domain-free, API bound to loopback, with SSM forwarding for access.
+The default deployment remains private, API bound to loopback, with SSM forwarding
+for access. The separately selected `--public-https` mode and its DNS/TLS checks
+are documented in [APP-DEPLOYMENT.md](APP-DEPLOYMENT.md).
 It does not modify security groups, register callbacks, grant model access, prepare
 new Flows, enable writes or remove the eight-hour host auto-stop timer.
 

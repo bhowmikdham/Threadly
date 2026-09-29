@@ -47,7 +47,12 @@ def test_google_migration_preserves_legacy_tokens_and_unknown_grants():
         result = subprocess.run(
             [sys.executable, "-m", "alembic", *args],
             cwd=Path(__file__).resolve().parents[1],
-            env={**os.environ, "DATABASE_URL": target.render_as_string(hide_password=False)},
+            env={
+                **os.environ,
+                "THREADLY_AUTH_SERVICES_STOPPED": "1",
+                "THREADLY_SESSION_SIGNING_KEY_ROTATED": "1",
+                "DATABASE_URL": target.render_as_string(hide_password=False),
+            },
             capture_output=True,
             text=True,
             timeout=30,
@@ -80,8 +85,9 @@ def test_google_migration_preserves_legacy_tokens_and_unknown_grants():
         assert rows[1][0] is False and rows[1][1] is None
         reject("UPDATE users SET google_token_version=0 WHERE id=1")
         execute("""INSERT INTO google_oauth_sessions(state_hash,code_challenge,redirect_uri,
-                 user_id,account_version,expires_at) VALUES(repeat('a',64),repeat('b',43),
-                 'https://test.chromiumapp.org/',1,1,now()+interval '10 minutes')""")
+                 user_id,account_version,session_version,expires_at)
+                 VALUES(repeat('a',64),repeat('b',43),
+                 'https://test.chromiumapp.org/',1,1,1,now()+interval '10 minutes')""")
         reject("UPDATE google_oauth_sessions SET account_version=NULL")
         migrate("downgrade", "d9302f5b7a14")
         assert execute("SELECT refresh_token_enc FROM users WHERE id=1")[0][0] == bytes.fromhex(

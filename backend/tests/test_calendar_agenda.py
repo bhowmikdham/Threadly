@@ -192,8 +192,10 @@ async def test_oauth_explicit_account_chooser_and_optional_agenda_grant(monkeypa
     monkeypatch.setattr(flow, "validate_redirect", lambda _uri: None)
 
     class Session:
-        async def get(self, _model, _key):
-            return SimpleNamespace(google_account_version=1)
+        async def get(self, _model, _key, **_kwargs):
+            return SimpleNamespace(
+                google_account_version=1, threadly_session_version=1, google_connected=True
+            )
 
         async def scalar(self, _query):
             return datetime(2026, 10, 1, tzinfo=UTC)
@@ -208,8 +210,16 @@ async def test_oauth_explicit_account_chooser_and_optional_agenda_grant(monkeypa
             return None
 
     common = (Session(), "https://ext.chromiumapp.org/", "a" * 43)
-    basic = await flow.begin(*common, user_id=1)
-    agenda_grant = await flow.begin(*common, user_id=1, calendar_events_read=True)
+    basic = await flow.begin(
+        *common, user_id=1, expected_account_version=1, expected_session_version=1
+    )
+    agenda_grant = await flow.begin(
+        *common,
+        user_id=1,
+        expected_account_version=1,
+        expected_session_version=1,
+        calendar_events_read=True,
+    )
     basic_params = parse_qs(urlsplit(basic["authorization_url"]).query)
     agenda_params = parse_qs(urlsplit(agenda_grant["authorization_url"]).query)
     assert basic_params["prompt"] == ["consent select_account"]

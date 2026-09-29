@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Explicit domain-free staging exception; only the fixed local test callback.
     google_allow_loopback_test_callback: bool = False
     fernet_key: str = ""  # encrypts refresh tokens at rest (auth/crypto.py)
+    oauth_begin_max_per_minute: int = Field(default=20, ge=1, le=300)
+    oauth_exchange_max_per_minute: int = Field(default=30, ge=1, le=300)
+    oauth_global_max_per_minute: int = Field(default=300, ge=10, le=10000)
 
     # Explicit migration switch; Bedrock never falls back to another cloud.
     inference_provider: Literal["legacy", "bedrock"] = "legacy"

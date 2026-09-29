@@ -3,8 +3,17 @@
 # TLS-ALPN-01 challenge over 443 (caddy does this automatically).
 {$DOMAIN} {
 	encode zstd gzip
+	# The current API accepts bounded JSON requests; voice upload remains a stub.
+	request_body {
+		max_size 10MB
+	}
 
 	reverse_proxy api:8000 {
+		# Replace client-supplied forwarding values. Uvicorn trusts only Caddy's
+		# static address on the dedicated ingress network.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
 		# SSE passthrough: disable response buffering so streamed tokens
 		# reach the extension immediately.
 		flush_interval -1

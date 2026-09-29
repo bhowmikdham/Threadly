@@ -50,6 +50,8 @@ async def begin(
     code_challenge,
     *,
     user_id=None,
+    expected_account_version=None,
+    expected_session_version=None,
     calendar_read=False,
     calendar_events_read=False,
     gmail_send=False,
@@ -57,6 +59,10 @@ async def begin(
 ):
     if (calendar_read or calendar_events_read) and user_id is None:
         raise ApiError(400, "calendar_login_required", "Sign in before connecting Calendar.")
+    if user_id is not None and (
+        expected_account_version is None or expected_session_version is None
+    ):
+        raise ApiError(401, "reauth_required", "Sign in with Google again.")
     validate_redirect(redirect_uri)
     settings = get_settings()
     if (gmail_send or calendar_write) and str(user_id) not in settings.write_pilot_user_ids_values:
@@ -74,14 +80,24 @@ async def begin(
         scopes = scopes + ["https://www.googleapis.com/auth/calendar.events"]
     if not settings.google_client_id or not settings.google_client_secret:
         raise ApiError(503, "google_not_configured", "Google login is not configured.")
-    user = await session.get(User, user_id) if user_id is not None else None
+    user = (
+        await session.get(User, user_id, with_for_update=True, populate_existing=True)
+        if user_id is not None
+        else None
+    )
     if user_id is not None and user is None:
         raise ApiError(401, "unauthorized", "Unknown user.")
+    if user is not None and (
+        not user.google_connected
+        or user.google_account_version != expected_account_version
+        or user.threadly_session_version != expected_session_version
+    ):
+        raise ApiError(401, "reauth_required", "Sign in with Google again.")
     now = await session.scalar(select(func.clock_timestamp()))
     # Bounded opportunistic cleanup; no credential or raw callback data in logs.
     old = (
         select(GoogleOAuthSession.state_hash)
-        .where(GoogleOAuthSession.expires_at < now - timedelta(days=1))
+        .where(GoogleOAuthSession.expires_at < now)
         .order_by(GoogleOAuthSession.expires_at)
         .limit(100)
     )
@@ -95,6 +111,7 @@ async def begin(
             redirect_uri=redirect_uri,
             user_id=user_id,
             account_version=user.google_account_version if user else None,
+            session_version=user.threadly_session_version if user else None,
             expires_at=expires,
         )
     )
@@ -135,6 +152,6 @@ async def consume(state, redirect_uri, verifier):
         ):
             raise ApiError(400, "oauth_state_invalid", "Restart Google sign-in.")
         row.consumed_at = now
-        result = row.user_id, row.account_version
+        result = row.user_id, row.account_version, row.session_version
         await session.commit()
         return result
