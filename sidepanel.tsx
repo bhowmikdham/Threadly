@@ -20,6 +20,7 @@ export default function SidePanel() {
     [capabilities, setCapabilities] = useState<Capability[]>([]),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
+    [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
     [dark, setDark] = useState(true),
@@ -98,12 +99,29 @@ export default function SidePanel() {
   }
   const logout = async () => {
     authEpoch.current++
-    await bridge({ type: "LOGOUT" })
-    setUser(null)
-    setCapabilities([])
-    setPreferencesState("missing")
-    setSettings(false)
+    setSigningOut(true)
     setError("")
+    try {
+      const result = await bridge<{ serverRevoked: boolean }>({
+        type: "LOGOUT"
+      })
+      if (!result.serverRevoked)
+        setError(
+          "Signed out on this device, but Threadly could not confirm server sign-out. Other sessions may remain active. Sign in and sign out again when the server is reachable."
+        )
+    } catch {
+      // The worker may fail before replying. Do not leave its local token behind.
+      await chrome.storage.session.remove("threadlySession")
+      setError(
+        "Signed out on this device, but Threadly could not confirm server sign-out. Other sessions may remain active. Sign in and sign out again when the server is reachable."
+      )
+    } finally {
+      setUser(null)
+      setCapabilities([])
+      setPreferencesState("missing")
+      setSettings(false)
+      setSigningOut(false)
+    }
   }
   const theme = () => {
     setDark(!dark)
@@ -174,9 +192,13 @@ export default function SidePanel() {
                 <p>Your email, your calendar, one conversation.</p>
                 <button
                   className="primary login-button"
-                  disabled={busy}
+                  disabled={busy || signingOut}
                   onClick={login}>
-                  {busy ? "Connecting…" : "Sign in with Google"}
+                  {signingOut
+                    ? "Signing out…"
+                    : busy
+                      ? "Connecting…"
+                      : "Sign in with Google"}
                 </button>
                 <p className="muted">
                   Read what matters. Find the words. Make time.

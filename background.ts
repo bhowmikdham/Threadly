@@ -13,8 +13,18 @@ type Session = {
   origin: string
 }
 let signingIn = false
+let signingOut = false
 let sessionGeneration = 0
 let refreshing: Promise<string> | null = null
+let sessionWriteTail: Promise<void> = Promise.resolve()
+function mutateSession<T>(operation: () => Promise<T>): Promise<T> {
+  const result = sessionWriteTail.then(operation)
+  sessionWriteTail = result.then(
+    () => undefined,
+    () => undefined
+  )
+  return result
+}
 const protectStorage = async () => {
   await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
   await chrome.storage.session.setAccessLevel({
@@ -47,7 +57,8 @@ async function transport(
   path: string,
   method: string,
   body?: unknown,
-  jwt?: string
+  jwt?: string,
+  timeoutMs = 150000
 ) {
   if (!allowedRequest(path, method))
     throw new Error("Unsupported backend request.")
@@ -62,7 +73,7 @@ async function transport(
     credentials: "omit",
     cache: "no-store",
     redirect: "error",
-    signal: AbortSignal.timeout(150000)
+    signal: AbortSignal.timeout(timeoutMs)
   }).catch((error: unknown) => {
     const timedOut =
       error instanceof DOMException && error.name === "TimeoutError"
@@ -98,9 +109,10 @@ async function transport(
   return data
 }
 async function activeSession() {
+  const generation = sessionGeneration
   const saved = await session(),
     origin = await settings()
-  if (!saved || saved.origin !== origin)
+  if (!saved || saved.origin !== origin || generation !== sessionGeneration)
     throw Object.assign(new Error("Sign in to Threadly first."), {
       code: "login_required",
       status: 401
@@ -122,24 +134,33 @@ async function activeSession() {
         undefined,
         saved.jwt
       )
-        .then(async (data) => {
-          const current = await session()
-          if (!current || current.jwt !== saved.jwt)
-            throw new Error("Your session changed. Sign in again.")
-          await chrome.storage.session.set({
-            threadlySession: { ...saved, jwt: data.jwt }
+        .then((data) =>
+          mutateSession(async () => {
+            const current = await session()
+            if (
+              generation !== sessionGeneration ||
+              !current ||
+              current.jwt !== saved.jwt
+            )
+              throw new Error("Your session changed. Sign in again.")
+            await chrome.storage.session.set({
+              threadlySession: { ...saved, jwt: data.jwt }
+            })
+            return data.jwt
           })
-          return data.jwt
-        })
+        )
         .finally(() => {
           refreshing = null
         })
     saved.jwt = await refreshing
   }
+  if (generation !== sessionGeneration)
+    throw new Error("Your session changed. Sign in again.")
   return saved
 }
 async function login(capabilities?: string[]) {
-  if (signingIn) throw new Error("A sign-in window is already open.")
+  if (signingIn || signingOut)
+    throw new Error("A sign-in or sign-out is already in progress.")
   signingIn = true
   try {
     const generation = sessionGeneration
@@ -183,9 +204,11 @@ async function login(capabilities?: string[]) {
       state: start.state,
       code_verifier
     })
-    if (generation !== sessionGeneration || origin !== (await settings()))
-      throw new Error("Session changed during login. Start again.")
-    await chrome.storage.session.set({ threadlySession: { ...result, origin } })
+    await mutateSession(async () => {
+      if (generation !== sessionGeneration || origin !== (await settings()))
+        throw new Error("Session changed during login. Start again.")
+      await chrome.storage.session.set({ threadlySession: { ...result, origin } })
+    })
     return result.user
   } finally {
     signingIn = false
@@ -219,16 +242,46 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case "LOGIN":
         return login(message.capabilities)
-      case "LOGOUT":
+      case "LOGOUT": {
+        // Clear the browser token immediately, even if the server cannot be reached.
+        // This endpoint revokes Threadly sessions; it does not disconnect Google.
         sessionGeneration++
-        await chrome.storage.session.remove("threadlySession")
-        return null
+        signingOut = true
+        try {
+          const previous = await mutateSession(async () => {
+            const saved = await session()
+            await chrome.storage.session.remove("threadlySession")
+            return saved
+          })
+          if (!previous) return { serverRevoked: false }
+          // Never send a token to an origin different from the configured API.
+          if (previous.origin !== (await settings()))
+            return { serverRevoked: false }
+          const result = await transport(
+            previous.origin,
+            "/auth/logout",
+            "POST",
+            undefined,
+            previous.jwt,
+            10000
+          )
+          return { serverRevoked: result?.signed_out === true }
+        } catch {
+          // A local sign-out is not evidence of server-side revocation.
+          return { serverRevoked: false }
+        } finally {
+          signingOut = false
+        }
+      }
       case "CONFIGURE": {
-        if (signingIn)
-          throw new Error("Finish sign-in before changing servers.")
+        if (signingIn || signingOut)
+          throw new Error("Finish sign-in or sign-out before changing servers.")
         const origin = backendOrigin(message.origin)
-        await chrome.storage.local.set({ backendOrigin: origin })
-        await chrome.storage.session.clear()
+        sessionGeneration++
+        await mutateSession(async () => {
+          await chrome.storage.local.set({ backendOrigin: origin })
+          await chrome.storage.session.clear()
+        })
         return { origin }
       }
       case "ACTION_REFERENCE": {

@@ -17,10 +17,12 @@ let server: Server,
   origin: string
 let lastAction: any = null
 test.describe.configure({ mode: "serial" })
-let calls: { path: string; body: any }[] = [],
+let calls: { path: string; body: any; method: string; authorized: boolean }[] =
+    [],
   tasks = new Map<string, any>(),
   artifacts = new Map<string, any>(),
   number = 0
+let failLogout = false
 const target = "abc123",
   thread = "def456"
 const user = { id: 1, email: "tester@example.test", name: "Tester" }
@@ -121,7 +123,12 @@ test.beforeAll(async () => {
     let p = req.url!.split("?")[0]
     const conversational = p === "/assistant/conversation-turns"
     const originalTurn = conversational ? { ...body } : null
-    calls.push({ path: req.url!, body: body ? structuredClone(body) : body })
+    calls.push({
+      path: req.url!,
+      body: body ? structuredClone(body) : body,
+      method: req.method!,
+      authorized: Boolean(req.headers.authorization)
+    })
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
       if (
@@ -150,7 +157,23 @@ test.beforeAll(async () => {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p === "/assistant/capabilities")
+    if (p === "/auth/logout") {
+      if (failLogout) {
+        res.statusCode = 503
+        data = {
+          error: { code: "service_unavailable", message: "Try again later." }
+        }
+      } else data = { signed_out: true, scope: "all_sessions" }
+    } else if (p === "/auth/refresh") {
+      data = {
+        jwt:
+          "header." +
+          Buffer.from(
+            JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+          ).toString("base64url") +
+          ".refreshed"
+      }
+    } else if (p === "/assistant/capabilities")
       data = {
         capabilities: [
           { id: "gmail_read", ready: true },
@@ -806,11 +829,166 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  const genericAuthCall = await page.evaluate(() =>
+    chrome.runtime.sendMessage({
+      channel: "threadly",
+      type: "API",
+      path: "/auth/logout",
+      method: "POST"
+    })
+  )
+  expect(genericAuthCall.ok).toBe(false)
   await page.getByRole("button", { name: "Sign out", exact: true }).click()
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
   ).toBeVisible()
+  expect(calls.filter((c) => c.path === "/auth/logout")).toEqual([
+    {
+      path: "/auth/logout",
+      method: "POST",
+      body: undefined,
+      authorized: true
+    }
+  ])
   await page.setViewportSize({ width: 420, height: 900 })
+})
+
+test("server logout failure clears the browser session and warns about remaining sessions", async () => {
+  failLogout = true
+  const jwt =
+    "header." +
+    Buffer.from(
+      JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString("base64url") +
+    ".signature"
+  await page.evaluate(
+    async ({ origin, jwt, user }) => {
+      await chrome.storage.session.set({
+        threadlySession: { jwt, user, origin }
+      })
+    },
+    { origin, jwt, user }
+  )
+  await page.reload()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Sign out", exact: true }).click()
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" })
+  ).toBeVisible()
+  await expect(page.getByRole("alert")).toContainText(
+    "could not confirm server sign-out"
+  )
+  expect(
+    await page.evaluate(async () =>
+      chrome.storage.session.get("threadlySession")
+    )
+  ).toEqual({})
+  failLogout = false
+})
+
+test("logout never sends a retained token to a stale server origin", async () => {
+  const priorLogoutCalls = calls.filter((c) => c.path === "/auth/logout").length
+  await page.evaluate(
+    async ({ user }) => {
+      await chrome.storage.session.set({
+        threadlySession: {
+          jwt: "retained-token",
+          user,
+          origin: "https://unexpected.example.test"
+        }
+      })
+    },
+    { user }
+  )
+  const response = await page.evaluate(() =>
+    chrome.runtime.sendMessage({ channel: "threadly", type: "LOGOUT" })
+  )
+  expect(response).toEqual({ ok: true, data: { serverRevoked: false } })
+  expect(calls.filter((c) => c.path === "/auth/logout")).toHaveLength(
+    priorLogoutCalls
+  )
+  expect(
+    await page.evaluate(async () =>
+      chrome.storage.session.get("threadlySession")
+    )
+  ).toEqual({})
+})
+
+test("concurrent token refresh cannot restore a signed-out session", async () => {
+  const nearExpiryJwt =
+    "header." +
+    Buffer.from(
+      JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 30 })
+    ).toString("base64url") +
+    ".signature"
+  await page.evaluate(
+    async ({ origin, jwt, user }) => {
+      await chrome.storage.session.set({
+        threadlySession: { jwt, user, origin }
+      })
+    },
+    { origin, jwt: nearExpiryJwt, user }
+  )
+  const worker = context.serviceWorkers()[0]
+  await worker.evaluate(() => {
+    const originalSet = chrome.storage.session.set.bind(chrome.storage.session)
+    const originalRemove = chrome.storage.session.remove.bind(
+      chrome.storage.session
+    )
+    const state = {
+      waiting: false,
+      removeStarted: false,
+      release: null as (() => void) | null
+    }
+    ;(globalThis as any).__threadlySessionRace = state
+    chrome.storage.session.set = async (items) => {
+      if (items.threadlySession?.jwt?.endsWith(".refreshed")) {
+        state.waiting = true
+        await new Promise<void>((resolve) => {
+          state.release = resolve
+        })
+      }
+      return originalSet(items)
+    }
+    chrome.storage.session.remove = async (keys) => {
+      state.removeStarted = true
+      return originalRemove(keys)
+    }
+  })
+  const pendingRequest = page.evaluate(() =>
+    chrome.runtime.sendMessage({
+      channel: "threadly",
+      type: "API",
+      path: "/assistant/capabilities",
+      method: "GET"
+    })
+  )
+  await expect
+    .poll(() =>
+      worker.evaluate(() => (globalThis as any).__threadlySessionRace.waiting)
+    )
+    .toBe(true)
+  const pendingLogout = page.evaluate(() =>
+    chrome.runtime.sendMessage({ channel: "threadly", type: "LOGOUT" })
+  )
+  // While the refresh write is held, logout must wait for it before removing.
+  await page.waitForTimeout(100)
+  expect(
+    await worker.evaluate(
+      () => (globalThis as any).__threadlySessionRace.removeStarted
+    )
+  ).toBe(false)
+  await worker.evaluate(() =>
+    (globalThis as any).__threadlySessionRace.release()
+  )
+  await Promise.all([pendingRequest, pendingLogout])
+  expect(
+    await page.evaluate(async () =>
+      chrome.storage.session.get("threadlySession")
+    )
+  ).toEqual({})
 })
 
 test("disconnected backend gives actionable login recovery without opening Google", async () => {
