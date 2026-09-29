@@ -114,6 +114,7 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Switch to dark appearance" }).click()
   await page.getByRole("button", { name: "Close conversation menu" }).click()
   await page.screenshot({
@@ -122,6 +123,7 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Switch to light appearance" }).click()
   await page.getByRole("button", { name: "Close conversation menu" }).click()
   await page.setViewportSize({ width: 420, height: 900 })
@@ -270,6 +272,7 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Switch to dark appearance" }).click()
   await page
     .getByRole("button", { name: "Close conversation menu", exact: true })
@@ -281,6 +284,7 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Switch to light appearance" }).click()
   await page
     .getByRole("button", { name: "Close conversation menu", exact: true })
@@ -342,6 +346,7 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
@@ -363,6 +368,7 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Sign out", exact: true }).click()
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })

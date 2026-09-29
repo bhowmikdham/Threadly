@@ -183,6 +183,7 @@ function Assistant({
   const c = useAssistant(user),
     [message, setMessage] = useState(""),
     [menu, setMenu] = useState(false),
+    [account, setAccount] = useState(false),
     [sources, setSources] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
     [history, setHistory] = useState<any>(null),
@@ -360,6 +361,7 @@ function Assistant({
     else recent.push({ key, context: contextOf(t), latest: t, count: 1 })
   }
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
+  const displayName = user.name?.trim() || user.email.split("@")[0]
   const initials =
     (user.name || user.email)
       .trim()
@@ -377,7 +379,10 @@ function Assistant({
           aria-label="Conversation menu"
           title="Conversation menu"
           aria-expanded={menu}
-          onClick={() => setMenu(!menu)}>
+          onClick={() => {
+            setMenu(!menu)
+            setAccount(false)
+          }}>
           <Icon name="menu" />
         </button>
         <span className="chat-title" title={title}>
@@ -472,43 +477,57 @@ function Assistant({
             </>
           )}
           <div className="menu-account">
-            <span className="avatar" aria-hidden="true">
-              {initials}
-            </span>
-            <span className="menu-account-name">
-              <b>{user.name || user.email.split("@")[0]}</b>
-              <small>{user.email}</small>
-            </span>
-            <span className="menu-account-actions">
-              <button
-                className="icon-button"
-                aria-label={
-                  dark
-                    ? "Switch to light appearance"
-                    : "Switch to dark appearance"
-                }
-                title={dark ? "Light appearance" : "Dark appearance"}
-                onClick={theme}>
-                <Icon name={dark ? "sun" : "moon"} size={16} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Settings"
-                title="Settings"
-                onClick={() => {
-                  openSettings()
-                  setMenu(false)
-                }}>
-                <Icon name="settings" size={16} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Sign out"
-                title="Sign out"
-                onClick={logout}>
-                <Icon name="signout" size={16} />
-              </button>
-            </span>
+            {account && (
+              <div className="account-card" role="group" aria-label="Account">
+                <div className="account-card-head">
+                  <span className="avatar" aria-hidden="true">
+                    {initials}
+                  </span>
+                  <span className="menu-account-name">
+                    <b>{displayName}</b>
+                    <small title={user.email}>{user.email}</small>
+                  </span>
+                </div>
+                <button
+                  aria-label="Settings"
+                  onClick={() => {
+                    openSettings()
+                    setAccount(false)
+                    setMenu(false)
+                  }}>
+                  <Icon name="settings" size={16} />
+                  Settings
+                </button>
+                <button
+                  aria-label={
+                    dark
+                      ? "Switch to light appearance"
+                      : "Switch to dark appearance"
+                  }
+                  onClick={theme}>
+                  <Icon name={dark ? "sun" : "moon"} size={16} />
+                  {dark ? "Light mode" : "Dark mode"}
+                </button>
+                <button
+                  className="account-signout"
+                  aria-label="Sign out"
+                  onClick={logout}>
+                  <Icon name="signout" size={16} />
+                  Sign out
+                </button>
+              </div>
+            )}
+            <button
+              className="account-button"
+              aria-label="Account menu"
+              aria-expanded={account}
+              onClick={() => setAccount(!account)}>
+              <span className="avatar" aria-hidden="true">
+                {initials}
+              </span>
+              <b>{displayName}</b>
+              <Icon name="chevron" size={14} />
+            </button>
           </div>
         </nav>
       )}
