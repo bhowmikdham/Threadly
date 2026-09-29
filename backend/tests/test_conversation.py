@@ -1573,6 +1573,8 @@ async def test_failure_after_proposal_reservation_resumes_saved_plan(
     recovered = await service.turn(1, r, factory=db_sessionmaker, model=Model())
     assert recovered["kind"] == "proposal" and recovered["version"] == 1
     assert recovered["proposal"]["state"] == "failed"
+    assert "couldn't prepare" in recovered["text"]
+    assert "proposed work for you to review" not in recovered["text"]
     async with db_sessionmaker() as session:
         assert await session.scalar(select(func.count()).select_from(CommandPlan)) == 1
     restored = await service.get(1, r.conversation_id, db_sessionmaker)

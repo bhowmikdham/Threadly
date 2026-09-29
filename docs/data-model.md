@@ -491,3 +491,8 @@ assistant worker purges eligible rows hourly. Browser session storage separately
 full exact unfinished turn for safe retry. Deleting the conversation does not delete existing
 tasks/artifacts/action audit records and does not erase existing backups.
 Downgrade refuses to drop retained conversations; disabling the feature is the safe rollback.
+
+
+Calendar evidence JSON may now include nullable `display_name` on each calendar
+coverage entry, populated from the current owner-authorized Calendar list. Old
+evidence without that optional field remains compatible. No schema migration.

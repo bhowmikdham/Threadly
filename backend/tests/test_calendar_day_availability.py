@@ -122,6 +122,8 @@ async def test_assistant_date_does_not_override_user_weekday(provider):
         "Am I free Thursday and Friday?",
         "Am I free Thursday? If so, send an email.",
         "Is Alex free Thursday?",
+        "Do not check my availability Thursday",
+        "Don't read my calendar on Thursday",
         "Don't check whether I am free Thursday",
         "I am not free Thursday",
         "Am I free next Thursday?",
@@ -198,7 +200,7 @@ async def test_missing_calendar_coverage_never_becomes_free(provider):
         ("calendar_connection_required", "Connect Calendar read access"),
         ("calendar_preferences_missing", "Choose your calendars and timezone"),
         ("calendar_context_changed", "settings changed"),
-        ("calendar_access_denied", "Calendar check failed"),
+        ("calendar_access_denied", "Reconnect Calendar"),
         ("calendar_upstream_failed", "Calendar check failed"),
     ],
 )
@@ -263,3 +265,145 @@ async def test_fresh_day_question_still_works_after_an_older_task(provider):
     r.state["active_task_id"] = "earlier-draft"
     result = await engine.run({}, r, NoModel())
     assert result["calendar_availability"]["date"] == "2026-10-01"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "check if i am free on thursday",
+        "check my availability for thursday this week",
+        "check my availabiloty for thurday this week",
+        "Can you check my availability on Thursday?",
+        "please check whether I'm available Thursday",
+    ],
+)
+async def test_reported_wording_bypasses_proposal_even_after_failed_proposal(provider, question):
+    r = runtime(question)
+    r.state["proposal_id"] = "old-failed-proposal"
+    result = await engine.run({}, r, NoModel())
+    assert result["kind"] == "message"
+    assert result["calendar_availability"]["date"] == "2026-10-01"
+    assert "proposal" not in result
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Do I have anything on Thursday?",
+        "How busy is my Thursday looking?",
+        "Could you take a look at my free time this Thursday?",
+    ],
+)
+async def test_semantic_read_tool_handles_paraphrases_without_model_dates(provider, question):
+    class ReadModel:
+        async def decide(self, prompt, messages, config):
+            assert "check_day_availability" in prompt
+            assert any(t["toolSpec"]["name"] == "check_day_availability" for t in config["tools"])
+            return {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "day-read",
+                            "name": "check_day_availability",
+                            "input": {},
+                        }
+                    }
+                ],
+            }
+
+    result = await engine.run({}, runtime(question), ReadModel())
+    assert result["kind"] == "message"
+    assert result["calendar_availability"]["date"] == "2026-10-01"
+    assert result["trace"] == [{"tool": "check_day_availability", "status": "ok"}]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Is Alex free Thursday?",
+        "Do not check my availability Thursday",
+        "Don't read my calendar on Thursday",
+        "Check my availability next Thursday",
+        "Check my availability Thursday and Friday",
+        "Am I free Thursday at 4?",
+        "Am I free Thursday morning?",
+        "Check my availability Thursday then send an email",
+        "Find me three slots Thursday",
+        "Am I free Thursday in America/New_York?",
+        "Am I free Thursday\nUser follow-up: no, send an email",
+    ],
+)
+def test_semantic_day_tool_preserves_scope_and_date_qualifiers(question):
+    with pytest.raises(ValueError):
+        day.tool_day(question)
+
+
+async def test_unknown_holiday_calendar_does_not_hide_verified_busy_times(provider):
+    _, current = provider
+    checked = evidence(
+        busy=[(datetime(2026, 10, 1, 0, tzinfo=UTC), datetime(2026, 10, 1, 1, tzinfo=UTC))]
+    )
+    checked.calendars.append(
+        CalendarCoverage(
+            calendar_id="private-provider-id",
+            display_name="Holidays",
+            status="unknown",
+            reason="provider_error",
+            busy=[],
+        )
+    )
+    checked.coverage = "unknown"
+    current["evidence"] = checked
+    result = await engine.run({}, runtime(QUESTION), NoModel())
+    assert "10:00 AM–11:00 AM" in result["text"]
+    assert "Holidays couldn't be checked" in result["text"]
+    assert "Review setup" in result["text"]
+    assert "no busy time recorded" not in result["text"]
+    assert "private-provider-id" not in result["text"]
+    assert result["calendar_availability"]["coverage"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "state", ["failed", "needs_clarification", "unsupported", "expired", "planning"]
+)
+def test_nonreviewable_proposals_do_not_claim_ready_for_review(state):
+    from app.conversation.runtime import proposal_text
+
+    assert "proposed work for you to review" not in proposal_text(state)
+    assert "invalid_master_proposal" not in proposal_text(state)
+
+
+async def test_versioned_semantic_replay_fixtures(provider):
+    path = Path(__file__).parents[2] / "docs/evaluation/calendar-day-availability-v2.json"
+    fixture = json.loads(path.read_text())
+    assert fixture["release"] == day.POLICY
+    for case in fixture["cases"]:
+
+        class FixtureModel:
+            async def decide(self, *args, case=case):
+                return {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "replay",
+                                "name": case["decision"]["tool"],
+                                "input": case["decision"]["input"],
+                            }
+                        }
+                    ],
+                }
+
+        result = await engine.run({}, runtime(case["user_turn"]), FixtureModel())
+        assert result["release"] == fixture["conversation_release"]
+        assert result["calendar_availability"]["date"] == case["expected_date"]
+
+
+def test_model_cannot_supply_date_or_calendar_id_to_day_tool():
+    from pydantic import ValidationError
+
+    from app.schemas.conversation import CheckDayAvailability
+
+    with pytest.raises(ValidationError):
+        CheckDayAvailability.model_validate({"date": "2026-10-01", "calendar_id": "someone-else"})

@@ -952,3 +952,26 @@ Conversation history retains the displayed answer, but raw availability metadata
 copied into turn receipts; previous Calendar answers are withheld from model history as
 fresh evidence. The free/busy evidence uses the existing storage/expiry policy. No new
 endpoint, migration, approval or external-write capability is introduced.
+
+
+## Availability request recovery (2026-09-29)
+
+Conversation release `contextual-conversation-1.2.5` / policy
+`calendar-day-answer-1.1.0` adds the argument-free terminal read tool
+`check_day_availability`. The semantic assistant can use it for standalone
+whole-day self-availability paraphrases. The backend extracts a single supported
+day only from user-authored dialogue, resolves it in saved Calendar timezone,
+and rejects unsupported date/time qualifiers and compound actions. Models cannot
+supply calendar IDs or dates. Common imperative wording also takes the direct
+read path, including both requests reported in the screenshot.
+
+When some selected calendars fail, replies retain verified busy periods and
+explicitly name unchecked calendars when current list metadata is available.
+Incomplete coverage never supports a claim of being free. Calendar selections
+are not silently changed. The additive nullable `display_name` field in each
+free/busy calendar result is provider data, not instruction authority. Existing
+stored evidence without names remains readable; no migration is required.
+
+Failed and expired workflow proposals use status-appropriate conversation text,
+including when hydrating an interrupted turn. They do not claim work is ready
+for review. These changes do not grant permission to send or book.

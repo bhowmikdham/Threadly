@@ -106,6 +106,7 @@ class BusyInterval(StrictModel):
 
 class CalendarCoverage(StrictModel):
     calendar_id: str
+    display_name: str | None = Field(default=None, max_length=1024)
     status: Literal["known", "unknown"]
     reason: Literal["provider_error", "missing", "malformed", "not_accessible"] | None = None
     busy: list[BusyInterval]

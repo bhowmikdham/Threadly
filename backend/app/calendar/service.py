@@ -141,6 +141,10 @@ async def query_freebusy(user_id, body):
         or CalendarCoverage(calendar_id=cid, status="unknown", reason="not_accessible", busy=[])
         for cid in ids
     ]
+    names = {item["id"]: item["summary"] for item in calendars}
+    results = [
+        item.model_copy(update={"display_name": names.get(item.calendar_id)}) for item in results
+    ]
     expires = checked + timedelta(minutes=5)
     async with get_session_factory()() as session:
         await account(session, user_id, lock=True, expected=version)
