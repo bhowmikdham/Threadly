@@ -489,6 +489,17 @@ returning a new JWT. `POST /auth/logout` advances only the Threadly generation,
 invalidating all current devices without removing Google access. See
 [Google lifecycle](google-capabilities.md).
 
+Unauthenticated `POST /auth/google/begin` and `/auth/google/exchange` count every
+bounded attempt (including schema-invalid requests) in PostgreSQL before creating
+state, consuming state or calling Google. Each observed peer has a one-minute fixed
+window (defaults: 20 begin and 30 exchange attempts); each route also has a
+300-attempt global window. At most 8 KiB of request body is accepted on `/auth`
+routes, including streamed requests. A 413 `request_too_large` or 429
+`oauth_rate_limited` retains the error envelope; 429 includes `Retry-After` seconds.
+If the shared limiter cannot reach its table, sign-in fails closed with 503
+`oauth_unavailable`. Raw `X-Forwarded-For` is ignored; public ingress must supply
+a trustworthy peer address.
+
 Domain-free staging may explicitly enable `GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK=true`.
 Only `http://127.0.0.1:8765/oauth/callback` then accepts HTTP, still requiring exact
 redirect allowlisting and the same state/PKCE exchange. Default remains HTTPS-only.

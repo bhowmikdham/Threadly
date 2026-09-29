@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentSession
 from app.api.errors import ApiError
 from app.auth import flow, service
+from app.auth.limits import OAuthIngressRoute
 from app.db.engine import get_session
 
 
@@ -17,7 +18,7 @@ def no_store(response: Response):
     response.headers["Pragma"] = "no-cache"
 
 
-router = APIRouter(dependencies=[Depends(no_store)])
+router = APIRouter(dependencies=[Depends(no_store)], route_class=OAuthIngressRoute)
 DB = Annotated[AsyncSession, Depends(get_session)]
 
 
