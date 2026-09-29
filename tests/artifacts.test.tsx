@@ -118,16 +118,49 @@ describe("reviewed draft integration", () => {
     expect(screen.queryByText("Approve and send")).toBeNull()
     expect(screen.getByText("Changed content")).toBeTruthy()
   })
-  it("offers no in-panel editing and saves nothing by itself", () => {
+  it("edits To and the message in place and saves only on request", async () => {
+    const calls: any[] = []
+    const replace = vi.fn()
+    mockApi((m) => {
+      calls.push(m)
+      return { ...draft, artifact_id: "a2", revision: 2 }
+    })
+    render(<ArtifactCard value={draft} replace={replace} report={vi.fn()} />)
+    expect(screen.queryByText("Cc and Bcc")).toBeNull()
+    fireEvent.change(screen.getByLabelText("To"), {
+      target: { value: "new@example.test" }
+    })
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Edited body" }
+    })
+    expect(calls.length).toBe(0)
+    expect(
+      (screen.getByLabelText("Review outgoing email") as HTMLButtonElement)
+        .disabled
+    ).toBe(true)
+    fireEvent.click(screen.getByText("Save changes"))
+    await waitFor(() => expect(replace).toHaveBeenCalled())
+    expect(calls[0].path).toBe("/assistant/tasks/t1/draft-revisions")
+    expect(calls[0].body.recipients.to).toEqual(["new@example.test"])
+    expect(calls[0].body.body).toBe("Edited body")
+    expect(calls[0].body.subject).toBe("Update")
+    expect(calls[0].body.expected_revision).toBe(1)
+  })
+  it("undo puts the draft back without saving", () => {
     const calls: any[] = []
     mockApi((m) => {
       calls.push(m)
       return null
     })
     render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
-    expect(screen.queryByRole("button", { name: "Edit draft" })).toBeNull()
-    expect(screen.queryByLabelText("Message")).toBeNull()
-    expect(screen.queryByText("Save edits")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Something else" }
+    })
+    fireEvent.click(screen.getByText("Undo"))
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).value
+    ).toBe("I will review it tomorrow.")
+    expect(screen.getByText("Copy")).toBeTruthy()
     expect(calls.some((c) => c.path?.includes("draft-revisions"))).toBe(false)
   })
   it("renders grounded answers safely as text", () => {

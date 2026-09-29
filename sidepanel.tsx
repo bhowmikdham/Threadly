@@ -8,6 +8,7 @@ import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
 import { gmailUrlShowsEmail } from "./lib/gmail-context"
+import { requestBackendAccess } from "./lib/backend-access"
 import {
   calendarReadReady,
   schedulingReadiness,
@@ -18,6 +19,7 @@ import { useAssistant } from "./lib/use-assistant"
 
 export default function SidePanel() {
   const [user, setUser] = useState<User | null>(null),
+    [serverOrigin, setServerOrigin] = useState(""),
     [capabilities, setCapabilities] = useState<Capability[]>([]),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
@@ -32,6 +34,7 @@ export default function SidePanel() {
     const epoch = ++authEpoch.current
     const s = await bridge<any>({ type: "STATUS" })
     if (epoch !== authEpoch.current) return
+    setServerOrigin(s.origin)
     setUser(s.user)
     if (s.user) {
       try {
@@ -90,6 +93,7 @@ export default function SidePanel() {
     setBusy(true)
     setError("")
     try {
+      await requestBackendAccess(serverOrigin)
       await bridge({ type: "LOGIN" })
       await refresh()
     } catch (e) {
@@ -541,16 +545,16 @@ function Assistant({
                 {connectors.map((tool) => (
                   <li key={tool.id}>
                     <span className="connector-icon">
-                      <Icon
-                        name={
-                          tool.id.startsWith("calendar")
-                            ? "calendar"
-                            : tool.id.endsWith("send")
-                              ? "send"
-                              : "mail"
-                        }
-                        size={15}
-                      />
+                      {tool.id === "gmail" ? (
+                        <GmailIcon size={15} />
+                      ) : (
+                        <Icon
+                          name={
+                            tool.id.startsWith("calendar") ? "calendar" : "mail"
+                          }
+                          size={15}
+                        />
+                      )}
                     </span>
                     <span className="connector-name">
                       {connectorNames[tool.id] || tool.id.replaceAll("_", " ")}

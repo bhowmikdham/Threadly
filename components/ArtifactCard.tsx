@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 
-import { actionReference, api, errorText, requestId } from "../lib/api"
+import {
+  actionReference,
+  addresses,
+  api,
+  errorText,
+  requestId
+} from "../lib/api"
 import type { Artifact, EmailAction } from "../lib/types"
 import { Booking } from "./Booking"
 import { Icon } from "./Icon"
@@ -239,19 +245,22 @@ function DraftCard({
 }) {
   const c = value.artifact.content,
     envelope = value.draft_envelope
-  // Drafts are read-only here: changes are asked for in the chat and arrive
-  // from the backend as a new revision.
-  const body = c.body,
-    subject = c.subject,
-    to = (envelope?.to || []).join(", ")
-  const [busy, setBusy] = useState(false),
+  // Two editable boxes, who it goes to and the message itself; anything else
+  // is asked for in the chat and arrives from the backend as a new revision.
+  const savedTo = (envelope?.to || []).join(", ")
+  const [to, setTo] = useState(savedTo),
+    [body, setBody] = useState(c.body),
+    [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<EmailAction | null>(null),
     [confirmed, setConfirmed] = useState(false),
     [replyOpen, setReplyOpen] = useState(false)
   const key = useRef(requestId()),
     decisionKey = useRef(requestId())
+  const dirty = to !== savedTo || body !== c.body
   useEffect(() => {
+    setTo(savedTo)
+    setBody(c.body)
     setAction(null)
     setConfirmed(false)
     key.current = requestId()
@@ -346,6 +355,31 @@ function DraftCard({
       setBusy(false)
     }
   }
+  const save = () =>
+    run(async () => {
+      const result = await api(
+        `/assistant/tasks/${value.task_id}/draft-revisions`,
+        {
+          request_id: requestId(),
+          expected_revision: value.revision,
+          subject: c.subject,
+          body,
+          recipients: {
+            to: addresses(to),
+            cc: envelope?.cc || [],
+            bcc: envelope?.bcc || []
+          },
+          unresolved_fields: c.unresolved_fields
+        }
+      )
+      replace(result)
+      setNotice("Changes saved.")
+    })
+  const discard = () => {
+    setTo(savedTo)
+    setBody(c.body)
+    setNotice("")
+  }
   const prepare = () =>
     run(async () => {
       const reviewed = await api(
@@ -403,18 +437,30 @@ function DraftCard({
       await navigator.clipboard.writeText(body)
       setNotice("Copied. Nothing was sent.")
     })
-  // The draft reads as the reply itself: its text, with Insert and Copy.
-  // Changes are asked for in the chat; the send review sits underneath.
+  // The draft reads as the email itself: who it goes to and the message, both
+  // editable in place, with Insert and Copy. The send review sits underneath.
   return (
     <section className="artifact draft-card" aria-label="draft result">
       <div className="draft-box">
-        {!envelope?.reply && (
-          <p className="draft-meta">
-            <span>To {to || "—"}</span>
-            {subject && <span>{subject}</span>}
-          </p>
+        <label className="draft-to">
+          <span>To</span>
+          <input
+            value={to}
+            disabled={locked}
+            placeholder="name@example.com"
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </label>
+        {!envelope?.reply && c.subject && (
+          <p className="draft-subject">{c.subject}</p>
         )}
-        <p className="prose draft-body">{body}</p>
+        <textarea
+          className="draft-body"
+          aria-label="Message"
+          value={body}
+          disabled={locked}
+          onChange={(e) => setBody(e.target.value)}
+        />
         {c.unresolved_fields?.length > 0 && (
           <div className="warning">
             <b>Needs your input</b>
@@ -427,6 +473,17 @@ function DraftCard({
           </div>
         )}
         <div className="draft-actions">
+          {dirty ? (
+            <>
+              <button disabled={busy || !body.trim()} onClick={save}>
+                Save changes
+              </button>
+              <button disabled={busy} onClick={discard}>
+                Undo
+              </button>
+            </>
+          ) : (
+            <>
           {envelope?.reply && (
             // Ready once Gmail's reply box is open for this thread.
             <button disabled={busy || !replyOpen} onClick={insert}>
@@ -436,6 +493,8 @@ function DraftCard({
           <button disabled={busy} onClick={copyDraft}>
             Copy
           </button>
+            </>
+          )}
         </div>
         {notice && (
           <p className="draft-notice" role="status">
@@ -449,7 +508,10 @@ function DraftCard({
           aria-label="Review outgoing email"
           title="Review and send"
           disabled={
-            locked || !value.is_latest || !!value.review?.blockers?.length
+            dirty ||
+            locked ||
+            !value.is_latest ||
+            !!value.review?.blockers?.length
           }
           onClick={prepare}>
           <Icon name="shield" size={15} />

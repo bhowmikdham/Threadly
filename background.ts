@@ -4,6 +4,7 @@ import {
   base64url,
   callbackCode,
   DEFAULT_BACKEND,
+  publishedBackendBuild,
   trustedSender
 } from "./lib/security"
 
@@ -41,6 +42,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   )
 })
 async function settings() {
+  if (publishedBackendBuild) return DEFAULT_BACKEND
   return backendOrigin(
     (await chrome.storage.local.get("backendOrigin")).backendOrigin ||
       DEFAULT_BACKEND
@@ -83,7 +85,11 @@ async function transport(
       : `Cannot reach the Threadly backend at ${origin}.`
     const recovery = local
       ? "Keep the EC2 connection terminal open and check that the server is running."
-      : "Check your connection and the server address in Settings."
+      : publishedBackendBuild
+        ? jwt
+          ? "Check your connection; if server access was removed, use Reconnect server in Settings."
+          : "Check your connection."
+        : "Check your connection and the server address in Settings."
     throw Object.assign(
       new Error(
         `${message} ${recovery}${jwt ? " Check task or action status before submitting again; a request may still be processing." : " Then try Sign in again."}`
@@ -207,7 +213,9 @@ async function login(capabilities?: string[]) {
     await mutateSession(async () => {
       if (generation !== sessionGeneration || origin !== (await settings()))
         throw new Error("Session changed during login. Start again.")
-      await chrome.storage.session.set({ threadlySession: { ...result, origin } })
+      await chrome.storage.session.set({
+        threadlySession: { ...result, origin }
+      })
     })
     return result.user
   } finally {
@@ -274,6 +282,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         }
       }
       case "CONFIGURE": {
+        if (publishedBackendBuild)
+          throw new Error(
+            "This extension is configured for the Threadly server."
+          )
         if (signingIn || signingOut)
           throw new Error("Finish sign-in or sign-out before changing servers.")
         const origin = backendOrigin(message.origin)

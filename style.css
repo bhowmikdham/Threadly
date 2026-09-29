@@ -1892,11 +1892,49 @@ summary:focus-visible {
   color: var(--text);
   font-weight: 550;
 }
+.draft-to {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.draft-to input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.draft-subject {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
 .draft-card .draft-body {
+  display: block;
+  width: 100%;
+  min-height: 7lh;
   margin: 0 0 12px;
   padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   font-size: 13.5px;
   line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+  outline: none;
+}
+.draft-to:focus-within {
+  border-bottom-color: var(--muted);
 }
 .draft-actions {
   display: flex;

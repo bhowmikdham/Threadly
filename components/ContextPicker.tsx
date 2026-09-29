@@ -1,5 +1,5 @@
 import type { Selection } from "../lib/types"
-import { Icon } from "./Icon"
+import { GmailIcon, Icon } from "./Icon"
 
 // What this conversation is about: the attached email's subject and who wrote
 // it. Read-only; detaching lives on the chip's own remove button.
@@ -27,7 +27,7 @@ export function ContextPicker({
       <p className="context-title">{selection.thread.subject}</p>
       {messages.map((m) => (
         <p className="context-from" key={m.gmail_msg_id}>
-          <Icon name="mail" size={14} />
+          <GmailIcon size={14} />
           <span>{m.from_addr}</span>
           {(m.sent_at || m.received_at) && (
             <small>
