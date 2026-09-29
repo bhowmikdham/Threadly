@@ -1,0 +1,43 @@
+# Loaded only by deploy-app.sh --public-https. Private redeploys never create this network.
+services:
+  api:
+    environment:
+      THREADLY_TRUSTED_PROXY_IP: 172.30.247.2
+    networks: [threadly_net, ingress_net]
+
+  caddy:
+    image: caddy:2.11.4
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      THREADLY_TRUSTED_PROXY_IP: ${THREADLY_TRUSTED_PROXY_IP:-}
+    # A direct Compose invocation must not publish HTTPS without matching
+    # domain and trusted-proxy settings.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        test -n "$$DOMAIN" && test "$$THREADLY_TRUSTED_PROXY_IP" = "172.30.247.2"
+        || { echo 'Public HTTPS requires DOMAIN and the trusted Caddy address' >&2; exit 1; };
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - "443:443/tcp"
+    volumes:
+      - ../../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      ingress_net:
+        ipv4_address: 172.30.247.2
+
+networks:
+  ingress_net:
+    ipam:
+      config:
+        - subnet: 172.30.247.0/29
+
+volumes:
+  caddy_data:
+  caddy_config:

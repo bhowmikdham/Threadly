@@ -1,4 +1,4 @@
-# Deploy the API, PostgreSQL, Chroma and workers without a domain
+# Deploy private staging or opt-in public HTTPS
 
 Current source policy: [on-demand Gmail](../../../docs/on-demand-gmail.md). Set
 `GMAIL_SOURCE_MODE=on_demand` and `MAILBOX_BACKGROUND_SYNC_ENABLED=false` in the
@@ -18,6 +18,21 @@ commit containing these deployment files:
 sudo bash deploy-app.sh FULL_40_CHARACTER_COMMIT
 ```
 
+This default is private, even if `DOMAIN` is present in the protected environment.
+It stops a previously running Caddy container before migrations, then exposes only
+`127.0.0.1:8000` for the SSM tunnel. To deploy the same pinned stack with public
+HTTPS, first set exactly one unquoted `DOMAIN=api.example.com` entry in the protected
+environment, point its A record at the host's Elastic IP, and run:
+
+```bash
+sudo bash deploy-app.sh FULL_40_CHARACTER_COMMIT --public-https
+```
+
+The public flag must be supplied on each public redeploy. Omitting it turns Caddy
+off after preflight and build. The script records `private` or `public-https` in
+`/srv/threadly-data/deployment/current-mode`; a failed deployment does not update
+that record. Review the selected mode before running the script.
+
 Download the script from the same immutable commit and verify its checksum
 before execution. Deployment retains the existing generated secrets file at
 `/srv/threadly-data/secrets/threadly.env` (root:600). The script never sources it
@@ -33,28 +48,34 @@ are reported as pending, not silently replaced with fake functionality.
 4. Start PostgreSQL, stop any old API/worker, create a compressed database dump,
    then apply Alembic migrations. A failed build does not stop the old app; a
    failed migration leaves the app stopped for inspection and data intact.
-5. Start Chroma, API and worker; wait for API readiness (database + Chroma),
-   check HTTP health and verify the worker container is running.
+5. Start Chroma, API and workers; wait for API readiness (database + Chroma),
+   check loopback HTTP health and verify both worker containers are running. In
+   public mode, then start Caddy and check certificate-valid HTTPS locally using
+   the configured DNS name and SNI. A failed TLS check stops Caddy and fails deploy.
 6. Record the commit and actual image IDs in `/srv/threadly-data/deployment/`;
    point `/opt/threadly/current` to the successful checkout.
 
 The worker's running state is not proof that a model job succeeds. Test that
-separately after configuring Bedrock. No synthetic user, email, invite or model
+separately after configuring Bedrock. `LOCAL_HTTPS_READY` proves the local proxy,
+certificate and API path, not external reachability or Google sign-in. Test HTTPS
+from outside EC2 before public use; missing Google settings only print `PENDING`
+in preflight. No synthetic user, email, invite or model
 invocation is created by deployment. Existing queued jobs may be processed when
 the worker starts; deploy only to the intended staging database.
 
 PostgreSQL and Chroma tags follow the repository baseline (`postgres:16`,
 `chromadb/chroma:latest`). Missing images are pulled; subsequent releases reuse
-local images, and their resolved IDs are recorded. Backend dependencies still
+local images, and their resolved IDs are recorded. Public mode additionally uses
+`caddy:2.11.4`; the resolved Caddy image ID is recorded with the release. Backend dependencies still
 use the existing version ranges. This pins application source, not the complete
 dependency supply chain. Dependency updates and digest pinning remain release
 engineering work; do not prune images required for rollback casually.
 
-## Access without DNS
+## Private tunnel access
 
 The API listens on **127.0.0.1:8000 on the EC2 host**. It is not available at the
-public IP from a laptop. Caddy is not started and no security-group rules are
-changed. PostgreSQL and Chroma have no host port mappings.
+public IP from a laptop. Caddy is stopped and no security-group rules are changed.
+PostgreSQL and Chroma have no host port mappings.
 
 On the server:
 
@@ -79,12 +100,52 @@ See [AWS port-forwarding instructions](https://docs.aws.amazon.com/systems-manag
 
 Google OAuth needs a registered callback and the application's matching configuration.
 Use the [domain-free local test client](../../../docs/google-local-testing.md) with the
-explicit, exact loopback exception; HTTP localhost is rejected by default. A public IP callback is not accepted
-by Google's web OAuth rules. Production CORS in the merged baseline does not
-yet allow an extension origin; browser/extension integration is a later setup
-step, not solved by exposing a port. The domain/TLS deployment will need a
-reviewed Compose/proxy transition without changing the `threadly` project name
-or its named volumes.
+explicit, exact loopback exception; HTTP localhost is rejected by default. A public
+IP callback is not accepted by Google's web OAuth rules. The extension's
+Chrome-captured `chromiumapp.org` callback is separate from the API hostname and
+still needs a live Google test. Production extension/CORS behavior also needs a
+real packaged-browser test before launch.
+
+## Opt-in HTTPS access
+
+The public-only Compose override starts pinned `caddy:2.11.4` on host TCP 443.
+Caddy limits incoming request bodies to 10 MB (larger bodies receive 413); current
+API operations use bounded JSON and voice upload is still a stub. Caddy and API share
+only a dedicated ingress network; Caddy has a fixed `172.30.247.2` address and no
+access to the PostgreSQL/Chroma network. The API remains host-loopback on 8000,
+and PostgreSQL/Chroma/worker ports remain unpublished. The deployment script sets
+`THREADLY_TRUSTED_PROXY_IP=172.30.247.2` only in public mode, so the API accepts
+forwarded client IP/proto only from Caddy. Caddy replaces incoming forwarding
+headers with the direct client address. The public deployment preflight checks
+the host's Docker networks for overlap with `172.30.247.0/29` before stopping
+the current API; private deployments do not create this network.
+
+The security group already allows 443, but port 80 is closed. Use a public DNS A
+record to the Elastic IP and allow Caddy to obtain its certificate with TLS-ALPN
+on 443. Do not use a bare EC2 IP, `localhost`, a URL or a quoted value as `DOMAIN`;
+this deployment requires a DNS name and a publicly trusted certificate. Caddy's
+certificate volumes `threadly_caddy_data` and `threadly_caddy_config` persist with
+the existing `threadly` Compose project and must not be pruned during redeploys.
+
+The API DNS name is for extension fetches and valid public TLS. Threadly's Chrome
+extension sends Google a separate `chromiumapp.org` redirect; do not register the
+API URL as its OAuth callback. An owned domain may also serve Google's production
+consent-screen branding, subject to Google's verification process.
+
+After `LOCAL_HTTPS_READY`, verify from a separate client with normal certificate
+validation and no `--resolve` override:
+
+```bash
+curl --fail --show-error https://api.example.com/healthz
+```
+
+Check the returned certificate and public DNS/443 route, then exercise sign-in,
+refresh, logout, two distinct client IPs and a forged `X-Forwarded-For` request.
+The OAuth limiter must distinguish real clients and ignore the forged address.
+Keep Gmail/Calendar writes disabled until their separate controlled pilot gate.
+The EC2 host's eight-hour auto-stop timer still applies in public mode. Decide and
+document the intended availability window before inviting testers; a valid TLS
+endpoint cannot remain reachable while the instance is stopped.
 
 ## Redeploy, logs and recovery
 
@@ -94,6 +155,7 @@ current deployment on the server:
 
 ```bash
 sudo cat /srv/threadly-data/deployment/current-commit
+sudo cat /srv/threadly-data/deployment/current-mode
 sudo docker ps --filter label=com.docker.compose.project=threadly
 sudo docker logs --tail 50 threadly-assistant-worker-1
 ```

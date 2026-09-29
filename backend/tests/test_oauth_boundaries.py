@@ -60,30 +60,32 @@ def exchange_body(start, **changes):
     }
 
 
-def test_route_state_pkce_replay_and_capabilities(db_client, configured):
-    start = begin(db_client)
+def test_route_state_pkce_replay_and_capabilities(secure_db_client, configured):
+    start = begin(secure_db_client)
     params = parse_qs(urlsplit(start["authorization_url"]).query)
     assert params["code_challenge"] == [flow.challenge(VERIFIER)]
     assert params["code_challenge_method"] == ["S256"]
     assert params["scope"] == ["openid email profile " + READ]
-    bad = db_client.post("/auth/google/exchange", json=exchange_body(start, code_verifier="b" * 64))
+    bad = secure_db_client.post(
+        "/auth/google/exchange", json=exchange_body(start, code_verifier="b" * 64)
+    )
     assert bad.status_code == 400
-    result = db_client.post("/auth/google/exchange", json=exchange_body(start))
+    result = secure_db_client.post("/auth/google/exchange", json=exchange_body(start))
     assert result.status_code == 200, result.text
     headers = {"Authorization": "Bearer " + result.json()["jwt"]}
-    replay = db_client.post("/auth/google/exchange", json=exchange_body(start))
+    replay = secure_db_client.post("/auth/google/exchange", json=exchange_body(start))
     assert replay.status_code == 400
-    caps = db_client.get("/assistant/capabilities", headers=headers).json()
+    caps = secure_db_client.get("/assistant/capabilities", headers=headers).json()
     assert caps["account"]["connected"] is True
     by_id = {c["id"]: c for c in caps["capabilities"]}
     assert by_id["gmail_read"]["ready"]
     assert not any(by_id[c]["ready"] for c in ["gmail_send", "calendar_read", "calendar_write"])
     assert "synthetic-secret" not in str(caps)
-    assert db_client.post("/auth/google/disconnect", headers=headers).status_code == 200
-    assert not db_client.get("/assistant/capabilities", headers=headers).json()["account"][
-        "connected"
-    ]
-    assert db_client.get("/assistant/capabilities").status_code == 401
+    assert secure_db_client.post("/auth/google/disconnect", headers=headers).status_code == 200
+    stale = secure_db_client.get("/assistant/capabilities", headers=headers)
+    assert stale.status_code == 401
+    assert stale.json()["error"]["code"] == "reauth_required"
+    assert secure_db_client.get("/assistant/capabilities").status_code == 401
 
 
 async def test_state_expiry_concurrent_consume_and_callback_binding(db_sessionmaker, configured):
@@ -111,7 +113,11 @@ async def test_reconnect_same_account_and_version_fence(db_sessionmaker, configu
         _, user = await configured(
             session, "code", REDIRECT, transport=google_transport(scopes=READ)
         )
-        owner, version = user.id, user.google_account_version
+        owner, version, session_version = (
+            user.id,
+            user.google_account_version,
+            user.threadly_session_version,
+        )
     async with db_sessionmaker() as session:
         with pytest.raises(ApiError) as failed:
             await configured(
@@ -120,6 +126,7 @@ async def test_reconnect_same_account_and_version_fence(db_sessionmaker, configu
                 REDIRECT,
                 expected_user_id=owner,
                 expected_version=version,
+                expected_session_version=session_version,
                 transport=google_transport(sub="different"),
             )
         assert failed.value.code == "google_account_mismatch"
@@ -132,6 +139,7 @@ async def test_reconnect_same_account_and_version_fence(db_sessionmaker, configu
                 REDIRECT,
                 expected_user_id=owner,
                 expected_version=version,
+                expected_session_version=session_version,
                 transport=google_transport(),
             )
         assert failed.value.code == "google_connection_changed"
@@ -143,6 +151,7 @@ async def test_reconnect_same_account_and_version_fence(db_sessionmaker, configu
             REDIRECT,
             expected_user_id=owner,
             expected_version=row.google_account_version,
+            expected_session_version=row.threadly_session_version,
             transport=google_transport(scopes=READ),
         )
         assert row.google_connected
@@ -368,17 +377,28 @@ def test_local_test_callback_still_binds_pkce_state_and_replay(db_client, config
     settings = get_settings()
     monkeypatch.setattr(settings, "google_allow_loopback_test_callback", True)
     monkeypatch.setattr(settings, "google_redirect_uri_allowlist", callback)
-    start = db_client.post("/auth/google/begin", json={
-        "redirect_uri": callback, "code_challenge": flow.challenge(VERIFIER),
-    })
+    start = db_client.post(
+        "/auth/google/begin",
+        json={
+            "redirect_uri": callback,
+            "code_challenge": flow.challenge(VERIFIER),
+        },
+    )
     assert start.status_code == 200
     params = parse_qs(urlsplit(start.json()["authorization_url"]).query)
     assert params["redirect_uri"] == [callback]
     assert params["code_challenge_method"] == ["S256"]
     body = exchange_body(start.json(), redirect_uri=callback)
-    assert db_client.post("/auth/google/exchange", json={
-        **body, "code_verifier": "b" * 64,
-    }).status_code == 400
+    assert (
+        db_client.post(
+            "/auth/google/exchange",
+            json={
+                **body,
+                "code_verifier": "b" * 64,
+            },
+        ).status_code
+        == 400
+    )
     # Disabling the exception also blocks an already-issued state from exchange.
     monkeypatch.setattr(settings, "google_allow_loopback_test_callback", False)
     assert db_client.post("/auth/google/exchange", json=body).status_code == 400

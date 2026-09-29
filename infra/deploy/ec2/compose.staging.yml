@@ -1,4 +1,4 @@
-# Domain-free staging. Use deploy-app.sh; the API binds only to host loopback.
+# The default deployment is private. Only the public override enables Caddy.
 name: threadly
 
 services:
@@ -7,6 +7,8 @@ services:
     build: ../../../backend
     restart: unless-stopped
     env_file: ${THREADLY_ENV_FILE:?set the protected environment file}
+    environment:
+      THREADLY_TRUSTED_PROXY_IP: ""
     ports:
       - "127.0.0.1:8000:8000"
     volumes:

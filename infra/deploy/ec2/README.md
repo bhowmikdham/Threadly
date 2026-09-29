@@ -135,10 +135,11 @@ cancel CloudFormation creation. Keep the printed work directory and outputs.
 
 ## Application deployment handoff
 
-For the current domain-free staging phase, use the
-[API/database/worker deployment runbook](APP-DEPLOYMENT.md). It uses the existing
-data disk and credentials, binds the API to loopback for SSM tunnelling, and
-records a specific Git commit. The domain-based handoff below remains later work.
+Use the [application deployment runbook](APP-DEPLOYMENT.md) for either the default
+private SSM-tunnel mode or the explicitly selected `--public-https` Caddy override.
+Both modes use the existing data disk, credentials and pinned Git commit. Public
+HTTPS code does not mean the EC2 host is deployed or reachable; verify the live
+host separately. The checklist below covers the remaining operator gates.
 
 1. Confirm the host checks above, and record stack name, instance ID, IP, volume
    ID and bucket name in the team's deployment record.
@@ -151,17 +152,26 @@ records a specific Git commit. The domain-based handoff below remains later work
    configuration names against that release. Keep secrets out of Git, shell
    history, pull requests and public deployment logs. No long-lived AWS keys are
    needed: use the instance role.
-4. Point the domain's A record at the Elastic IP. Configure the application's
-   HTTPS OAuth callback in Google and its allowed origins. Current Caddy exposes
-   443 only; TLS-ALPN certificate issuance requires that DNS reaches this server.
-5. Use that release's Compose file with the protected env file and its
-   `assistant` worker profile. Build services, run its documented Alembic migration
-   command, and start Caddy/API/PostgreSQL/Chroma/worker as required. Do not use the
-   legacy Mac/Ollama setup or assume model files are configured by this launcher.
-6. Verify HTTPS health, Google login, Bedrock inference, queue processing and a
+4. For public mode, point the API domain's A record at the Elastic IP and put an
+   unquoted DNS name in `DOMAIN`. That domain provides HTTPS for extension fetches;
+   the extension's Google OAuth callback remains `chromiumapp.org`. Register its
+   exact redirect URI and verify the consent screen. An owned verified domain is
+   also needed for Google's external production-app branding.
+   Caddy exposes 443 only; TLS-ALPN certificate issuance requires DNS to reach
+   this server. The public deployment checks Docker's `172.30.247.0/29`
+   ingress network for overlap before stopping the running API.
+5. Run the pinned release's `deploy-app.sh` with `--public-https` only when the
+   public mode is intended. Its default is the private tunnel. It builds services,
+   migrates the database, starts API/workers, then optionally starts Caddy and
+   verifies local TLS. Do not use the legacy Mac/Ollama stack or assume model
+   files are configured by this launcher.
+6. Verify HTTPS health from outside EC2, Google login, Bedrock inference, queue processing and a
    draft-only assistant request. Test approval enforcement and uncertain-write
    reconciliation before enabling real email/calendar writes.
-7. Install scheduled off-instance PostgreSQL backups, document any Chroma rebuild
+7. The host's eight-hour auto-stop timer still applies to public mode. Decide and
+   document tester availability before a pilot; extend or disable the timer only
+   through the operator procedure above.
+8. Install scheduled off-instance PostgreSQL backups, document any Chroma rebuild
    strategy, and run a restore drill. Test a stop/start cycle with persistent data.
 
 ## Failure recovery and eventual removal
