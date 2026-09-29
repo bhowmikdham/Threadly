@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
-import {
-  actionReference,
-  addresses,
-  api,
-  errorText,
-  requestId
-} from "../lib/api"
+import { actionReference, api, errorText, requestId } from "../lib/api"
 import type { Artifact, EmailAction } from "../lib/types"
 import { Booking } from "./Booking"
 import { Icon } from "./Icon"
@@ -245,45 +239,24 @@ function DraftCard({
 }) {
   const c = value.artifact.content,
     envelope = value.draft_envelope
-  const [body, setBody] = useState(c.body),
-    [subject, setSubject] = useState(c.subject),
-    [to, setTo] = useState(envelope?.to?.join(", ") || ""),
-    [cc, setCc] = useState(envelope?.cc?.join(", ") || ""),
-    [bcc, setBcc] = useState(envelope?.bcc?.join(", ") || "")
+  // Drafts are read-only here: changes are asked for in the chat and arrive
+  // from the backend as a new revision.
+  const body = c.body,
+    subject = c.subject,
+    to = (envelope?.to || []).join(", ")
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<EmailAction | null>(null),
     [confirmed, setConfirmed] = useState(false),
-    [history, setHistory] = useState<any[]>([]),
-    [editing, setEditing] = useState(false),
     [replyOpen, setReplyOpen] = useState(false)
-  const [resolved, setResolved] = useState(false),
-    key = useRef(requestId()),
+  const key = useRef(requestId()),
     decisionKey = useRef(requestId())
-  const dirty =
-    body !== c.body ||
-    subject !== c.subject ||
-    to !== (envelope?.to || []).join(", ") ||
-    cc !== (envelope?.cc || []).join(", ") ||
-    bcc !== (envelope?.bcc || []).join(", ") ||
-    resolved
   useEffect(() => {
-    setBody(c.body)
-    setSubject(c.subject)
-    setTo((envelope?.to || []).join(", "))
-    setCc((envelope?.cc || []).join(", "))
-    setBcc((envelope?.bcc || []).join(", "))
     setAction(null)
     setConfirmed(false)
-    setResolved(false)
     key.current = requestId()
   }, [value.artifact_id])
   useEffect(() => {
-    setAction(null)
-    setConfirmed(false)
-  }, [body, subject, to, cc, bcc, resolved])
-  useEffect(() => {
-    if (dirty) return
     let current = true
     void actionReference(value.artifact_id, "email")
       .then(async (id) => (id ? api(`/assistant/actions/${id}`) : null))
@@ -296,7 +269,7 @@ function DraftCard({
     return () => {
       current = false
     }
-  }, [value.artifact_id, dirty])
+  }, [value.artifact_id])
   useEffect(() => {
     if (
       !action ||
@@ -373,31 +346,8 @@ function DraftCard({
       setBusy(false)
     }
   }
-  const save = () =>
-    run(async () => {
-      const result = await api(
-        `/assistant/tasks/${value.task_id}/draft-revisions`,
-        {
-          request_id: requestId(),
-          expected_revision: value.revision,
-          subject,
-          body,
-          recipients: {
-            to: addresses(to),
-            cc: addresses(cc),
-            bcc: addresses(bcc)
-          },
-          unresolved_fields: resolved ? [] : c.unresolved_fields
-        }
-      )
-      replace(result)
-      setEditing(false)
-      setNotice("Changes saved.")
-    })
   const prepare = () =>
     run(async () => {
-      if (dirty)
-        throw new Error("Save your edits before reviewing the outgoing email.")
       const reviewed = await api(
         `/assistant/artifacts/${value.artifact_id}/review`,
         {
@@ -418,7 +368,6 @@ function DraftCard({
     })
   const insert = () =>
     run(async () => {
-      if (dirty) throw new Error("Save your edits before inserting this draft.")
       const [tab] = await chrome.tabs.query({
         active: true,
         lastFocusedWindow: true
@@ -455,64 +404,17 @@ function DraftCard({
       setNotice("Copied. Nothing was sent.")
     })
   // The draft reads as the reply itself: its text, with Insert and Copy.
-  // Editing, revisions and the send review stay one tap away underneath.
+  // Changes are asked for in the chat; the send review sits underneath.
   return (
     <section className="artifact draft-card" aria-label="draft result">
       <div className="draft-box">
-        {!envelope?.reply && !editing && (
+        {!envelope?.reply && (
           <p className="draft-meta">
             <span>To {to || "—"}</span>
             {subject && <span>{subject}</span>}
           </p>
         )}
-        {!editing && <p className="prose draft-body">{body}</p>}
-        <div hidden={!editing}>
-          <label>
-            To
-            <input
-              value={to}
-              disabled={locked}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </label>
-          <details>
-            <summary>Cc and Bcc</summary>
-            <label>
-              Cc
-              <input
-                value={cc}
-                disabled={locked}
-                onChange={(e) => setCc(e.target.value)}
-              />
-            </label>
-            <label>
-              Bcc
-              <input
-                value={bcc}
-                disabled={locked}
-                onChange={(e) => setBcc(e.target.value)}
-              />
-            </label>
-          </details>
-          <label>
-            Subject
-            <input
-              value={subject}
-              disabled={locked || !!envelope?.reply}
-              onChange={(e) => setSubject(e.target.value)}
-            />
-          </label>
-          <label>
-            Message
-            <textarea
-              aria-label="Message"
-              rows={7}
-              value={body}
-              disabled={locked}
-              onChange={(e) => setBody(e.target.value)}
-            />
-          </label>
-        </div>
+        <p className="prose draft-body">{body}</p>
         {c.unresolved_fields?.length > 0 && (
           <div className="warning">
             <b>Needs your input</b>
@@ -521,41 +423,18 @@ function DraftCard({
                 <li key={x}>{x}</li>
               ))}
             </ul>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={resolved}
-                disabled={locked}
-                onChange={(e) => setResolved(e.target.checked)}
-              />
-              I filled in all missing details in this draft.
-            </label>
+            <p>Tell Threadly the missing details in the chat.</p>
           </div>
         )}
         <div className="draft-actions">
-          {editing ? (
-            <>
-              <button
-                disabled={!dirty || locked || !value.is_latest}
-                onClick={save}>
-                Save edits
-              </button>
-              <button disabled={busy} onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {envelope?.reply && replyOpen && (
-                <button disabled={busy || dirty} onClick={insert}>
-                  Insert
-                </button>
-              )}
-              <button disabled={busy} onClick={copyDraft}>
-                Copy
-              </button>
-            </>
+          {envelope?.reply && replyOpen && (
+            <button disabled={busy} onClick={insert}>
+              Insert
+            </button>
           )}
+          <button disabled={busy} onClick={copyDraft}>
+            Copy
+          </button>
         </div>
         {notice && (
           <p className="draft-notice" role="status">
@@ -564,32 +443,16 @@ function DraftCard({
         )}
       </div>
       <div className="draft-footer">
-        {!editing && (
-          <button
-            className="icon-button"
-            aria-label="Edit draft"
-            title="Edit draft"
-            disabled={locked || !value.is_latest}
-            onClick={() => setEditing(true)}>
-            <Icon name="edit" size={15} />
-          </button>
-        )}
         <button
           className="icon-button"
           aria-label="Review outgoing email"
           title="Review and send"
           disabled={
-            locked ||
-            dirty ||
-            !value.is_latest ||
-            !!value.review?.blockers?.length
+            locked || !value.is_latest || !!value.review?.blockers?.length
           }
           onClick={prepare}>
           <Icon name="shield" size={15} />
         </button>
-        {value.revision > 1 && (
-          <small className="draft-revision">Revision {value.revision}</small>
-        )}
       </div>
       {value.review?.blockers?.length > 0 && (
         <p className="warning">
@@ -608,31 +471,6 @@ function DraftCard({
           }>
           Load latest revision
         </button>
-      )}
-      {editing && (
-        <>
-          <details
-            onToggle={(e) => {
-              if (e.currentTarget.open)
-                void api(`/assistant/tasks/${value.task_id}/draft-revisions`)
-                  .then((r) => setHistory(r.revisions))
-                  .catch((e) => setNotice(errorText(e)))
-            }}>
-            <summary>Revision history</summary>
-            {history.map((h) => (
-              <button
-                key={h.artifact_id}
-                onClick={() =>
-                  run(async () =>
-                    replace(await api(`/assistant/artifacts/${h.artifact_id}`))
-                  )
-                }>
-                Revision {h.revision}
-              </button>
-            ))}
-          </details>
-          <Evidence value={value} />
-        </>
       )}
       {action && (
         <div className="approval">

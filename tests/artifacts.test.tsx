@@ -94,43 +94,41 @@ describe("reviewed draft integration", () => {
     await screen.findByText("email writes disabled")
     expect(screen.queryByText("Approve and send")).toBeNull()
   })
-  it("invalidates a displayed preview immediately when the body is edited", async () => {
+  it("drops a displayed preview as soon as a revised draft arrives from chat", async () => {
     mockApi((m) => (m.path.endsWith("/review") ? draft : action))
-    render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
+    const { rerender } = render(
+      <ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />
+    )
     fireEvent.click(
       screen.getByRole("button", { name: "Review outgoing email" })
     )
     await screen.findByText("Approve and send")
-    fireEvent.click(screen.getByRole("button", { name: "Edit draft" }))
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Changed content" }
-    })
+    const revised = {
+      ...draft,
+      artifact_id: "a2",
+      revision: 2,
+      artifact: {
+        ...draft.artifact,
+        content: { ...draft.artifact.content, body: "Changed content" }
+      }
+    }
+    rerender(
+      <ArtifactCard value={revised} replace={vi.fn()} report={vi.fn()} />
+    )
     expect(screen.queryByText("Approve and send")).toBeNull()
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Review outgoing email"
-        }) as HTMLButtonElement
-      ).disabled
-    ).toBe(true)
+    expect(screen.getByText("Changed content")).toBeTruthy()
   })
-  it("saves a revision with exact edited recipients and does not send", async () => {
+  it("offers no in-panel editing and saves nothing by itself", () => {
     const calls: any[] = []
     mockApi((m) => {
       calls.push(m)
-      return { ...draft, revision: 2, artifact_id: "a2" }
+      return null
     })
-    const replace = vi.fn()
-    render(<ArtifactCard value={draft} replace={replace} report={vi.fn()} />)
-    fireEvent.click(screen.getByRole("button", { name: "Edit draft" }))
-    fireEvent.change(screen.getByLabelText("To"), {
-      target: { value: "new@example.test" }
-    })
-    fireEvent.click(screen.getByText("Save edits"))
-    await waitFor(() => expect(replace).toHaveBeenCalled())
-    expect(calls[0].body.recipients.to).toEqual(["new@example.test"])
-    expect(calls[0].body.expected_revision).toBe(1)
-    expect(calls).toHaveLength(1)
+    render(<ArtifactCard value={draft} replace={vi.fn()} report={vi.fn()} />)
+    expect(screen.queryByRole("button", { name: "Edit draft" })).toBeNull()
+    expect(screen.queryByLabelText("Message")).toBeNull()
+    expect(screen.queryByText("Save edits")).toBeNull()
+    expect(calls.some((c) => c.path?.includes("draft-revisions"))).toBe(false)
   })
   it("renders grounded answers safely as text", () => {
     const a: any = {

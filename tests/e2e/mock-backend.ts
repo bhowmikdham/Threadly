@@ -54,7 +54,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
               subject: body.draft_options?.reply_message_id
                 ? "Re: Test receipt"
                 : "Project update",
-              body: "Thank you for the update.",
+              body: body.draft_body || "Thank you for the update.",
               unresolved_fields: []
             }
           : kind === "schedule_options"
@@ -75,7 +75,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     artifacts.set(aid, {
       artifact_id: aid,
       task_id: id,
-      revision: 1,
+      revision: body.draft_revision || 1,
       is_latest: true,
       artifact: {
         kind,
@@ -157,6 +157,25 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         p = "/assistant/requests"
         if (body.instruction === "Make it shorter")
           body.intent_hint = "summarise"
+        // A follow-up while a draft is active revises that draft, as the
+        // conversation backend does when the user asks for changes in chat.
+        const active = tasks.get(body.active_task_id)
+        const draft = active && artifacts.get(active.artifact_id)
+        if (
+          draft?.artifact.kind === "draft" &&
+          !/summari[sz]e|meeting time|how much|^(show|find)\b/i.test(
+            body.instruction
+          )
+        ) {
+          const change = body.instruction.trim().replace(/[.!?]*$/, ".")
+          body.intent_hint = draft.draft_envelope.reply ? "reply" : "compose"
+          body.draft_options = {
+            to: draft.draft_envelope.to,
+            reply_message_id: draft.draft_envelope.reply?.gmail_message_id
+          }
+          body.draft_body = `Thank you for the update. ${change[0].toUpperCase()}${change.slice(1)}`
+          body.draft_revision = draft.revision + 1
+        }
       }
     }
     if (p === "/auth/google/begin") {
@@ -282,11 +301,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         body.ui_map.selected_message_ids,
         [target]
       )
-      verify(
-        "context snapshot omits message bodies",
-        "messages" in body,
-        false
-      )
+      verify("context snapshot omits message bodies", "messages" in body, false)
       data = {
         context_snapshot_id: "ctx-1",
         thread_id: thread,
@@ -463,7 +478,11 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         }
       }
     else if (p === "/assistant/workflow-proposals/plan-1/confirm") {
-      verify("plan confirmation echoes plan hash", body.plan_hash, "c".repeat(64))
+      verify(
+        "plan confirmation echoes plan hash",
+        body.plan_hash,
+        "c".repeat(64)
+      )
       verify(
         "plan confirmation is explicit",
         body.confirm_complete_command,

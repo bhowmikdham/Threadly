@@ -322,6 +322,15 @@ function Assistant({
     : "New conversation"
   // Sending is an approval step, not a connector, so it isn't listed here.
   const connectors = capabilities.filter((tool) => !tool.id.endsWith("_send"))
+  // Recent chats leaves out what is already open here and repeats of a request.
+  const openTasks = new Set(c.entries.map((e) => e.task?.task_id))
+  const seen = new Set<string>()
+  const recent = (history || []).filter((t) => {
+    const text = t.instruction?.trim().toLowerCase()
+    if (openTasks.has(t.task_id) || seen.has(text)) return false
+    seen.add(text)
+    return true
+  })
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
   const initials =
     (user.name || user.email)
@@ -382,7 +391,7 @@ function Assistant({
             disabled={inputBusy}
             onClick={() => void historyPage()}>
             <Icon name="clock" size={16} />
-            Recent work
+            Recent chats
           </button>
           <button
             className="drawer-row drawer-danger"
@@ -390,7 +399,7 @@ function Assistant({
             onClick={async () => {
               if (
                 window.confirm(
-                  "Delete this conversation? Existing tasks and drafts will remain in Recent work."
+                  "Delete this conversation? Existing tasks and drafts will remain in Recent chats."
                 )
               ) {
                 await c.deleteChat()
@@ -486,7 +495,7 @@ function Assistant({
         {history && (
           <section className="history-surface">
             <div className="card-heading">
-              <h2>Recent work</h2>
+              <h2>Recent chats</h2>
               <button
                 className="icon-button"
                 aria-label="Close history"
@@ -494,12 +503,8 @@ function Assistant({
                 <Icon name="close" />
               </button>
             </div>
-            {history.length === 0 && (
-              <p>
-                Your generated drafts, summaries and plans will appear here.
-              </p>
-            )}
-            {history.map((t) => (
+            {recent.length === 0 && <p>Your earlier chats will appear here.</p>}
+            {recent.map((t) => (
               <button
                 className="history-row"
                 key={t.task_id}
@@ -545,15 +550,6 @@ function Assistant({
                     onClick={() => suggest("Draft a reply to this thread.")}>
                     <Icon name="edit" />
                     Draft a reply to this thread
-                    <Icon name="chevron" size={14} />
-                  </button>
-                  <button
-                    disabled={inputBusy}
-                    onClick={() =>
-                      suggest("What needs my attention in this email?")
-                    }>
-                    <Icon name="check" />
-                    What needs my attention?
                     <Icon name="chevron" size={14} />
                   </button>
                 </>
@@ -749,7 +745,9 @@ function Assistant({
             placeholder={
               latest?.task?.state === "needs_clarification"
                 ? "Reply or ask a follow-up…"
-                : "Ask your inbox…"
+                : latest?.artifacts?.some((a) => a.artifact.kind === "draft")
+                  ? "Edit the reply or ask a question…"
+                  : "Ask your inbox…"
             }
             value={message}
             rows={1}

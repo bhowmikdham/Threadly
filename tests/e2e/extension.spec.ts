@@ -175,16 +175,21 @@ test("real extension bridge: selected summary, answer and edited reply without s
   expect(
     calls.filter((c) => c.path.endsWith("/inputs")).at(-1)?.body.answer
   ).toEqual({ reply_message_id: target, recipients: ["supplier@example.test"] })
-  await page.getByRole("button", { name: "Edit draft" }).click()
-  await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
-    "Thank you for the update."
+  // No edit form: the reply is changed by asking in the chat.
+  await expect(page.getByRole("button", { name: "Edit draft" })).toHaveCount(0)
+  await expect(page.getByLabel("Your request")).toHaveAttribute(
+    "placeholder",
+    "Edit the reply or ask a question…"
   )
+  await page.getByLabel("Your request").fill("The total should be $9.80")
+  await page.getByRole("button", { name: "Send request", exact: true }).click()
+  await expect(
+    page.getByText("Thank you for the update. The total should be $9.80.")
+  ).toBeVisible()
   await page
-    .getByLabel("Message", { exact: true })
-    .fill("Thank you for confirming.")
-  await page.getByRole("button", { name: "Save edits" }).click()
-  await expect(page.getByText("Revision 2", { exact: true })).toBeVisible()
-  await page.getByRole("button", { name: "Review outgoing email" }).click()
+    .getByRole("button", { name: "Review outgoing email" })
+    .last()
+    .click()
   await expect(page.getByText("Exact outgoing email")).toBeVisible()
   await expect(
     page.getByRole("button", { name: "Approve and send" })
@@ -195,10 +200,20 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "Recent work", exact: true }).click()
+  // Recent chats leaves out the chat that is already open.
+  await page.getByRole("button", { name: "Recent chats", exact: true }).click()
+  await expect(
+    page.getByRole("button", { name: /The total should be/ })
+  ).toHaveCount(0)
   await page
-    .getByRole("button", { name: /Draft a reply to this thread/ })
+    .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
+  await page.getByRole("button", { name: "New conversation" }).click()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Recent chats", exact: true }).click()
+  await page.getByRole("button", { name: /The total should be/ }).click()
   await expect(page.getByText("Exact outgoing email")).toBeVisible()
   expect(calls.filter((c) => c.path.endsWith("/actions"))).toHaveLength(1)
   expect(calls.some((c) => c.path === "/assistant/actions/action-1")).toBe(true)
@@ -315,11 +330,11 @@ test("settings use real capability and versioned preference contracts; history s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "Recent work", exact: true }).click()
+  await page.getByRole("button", { name: "Recent chats", exact: true }).click()
   await expect(
     page
-      .getByRole("heading", { name: "Recent work" })
-      .or(page.getByText("Recent work", { exact: true }))
+      .getByRole("heading", { name: "Recent chats" })
+      .or(page.getByText("Recent chats", { exact: true }))
   ).toBeVisible()
   await expect(
     page.getByRole("button", { name: /Draft a reply/ }).first()
