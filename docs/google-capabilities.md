@@ -168,3 +168,10 @@ Tests and remaining boundaries: [B01 checkpoint](backend-execution/checkpoints/B
 Calendar API, narrow scope pair and ACL limitations: [Calendar reads](calendar-reads.md).
 
 For domain-free staging, use the [local OAuth test client and setup](google-local-testing.md).
+
+For multi-account use, Google `sub` is the stable owner key; there is no email
+allowlist in the API. The OAuth account chooser helps a person select the intended
+Google identity, and authenticated reconnect still rejects a different subject.
+Optional `calendar_events_read` adds event-detail visibility to the existing
+Calendar list/free-busy grant. See [on-demand agenda](calendar-agenda.md). External/Testing Google
+consent and the local SSM-only API still limit who can connect in practice.

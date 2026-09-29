@@ -1,0 +1,41 @@
+{
+  "receipt_release": "calendar-agenda-deterministic-v1",
+  "release": "contextual-conversation-1.2.1",
+  "prompt_hash": "f68bfde63bd827637a7b145d07711ab71373cec80314671c167146fe593e9644",
+  "tools_hash": "1ccbfaa9a8b97eb37fe75241c16e1ed11a0af107f23192488232eb803221229f",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "cases_hash": "2734fcabb9cb5e67ebde227ee4bfed0072abbbba7ae50131399b6e1c77be92d0",
+  "method": "Deterministic fixture and grader replay; not a live model quality result.",
+  "model_invoked": false,
+  "google_invoked": false,
+  "external_actions": false,
+  "command": "PYTHONPATH=backend python -m pytest -q backend/tests/test_calendar_agenda.py",
+  "cases": [
+    {
+      "id": "calendar_today_agenda",
+      "turn": "What meetings are on my calendar today?",
+      "expected_tool": "read_calendar",
+      "expected_period": "today",
+      "passed": true
+    },
+    {
+      "id": "calendar_tomorrow_partial",
+      "turn": "What is on my calendar tomorrow?",
+      "expected_tool": "read_calendar",
+      "expected_period": "tomorrow",
+      "passed": true
+    },
+    {
+      "id": "calendar_slots_use_schedule",
+      "turn": "Find me three free slots tomorrow for a meeting",
+      "expected_tool": "prepare_workflow",
+      "expected_intent": "plan_schedule",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "The deterministic replay proves the fixture/runtime/grader contract, not that Bedrock selects the expected tools.",
+    "The three new cases are also included in the versioned live Bedrock replay; live results remain to be collected."
+  ]
+}

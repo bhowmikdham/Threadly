@@ -17,6 +17,7 @@ from app.conversation.prompt import assets
 from app.conversation.runtime import (
     authoritative_user_instruction,
     authorize_workflow,
+    model_history,
     user_recipient_references,
     validate_workflow_bindings,
 )
@@ -30,7 +31,7 @@ AMBIGUOUS_NEWER_ORDER = (
     "Browse the app for seasonal meals and loyalty rewards. "
     "Purchase 3344 was confirmed. Your receipt is available in the app."
 )
-RECEIPT_RELEASE = "contextual-conversation-live-v6"
+RECEIPT_RELEASE = "contextual-conversation-live-v7"
 SENDER_ADDRESS = "naveen@example.test"
 SENDER_MESSAGE = (
     "From: Naveen <naveen@example.test>. Subject: Design review notes. "
@@ -41,6 +42,29 @@ INBOX_MESSAGES = {
     "mail-2": "From: Casey <casey@example.test>. Subject: Project update. The draft is ready.",
 }
 CASES = [
+    {
+        "id": "calendar_today_agenda",
+        "turns": ["What meetings are on my calendar today?"],
+        "kinds": ["message"],
+        "required": ["read_calendar"],
+        "forbid": ["search_mail", "prepare_workflow"],
+        "words": ["Project check-in"],
+    },
+    {
+        "id": "calendar_tomorrow_partial",
+        "turns": ["What is on my calendar tomorrow?"],
+        "kinds": ["message"],
+        "required": ["read_calendar"],
+        "forbid": ["search_mail", "prepare_workflow"],
+        "words": ["incomplete"],
+    },
+    {
+        "id": "calendar_slots_use_schedule",
+        "turns": ["Find me three free slots tomorrow for a meeting"],
+        "kinds": ["proposal"],
+        "required": ["prepare_workflow"],
+        "forbid": ["read_calendar"],
+    },
     {
         "id": "social_typo",
         "turns": ["hey", "how are yo u"],
@@ -405,6 +429,52 @@ class FixtureRuntime:
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
+        if name == "read_calendar":
+            from app.calendar import agenda
+            from app.schemas.calendar import AgendaCalendar, AgendaEvent, AgendaOut
+
+            if "calendar" not in self.instruction.casefold():
+                raise ValueError("Calendar read must be user-requested")
+            if "tomorrow" in self.instruction.casefold() and args.period != "tomorrow":
+                raise ValueError("Use the user's requested period")
+            if "today" in self.instruction.casefold() and args.period != "today":
+                raise ValueError("Use the user's requested period")
+            checked = datetime(2026, 9, 23, 12, tzinfo=UTC)
+            partial = self.case["id"] == "calendar_tomorrow_partial"
+            result = AgendaOut(
+                period=args.period,
+                timezone="Australia/Melbourne",
+                start=checked,
+                end=checked.replace(day=24),
+                checked_at=checked,
+                account_version=1,
+                preferences_version=1,
+                coverage="partial" if partial else "complete",
+                calendars=[
+                    AgendaCalendar(
+                        calendar_id="fixture-calendar",
+                        name="Work",
+                        status="known",
+                        reason=None,
+                        events=[
+                            AgendaEvent(
+                                summary="Project check-in",
+                                start="2026-09-23T16:00:00+10:00",
+                                end="2026-09-23T16:30:00+10:00",
+                                all_day=False,
+                                redacted=False,
+                            )
+                        ],
+                    ),
+                    *(
+                        [agenda.unknown("fixture-private", "Other", "provider_error")]
+                        if partial
+                        else []
+                    ),
+                ],
+                total_returned=1,
+            )
+            return {"kind": "message", "text": agenda.render(result)}
         if name in {"search_mail", "more_mail"}:
             if name == "search_mail":
                 query, sender_email, folder, date_phrase, limit = (
@@ -528,7 +598,9 @@ class FixtureRuntime:
             validate_workflow_bindings(args, set(self.evidence), set(self.recipient_refs))
             if args.source_scope == "visible_thread" and args.reference != "selected":
                 raise ValueError("Visible thread requires the pinned reference")
-            if args.intent != "compose" and args.reference not in self.evidence:
+            if args.intent not in {"compose", "plan_schedule", "other"} and (
+                args.reference not in self.evidence
+            ):
                 raise ValueError("Read source first")
             if args.reference and args.source_scope not in self.read_scopes.get(
                 args.reference, set()
@@ -695,6 +767,18 @@ def grade(case, response, calls, search_page=None):
                 failures.append("inbox_card_count_mismatch")
             if any("GYG" in row.get("subject", "") for row in rows):
                 failures.append("stale_merchant_cards")
+    elif case_id.startswith("calendar_"):
+        reads = _tool_inputs(calls, "read_calendar")
+        if case_id == "calendar_today_agenda" and (
+            len(reads) != 1 or reads[0].get("period") != "today"
+        ):
+            failures.append("wrong_agenda_period")
+        if case_id == "calendar_tomorrow_partial" and (
+            len(reads) != 1 or reads[0].get("period") != "tomorrow"
+        ):
+            failures.append("wrong_agenda_period")
+        if case_id == "calendar_slots_use_schedule" and workflow.get("intent") != "plan_schedule":
+            failures.append("slot_request_not_scheduled")
     elif case_id == "ordered_reference":
         reads = _read_references(calls)
         if "mail-2" not in reads:
@@ -955,19 +1039,34 @@ async def evaluate(trials, *, case_delay_seconds=0):
                 runtime = FixtureRuntime(case, turn)
                 context = {
                     "user_turn": turn,
-                    "recent_dialogue": history,
+                    "recent_dialogue": model_history(history),
                     "selected_reference": "selected" if case.get("selected") else None,
                     "displayed_result_order": runtime.result_order,
                     "active_work": None,
                     "user_recipient_refs": runtime.recipient_refs,
-                    "capabilities": {"gmail_read": True, "calendar_read": True, "send": False},
+                    "capabilities": {
+                        "gmail_read": True,
+                        "calendar_read": True,
+                        "calendar_events_read": True,
+                        "send": False,
+                    },
                     "now": "2026-09-23T12:00:00Z",
                     "timezone": "Australia/Melbourne",
                 }
                 try:
                     response = await engine.run(context, runtime)
                     failures = grade(case, response, runtime.calls, runtime.search_page)
-                    history.append({"user": turn, "assistant": response.get("text", "")})
+                    history.append(
+                        {
+                            "user": turn,
+                            "assistant": response.get("text", ""),
+                            "source": (
+                                "calendar_agenda"
+                                if any(call["name"] == "read_calendar" for call in runtime.calls)
+                                else None
+                            ),
+                        }
+                    )
                     result = {
                         "case": case["id"],
                         "trial": trial + 1,

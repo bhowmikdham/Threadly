@@ -1,4 +1,5 @@
 """OAuth persistence, capability readiness and refresh lifecycle against PostgreSQL."""
+
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -15,6 +16,8 @@ def google_transport(
     access_token: str = "at-1",
     scopes: str | None = None,
     sub: str = "g-sub-1",
+    email: str = "b@x.com",
+    name: str = "Bhowmik",
     email_verified: bool = True,
 ):
     def handler(request: httpx.Request) -> httpx.Response:
@@ -30,8 +33,8 @@ def google_transport(
                 200,
                 json={
                     "sub": sub,
-                    "email": "b@x.com",
-                    "name": "Bhowmik",
+                    "email": email,
+                    "name": name,
                     "email_verified": email_verified,
                 },
             )
@@ -80,6 +83,88 @@ async def test_second_login_without_refresh_token_keeps_old_one(db_sessionmaker)
     async with db_sessionmaker() as session:
         row = (await session.execute(select(User))).scalar_one()
         assert crypto.decrypt_token(row.refresh_token_enc) == "rt-first"  # never nulled
+
+
+@pytest.mark.asyncio
+async def test_two_google_subjects_get_separate_accounts_and_calendar_settings(
+    db_sessionmaker, db_client, monkeypatch
+):
+    from sqlalchemy import select
+
+    from app.auth import crypto, service
+    from app.calendar import service as calendar_service
+    from app.db.models import CalendarPreference, User
+    from app.schemas.calendar import POLICY_VERSION
+
+    monkeypatch.setattr(calendar_service, "get_session_factory", lambda: db_sessionmaker)
+
+    grants = (
+        "https://www.googleapis.com/auth/gmail.readonly "
+        "https://www.googleapis.com/auth/calendar.calendarlist.readonly "
+        "https://www.googleapis.com/auth/calendar.events.freebusy"
+    )
+    identities = [
+        ("google-person-a", "person-a@example.test", "access-a", "calendar-a"),
+        ("google-person-b", "person-b@example.test", "access-b", "calendar-b"),
+    ]
+    sessions = []
+    for subject, email, access, calendar_id in identities:
+        async with db_sessionmaker.begin() as session:
+            token, user = await service.exchange_code(
+                session,
+                "synthetic-code",
+                "https://ext.chromiumapp.org/",
+                transport=google_transport(
+                    sub=subject,
+                    email=email,
+                    access_token=access,
+                    refresh_token="refresh-" + subject,
+                    scopes=grants,
+                ),
+            )
+            sessions.append((token, user.id, email, access, calendar_id))
+            session.add(
+                CalendarPreference(
+                    user_id=user.id,
+                    version=1,
+                    account_version=user.google_account_version,
+                    policy_version=POLICY_VERSION,
+                    preferences={
+                        "timezone": "Australia/Melbourne",
+                        "calendar_ids": [calendar_id],
+                        "working_periods": [
+                            {"weekday": 0, "start_minute": 540, "end_minute": 1020}
+                        ],
+                        "buffer_before_minutes": 0,
+                        "buffer_after_minutes": 0,
+                        "minimum_notice_minutes": 60,
+                        "default_duration_minutes": 30,
+                    },
+                )
+            )
+
+    assert sessions[0][1] != sessions[1][1]
+    async with db_sessionmaker() as session:
+        users = (await session.execute(select(User).order_by(User.id))).scalars().all()
+        assert [user.google_sub for user in users] == [person[0] for person in identities]
+        assert [crypto.decrypt_token(user.access_token_enc) for user in users] == [
+            "access-a",
+            "access-b",
+        ]
+
+    users_by_id = {user.id: user for user in users}
+    for token, owner, email, _access, calendar_id in sessions:
+        headers = {"Authorization": "Bearer " + token}
+        capabilities = db_client.get("/assistant/capabilities", headers=headers)
+        assert capabilities.status_code == 200
+        assert capabilities.json()["account"]["connected"] is True
+        by_id = {item["id"]: item for item in capabilities.json()["capabilities"]}
+        assert by_id["calendar_list"]["ready"] and by_id["calendar_read"]["ready"]
+        preferences = db_client.get("/calendar/preferences", headers=headers)
+        assert preferences.status_code == 200
+        assert preferences.json()["preferences"]["calendar_ids"] == [calendar_id]
+        assert capabilities.json()["account"]["account_version"] == 1
+        assert users_by_id[owner].email == email
 
 
 def test_jwt_from_exchange_opens_protected_routes(db_client, auth_headers):

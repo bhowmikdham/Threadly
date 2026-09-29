@@ -806,7 +806,7 @@ response is execution approval. Ordinary follow-up text uses another turn with t
 version. A retry must reuse identical request ID and the complete input, including whether
 optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
 
-In `contextual-conversation-1.1.6`, the model's `search_mail` tool accepts
+In `contextual-conversation-1.2.2`, the model's `search_mail` tool accepts
 `{query, sender_email?, date_phrase?, folder?, limit?}`; `sender_email` defaults to empty
 and `limit` defaults to 5, with 1–5 allowed. An explicit new “from
 person@example.com” request starts a fresh exact-sender search with an empty phrase
@@ -818,6 +818,9 @@ independently pinned email available. A `more_mail` call pages only the current 
 The [v6 receipt](evaluation/contextual-conversation-live-v6.json) records 40/40 passing
 synthetic Bedrock checks for release `1.1.6`; the
 [v5 receipt](evaluation/contextual-conversation-live-v5.json) covers release `1.1.5`.
+Release `1.2.2` combines these search constraints with Calendar agenda support.
+Its [deterministic receipt](evaluation/contextual-conversation-merge-deterministic-v1.json)
+pins the combined assets; live Bedrock replay for this combined version is pending.
 
 For `prepare_workflow(intent=summarise, reference=selected|mail-N)`, the backend requires
 that reference to have been read and creates a typed `operations:["summary"]` task with
@@ -873,3 +876,21 @@ All failures use `{"error":{"code":"<machine code>","message":"<safe text>","det
 `conversation_turn_limit`, and 503 `conversation_disabled`,
 `conversation_provider_unavailable` or `conversation_unavailable`. The public provider code
 is generic; SDK exception text, Bedrock error type and raw email bodies are not returned.
+
+## On-demand Calendar agenda and per-account consent (2026-09-28)
+
+Google sign-in creates or resumes a Threadly user from the verified Google subject;
+there is no application email allowlist. A signed-in user's
+`POST /auth/google/reconnect` may request `calendar_events_read` in addition to
+the existing Calendar free/busy grant. The granted scope and owner-bound account
+version, not the requested scope, determine readiness. The OAuth account chooser
+is shown at sign-in; reconnect still refuses a different Google subject.
+
+Authenticated `GET /calendar/agenda?period=today|tomorrow|this_week|next_7_days`
+reads only the owner's explicitly selected calendars in a bounded time window.
+The result has per-calendar `known`, `partial` or `unknown` coverage and at most
+50 event previews. Private event titles/locations are redacted. No background
+Calendar import or event cache is introduced. `read_calendar` can provide a
+deterministic agenda answer in `/assistant/conversation-turns`, while the existing
+reviewed scheduling/slot/booking routes remain the authority for availability
+and external actions. See [the detailed agenda contract](calendar-agenda.md).

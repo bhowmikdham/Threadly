@@ -172,6 +172,45 @@ def authoritative_user_instruction(latest_turn, history):
     return latest
 
 
+def model_history(history):
+    """Hide provider-authored agenda details from later model decisions."""
+    return [
+        {
+            **entry,
+            "assistant": "Calendar agenda was shown. Read Calendar again for current details.",
+        }
+        if entry.get("source") == "calendar_agenda"
+        else entry
+        for entry in history
+    ]
+
+
+MONTH = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
+    r"nov(?:ember)?|dec(?:ember)?)"
+)
+
+
+def unsupported_agenda_date(instruction):
+    """Reject explicit dates that the bounded day/week agenda cannot represent."""
+    return bool(
+        re.search(
+            r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+            r"weekend|yesterday|tonight|morning|afternoon|evening)\b|"
+            r"\b(?:this|next|last)\s+(?:month|year|weekend)\b|"
+            r"\b(?:next|last)\s+week\b|"
+            r"\b\d{4}-\d{1,2}-\d{1,2}\b|"
+            r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b|"
+            r"\b(?:on\s+(?:the\s+)?|for\s+the\s+)\d{1,2}(?:st|nd|rd|th)?\b|"
+            r"\b(?:in|on|for|during|this|next)\s+(?:the\s+)?" + MONTH + r"\b|"
+            r"\b" + MONTH + r"\s+(?:\d{1,4}|events?|meetings?|calendar|schedule)\b|"
+            r"\b\d{1,2}\s+" + MONTH + r"\b",
+            instruction,
+        )
+    )
+
+
 def authorize_workflow(instruction, intent, compound):
     """Require a user-authored request for every model-selected workflow class."""
     value = _normalise_words(instruction)
@@ -210,7 +249,7 @@ def authorize_workflow(instruction, intent, compound):
         r"\b(?:suggest|offer|propose)\b.{0,50}\b"
         r"(?:slots?|meeting times?|times? to meet|availability)\b|"
         r"\b(?:give|find)\s+(?:me\s+)?(?:(?:one|two|three|\d+)\s+)?"
-        r"(?:slots?|times? to meet)\b|"
+        r"(?:(?:free|available)\s+)?(?:slots?|times? to meet)\b|"
         r"\bfind\s+(?:my|our)\s+availability\b|"
         r"\b(?:are|am|is|will)\b.{0,35}\b(?:free|available)\b|"
         r"\b(?:can|could|should)\s+(?:we|i|you)\s+meet\b|"
@@ -355,7 +394,9 @@ class Runtime:
         return {
             "now": datetime.now(UTC).isoformat(),
             "timezone": self.request.timezone,
-            "recent_dialogue": self.state["history"],
+            # Keep UI history, but never pass provider-authored agenda details as
+            # instructions or remembered facts to the next model decision.
+            "recent_dialogue": model_history(self.state["history"]),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "user_recipient_refs": self.recipients,
@@ -383,6 +424,8 @@ class Runtime:
             return await self.read(args.reference, args.scope)
         if name == "read_search_results":
             return await self.read_search_results(args.references)
+        if name == "read_calendar":
+            return await self.read_calendar(args.period)
         if name == "prepare_workflow":
             return await self.workflow(args)
         if name == "answer_question":
@@ -390,6 +433,58 @@ class Runtime:
         if name == "revise_draft":
             return await self.revise(args)
         raise ValueError("Unknown capability")
+
+    async def read_calendar(self, period):
+        from app.calendar import agenda
+
+        instruction = self.authoritative_instruction().casefold()
+        if not re.search(
+            r"\b(?:calendar|agenda|events?|meetings?|appointments?|schedule|busy|free)\b",
+            instruction,
+        ):
+            raise ValueError("The user did not request Calendar information")
+        if re.search(
+            r"\b(?:free|available|availability|slots?|times? to meet)\b|"
+            r"\b(?:schedule|reschedule|book)\b.{0,50}\b(?:meeting|call|appointment)\b",
+            instruction,
+        ):
+            raise ValueError("Use the scheduling workflow for availability or booking")
+        if unsupported_agenda_date(instruction):
+            raise ValueError("Ask about an unsupported date or time before reading")
+        requested_periods = {
+            requested
+            for requested, pattern in (
+                ("today", r"\btoday\b"),
+                ("tomorrow", r"\btomorrow\b"),
+                ("this_week", r"\bthis week\b"),
+                (
+                    "next_7_days",
+                    r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
+                ),
+            )
+            if re.search(pattern, instruction)
+        }
+        if len(requested_periods) > 1:
+            raise ValueError("Ask which Calendar period to read")
+        if period == "tomorrow" and "tomorrow" not in instruction:
+            raise ValueError("Tomorrow was not requested")
+        if period == "this_week" and "this week" not in instruction:
+            raise ValueError("This week was not requested")
+        if period == "next_7_days" and not re.search(
+            r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
+            instruction,
+        ):
+            raise ValueError("A seven-day window was not requested")
+        if period == "today" and re.search(
+            r"\b(?:tomorrow|this week|next week|next 7 days)\b", instruction
+        ):
+            raise ValueError("Use the requested Calendar period")
+        result = await agenda.read(self.owner, period)
+        return {
+            "kind": "message",
+            "text": agenda.render(result),
+            "agenda": result.model_dump(mode="json"),
+        }
 
     async def search(self, args):
         if args is not None and self.fresh_search_scope:

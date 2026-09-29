@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.1.6`. Feature switch:
+Implementation release: `contextual-conversation-1.2.2`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
 `c23026e9a039`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
@@ -12,6 +12,15 @@ pins the prompt, tool and case hashes. An [earlier replay](evaluation/contextual
 passed 38/40 because the evaluator treated a safe review recommendation as an
 invalid answer type for “do that”; its external-action check found no send claim.
 The accepted type was corrected and the entire suite rerun.
+
+Release `1.2.2` combines those exact-sender and fresh-Inbox constraints with
+`1.2.1` Calendar agenda support. The replay retains Calendar period checks,
+scheduling boundaries and removal of prior agenda details from model history,
+alongside current-search card grading. The
+[combined deterministic receipt](evaluation/contextual-conversation-merge-deterministic-v1.json)
+pins the merged prompt, tools and case list. The v6 live result above remains
+historical evidence for `1.1.6`; live Bedrock replay of `1.2.2` is still pending
+and uses a new `contextual-conversation-live-v7` receipt identifier.
 
 Release `1.1.5` kept search and reads on demand, made the quoted Gmail search
 behavior explicit to the model, and returned a latest-request answer for correction

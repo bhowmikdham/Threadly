@@ -9,7 +9,7 @@ from urllib.parse import urlencode, urlsplit
 from sqlalchemy import delete, func, select
 
 from app.api.errors import ApiError
-from app.auth.google import CALENDAR_SCOPES, SCOPES
+from app.auth.google import CALENDAR_EVENTS_READ_SCOPE, CALENDAR_SCOPES, SCOPES
 from app.config import get_settings
 from app.db.engine import get_session_factory
 from app.db.models import GoogleOAuthSession, User
@@ -51,10 +51,11 @@ async def begin(
     *,
     user_id=None,
     calendar_read=False,
+    calendar_events_read=False,
     gmail_send=False,
     calendar_write=False,
 ):
-    if calendar_read and user_id is None:
+    if (calendar_read or calendar_events_read) and user_id is None:
         raise ApiError(400, "calendar_login_required", "Sign in before connecting Calendar.")
     validate_redirect(redirect_uri)
     settings = get_settings()
@@ -62,7 +63,11 @@ async def begin(
         raise ApiError(
             409, "write_pilot_unavailable", "Write access is limited to configured test accounts."
         )
-    scopes = SCOPES + (CALENDAR_SCOPES if calendar_read or calendar_write else [])
+    scopes = SCOPES + (
+        CALENDAR_SCOPES if calendar_read or calendar_events_read or calendar_write else []
+    )
+    if calendar_events_read:
+        scopes = scopes + [CALENDAR_EVENTS_READ_SCOPE]
     if gmail_send:
         scopes = scopes + ["https://www.googleapis.com/auth/gmail.send"]
     if calendar_write:
@@ -104,7 +109,7 @@ async def begin(
         "code_challenge_method": "S256",
         "access_type": "offline",
         "include_granted_scopes": "true",
-        "prompt": "consent",
+        "prompt": "consent select_account",
     }
     return {
         "state": state,

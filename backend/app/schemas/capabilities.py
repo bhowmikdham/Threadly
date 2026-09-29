@@ -15,7 +15,10 @@ class GoogleAccountCapability(StrictModel):
 
 
 class GoogleCapability(StrictModel):
-    id: Literal["gmail_read", "gmail_send", "calendar_read", "calendar_list", "calendar_write"]
+    id: Literal[
+        "gmail_read", "gmail_send", "calendar_read", "calendar_list",
+        "calendar_events_read", "calendar_write",
+    ]
     implemented: bool
     enabled: bool
     scope_status: Literal["unknown", "granted", "missing"]
@@ -36,7 +39,13 @@ class ReconnectCapability(StrictModel):
     available: bool
     method: Literal["POST /auth/google/reconnect"]
     requestable_capabilities: list[
-        Literal["gmail_read", "calendar_read", "gmail_send", "calendar_write"]
+        Literal[
+            "gmail_read",
+            "calendar_read",
+            "calendar_events_read",
+            "gmail_send",
+            "calendar_write",
+        ]
     ]
     state_pkce_required: bool
 

@@ -1,0 +1,67 @@
+{
+  "receipt_release": "contextual-conversation-merge-deterministic-v1",
+  "release": "contextual-conversation-1.2.2",
+  "prompt_hash": "655429e6601a72e8182f4597d802e4b7e280439c294a38f5663b54f5128cb916",
+  "tools_hash": "c0bb633f6857087e6f5a6d10cb6ce563336664f250fe438c90813ad0b84a7ce7",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "cases_hash": "c48e3ae0b23f1ad8d4dd1868f5533a18926b7aa320d5ddd80a677f2cfced5bab",
+  "method": "Deterministic fixture and grader replay; not a live model quality result.",
+  "model_invoked": false,
+  "google_invoked": false,
+  "external_actions": false,
+  "command": "PYTHONPATH=backend python -m pytest -q backend/tests/test_calendar_agenda.py backend/tests/test_conversation_evaluate.py backend/tests/test_conversation_fresh_search.py backend/tests/test_conversation_search_grounding.py backend/tests/test_inbox_sender_search.py",
+  "cases": [
+    {
+      "id": "calendar_today_agenda",
+      "turn": "What meetings are on my calendar today?",
+      "expected_tool": "read_calendar",
+      "expected_period": "today",
+      "passed": true
+    },
+    {
+      "id": "calendar_tomorrow_partial",
+      "turn": "What is on my calendar tomorrow?",
+      "expected_tool": "read_calendar",
+      "expected_period": "tomorrow",
+      "passed": true
+    },
+    {
+      "id": "calendar_slots_use_schedule",
+      "turn": "Find me three free slots tomorrow for a meeting",
+      "expected_tool": "prepare_workflow",
+      "expected_intent": "plan_schedule",
+      "passed": true
+    },
+    {
+      "id": "sender_after_unrelated_search",
+      "turn": "Did I get any emails from naveen@example.test?",
+      "expected_tool": "search_mail",
+      "passed": true
+    },
+    {
+      "id": "latest_two_inbox_after_merchant",
+      "turn": "Show me the latest 2 emails in my inbox.",
+      "expected_tool": "search_mail",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Deterministic fixture/runtime/grader tests do not measure live Bedrock tool selection.",
+    "Combined release 1.2.2 has not been replayed against Bedrock; live-v6 covers only 1.1.6. A future live replay writes a new live-v7 receipt."
+  ],
+  "verification": {
+    "focused_tests": {
+      "passed": 135,
+      "skipped": 3
+    },
+    "backend_suite": {
+      "passed": 837,
+      "skipped": 594,
+      "database_tests": "Disabled locally; CI supplies PostgreSQL."
+    },
+    "ruff_check": "passed",
+    "diff_check": "passed",
+    "live_bedrock": "not run"
+  }
+}

@@ -8,7 +8,7 @@ from app.conversation import evaluate
 from app.conversation.prompt import assets
 
 
-def test_committed_live_v6_receipt_matches_current_assets_and_passes():
+def test_committed_live_v6_receipt_preserves_historical_evidence():
     from pathlib import Path
 
     receipt = json.loads(
@@ -16,12 +16,20 @@ def test_committed_live_v6_receipt_matches_current_assets_and_passes():
             Path(__file__).parents[2] / "docs/evaluation/contextual-conversation-live-v6.json"
         ).read_text()
     )
-    assert receipt["receipt_release"] == evaluate.RECEIPT_RELEASE
-    for key, value in assets().items():
-        assert receipt[key] == value
-    assert receipt["cases_hash"] == digest(evaluate.CASES)
+    # The pre-Calendar live replay cannot attest to the combined release.
+    assert receipt["receipt_release"] == "contextual-conversation-live-v6"
+    assert receipt["release"] == "contextual-conversation-1.1.6"
+    assert receipt["prompt_hash"] == (
+        "fb9e439f72096a0066014ccef0006bc94abf9d4093f730d7ee368e4757bef0a8"
+    )
+    assert receipt["tools_hash"] == (
+        "2700beaf478750121bfa273aa0008a9faa54e5b206376d35cb9d6aa725d73a5c"
+    )
+    assert receipt["cases_hash"] == (
+        "64748ae6118a8072caaf91345e1b228a89450574b6190efa0a548007e78d21ff"
+    )
     assert receipt["trials"] == 2
-    assert receipt["total"] == 2 * sum(len(case["turns"]) for case in evaluate.CASES)
+    assert receipt["total"] == 40
     assert receipt["passed"] == receipt["total"]
     assert receipt["quality_failures"] == receipt["availability_failures"] == 0
     assert receipt["real_model"] is True
@@ -807,3 +815,35 @@ async def test_live_replay_paces_between_cases_without_delaying_the_first(monkey
     assert result["case_delay_seconds"] == 15
     assert result["passed"] == 2
     assert evaluate.compact_receipt(result)["case_delay_seconds"] == 15
+
+
+async def test_replay_withholds_previous_calendar_details_and_grades_search_cards(monkeypatch):
+    from app.schemas.conversation import ReadCalendar, SearchMail
+
+    calendar = {
+        **_case("calendar_today_agenda"),
+        "turns": ["What meetings are on my calendar today?", "Read my calendar today again"],
+    }
+    sender = _case("sender_after_unrelated_search")
+    contexts = []
+
+    async def fake_run(context, runtime):
+        contexts.append(context)
+        if runtime.case["id"] == "calendar_today_agenda":
+            return await runtime.call("read_calendar", ReadCalendar(period="today"))
+        await runtime.call(
+            "search_mail", SearchMail(query="", sender_email=evaluate.SENDER_ADDRESS)
+        )
+        return _response("message", "I found one email from Naveen in this search.")
+
+    monkeypatch.setattr(evaluate, "CASES", [calendar, sender])
+    monkeypatch.setattr(evaluate.engine, "run", fake_run)
+    monkeypatch.setattr(
+        evaluate, "get_settings", lambda: SimpleNamespace(bedrock_model_id="fixture/model")
+    )
+    result = await evaluate.evaluate(1)
+
+    assert result["passed"] == result["total"] == 3
+    assert contexts[1]["recent_dialogue"]
+    assert "Project check-in" not in json.dumps(contexts[1]["recent_dialogue"])
+    assert contexts[2]["displayed_result_order"] == []

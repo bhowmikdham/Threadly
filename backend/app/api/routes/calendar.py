@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser
 from app.api.routes.auth import no_store
-from app.calendar import negotiations, service, slots
+from app.calendar import agenda, negotiations, service, slots
 from app.mail.dependency import gmail_sources
 from app.schemas.calendar import (
+    AgendaOut,
+    AgendaPeriod,
     CalendarListOut,
     FreeBusyOut,
     FreeBusyRequest,
@@ -32,6 +34,11 @@ router = APIRouter(dependencies=[Depends(no_store), Depends(gmail_sources)])
 @router.get("/calendars", response_model=CalendarListOut)
 async def list_calendars(user_id: CurrentUser):
     return await service.list_calendars(user_id)
+
+
+@router.get("/agenda", response_model=AgendaOut)
+async def read_agenda(user_id: CurrentUser, period: AgendaPeriod = "today"):
+    return await agenda.read(user_id, period)
 
 
 @router.get("/preferences", response_model=PreferencesOut)
