@@ -25,6 +25,9 @@ export function backendOrigin(value: string): string {
 export const DEFAULT_BACKEND = backendOrigin(
   process.env.PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN || "http://127.0.0.1:8000"
 )
+// A packaged HTTPS build is bound to its configured API. Local development can
+// still select a server in Settings without changing the released extension.
+export const publishedBackendBuild = DEFAULT_BACKEND.startsWith("https:")
 export function allowedPath(path: string) {
   if (
     !/^\/(auth|assistant|calendar|threads|commitments)(\/|\?|$)/.test(path) &&

@@ -23,8 +23,18 @@ unpacked**, and select `build/chrome-mv3-prod`. Reload any existing Gmail tabs.
 The committed public manifest key keeps the unpacked extension ID stable:
 `ffmlcgieiefcjkjkebfhfkglehgljbhk`.
 
-Open Threadly from the browser’s extensions menu or the Gmail hover widget. Settings
-lets you choose your backend. The default is `http://127.0.0.1:8000`.
+Open Threadly from the browser’s extensions menu or the Gmail hover widget. In
+the local development build, Settings lets you choose your backend. Its default
+is `http://127.0.0.1:8000`.
+
+To package for a public HTTPS API, set
+`PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://<your-api-host>` before
+`npm run build`. The packaged extension then uses that server exclusively and
+asks the user for access to that exact host on first sign-in. It does not expose
+backend addresses, EC2 instructions or Google OAuth setup in user settings.
+The `chrome.identity` callback remains the extension URL documented below; it
+does not become an API callback. Leave the variable unset for the developer
+localhost path and change servers in Settings there.
 
 ## EC2 development connection
 
@@ -123,6 +133,17 @@ npm run build
 npx playwright install chromium
 npm run test:e2e                # real packaged extension + deterministic local API
 ```
+
+For the HTTPS release configuration, build and run the separate packaged-origin
+check with the same public origin in both commands:
+
+```sh
+PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.example.test npm run build
+PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.example.test npx playwright test tests/e2e/public-origin.spec.ts
+```
+
+Replace the example host with the actual HTTPS API. This checks the pinned
+server and public Settings without contacting Google or the API.
 
 For the opt-in **live** check, first perform the existing laptop OAuth login and
 open the tunnel. The helper reads your private `~/.threadly-staging/session.json`
