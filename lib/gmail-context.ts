@@ -44,11 +44,18 @@ export function readGmailSelection(doc: Document, href: string) {
       .querySelector('[aria-label*="Google Account:"]')
       ?.getAttribute("aria-label")
       ?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null
+  // Only whether a reply box is showing; its contents are never read.
+  const replyEditorOpen = rows.some((r) =>
+    Array.from(
+      r.querySelectorAll('[contenteditable="true"][role="textbox"]')
+    ).some((el) => el.getClientRects().length > 0)
+  )
   return {
     threadId,
     messageIds,
     selectedMessageId: selected,
     subject: heading?.textContent?.trim() || null,
-    accountEmail: account
+    accountEmail: account,
+    replyEditorOpen
   }
 }

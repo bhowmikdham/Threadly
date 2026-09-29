@@ -126,6 +126,23 @@ describe("selected Gmail references", () => {
     expect(s.selectedMessageId).toBe("abcd1")
     expect(JSON.stringify(s)).not.toContain("PRIVATE_BODY")
   })
+  it("reports whether a reply box is open, never what is typed in it", () => {
+    document.body.innerHTML =
+      '<main role="main"><h2 class="hP">Receipt</h2><div data-legacy-thread-id="abcdef"><div data-legacy-message-id="abcd1" aria-expanded="true"></div></div></main>'
+    const href = "https://mail.google.com/#inbox/abcdef"
+    expect(readGmailSelection(document, href).replyEditorOpen).toBe(false)
+    const editor = document.createElement("div")
+    editor.setAttribute("contenteditable", "true")
+    editor.setAttribute("role", "textbox")
+    editor.textContent = "PRIVATE_DRAFT"
+    document.querySelector("[data-legacy-message-id]")!.append(editor)
+    // Closed editors have no layout; only a visible one counts as open.
+    expect(readGmailSelection(document, href).replyEditorOpen).toBe(false)
+    editor.getClientRects = () => [{}] as any
+    const s = readGmailSelection(document, href)
+    expect(s.replyEditorOpen).toBe(true)
+    expect(JSON.stringify(s)).not.toContain("PRIVATE_DRAFT")
+  })
   it("requires explicit target when multiple messages are expanded", () => {
     document.body.innerHTML =
       '<h2 class="hP">Receipt</h2><div data-legacy-message-id="a1" aria-expanded="true"></div><div data-legacy-message-id="a2" aria-expanded="true"></div>'

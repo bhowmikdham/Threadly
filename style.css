@@ -1729,10 +1729,14 @@ summary:focus-visible {
   height: 28px;
   padding: 6px;
 }
-.draft-revision,
-.draft-notice {
+.draft-revision {
   margin-left: 6px;
   font-size: 11px;
+  color: var(--muted);
+}
+.draft-notice {
+  margin: 10px 0 0;
+  font-size: 11.5px;
   color: var(--muted);
 }
 /* The reply's time sits on the same quiet row as its Edit and Review icons. */

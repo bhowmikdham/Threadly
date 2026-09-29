@@ -255,7 +255,8 @@ function DraftCard({
     [action, setAction] = useState<EmailAction | null>(null),
     [confirmed, setConfirmed] = useState(false),
     [history, setHistory] = useState<any[]>([]),
-    [editing, setEditing] = useState(false)
+    [editing, setEditing] = useState(false),
+    [replyOpen, setReplyOpen] = useState(false)
   const [resolved, setResolved] = useState(false),
     key = useRef(requestId()),
     decisionKey = useRef(requestId())
@@ -329,6 +330,37 @@ function DraftCard({
       clearInterval(timer)
     }
   }, [action?.action_id, action?.state])
+  // Insert is only offered while Gmail shows a reply box for this thread.
+  useEffect(() => {
+    const threadId = envelope?.reply?.gmail_thread_id
+    if (!threadId || !chrome.tabs?.query) return
+    let active = true
+    const check = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true
+        })
+        const open =
+          !!tab?.id &&
+          !!tab.url?.startsWith("https://mail.google.com/") &&
+          (await chrome.tabs
+            .sendMessage(tab.id, { action: "THREADLY_SELECTION" })
+            .then(
+              (s: any) => s?.replyEditorOpen === true && s.threadId === threadId
+            ))
+        if (active) setReplyOpen(open)
+      } catch {
+        if (active) setReplyOpen(false)
+      }
+    }
+    void check()
+    const timer = setInterval(check, 1500)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [envelope?.reply?.gmail_thread_id])
   const run = async (fn: () => Promise<void>) => {
     if (busy) return
     setBusy(true)
@@ -514,7 +546,7 @@ function DraftCard({
             </>
           ) : (
             <>
-              {envelope?.reply && (
+              {envelope?.reply && replyOpen && (
                 <button disabled={busy || dirty} onClick={insert}>
                   Insert
                 </button>
@@ -525,6 +557,11 @@ function DraftCard({
             </>
           )}
         </div>
+        {notice && (
+          <p className="draft-notice" role="status">
+            {notice}
+          </p>
+        )}
       </div>
       <div className="draft-footer">
         {!editing && (
@@ -552,11 +589,6 @@ function DraftCard({
         </button>
         {value.revision > 1 && (
           <small className="draft-revision">Revision {value.revision}</small>
-        )}
-        {notice && (
-          <small className="draft-notice" role="status">
-            {notice}
-          </small>
         )}
       </div>
       {value.review?.blockers?.length > 0 && (

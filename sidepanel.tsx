@@ -419,8 +419,7 @@ function Assistant({
                       />
                     </span>
                     <span className="connector-name">
-                      {connectorNames[tool.id] ||
-                        tool.id.replaceAll("_", " ")}
+                      {connectorNames[tool.id] || tool.id.replaceAll("_", " ")}
                     </span>
                     <span
                       className={`connector-status${tool.ready ? " is-on" : ""}`}>
@@ -447,7 +446,9 @@ function Assistant({
               <button
                 className="icon-button"
                 aria-label={
-                  dark ? "Switch to light appearance" : "Switch to dark appearance"
+                  dark
+                    ? "Switch to light appearance"
+                    : "Switch to dark appearance"
                 }
                 title={dark ? "Light appearance" : "Dark appearance"}
                 onClick={theme}>
@@ -536,14 +537,14 @@ function Assistant({
                     disabled={inputBusy}
                     onClick={() => suggest("Summarise this thread.")}>
                     <Icon name="sparkle" />
-                    Summarise this for me
+                    Summarise this thread
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
                     disabled={inputBusy}
                     onClick={() => suggest("Draft a reply to this thread.")}>
                     <Icon name="edit" />
-                    Help me reply
+                    Draft a reply to this thread
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
