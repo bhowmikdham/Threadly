@@ -43,6 +43,10 @@ class ReadSearchResults(StrictModel):
     )
 
 
+class ReadCalendar(StrictModel):
+    period: Literal["today", "tomorrow", "this_week", "next_7_days"] = "today"
+
+
 class Evidence(StrictModel):
     reference: str = Field(min_length=1, max_length=40)
     quote: str = Field(min_length=1, max_length=500)
@@ -104,6 +108,16 @@ TOOLS = {
             "Returns bounded excerpts of each selected email so you can distinguish "
             "relevant messages from promotions and cite exact returned text. "
             "Cannot read the pinned selection or widen results to a thread."
+        ),
+    ),
+    "read_calendar": (
+        ReadCalendar,
+        (
+            "Read the signed-in user's selected calendars on demand, only for an "
+            "agenda/event question. Periods are today, tomorrow, this local "
+            "Monday-Sunday week, or the next seven days. This is not a free/busy "
+            "slot search and cannot book or change events. Results can have "
+            "partial coverage; private event details are redacted."
         ),
     ),
     "prepare_workflow": (

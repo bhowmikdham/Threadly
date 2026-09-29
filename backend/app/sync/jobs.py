@@ -119,9 +119,11 @@ async def claim(factory):
             row.state, row.error_code = "failed", "sync_retry_budget_exhausted"
             row.lease_token, row.lease_expires_at = None, None
             return None
-        row.state, row.lease_token = "running", str(uuid4())
-        row.lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
+        lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
             seconds=180
+        )
+        row.state, row.lease_token, row.lease_expires_at = (
+            "running", str(uuid4()), lease_expires_at
         )
         row.attempts += 1
         return row
@@ -323,11 +325,10 @@ async def failure(factory, claim, error):
             row.full, row.phase, row.cursor, row.resets = True, "start", {}, row.resets + 1
             row.attempts = 0
             await session.execute(delete(MailSyncStage).where(MailSyncStage.job_id == row.id))
+        available_at = await session.scalar(select(func.clock_timestamp())) + timedelta(seconds=30)
         row.state = "failed" if row.attempts >= 5 else "queued"
         row.error_code = "mailbox_sync_unavailable"
-        row.available_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
-            seconds=30
-        )
+        row.available_at = available_at
         row.lease_token, row.lease_expires_at = None, None
 
 

@@ -27,8 +27,16 @@ class BeginIn(BaseModel):
 
 
 class ReconnectIn(BeginIn):
-    capabilities: list[Literal["gmail_read", "calendar_read", "gmail_send", "calendar_write"]] = (
-        Field(default_factory=list, max_length=4)
+    capabilities: list[
+        Literal[
+            "gmail_read",
+            "calendar_read",
+            "calendar_events_read",
+            "gmail_send",
+            "calendar_write",
+        ]
+    ] = (
+        Field(default_factory=list, max_length=5)
     )
 
 
@@ -77,6 +85,7 @@ async def google_reconnect(body: ReconnectIn, user_id: CurrentUser, session: DB)
         body.code_challenge,
         user_id=user_id,
         calendar_read="calendar_read" in body.capabilities,
+        calendar_events_read="calendar_events_read" in body.capabilities,
         gmail_send="gmail_send" in body.capabilities,
         calendar_write="calendar_write" in body.capabilities,
     )

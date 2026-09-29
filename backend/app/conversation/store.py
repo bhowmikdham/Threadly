@@ -204,7 +204,8 @@ async def complete(session, owner, request, lease, state, response):
     # Search snippets and raw tool observations are NEVER stored. Only source IDs,
     # user dialogue, assistant answers and generated task/proposal references survive.
     saved = {
-        k: v for k, v in response.items() if k not in {"search", "task", "artifacts", "proposal"}
+        k: v for k, v in response.items()
+        if k not in {"search", "agenda", "task", "artifacts", "proposal"}
     }
     saved.update(conversation_id=row.id, version=row.version + 1)
     state["history"] = (
@@ -214,6 +215,7 @@ async def complete(session, owner, request, lease, state, response):
                 "user": request.instruction,
                 "assistant": saved.get("text", ""),
                 "kind": saved["kind"],
+                "source": "calendar_agenda" if "agenda" in response else None,
                 "task_id": saved.get("task_id"),
                 "proposal_id": saved.get("proposal_id"),
                 "request_id": request.request_id,
@@ -268,7 +270,9 @@ async def checkpoint(session, owner, request, lease, state, response):
     if row.lease_id != lease or row.lease_until <= datetime.now(UTC):
         raise ApiError(409, "conversation_lease_lost", "Retry this message.")
     state["pending_result"] = {
-        k: v for k, v in response.items() if k not in {"search", "task", "artifacts", "proposal"}
+        k: v
+        for k, v in response.items()
+        if k not in {"search", "agenda", "task", "artifacts", "proposal"}
     }
     compact(state)
     row.state_enc = encode(state)

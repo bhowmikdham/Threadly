@@ -2,11 +2,14 @@
 
 import asyncio
 import json
+from datetime import UTC, date, datetime
+from urllib.parse import quote
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
 from app.api.errors import ApiError
-from app.schemas.calendar import CalendarCoverage, parse_instant
+from app.schemas.calendar import AgendaCalendar, AgendaEvent, CalendarCoverage, parse_instant
 
 BASE = "https://www.googleapis.com/calendar/v3"
 READ_ROLES = {"freeBusyReader", "reader", "writer", "writerWithoutPrivateAccess", "owner"}
@@ -14,6 +17,7 @@ MAX_PAGES = 10
 MAX_LIST_ENTRIES = 1000
 MAX_INTERVALS = 2000  # Across the entire response, before clipping/merging.
 MAX_RESPONSE_BYTES = 2_000_000
+MAX_AGENDA_ITEMS_PER_CALENDAR = 25
 
 
 def invalid():
@@ -178,3 +182,127 @@ async def freebusy(token, ids, start, end, *, transport=None):
     except TimeoutError:
         raise ApiError(503, "calendar_unavailable", "Google Calendar is unavailable.") from None
     return normalize(body, ids, start, end)
+
+
+def _agenda_event(row, fallback_zone=None):
+    if not isinstance(row, dict):
+        raise ValueError("Invalid event")
+    if row.get("status") == "cancelled":
+        return None
+    status = row.get("status", "confirmed")
+    if status not in {"confirmed", "tentative"}:
+        raise ValueError("Invalid event status")
+    start, end = row.get("start"), row.get("end")
+    if not isinstance(start, dict) or not isinstance(end, dict):
+        raise ValueError("Missing event time")
+    all_day = "date" in start and "date" in end
+    if all_day:
+        if set(start) & {"dateTime"} or set(end) & {"dateTime"}:
+            raise ValueError("Mixed event time")
+        begin, finish = date.fromisoformat(start["date"]), date.fromisoformat(end["date"])
+        if begin >= finish:
+            raise ValueError("Invalid all-day range")
+        first, last = begin.isoformat(), finish.isoformat()
+    else:
+        if "date" in start or "date" in end:
+            raise ValueError("Mixed event time")
+        begin, finish = _event_datetime(start, fallback_zone), _event_datetime(end, fallback_zone)
+        if begin >= finish:
+            raise ValueError("Invalid timed range")
+        first, last = begin.isoformat(), finish.isoformat()
+    visibility = row.get("visibility", "default")
+    if visibility not in {"default", "public", "private", "confidential"}:
+        raise ValueError("Invalid visibility")
+    private = visibility in {"private", "confidential"}
+    title, location = row.get("summary", ""), row.get("location")
+    if not isinstance(title, str) or len(title) > 300:
+        raise ValueError("Invalid summary")
+    if location is not None and (not isinstance(location, str) or len(location) > 300):
+        raise ValueError("Invalid location")
+    summary = "Busy" if private else title.strip() or "Untitled event"
+    if status == "tentative":
+        summary = "Busy (tentative)" if private else "Tentative: " + summary
+    return AgendaEvent(
+        summary=summary,
+        start=first,
+        end=last,
+        all_day=all_day,
+        redacted=private,
+        location=None if private else location,
+    )
+
+
+def _event_datetime(part, fallback_zone=None):
+    """Resolve Google's offsetless dateTime only when its IANA zone is unambiguous."""
+    raw = part.get("dateTime")
+    if not isinstance(raw, str):
+        raise ValueError("Missing event dateTime")
+    try:
+        value = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("Invalid event dateTime") from None
+    if value.tzinfo is not None and value.utcoffset() is not None:
+        return parse_instant(value)
+    zone_name = part.get("timeZone", fallback_zone)
+    if not isinstance(zone_name, str) or not zone_name:
+        raise ValueError("Offsetless event needs timeZone")
+    try:
+        zone = ZoneInfo(zone_name)
+    except (ValueError, ZoneInfoNotFoundError):
+        raise ValueError("Invalid event timeZone") from None
+    instants = set()
+    for fold in (0, 1):
+        local = value.replace(tzinfo=zone, fold=fold)
+        instant = local.astimezone(UTC)
+        if instant.astimezone(zone).replace(tzinfo=None) == value:
+            instants.add(instant)
+    if len(instants) != 1:
+        # No instant in a DST gap, two in a repeated hour. Do not invent one.
+        raise ValueError("Ambiguous or nonexistent event time")
+    return instants.pop()
+
+
+async def list_events(token, calendar_id, name, start, end, *, transport=None):
+    """One bounded events.list page; a continuation is explicit partial coverage."""
+    body = await _request(
+        "GET",
+        "/calendars/" + quote(calendar_id, safe="") + "/events",
+        token,
+        transport=transport,
+        params={
+            "timeMin": start.isoformat(),
+            "timeMax": end.isoformat(),
+            "singleEvents": "true",
+            "orderBy": "startTime",
+            "showDeleted": "false",
+            "maxResults": MAX_AGENDA_ITEMS_PER_CALENDAR,
+            "fields": (
+                "kind,timeZone,items(start,end,summary,location,status,visibility),nextPageToken"
+            ),
+        },
+    )
+    rows, more = body.get("items", []), body.get("nextPageToken")
+    fallback_zone = body.get("timeZone")
+    if body.get("kind") != "calendar#events":
+        raise invalid()
+    if fallback_zone is not None and (
+        not isinstance(fallback_zone, str) or not 0 < len(fallback_zone) <= 100
+    ):
+        raise invalid()
+    if not isinstance(rows, list) or len(rows) > MAX_AGENDA_ITEMS_PER_CALENDAR:
+        raise invalid()
+    if more is not None and (not isinstance(more, str) or not more):
+        raise invalid()
+    try:
+        events = [
+            event for row in rows if (event := _agenda_event(row, fallback_zone)) is not None
+        ]
+    except (KeyError, TypeError, ValueError):
+        raise invalid() from None
+    return AgendaCalendar(
+        calendar_id=calendar_id,
+        name=name,
+        status="partial" if more else "known",
+        reason="result_limit" if more else None,
+        events=events,
+    )

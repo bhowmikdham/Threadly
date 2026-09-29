@@ -7,7 +7,7 @@ Defaults are dev-safe placeholders; prod MUST override the obvious ones.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     secret_key: str = "dev-insecure-change-me-needs-32-bytes!"  # override in prod (.env)
     jwt_ttl_minutes: int = 1440
     jwt_algorithm: str = "HS256"
+
+    @model_validator(mode="after")
+    def production_secret_required(self):
+        if self.app_env == "prod" and (
+            len(self.secret_key) < 32 or self.secret_key.startswith("dev-insecure")
+        ):
+            raise ValueError(
+                "APP_ENV=prod requires a non-default SECRET_KEY of at least 32 characters"
+            )
+        return self
 
     gmail_source_mode: Literal["on_demand", "legacy_sync"] = "on_demand"
     mailbox_background_sync_enabled: bool = False

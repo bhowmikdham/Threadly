@@ -147,9 +147,11 @@ async def claim_one(factory, *, transport=None):
                 code="preflight_budget_or_attempt",
             )
             return None
-        job.state, job.lease_token = "running", identity.lease_token
-        job.lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
+        lease_expires_at = await session.scalar(select(func.clock_timestamp())) + timedelta(
             seconds=get_settings().email_action_lease_seconds
+        )
+        job.state, job.lease_token, job.lease_expires_at = (
+            "running", identity.lease_token, lease_expires_at
         )
         job.attempts += 1
         return identity
