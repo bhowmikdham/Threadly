@@ -522,3 +522,14 @@ release (six route checks, summary, reply, present/absent factual answers and tw
 compose checks); it is not a mailbox-wide or external-write acceptance claim.
 Pending jobs pinned to an unavailable older release fail closed and must be
 resubmitted. Completed artifacts remain readable.
+
+### Direct day availability (2026-09-29)
+
+`app/calendar/day_availability.py` handles a bounded standalone “am I free on this day?”
+question before conversational model inference. It resolves the local day from user text,
+reads saved owner-scoped preferences and reuses `calendar.service.query_freebusy` with its
+existing account/ACL/version/freshness checks. It renders only checked busy intervals or
+explicit unknown coverage. The conversation runtime retains a confirmed user request;
+assistant-authored dates cannot select the window. Complex scheduling still uses the
+reviewed coordinator. Current-day checks cover remaining hours, named future days cover
+the full local day, and Calendar results are withheld from later model history.

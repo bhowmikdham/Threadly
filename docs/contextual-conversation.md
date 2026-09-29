@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.2.3`. Feature switch:
+Implementation release: `contextual-conversation-1.2.4`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
 `c23026e9a039`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
@@ -21,6 +21,17 @@ alongside current-search card grading. The
 pins the merged prompt, tools and case list. The v6 live result above remains
 historical evidence for `1.1.6`; live Bedrock replay of `1.2.2` is still pending
 and uses a new `contextual-conversation-live-v7` receipt identifier.
+
+
+Release `1.2.4` adds a deterministic read for bounded whole-day self-availability
+questions before the model runs, including “thurday this week” and its “yes” follow-up.
+It uses saved Calendar timezone and selections, the existing checked free/busy service,
+and explicit unknown/access-failure responses. It does not require a duration or date
+confirmation for a supported unambiguous day. Current-day reads cover only remaining
+hours. Complex scheduling retains the existing coordinator. Model prompt and tools are
+unchanged; the day-read policy is pinned in the conversation release assets. The
+[replay fixture](evaluation/calendar-day-availability-v1.json) uses synthetic Calendar
+adapters through the real conversation runtime and makes no model or Google calls.
 
 Release `1.2.3` repairs conversational compose follow-ups. While an assistant
 clarification is open, the backend carries the original compose request and subsequent
