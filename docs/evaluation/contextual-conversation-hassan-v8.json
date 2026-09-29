@@ -1,0 +1,45 @@
+{
+  "receipt_release": "contextual-conversation-live-v8",
+  "release": "contextual-conversation-1.2.3",
+  "prompt_hash": "1a63f447552790b21578348e2a45eb825badad62029494350482b6c6ba933247",
+  "tools_hash": "921acd29116698c909f5b2e2a0c42175f5bf784d74a0cd7be6ff5a04692d9bff",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "cases_hash": "fc6e4af8c3916bb67ff2fdc694d1d50ef6a77c42897f988a885b89a0106200b6",
+  "timestamp": "2026-09-29T06:08:39.471890+00:00",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "provider": "bedrock",
+  "case_delay_seconds": 15,
+  "trials": 2,
+  "passed": 2,
+  "total": 2,
+  "availability_failures": 0,
+  "quality_failures": 0,
+  "cases": [
+    {
+      "case": "hassan_basic_email_confirmed_followup",
+      "trial": 1,
+      "passed": true,
+      "kind": "task",
+      "tools": [
+        "prepare_workflow"
+      ],
+      "failures": []
+    },
+    {
+      "case": "hassan_basic_email_confirmed_followup",
+      "trial": 2,
+      "passed": true,
+      "kind": "task",
+      "tools": [
+        "prepare_workflow"
+      ],
+      "failures": []
+    }
+  ],
+  "real_model": true,
+  "synthetic_mail_tools": true,
+  "live_gmail": false,
+  "external_actions": false,
+  "grading": "Deterministic outcome, source-continuity, constraint, provenance, fresh-search scope, card alignment, incomplete-search coverage and external-action checks; not a general accuracy estimate."
+}

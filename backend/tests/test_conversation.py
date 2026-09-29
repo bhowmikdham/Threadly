@@ -11,6 +11,7 @@ from app.assistant import coordinator, source_data, worker, workflows
 from app.assistant.summary import digest
 from app.config import get_settings
 from app.conversation import engine, service, store
+from app.conversation.runtime import Runtime as ConversationRuntime
 from app.conversation.runtime import (
     _is_contextual_followup,
     authorize_workflow,
@@ -28,10 +29,12 @@ from app.db.models import (
     User,
 )
 from app.mail import live
+from app.model_client.client import GenResult
 from app.model_client.conversation import ConversationProviderError
 from app.model_client.providers import ProviderError
 from app.schemas.continuation import ClarificationAnswer
 from app.schemas.conversation import ConversationTurn, PrepareWorkflow
+from tests.test_intent_router import proposal
 from tests.test_on_demand_gmail import MID, TEXT, TID, setup  # noqa: F401
 from tests.test_on_demand_gmail import Model as SummaryModel
 
@@ -79,6 +82,73 @@ async def test_semantic_decision_has_history_and_no_tool_on_social():
     result = await engine.run(context, runtime, model)
     assert result["kind"] == "message" and runtime.calls == []
     assert model.contexts[0] == context
+
+
+async def test_complete_compose_goal_rejects_optional_question_and_prepares_draft():
+    class ReadyComposeRuntime(Runtime):
+        def ready_compose_goal(self):
+            return True
+
+    runtime = ReadyComposeRuntime()
+    model = Model(
+        tool("respond", kind="clarification", text="What specific points should I include?"),
+        tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]),
+    )
+    result = await engine.run({}, runtime, model)
+    assert result["kind"] == "task"
+    assert result["trace"] == [
+        {"tool": "respond", "status": "invalid", "reason": "draft_workflow_required"},
+        {"tool": "prepare_workflow", "status": "ok"},
+    ]
+    assert runtime.calls == ["prepare_workflow"]
+
+
+async def test_invalid_prepare_does_not_allow_an_optional_question_to_finish_compose():
+    class InvalidThenReady(Runtime):
+        def ready_compose_goal(self):
+            return True
+
+        async def call(self, name, arguments):
+            if name == "prepare_workflow" and arguments.to_refs == ["stale-recipient"]:
+                self.calls.append(name)
+                raise ApiError(422, "workflow_binding_invalid", "Use the current recipient.")
+            return await super().call(name, arguments)
+
+    runtime = InvalidThenReady()
+    model = Model(
+        tool("prepare_workflow", intent="compose", to_refs=["stale-recipient"]),
+        tool("respond", kind="clarification", text="What specific points should I include?"),
+        tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]),
+    )
+    result = await engine.run({}, runtime, model)
+    assert result["kind"] == "task"
+    assert result["trace"] == [
+        {"tool": "prepare_workflow", "status": "workflow_binding_invalid"},
+        {"tool": "respond", "status": "invalid", "reason": "draft_workflow_required"},
+        {"tool": "prepare_workflow", "status": "ok"},
+    ]
+    assert runtime.calls == ["prepare_workflow", "prepare_workflow"]
+
+
+async def test_disabled_sending_cannot_be_fixed_by_reconnecting_before_draft():
+    class DisabledSendRuntime(Runtime):
+        capabilities = {"capabilities": [{"id": "gmail_send", "status": "disabled"}]}
+
+    runtime = DisabledSendRuntime()
+    model = Model(
+        tool(
+            "respond",
+            kind="message",
+            text="Sending isn't enabled. Reconnect Google to enable it.",
+        ),
+        tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]),
+    )
+    result = await engine.run({}, runtime, model)
+    assert result["kind"] == "task"
+    assert result["trace"] == [
+        {"tool": "respond", "status": "invalid", "reason": "send_reconnect_incorrect"},
+        {"tool": "prepare_workflow", "status": "ok"},
+    ]
 
 
 async def test_read_before_advice_and_quote_validation():
@@ -243,6 +313,184 @@ def request(**values):
     )
 
 
+def compose_runtime(instruction, history=()):
+    turn = request().model_copy(update={"instruction": instruction})
+    return ConversationRuntime(
+        1, turn, {"history": list(history), "refs": {}, "result_order": []}, None
+    )
+
+
+def pending_hassan_history():
+    return [
+        {
+            "user": "Create an email to Hassan about the final semester presentation",
+            "assistant": "What is Hassan's email address?",
+            "kind": "clarification",
+        },
+        {
+            "user": "old@example.test",
+            "assistant": "Is old@example.test Hassan's email address?",
+            "kind": "clarification",
+        },
+        {
+            "user": "yes",
+            "assistant": "What would you like the email to say?",
+            "kind": "clarification",
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    "latest",
+    [
+        "cancel",
+        "never mind",
+        "please cancel",
+        "actually never mind",
+        "I changed my mind, cancel it",
+        "no, stop",
+    ],
+)
+async def test_canceled_pending_compose_cannot_submit_a_workflow(latest):
+    runtime = compose_runtime(latest, pending_hassan_history())
+    assert runtime.goal_instruction == latest
+    assert runtime.recipients == {}
+    assert not runtime.ready_compose_goal()
+    assert (
+        engine.validate_response(
+            engine.Respond(kind="message", text="Okay, I won't draft it."), runtime
+        )["kind"]
+        == "message"
+    )
+    with pytest.raises(ValueError, match="cancelled or declined"):
+        await runtime.workflow(PrepareWorkflow(intent="compose", to_refs=["recipient-1"]))
+
+
+@pytest.mark.parametrize(
+    ("latest", "recipients"),
+    [
+        ("Actually, write an email to Priya about the budget", {}),
+        ("I'd like you to write an email to Priya about the budget", {}),
+        ("Could you help write an email to Priya about the budget", {}),
+        (
+            "Could you help me write an email to priya@example.test about the budget?",
+            {"recipient-1": "priya@example.test"},
+        ),
+    ],
+)
+def test_independent_request_replaces_pending_compose_and_old_address(latest, recipients):
+    runtime = compose_runtime(latest, pending_hassan_history())
+    assert runtime.goal_instruction == latest
+    assert runtime.recipients == recipients
+    assert "old@example.test" not in runtime.recipients.values()
+    assert runtime.ready_compose_goal() == bool(recipients)
+
+
+@pytest.mark.parametrize("latest", ["please draft it", "yes, draft it", "yes please draft it"])
+def test_draft_it_followup_retains_open_compose_goal_and_recipient(latest):
+    runtime = compose_runtime(latest, pending_hassan_history())
+    assert runtime.goal_instruction.startswith(pending_hassan_history()[0]["user"])
+    assert runtime.goal_instruction.endswith("User follow-up: " + latest)
+    assert runtime.recipients == {"recipient-1": "old@example.test"}
+    assert runtime.ready_compose_goal()
+
+
+async def test_incidental_email_address_is_not_a_recipient_or_a_reason_to_skip_question():
+    runtime = compose_runtime("Create an email to Hassan about the report from alerts@example.test")
+    assert runtime.recipients == {}
+    assert not runtime.ready_compose_goal()
+    with pytest.raises(ApiError) as exc:
+        await runtime.workflow(PrepareWorkflow(intent="compose", to_refs=["recipient-1"]))
+    assert exc.value.code == "workflow_binding_invalid"
+    answer = engine.validate_response(
+        engine.Respond(kind="clarification", text="What is Hassan's email address?"),
+        runtime,
+    )
+    assert answer["kind"] == "clarification"
+
+
+async def test_cc_address_cannot_be_promoted_to_missing_to_recipient():
+    runtime = compose_runtime("Create an email to Hassan and cc alice@example.test")
+    assert runtime.recipients == {"recipient-1": "alice@example.test"}
+    assert runtime.recipient_roles == {"to": set(), "cc": {"recipient-1"}, "bcc": set()}
+    assert not runtime.ready_compose_goal()
+    with pytest.raises(ApiError) as exc:
+        await runtime.workflow(PrepareWorkflow(intent="compose", to_refs=["recipient-1"]))
+    assert exc.value.code == "workflow_binding_invalid"
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    [
+        "Compose to alex@example.test, cc bob@example.test and bcc cara@example.test: thanks",
+        (
+            "Compose to Alex <alex@example.test>, cc Bob <bob@example.test> "
+            "and bcc Cara <cara@example.test>: thanks"
+        ),
+    ],
+)
+def test_to_cc_bcc_handles_preserve_their_user_authorized_roles(instruction):
+    runtime = compose_runtime(instruction)
+    assert runtime.recipients == {
+        "recipient-1": "alex@example.test",
+        "recipient-2": "bob@example.test",
+        "recipient-3": "cara@example.test",
+    }
+    assert runtime.recipient_roles == {
+        "to": {"recipient-1"},
+        "cc": {"recipient-2"},
+        "bcc": {"recipient-3"},
+    }
+    correct = PrepareWorkflow(
+        intent="compose",
+        to_refs=["recipient-1"],
+        cc_refs=["recipient-2"],
+        bcc_refs=["recipient-3"],
+    )
+    validate_workflow_bindings(correct, set(), set(runtime.recipients), runtime.recipient_roles)
+    for swapped in (
+        PrepareWorkflow(intent="compose", to_refs=["recipient-2"]),
+        PrepareWorkflow(intent="compose", cc_refs=["recipient-1"]),
+        PrepareWorkflow(intent="compose", bcc_refs=["recipient-1"]),
+        PrepareWorkflow(intent="compose", to_refs=["recipient-3"]),
+        PrepareWorkflow(intent="compose", cc_refs=["recipient-3"]),
+        PrepareWorkflow(intent="compose", bcc_refs=["recipient-2"]),
+    ):
+        with pytest.raises(ApiError) as exc:
+            validate_workflow_bindings(
+                swapped, set(), set(runtime.recipients), runtime.recipient_roles
+            )
+        assert exc.value.code == "workflow_binding_invalid"
+
+
+@pytest.mark.parametrize(
+    ("latest", "history"),
+    [
+        ("Create an email to hassan@example.test about the presentation", []),
+        (
+            "hassan@example.test",
+            [
+                {
+                    "user": "Create an email to Hassan about the presentation",
+                    "assistant": "What is Hassan's email address?",
+                    "kind": "clarification",
+                }
+            ],
+        ),
+    ],
+)
+def test_explicit_recipient_enables_the_normal_compose_draft_path(latest, history):
+    runtime = compose_runtime(latest, history)
+    assert runtime.recipients == {"recipient-1": "hassan@example.test"}
+    assert runtime.ready_compose_goal()
+    authorize_workflow(runtime.authoritative_instruction(), "compose", False)
+    validate_workflow_bindings(
+        PrepareWorkflow(intent="compose", to_refs=["recipient-1"]),
+        set(),
+        set(runtime.recipients),
+    )
+
+
 @pytest.fixture()
 def two_message_thread(configured, monkeypatch):
     """Keep a second message in the Gmail thread to detect scope expansion."""
@@ -350,6 +598,14 @@ def test_explicit_short_draft_is_not_bound_to_unrelated_previous_turn():
     assert _is_contextual_followup("Yes, draft that")
 
 
+def test_typoed_compose_request_still_authorizes_a_draft():
+    authorize_workflow(
+        "craete an email for me to Hassan about the final semester presentation",
+        "compose",
+        False,
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "intent", "compound"),
     [
@@ -365,6 +621,7 @@ def test_explicit_short_draft_is_not_bound_to_unrelated_previous_turn():
         ("Get back to Alex with a yes", "reply", False),
         ("Could you draft a reply here?", "reply", False),
         ("Could we meet tomorrow?", "plan_schedule", False),
+        ("Find a time to meet Alex tomorrow", "plan_schedule", False),
         ("Suggest three times to meet next week", "plan_schedule", False),
         (
             "Summarise this, suggest three slots, and draft a reply",
@@ -739,6 +996,137 @@ async def test_prepare_workflow_submits_existing_job_and_retry_only_once(
     assert first["task_id"] == second["task_id"]
     assert first["task"]["state"] == "queued"
     assert first["task"]["draft_input"]["to"] == ["alex@example.test"]
+
+
+async def test_hassan_compose_followup_keeps_goal_and_confirmed_recipient_without_send_scope(
+    configured, db_sessionmaker, db_client, auth_headers, monkeypatch
+):
+    # This reproduces a real four-turn failure: a misspelled initial request,
+    # recipient confirmation, then a request for a generic email. Drafting must
+    # use the original purpose rather than treating the last sentence as a new task.
+    monkeypatch.setenv("EMAIL_WRITES_ENABLED", "false")
+    get_settings.cache_clear()
+    initial = (
+        "craete an email for me to Hassan asking for clarification on "
+        "the upcoming final semester presentation"
+    )
+    recipient = "owner1@example.test"  # Explicitly confirmed, even though it is this account.
+    # These are already-saved turns from the deployed chat. The correction must
+    # recover its goal without replaying its obsolete clarification decisions.
+    history = [
+        {
+            "user": instruction,
+            "assistant": question,
+            "kind": "clarification",
+            "request_id": str(uuid4()),
+        }
+        for instruction, question in [
+            (initial, "What is Hassan's email address?"),
+            (recipient, f"Is {recipient} Hassan's email address?"),
+            ("yes", "What would you like the email to say?"),
+        ]
+    ]
+    first = request().model_copy(update={"instruction": initial})
+    async with db_sessionmaker.begin() as session:
+        user = await session.get(User, 1)
+        session.add(
+            Conversation(
+                id=first.conversation_id,
+                user_id=1,
+                version=3,
+                account_version=user.google_account_version,
+                state_enc=store.encode({"history": history, "refs": {}, "result_order": []}),
+                expires_at=datetime.now(UTC) + timedelta(days=7),
+            )
+        )
+    final = first.model_copy(
+        update={
+            "request_id": str(uuid4()),
+            "expected_version": 3,
+            "instruction": "nothing specific, just a basic email",
+        }
+    )
+    async with source_data.source_scope():
+        model = Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]))
+        prepared = await service.turn(1, final, factory=db_sessionmaker, model=model)
+
+    assert prepared["kind"] == "task"
+    assert prepared["task"]["draft_input"]["to"] == [recipient]
+    assert initial in prepared["task"]["instruction"]
+    assert "nothing specific, just a basic email" in prepared["task"]["instruction"]
+    assert model.contexts[0]["user_recipient_refs"] == {"recipient-1": recipient}
+    send = next(
+        item
+        for item in model.contexts[0]["capabilities"]["capabilities"]
+        if item["id"] == "gmail_send"
+    )
+    assert send["status"] == "disabled" and not send["ready"]
+
+    class ComposeModel:
+        async def generate(self, prompt, **_kwargs):
+            if "You classify" in prompt:
+                value = proposal(intent="compose", output_kind="draft", operations=["draft_new"])
+            else:
+                value = {
+                    "subject": "Question about the final semester presentation",
+                    "body": (
+                        "Hi Hassan,\n\nCould you clarify what we should prepare for the "
+                        "upcoming final semester presentation?\n\nThank you."
+                    ),
+                    "unresolved_fields": [],
+                    "sources": [],
+                }
+            return json.dumps(value), GenResult("fake", "compose-regression")
+
+    assert await worker.run_once(db_sessionmaker, ComposeModel())
+    task = db_client.get(f"/assistant/tasks/{prepared['task_id']}", headers=auth_headers(1)).json()
+    assert task["state"] == "succeeded"
+    artifact = db_client.get(
+        f"/assistant/artifacts/{task['artifact_id']}", headers=auth_headers(1)
+    ).json()
+    assert artifact["artifact"]["kind"] == "draft"
+    assert artifact["draft_envelope"]["to"] == [recipient]
+    assert "final semester presentation" in artifact["artifact"]["content"]["body"]
+    assert not artifact["sending_available"]
+
+
+async def test_independent_compose_does_not_reuse_old_conversation_address(
+    configured, db_sessionmaker
+):
+    first = request().model_copy(
+        update={"instruction": "An unrelated contact is old@example.test."}
+    )
+    async with source_data.source_scope():
+        await service.turn(
+            1,
+            first,
+            factory=db_sessionmaker,
+            model=Model(tool("respond", kind="message", text="Okay.")),
+        )
+        compose = first.model_copy(
+            update={
+                "request_id": str(uuid4()),
+                "expected_version": 1,
+                "instruction": "Create an email to Hassan about the final semester presentation",
+            }
+        )
+        asking = Model(
+            tool("respond", kind="clarification", text="What is Hassan's email address?")
+        )
+        await service.turn(1, compose, factory=db_sessionmaker, model=asking)
+        assert asking.contexts[0]["user_recipient_refs"] == {}
+
+        address = compose.model_copy(
+            update={
+                "request_id": str(uuid4()),
+                "expected_version": 2,
+                "instruction": "hassan@example.test",
+            }
+        )
+        model = Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]))
+        prepared = await service.turn(1, address, factory=db_sessionmaker, model=model)
+    assert model.contexts[0]["user_recipient_refs"] == {"recipient-1": "hassan@example.test"}
+    assert prepared["task"]["draft_input"]["to"] == ["hassan@example.test"]
 
 
 async def test_workflow_records_user_turn_and_model_release(configured, db_sessionmaker):

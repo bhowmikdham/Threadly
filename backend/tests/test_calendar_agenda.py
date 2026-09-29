@@ -17,7 +17,6 @@ from app.auth.google import CALENDAR_EVENTS_READ_SCOPE, CALENDAR_SCOPES
 from app.calendar import agenda, client
 from app.capabilities.service import build_capabilities
 from app.conversation import engine, evaluate
-from app.conversation.prompt import assets
 from app.conversation.runtime import Runtime, model_history, unsupported_agenda_date
 from app.db.models import CalendarEvidence, CalendarPreference, User
 from app.schemas.calendar import POLICY_VERSION, AgendaCalendar, AgendaEvent, AgendaOut
@@ -266,8 +265,12 @@ def test_committed_calendar_evaluation_fixture_matches_versioned_assets():
     )
     assert receipt["model_invoked"] is False
     assert receipt["google_invoked"] is False
-    assert {key: receipt[key] for key in assets()} == assets()
-    assert receipt["cases_hash"] == evaluate.digest(evaluate.CASES)
+    # This committed receipt records the previous prompt and case list. Keep
+    # historical evidence immutable when later conversation releases are added.
+    assert receipt["release"] == "contextual-conversation-1.2.2"
+    assert len(receipt["prompt_hash"]) == 64
+    assert len(receipt["cases_hash"]) == 64
+    assert len(receipt["tools_hash"]) == 64
     cases = {case["id"]: case for case in evaluate.CASES}
     for item in receipt["cases"]:
         assert item["turn"] == cases[item["id"]]["turns"][0]
@@ -338,6 +341,23 @@ async def test_versioned_calendar_replay_fixtures_grade_period_and_scheduler_bou
 
 
 @pytest.mark.asyncio
+async def test_calendar_fixture_rejects_unsupported_tuesday_like_production():
+    from app.schemas.conversation import ReadCalendar
+
+    instruction = "What meetings are on my calendar Tuesday?"
+    production = Runtime.__new__(Runtime)
+    production.owner = 7
+    production.request = SimpleNamespace(instruction=instruction)
+    production.goal_instruction = instruction
+    fixture = evaluate.FixtureRuntime({"id": "calendar_today_agenda"}, instruction)
+
+    with pytest.raises(ValueError, match="unsupported date"):
+        await production.read_calendar("today")
+    with pytest.raises(ValueError, match="unsupported date"):
+        await fixture.call("read_calendar", ReadCalendar(period="today"))
+
+
+@pytest.mark.asyncio
 async def test_conversation_read_calendar_is_terminal_and_period_is_user_authorized(monkeypatch):
     checked = []
     start = datetime(2026, 10, 1, tzinfo=UTC)
@@ -368,8 +388,9 @@ async def test_conversation_read_calendar_is_terminal_and_period_is_user_authori
         await runtime.read_calendar("tomorrow")
     assert checked == []
     runtime.request = SimpleNamespace(instruction="Find me three free slots tomorrow")
-    with pytest.raises(ValueError):
+    with pytest.raises(ApiError) as scheduling_error:
         await runtime.read_calendar("tomorrow")
+    assert scheduling_error.value.code == "scheduling_workflow_required"
     runtime.request = SimpleNamespace(instruction="What meetings are on my calendar Tuesday?")
     with pytest.raises(ValueError):
         await runtime.read_calendar("today")

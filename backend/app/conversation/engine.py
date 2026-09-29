@@ -62,6 +62,14 @@ class UnsupportedClarificationClaim(ValueError):
     """An uncited clarification asserts an inbox ranking instead of only asking."""
 
 
+class DraftWorkflowRequired(ValueError):
+    """A complete user-authored compose request needs a reviewable draft task."""
+
+
+class IncorrectCapabilityAdvice(ValueError):
+    """Reconnecting cannot enable an account's server-disabled send capability."""
+
+
 async def run(context, runtime, model=None):
     messages = [{"role": "user", "content": [{"text": json.dumps(context)}]}]
     seen, calls, trace = set(), 0, []
@@ -235,6 +243,42 @@ async def run(context, runtime, model=None):
                                     "A source-free clarification should ask only for "
                                     "missing information. Remove the order ranking, or "
                                     "read and cite the source before answering."
+                                ),
+                            }
+                        }
+                        status = "error"
+                    except DraftWorkflowRequired:
+                        trace.append(
+                            {"tool": name, "status": "invalid", "reason": "draft_workflow_required"}
+                        )
+                        result = {
+                            "json": {
+                                "error": "draft_workflow_required",
+                                "message": (
+                                    "The user has supplied a compose goal and one recipient. "
+                                    "Prepare an unreviewed draft with "
+                                    "prepare_workflow(intent=compose) "
+                                    "and the current user_recipient_refs. Optional wording details "
+                                    "and Gmail send permission are not required to draft."
+                                ),
+                            }
+                        }
+                        status = "error"
+                    except IncorrectCapabilityAdvice:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "send_reconnect_incorrect",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "send_reconnect_incorrect",
+                                "message": (
+                                    "Gmail sending is disabled by server controls; reconnecting "
+                                    "cannot enable it. Drafting is available without "
+                                    "send permission."
                                 ),
                             }
                         }
@@ -444,6 +488,20 @@ def _tool_error(tool_use_id, code, message):
 
 
 def validate_response(answer: Respond, runtime):
+    if getattr(runtime, "ready_compose_goal", lambda: False)():
+        raise DraftWorkflowRequired("Prepare the requested draft")
+    capabilities = getattr(runtime, "capabilities", None) or {}
+    send = next(
+        (item for item in capabilities.get("capabilities", []) if item.get("id") == "gmail_send"),
+        None,
+    )
+    if (
+        send
+        and send.get("status") == "disabled"
+        and re.search(r"\b(?:send|sending)\b", answer.text, re.I)
+        and re.search(r"\b(?:reconnect|sign in again)\b", answer.text, re.I)
+    ):
+        raise IncorrectCapabilityAdvice("Reconnect cannot enable disabled sending")
     if getattr(runtime, "fresh_search_scope", None):
         if not getattr(runtime, "fresh_search_attempted", False):
             raise FreshSearchRequired("Search the latest explicit mailbox scope first")
