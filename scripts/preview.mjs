@@ -132,7 +132,7 @@ Scripted prompts the fixture understands:
   Summarise this thread.               summary result
   Make it shorter                      refinement of the active task
   How much did I pay?                  answer card
-  Draft a reply to this thread.        clarification, then editable draft
+  Draft a reply to this thread.        editable draft (with an email attached, no questions)
   Write an email thanking Alex …       recipient question; answer alex@example.test
   Find a meeting time tomorrow.        multi-step proposal and slot picker
   Menu (top left) → Recent work, Settings, appearance, Sign out

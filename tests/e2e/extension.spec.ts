@@ -166,11 +166,15 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await expect(page.getByText("$18.60", { exact: true })).toBeVisible()
   await page.getByLabel("Your request").fill("Draft a reply to this thread.")
   await page.getByRole("button", { name: "Send request", exact: true }).click()
-  await page.getByLabel("Reply to", { exact: true }).selectOption(target)
-  await page
-    .getByLabel("Email address", { exact: true })
-    .fill("supplier@example.test")
-  await page.getByRole("button", { name: "Continue request" }).click()
+  // The attached email already fixes the reply target and sender, so the
+  // request continues without asking.
+  await expect(page.locator(".draft-body")).toBeVisible()
+  await expect(
+    page.getByText("Which message are you replying to?")
+  ).toHaveCount(0)
+  expect(
+    calls.filter((c) => c.path.endsWith("/inputs")).at(-1)?.body.answer
+  ).toEqual({ reply_message_id: target, recipients: ["supplier@example.test"] })
   await page.getByRole("button", { name: "Edit draft" }).click()
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
     "Thank you for the update."

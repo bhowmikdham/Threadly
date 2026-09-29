@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { addresses } from "../lib/api"
 import type { Entry, Selection } from "../lib/types"
@@ -6,6 +6,63 @@ import { ArtifactCard } from "./ArtifactCard"
 import { Icon } from "./Icon"
 import { InboxCards } from "./InboxCards"
 
+const senderAddress = (from?: string | null) => {
+  const candidate = from?.match(/<([^>]+)>/)?.[1] || from || ""
+  return /^[^\s<>@]+@[^\s<>@]+$/.test(candidate) ? candidate : ""
+}
+// A reply question can be answered without asking when the attached email pins
+// down both parts: the message the user opened, and a real sender address. Any
+// other question, or any doubt about the target, still shows the form.
+export function knownReplyAnswer(entry: Entry, selection: Selection | null) {
+  const fields = entry.task?.question?.fields || []
+  if (
+    !fields.length ||
+    entry.task?.question?.expired ||
+    fields.some((f) => !["reply_message_id", "recipients"].includes(f))
+  )
+    return null
+  const reply =
+    fields.includes("reply_message_id") ||
+    entry.task?.route?.decision?.intent === "reply"
+  const target = selection?.targetId
+  const message = selection?.messages.find((m) => m.gmail_msg_id === target)
+  if (!reply || !message || !selection.selectedIds.includes(target)) return null
+  const recipient = senderAddress(message.from_addr)
+  if (fields.includes("recipients") && !recipient) return null
+  const answer: Record<string, any> = {}
+  if (fields.includes("reply_message_id")) answer.reply_message_id = target
+  if (fields.includes("recipients")) answer.recipients = [recipient]
+  return answer
+}
+// Rotating status words, so a wait reads as progress rather than a stall.
+const phrases = {
+  thinking: [
+    "Thinking it through…",
+    "Reading the thread…",
+    "Analysing…",
+    "Putting it together…"
+  ],
+  working: [
+    "Getting started…",
+    "Analysing…",
+    "Working on it…",
+    "Checking the details…"
+  ],
+  reply: [
+    "Reading the thread…",
+    "Drafting your reply…",
+    "Checking the details…"
+  ]
+}
+function Working({ kind }: { kind: keyof typeof phrases }) {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => n + 1), 1800)
+    return () => clearInterval(id)
+  }, [])
+  const list = phrases[kind]
+  return <>{list[i % list.length]}</>
+}
 export function TaskCard({
   entry,
   controller
@@ -15,7 +72,11 @@ export function TaskCard({
 }) {
   const t = entry.task,
     p = entry.proposal,
-    progress = t?.workflow || t?.compound
+    progress = t?.workflow || t?.compound,
+    autoReply =
+      t?.state === "needs_clarification" &&
+      !entry.error &&
+      knownReplyAnswer(entry, controller.selection)
   return (
     <article className="exchange" data-entry-id={entry.id}>
       <div className="user-message">{entry.instruction}</div>
@@ -43,20 +104,22 @@ export function TaskCard({
         ))}
         {entry.pending && (
           <p className="thinking" role="status">
-            <Icon name="sparkle" size={15} /> Thinking it through…
+            <Icon name="sparkle" size={15} /> <Working kind="thinking" />
           </p>
         )}
-        {t && t.state !== "succeeded" && (
+        {t && t.state !== "succeeded" && !autoReply && (
           <div className="task-status">
             <span role="status">
-              {{
-                queued: "Getting started…",
-                running: "Working on it…",
-                needs_clarification: "One more thing",
-                unsupported: "Let’s try another way",
-                failed: "Couldn’t finish",
-                cancelled: "Stopped"
-              }[t.state] || t.state.replaceAll("_", " ")}
+              {["queued", "running"].includes(t.state) ? (
+                <Working kind="working" />
+              ) : (
+                {
+                  needs_clarification: "One more thing",
+                  unsupported: "Let’s try another way",
+                  failed: "Couldn’t finish",
+                  cancelled: "Stopped"
+                }[t.state] || t.state.replaceAll("_", " ")
+              )}
             </span>
             {progress?.total_steps > 0 && (
               <>
@@ -242,7 +305,21 @@ function Clarification({
             : ""
       }
     }),
-    [error, setError] = useState("")
+    [error, setError] = useState(""),
+    known = entry.error ? null : knownReplyAnswer(entry, selection),
+    sent = useRef(false)
+  useEffect(() => {
+    if (known && !entry.pending && !sent.current) {
+      sent.current = true
+      submit(known)
+    }
+  }, [])
+  if (known)
+    return (
+      <p className="thinking" role="status">
+        <Icon name="sparkle" size={15} /> <Working kind="reply" />
+      </p>
+    )
   if (!q)
     return (
       <p>
