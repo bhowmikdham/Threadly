@@ -88,7 +88,10 @@ export function TaskCard({
     <article className="exchange" data-entry-id={entry.id}>
       <div className="user-message">{entry.instruction}</div>
       <div className="assistant-message">
-        {entry.message && <p className="chat-response">{entry.message}</p>}
+        {entry.message &&
+          (!p || p.state === "proposed" || p.state === "consumed") && (
+            <p className="chat-response">{entry.message}</p>
+          )}
         {entry.evidence?.length > 0 && (
           <details className="work-details">
             <summary>Sources</summary>
@@ -187,9 +190,35 @@ export function TaskCard({
             submit={(values) => controller.answer(entry, values)}
           />
         )}
-        {p && p.state !== "consumed" && (
+        {p && ["failed", "expired"].includes(p.state) && (
+          <section className="proposal" role="alert">
+            <b>
+              {p.state === "expired"
+                ? "This request has expired"
+                : "I couldn’t prepare this request"}
+            </b>
+            <p>
+              {p.state === "expired"
+                ? "Ask again to get an up-to-date result."
+                : "Something went wrong while preparing the result. You can try the same request again."}
+            </p>
+            <p className="muted">Nothing was sent or booked.</p>
+            <button
+              disabled={entry.pending || controller.busy}
+              onClick={() => controller.submit(entry.instruction)}>
+              Try request again
+            </button>
+          </section>
+        )}
+        {p && !["consumed", "failed", "expired"].includes(p.state) && (
           <section className="proposal">
-            <b>Here’s what I’ll do</b>
+            <b>
+              {p.state === "proposed"
+                ? "Here’s what I’ll do"
+                : p.state === "planning"
+                  ? "Preparing your request"
+                  : "A little more detail is needed"}
+            </b>
             <p>{p.request.instruction}</p>
             <ol>
               {p.result?.clauses?.map((c: any, i: number) => (
@@ -206,8 +235,11 @@ export function TaskCard({
               ))}
             </ol>
             {p.result?.questions?.map((q: string) => <p key={q}>{q}</p>)}
-            {p.result?.reason && (
-              <p className="warning">{p.result.reason.replaceAll("_", " ")}</p>
+            {p.result?.reason && p.state === "unsupported" && (
+              <p className="warning">
+                I couldn’t prepare all of the requested steps. Please revise the
+                request.
+              </p>
             )}
             {p.result?.scheduling_assumptions?.map((x: any, i: number) => (
               <p key={i}>
@@ -225,14 +257,17 @@ export function TaskCard({
               </button>
             ) : (
               <p>
-                {p.state.replaceAll("_", " ")} — update the full request and
-                submit it again.
+                {p.state === "planning"
+                  ? "The request is still being prepared."
+                  : "Add the missing details and submit your request again."}
               </p>
             )}
-            <p className="muted">
-              I’ll prepare the results. You’ll review separately before anything
-              is sent or booked.
-            </p>
+            {p.state === "proposed" && (
+              <p className="muted">
+                I’ll prepare the results. You’ll review separately before
+                anything is sent or booked.
+              </p>
+            )}
           </section>
         )}
         {entry.artifacts?.map((a) => (
