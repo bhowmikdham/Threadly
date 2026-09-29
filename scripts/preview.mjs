@@ -192,7 +192,13 @@ async function stop() {
   plasmo?.kill()
   await context.close().catch(() => {})
   await new Promise((r) => server.close(() => r()))
-  await rm(profile, { recursive: true, force: true })
+  // Chromium can still be flushing its profile as it exits; retry, then give up quietly.
+  await rm(profile, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 200
+  }).catch(() => {})
   process.exit(0)
 }
 context.on("close", stop)
