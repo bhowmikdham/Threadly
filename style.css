@@ -1658,3 +1658,13 @@ summary:focus-visible {
 .menu-account-actions .icon-button:last-child:hover {
   color: #d9534a;
 }
+
+/* A shortcut that needs something first says what, in place of its arrow. */
+.suggestions button:disabled {
+  opacity: 0.55;
+}
+.suggestion-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}

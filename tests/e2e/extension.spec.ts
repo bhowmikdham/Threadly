@@ -114,15 +114,15 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "Switch to light appearance" }).click()
+  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
   await page.getByRole("button", { name: "Close conversation menu" }).click()
   await page.screenshot({
-    path: path.join("test-results", "inbox-cards-light.png")
+    path: path.join("test-results", "inbox-cards-dark.png")
   })
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
-  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
+  await page.getByRole("button", { name: "Switch to light appearance" }).click()
   await page.getByRole("button", { name: "Close conversation menu" }).click()
   await page.setViewportSize({ width: 420, height: 900 })
   await page.emulateMedia({ reducedMotion: "no-preference" })
@@ -246,6 +246,17 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   ).toBe(true)
   await page.screenshot({
     animations: "disabled",
+    path: path.join("test-results", "conversation-narrow-light.png")
+  })
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
+  await page
+    .getByRole("button", { name: "Close conversation menu", exact: true })
+    .click()
+  await page.screenshot({
+    animations: "disabled",
     path: path.join("test-results", "conversation-narrow-dark.png")
   })
   await page
@@ -255,10 +266,6 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   await page
     .getByRole("button", { name: "Close conversation menu", exact: true })
     .click()
-  await page.screenshot({
-    animations: "disabled",
-    path: path.join("test-results", "conversation-narrow-light.png")
-  })
   await page.setViewportSize({ width: 420, height: 900 })
 })
 test("an attached email can be detached directly from the composer", async () => {

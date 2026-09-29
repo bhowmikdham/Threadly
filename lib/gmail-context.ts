@@ -3,6 +3,13 @@ export function gmailId(value?: string | null): string | null {
   if (!value) return null
   return /^[a-f0-9]{1,32}$/i.test(value) ? value.toLowerCase() : null
 }
+/** True when a Gmail URL is showing one email thread rather than a list. */
+export function gmailUrlShowsEmail(href?: string | null): boolean {
+  if (!href?.startsWith("https://mail.google.com/")) return false
+  const parts = new URL(href).hash.replace(/^#/, "").split("/")
+  // Lists look like #inbox or #label/Work; an open thread adds its id: #inbox/FMfcgz…
+  return parts.length >= 2 && /^[A-Za-z0-9_-]{16,}$/.test(parts.at(-1)!)
+}
 export function readGmailSelection(doc: Document, href: string) {
   const heading = doc.querySelector("h2.hP")
   const main =

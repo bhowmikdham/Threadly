@@ -7,6 +7,7 @@ import { Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
+import { gmailUrlShowsEmail } from "./lib/gmail-context"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -17,7 +18,7 @@ export default function SidePanel() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
-    [dark, setDark] = useState(true)
+    [dark, setDark] = useState(false)
   const refresh = async () => {
     const s = await bridge<any>({ type: "STATUS" })
     setUser(s.user)
@@ -37,7 +38,7 @@ export default function SidePanel() {
       .finally(() => setReady(true))
     void chrome.storage.local
       .get("darkMode")
-      .then((s) => setDark(s.darkMode !== false))
+      .then((s) => setDark(s.darkMode === true))
     const changed = (changes: any, area: string) => {
       if (
         area === "session" &&
@@ -189,6 +190,7 @@ function Assistant({
     [history, setHistory] = useState<any>(null),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
+    [openEmail, setOpenEmail] = useState(false),
     [approvalInfo, setApprovalInfo] = useState(false)
   const recognition = useRef<any>(null),
     last = useRef<HTMLDivElement>(null),
@@ -201,6 +203,26 @@ function Assistant({
   useEffect(() => {
     void c.selectActive(true)
     return () => recognition.current?.abort()
+  }, [])
+  // "Ask about the open email" only makes sense while Gmail is showing an email.
+  useEffect(() => {
+    const check = () =>
+      void chrome.tabs
+        ?.query({ active: true, lastFocusedWindow: true })
+        .then((tabs) => setOpenEmail(gmailUrlShowsEmail(tabs[0]?.url)))
+        .catch(() => setOpenEmail(false))
+    const changed = (_id: number, info: { url?: string }) => {
+      if (info.url) check()
+    }
+    check()
+    chrome.tabs?.onActivated?.addListener(check)
+    chrome.tabs?.onUpdated?.addListener(changed)
+    chrome.windows?.onFocusChanged?.addListener(check)
+    return () => {
+      chrome.tabs?.onActivated?.removeListener(check)
+      chrome.tabs?.onUpdated?.removeListener(changed)
+      chrome.windows?.onFocusChanged?.removeListener(check)
+    }
   }, [])
   useEffect(() => {
     const newest = c.entries.at(-1)
@@ -537,10 +559,14 @@ function Assistant({
               ) : (
                 <>
                   <button
-                    disabled={inputBusy}
+                    disabled={inputBusy || !openEmail}
+                    title={openEmail ? undefined : "Open an email in Gmail first"}
                     onClick={() => void c.selectActive()}>
                     <Icon name="mail" />
                     Ask about the open email
+                    {!openEmail && (
+                      <small className="suggestion-hint">Open an email first</small>
+                    )}
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
@@ -561,7 +587,7 @@ function Assistant({
                       input.current?.focus()
                     }}>
                     <Icon name="edit" />
-                    Find the right words
+                    Write an email
                     <Icon name="chevron" size={14} />
                   </button>
                 </>
