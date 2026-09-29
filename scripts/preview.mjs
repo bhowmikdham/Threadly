@@ -9,7 +9,7 @@
 // never touches your own Chrome profile, Gmail, Google OAuth or AWS.
 import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -62,9 +62,21 @@ const context = await chromium.launchPersistentContext(profile, {
   args: [
     `--disable-extensions-except=${extension}`,
     `--load-extension=${extension}`,
-    "--window-size=440,960"
+    "--window-size=1320,900"
   ]
 })
+
+// A stand-in open email at a mail.google.com address, so the content script,
+// the edge launcher and the real side panel work as they do on Gmail. The page
+// is served locally by this script; no request reaches Google.
+const gmailUrl = "https://mail.google.com/mail/u/0/#inbox/FMfcgzPreviewThreadDef456"
+const gmailPage = await readFile(
+  new URL("./preview-gmail.html", import.meta.url),
+  "utf8"
+)
+await context.route("https://mail.google.com/**", (route) =>
+  route.fulfill({ contentType: "text/html", body: gmailPage })
+)
 
 const jwt =
   "preview." +
@@ -74,67 +86,13 @@ const jwt =
   ".local"
 let panel = null
 
-// Preview-only design controls: a thin strip above the panel for switching
-// appearance and trying dark tones. Injected from here, never part of the build.
-// Add CSS-variable overrides here to try alternative dark tones in the preview.
-const tones = {}
-const look = { scheme: "dark", tone: null }
-async function applyLook(page) {
-  await page.emulateMedia({ colorScheme: look.scheme })
-  await page.evaluate(
-    ({ look, tones }) => {
-      document.getElementById("tl-preview-bar")?.remove()
-      document.getElementById("tl-preview-tone")?.remove()
-      const vars = tones[look.tone]
-      const tone = document.createElement("style")
-      tone.id = "tl-preview-tone"
-      tone.textContent =
-        "body{padding-top:34px}.threadly{height:calc(100dvh - 34px)!important}" +
-        (vars
-          ? ".threadly.dark{" +
-            Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(";") +
-            "}"
-          : "")
-      document.head.append(tone)
-      const bar = document.createElement("div")
-      bar.id = "tl-preview-bar"
-      bar.style.cssText =
-        "position:fixed;inset:0 0 auto 0;height:34px;z-index:99;display:flex;" +
-        "align-items:center;gap:4px;padding:0 8px;background:#111;color:#bbb;" +
-        "font:500 11px -apple-system,sans-serif;overflow-x:auto;white-space:nowrap"
-      const chip = (label, active, onClick) => {
-        const b = document.createElement("button")
-        b.textContent = label
-        b.style.cssText =
-          "all:unset;cursor:pointer;padding:4px 8px;border-radius:5px;" +
-          (active ? "background:#fff;color:#111" : "color:#bbb")
-        b.onclick = onClick
-        return b
-      }
-      const label = document.createElement("span")
-      label.textContent = "PREVIEW"
-      label.style.cssText = "color:#d9a53f;letter-spacing:.08em;margin-right:6px"
-      bar.append(label)
-      for (const scheme of ["light", "dark"])
-        bar.append(
-          chip(scheme, look.scheme === scheme, () =>
-            window.__threadlyPreview({ scheme })
-          )
-        )
-      for (const tone of Object.keys(tones))
-        bar.append(
-          chip(tone, look.tone === tone, () =>
-            window.__threadlyPreview({ scheme: "dark", tone })
-          )
-        )
-      document.body.append(bar)
-    },
-    { look, tones }
-  )
-}
 // An extension reload (Chrome's reload button, or plasmo dev rebuilding)
 // starts a new service worker and clears session storage, so re-seed each time.
+const seeded = new WeakSet()
 async function seed(worker) {
+  // The startup worker can arrive both from the event and the explicit call.
+  if (seeded.has(worker)) return
+  seeded.add(worker)
   await worker.evaluate(
     async ({ origin, jwt, user }) => {
       await chrome.storage.local.set({ backendOrigin: origin })
@@ -147,15 +105,8 @@ async function seed(worker) {
   const url = `chrome-extension://${worker.url().split("/")[2]}/sidepanel.html`
   if (!panel || panel.isClosed()) {
     panel = context.pages()[0] || (await context.newPage())
-    await panel.exposeBinding("__threadlyPreview", async (_, change) => {
-      Object.assign(look, change)
-      await applyLook(panel)
-    })
-    // The panel has its own appearance toggle; enable this to preview system-theme designs.
-    if (process.env.THREADLY_PREVIEW_BAR)
-      panel.on("load", () => applyLook(panel).catch(() => {}))
     await panel.goto(url)
-  } else await panel.reload()
+  } else await panel.reload().catch(() => {})
 }
 context.on("serviceworker", (worker) =>
   seed(worker).catch((e) => console.warn("[preview] reseed failed:", e.message))
@@ -163,6 +114,9 @@ context.on("serviceworker", (worker) =>
 const worker =
   context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"))
 await seed(worker)
+const gmail = await context.newPage()
+await gmail.goto(gmailUrl)
+await gmail.bringToFront()
 
 console.log(`
 Threadly offline preview
@@ -181,6 +135,12 @@ Scripted prompts the fixture understands:
   Write an email thanking Alex …       recipient question; answer alex@example.test
   Find a meeting time tomorrow.        multi-step proposal and slot picker
   Menu (top left) → Recent work, Settings, appearance, Sign out
+
+Two tabs are open:
+  Test receipt           a stand-in open email. Click the Threadly button on the
+                         right edge (or the toolbar icon) to open the real side
+                         panel with that email attached.
+  Threadly side panel    the panel on its own, with no email open.
 
 Close the browser window or press Ctrl+C to stop.
 `)

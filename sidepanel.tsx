@@ -560,7 +560,6 @@ function Assistant({
                 <>
                   <button
                     disabled={inputBusy || !openEmail}
-                    title={openEmail ? undefined : "Open an email in Gmail first"}
                     onClick={() => void c.selectActive()}>
                     <Icon name="mail" />
                     Ask about the open email
