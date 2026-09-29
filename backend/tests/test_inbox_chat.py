@@ -54,7 +54,20 @@ async def test_email_search_restores_only_masked_user_literal():
         InboxChatRequest(instruction="Find emails from alex@example.test"), model, NOW
     )
     assert "alex@example.test" not in model.calls[0]
-    assert result["filters"].query == "alex@example.test"
+    assert result["filters"].query == ""
+    assert result["filters"].sender_email == "alex@example.test"
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Did I get mail from Naveen@Example.Test?", "naveen@example.test"),
+        ("Show mail sent by alice@example.test", "alice@example.test"),
+        ("Show mail about alice@example.test", None),
+    ],
+)
+def test_explicit_sender_requires_from_wording(text, expected):
+    assert inbox.explicit_sender_email(text) == expected
 
 
 @pytest.mark.parametrize(
@@ -117,7 +130,7 @@ def test_committed_live_receipt_matches_current_assets():
     from app.planner.evaluate_inbox_chat import CASES, assets
 
     receipt = json.loads(
-        (Path(__file__).parents[2] / "docs/evaluation/inbox-chat-live-v1.json").read_text()
+        (Path(__file__).parents[2] / "docs/evaluation/inbox-chat-live-v2.json").read_text()
     )
     for key, value in assets().items():
         assert receipt[key] == value

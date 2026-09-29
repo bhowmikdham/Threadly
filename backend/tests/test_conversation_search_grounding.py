@@ -104,7 +104,16 @@ async def test_equivalent_search_defaults_do_not_issue_two_provider_searches():
     result = await engine.run({}, runtime, model)
 
     assert runtime.calls == [
-        ("search_mail", {"query": "GYG", "date_phrase": "", "folder": "all_mail"})
+        (
+            "search_mail",
+            {
+                "query": "GYG",
+                "sender_email": "",
+                "date_phrase": "",
+                "folder": "all_mail",
+                "limit": 5,
+            },
+        )
     ]
     assert result["trace"] == [
         {"tool": "search_mail", "status": "ok"},

@@ -17,7 +17,7 @@ CASES = [
     ("Show me all the GYG emails", "search", "GYG"),
     ("Find my flight emails", "search", "flight"),
     ("Show GYG emails from last month", "search", "GYG"),
-    ("Find emails from alex@example.test", "search", "alex@example.test"),
+    ("Find emails from alex@example.test", "search", ""),
     ("Show my latest emails", "search", ""),
     ("Summarise this thread", "continue", None),
     ("Find GYG emails and draft a reply", "continue", None),
@@ -52,6 +52,8 @@ async def evaluate():
         assert value["kind"] == kind, (instruction, value["kind"])
         if query is not None:
             assert value["filters"].query.casefold() == query.casefold(), instruction
+        if instruction == "Find emails from alex@example.test":
+            assert value["filters"].sender_email == "alex@example.test"
         if "last month" in instruction:
             assert value["filters"].received_from.isoformat() == "2026-07-31T14:00:00+00:00"
         results.append({"instruction": instruction, "kind": kind, "passed": True})

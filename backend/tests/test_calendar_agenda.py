@@ -250,7 +250,8 @@ def test_calendar_render_marks_unknown_coverage_and_model_history_hides_titles()
 def test_committed_calendar_evaluation_fixture_matches_versioned_assets():
     receipt = json.loads(
         (
-            Path(__file__).parents[2] / "docs/evaluation/calendar-agenda-deterministic-v1.json"
+            Path(__file__).parents[2]
+            / "docs/evaluation/contextual-conversation-merge-deterministic-v1.json"
         ).read_text()
     )
     assert receipt["model_invoked"] is False

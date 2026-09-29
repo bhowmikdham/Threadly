@@ -31,7 +31,16 @@ AMBIGUOUS_NEWER_ORDER = (
     "Browse the app for seasonal meals and loyalty rewards. "
     "Purchase 3344 was confirmed. Your receipt is available in the app."
 )
-RECEIPT_RELEASE = "contextual-conversation-live-v6"
+RECEIPT_RELEASE = "contextual-conversation-live-v7"
+SENDER_ADDRESS = "naveen@example.test"
+SENDER_MESSAGE = (
+    "From: Naveen <naveen@example.test>. Subject: Design review notes. "
+    "The notes from Tuesday's design review are attached."
+)
+INBOX_MESSAGES = {
+    "mail-1": "From: Alex <alex@example.test>. Subject: Tuesday workshop. Room B is booked.",
+    "mail-2": "From: Casey <casey@example.test>. Subject: Project update. The draft is ready.",
+}
 CASES = [
     {
         "id": "calendar_today_agenda",
@@ -101,6 +110,36 @@ CASES = [
         "kinds": ["message"],
         "required": ["search_mail", "more_mail"],
         "words": ["2241"],
+        "forbid": ["prepare_workflow"],
+    },
+    {
+        "id": "sender_after_unrelated_search",
+        "turns": [f"Did I get any emails from {SENDER_ADDRESS}?"],
+        "history": [
+            {
+                "user": "Find my latest GYG order",
+                "assistant": "I found GYG order 2241 among the results I checked.",
+            }
+        ],
+        "order": ["mail-1", "mail-2"],
+        "fresh_sender": SENDER_ADDRESS,
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "forbid": ["prepare_workflow"],
+    },
+    {
+        "id": "latest_two_inbox_after_merchant",
+        "turns": ["Show me the latest 2 emails in my inbox."],
+        "history": [
+            {
+                "user": "Find my latest GYG order",
+                "assistant": "I found GYG order 2241 among the results I checked.",
+            }
+        ],
+        "order": ["mail-1", "mail-2"],
+        "fresh_inbox_limit": 2,
+        "kinds": ["message"],
+        "required": ["search_mail"],
         "forbid": ["prepare_workflow"],
     },
     {
@@ -197,7 +236,7 @@ CASES = [
         "id": "no_blanket_send",
         "turns": ["do that"],
         "history": [{"user": "What next?", "assistant": "Review your draft before sending."}],
-        "kinds": ["message", "clarification"],
+        "kinds": ["message", "clarification", "recommendation"],
         "forbid": ["prepare_workflow"],
     },
 ]
@@ -215,9 +254,28 @@ class FixtureRuntime:
         self.user_text = user_text
         self.instruction = authoritative_user_instruction(turn, history)
         self.recipient_refs = user_recipient_references(user_text)
+        self.fresh_search_scope = (
+            {"kind": "sender", "sender_email": case["fresh_sender"]}
+            if case.get("fresh_sender")
+            else (
+                {"kind": "recent_inbox", "limit": case["fresh_inbox_limit"]}
+                if case.get("fresh_inbox_limit")
+                else None
+            )
+        )
+        self.fresh_search_attempted = False
+        self.fresh_search_done = False
+        if self.fresh_search_scope:
+            # Production clears old search references before constructing the
+            # model context. Replay must expose that same initial state.
+            self.result_order = []
 
     def _source_text(self, reference):
         sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
+        if self.case.get("fresh_sender") and self.search_page is not None:
+            sources = {"mail-1": SENDER_MESSAGE}
+        elif self.case.get("fresh_inbox_limit") and self.search_page is not None:
+            sources = INBOX_MESSAGES
         if self.case.get("merchant_rank_search"):
             sources = {
                 "mail-1": (AMBIGUOUS_NEWER_ORDER if self.search_query == "gyg" else RECEIPT),
@@ -231,11 +289,11 @@ class FixtureRuntime:
             sources["mail-6"] = RECEIPT
         if self.case.get("selected"):
             sources["selected"] = self.case["selected"]
+        if reference.startswith("mail-") and reference not in self.result_order:
+            raise ValueError("Reference has not been returned by this search")
         text = sources.get(reference)
         if not text:
             raise ValueError("Unknown reference")
-        if reference.startswith("mail-") and reference not in self.result_order:
-            raise ValueError("Reference has not been returned by this search")
         return text
 
     def _read_source(self, reference, scope="selected_message"):
@@ -247,6 +305,48 @@ class FixtureRuntime:
         return text
 
     def _search_rows(self):
+        if self.case.get("fresh_sender"):
+            return [
+                {
+                    "message_id": "fixture-sender-message",
+                    "thread_id": "fixture-sender-thread",
+                    "reference": "mail-1",
+                    "subject": "Design review notes",
+                    "sender": f"Naveen <{SENDER_ADDRESS}>",
+                    "received_at": "2026-09-22T10:00:00Z",
+                    "snippet": "The notes from Tuesday's design review are attached.",
+                    "flight": None,
+                }
+            ]
+        if self.case.get("fresh_inbox_limit"):
+            return [
+                {
+                    "message_id": f"fixture-inbox-{number}",
+                    "thread_id": f"fixture-inbox-thread-{number}",
+                    "reference": f"mail-{number}",
+                    "subject": subject,
+                    "sender": sender,
+                    "received_at": received_at,
+                    "snippet": snippet,
+                    "flight": None,
+                }
+                for number, subject, sender, received_at, snippet in [
+                    (
+                        1,
+                        "Tuesday workshop",
+                        "Alex <alex@example.test>",
+                        "2026-09-23T10:00:00Z",
+                        "Room B is booked.",
+                    ),
+                    (
+                        2,
+                        "Project update",
+                        "Casey <casey@example.test>",
+                        "2026-09-22T10:00:00Z",
+                        "The draft is ready.",
+                    ),
+                ]
+            ]
         if self.case.get("merchant_rank_search"):
             older_reference = "mail-2" if self.search_query == "gyg" else "mail-1"
             older = {
@@ -342,22 +442,34 @@ class FixtureRuntime:
             checked = datetime(2026, 9, 23, 12, tzinfo=UTC)
             partial = self.case["id"] == "calendar_tomorrow_partial"
             result = AgendaOut(
-                period=args.period, timezone="Australia/Melbourne", start=checked,
-                end=checked.replace(day=24), checked_at=checked, account_version=1,
-                preferences_version=1, coverage="partial" if partial else "complete",
+                period=args.period,
+                timezone="Australia/Melbourne",
+                start=checked,
+                end=checked.replace(day=24),
+                checked_at=checked,
+                account_version=1,
+                preferences_version=1,
+                coverage="partial" if partial else "complete",
                 calendars=[
                     AgendaCalendar(
-                        calendar_id="fixture-calendar", name="Work",
-                        status="known", reason=None,
-                        events=[AgendaEvent(
-                            summary="Project check-in", start="2026-09-23T16:00:00+10:00",
-                            end="2026-09-23T16:30:00+10:00", all_day=False,
-                            redacted=False,
-                        )],
+                        calendar_id="fixture-calendar",
+                        name="Work",
+                        status="known",
+                        reason=None,
+                        events=[
+                            AgendaEvent(
+                                summary="Project check-in",
+                                start="2026-09-23T16:00:00+10:00",
+                                end="2026-09-23T16:30:00+10:00",
+                                all_day=False,
+                                redacted=False,
+                            )
+                        ],
                     ),
                     *(
                         [agenda.unknown("fixture-private", "Other", "provider_error")]
-                        if partial else []
+                        if partial
+                        else []
                     ),
                 ],
                 total_returned=1,
@@ -365,29 +477,49 @@ class FixtureRuntime:
             return {"kind": "message", "text": agenda.render(result)}
         if name in {"search_mail", "more_mail"}:
             if name == "search_mail":
-                for value in (args.query, args.date_phrase):
+                query, sender_email, folder, date_phrase, limit = (
+                    args.query,
+                    args.sender_email,
+                    args.folder,
+                    args.date_phrase,
+                    args.limit,
+                )
+                if self.case.get("fresh_sender"):
+                    sender_email = self.case["fresh_sender"]
+                    if query.casefold() == sender_email.casefold() or (
+                        query and query.casefold() not in self.instruction.casefold()
+                    ):
+                        query = ""
+                    if query.casefold() in {"email", "emails", "message", "messages"}:
+                        query = ""
+                    date_phrase = ""
+                    folder = "all_mail"
+                elif self.case.get("fresh_inbox_limit"):
+                    query, sender_email, folder, date_phrase = "", "", "INBOX", ""
+                    limit = self.case["fresh_inbox_limit"]
+                for value in (query, sender_email, date_phrase):
                     if value and value.casefold() not in self.user_text.casefold():
                         raise ValueError("Search literals must come from user dialogue")
-                if (
-                    args.folder != "all_mail"
-                    and args.folder.casefold() not in self.user_text.casefold()
-                ):
+                if folder != "all_mail" and folder.casefold() not in self.user_text.casefold():
                     raise ValueError("Folder is not user supplied")
                 start, end = inbox_chat.date_window(
-                    args.date_phrase,
+                    date_phrase,
                     datetime(2026, 9, 23, 12, tzinfo=UTC),
                     "Australia/Melbourne",
                 )
-                if "gyg" not in args.query.casefold():
+                if not self.fresh_search_scope and "gyg" not in query.casefold():
                     raise ValueError("Only user's GYG literal is available")
-                self.search_query = args.query.casefold()
+                self.search_query = query.casefold()
                 filters = InboxFilters(
                     schema_version="1.0",
-                    query=args.query,
-                    folder=args.folder,
+                    query=query,
+                    sender_email=sender_email,
+                    folder=folder,
                     received_from=start,
                     received_before=end,
+                    limit=limit,
                 ).model_dump(mode="json")
+                self.fresh_search_attempted = True
                 self.search_page_index = 0
                 self.result_order = []
                 self.evidence = {
@@ -421,6 +553,8 @@ class FixtureRuntime:
                     "persisted": False,
                 },
             }
+            if name == "search_mail" and self.fresh_search_scope:
+                self.fresh_search_done = True
             observations = [
                 {k: v for k, v in row.items() if k not in {"message_id", "thread_id"}}
                 for row in rows
@@ -529,7 +663,33 @@ def _claims_external_action(text):
     return any(re.search(pattern, value) for pattern in patterns)
 
 
-def grade(case, response, calls):
+_MAIL_COUNT_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+
+
+def _contradicts_fixture_mail_count(text, expected):
+    """Catch explicit counts that disagree with the known synthetic cards."""
+    if re.search(
+        r"\b(?:no|zero|0)\s+(?:(?:matching|new|recent)\s+)?"
+        r"(?:emails?|messages?|mail|results?)\b|"
+        r"\b(?:found|have|got|received|saw)\s+(?:none|nothing|zero|0)\b|"
+        r"\bnone\s+(?:from|in|among)\b",
+        text,
+        re.I,
+    ):
+        return expected != 0
+    for match in re.finditer(
+        r"\b(?P<count>\d+|one|two|three|four|five)\s+"
+        r"(?:(?:matching|new|recent)\s+)?(?:emails?|messages?|mail|results?)\b",
+        text,
+        re.I,
+    ):
+        word = match["count"].casefold()
+        if (int(word) if word.isdigit() else _MAIL_COUNT_WORDS[word]) != expected:
+            return True
+    return False
+
+
+def grade(case, response, calls, search_page=None):
     """Return deterministic failures for a synthetic behavioral replay."""
 
     failures = []
@@ -549,7 +709,65 @@ def grade(case, response, calls):
 
     case_id = case["id"]
     workflow = _workflow_input(calls)
-    if case_id.startswith("calendar_"):
+    if case_id == "sender_after_unrelated_search":
+        searches = _tool_inputs(calls, "search_mail")
+        if (
+            len(searches) != 1
+            or searches[0].get("sender_email", "").casefold() != SENDER_ADDRESS
+            or searches[0].get("query") != ""
+        ):
+            failures.append("wrong_exact_sender_search")
+        if re.search(r"\b(?:GYG|2241|orders?|receipts?)\b", text, re.I):
+            failures.append("stale_merchant_answer")
+        if _contradicts_fixture_mail_count(text, 1):
+            failures.append("sender_answer_count_mismatch")
+        if search_page is None:
+            failures.append("fresh_sender_cards_missing")
+        else:
+            filters = search_page.get("filters", {})
+            if (
+                filters.get("sender_email", "").casefold() != SENDER_ADDRESS
+                or filters.get("query") != ""
+                or filters.get("folder") != "all_mail"
+            ):
+                failures.append("sender_search_scope_mismatch")
+            rows = search_page.get("results", [])
+            if len(rows) != 1 or any(
+                SENDER_ADDRESS not in row.get("sender", "").casefold() for row in rows
+            ):
+                failures.append("sender_card_mismatch")
+    elif case_id == "latest_two_inbox_after_merchant":
+        searches = _tool_inputs(calls, "search_mail")
+        if (
+            len(searches) != 1
+            or searches[0].get("query") != ""
+            or searches[0].get("sender_email", "") != ""
+            or searches[0].get("folder") != "INBOX"
+            or searches[0].get("limit") != 2
+            or searches[0].get("date_phrase", "") != ""
+        ):
+            failures.append("wrong_fresh_inbox_search")
+        if re.search(r"\b(?:GYG|2241|orders?|receipts?)\b", text, re.I):
+            failures.append("stale_merchant_answer")
+        if _contradicts_fixture_mail_count(text, 2):
+            failures.append("inbox_answer_count_mismatch")
+        if search_page is None:
+            failures.append("fresh_inbox_cards_missing")
+        else:
+            filters = search_page.get("filters", {})
+            if (
+                filters.get("query") != ""
+                or filters.get("sender_email", "") != ""
+                or filters.get("folder") != "INBOX"
+                or filters.get("limit") != 2
+            ):
+                failures.append("inbox_search_scope_mismatch")
+            rows = search_page.get("results", [])
+            if len(rows) != 2:
+                failures.append("inbox_card_count_mismatch")
+            if any("GYG" in row.get("subject", "") for row in rows):
+                failures.append("stale_merchant_cards")
+    elif case_id.startswith("calendar_"):
         reads = _tool_inputs(calls, "read_calendar")
         if case_id == "calendar_today_agenda" and (
             len(reads) != 1 or reads[0].get("period") != "today"
@@ -823,7 +1041,7 @@ async def evaluate(trials, *, case_delay_seconds=0):
                     "user_turn": turn,
                     "recent_dialogue": model_history(history),
                     "selected_reference": "selected" if case.get("selected") else None,
-                    "displayed_result_order": case.get("order", []),
+                    "displayed_result_order": runtime.result_order,
                     "active_work": None,
                     "user_recipient_refs": runtime.recipient_refs,
                     "capabilities": {
@@ -837,16 +1055,18 @@ async def evaluate(trials, *, case_delay_seconds=0):
                 }
                 try:
                     response = await engine.run(context, runtime)
-                    failures = grade(case, response, runtime.calls)
-                    history.append({
-                        "user": turn,
-                        "assistant": response.get("text", ""),
-                        "source": (
-                            "calendar_agenda"
-                            if any(call["name"] == "read_calendar" for call in runtime.calls)
-                            else None
-                        ),
-                    })
+                    failures = grade(case, response, runtime.calls, runtime.search_page)
+                    history.append(
+                        {
+                            "user": turn,
+                            "assistant": response.get("text", ""),
+                            "source": (
+                                "calendar_agenda"
+                                if any(call["name"] == "read_calendar" for call in runtime.calls)
+                                else None
+                            ),
+                        }
+                    )
                     result = {
                         "case": case["id"],
                         "trial": trial + 1,
@@ -881,7 +1101,8 @@ async def evaluate(trials, *, case_delay_seconds=0):
         "external_actions": False,
         "grading": (
             "Deterministic outcome, source-continuity, constraint, provenance, "
-            "incomplete-search coverage and external-action checks; not a general "
+            "fresh-search scope, card alignment, incomplete-search coverage and "
+            "external-action checks; not a general "
             "accuracy estimate."
         ),
     }

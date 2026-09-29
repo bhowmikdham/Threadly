@@ -551,7 +551,13 @@ def test_conversation_inbox_search_five_messages_signed_cursor_and_no_import(
     assert len(data["results"]) == 1 and data["results"][0]["sender"] == "sender@example.test"
     assert data["coverage"]["persisted"] is False
     lists = [r for r in setup.calls if r.url.path.endswith("/messages")]
-    assert len(lists) == 1 and lists[0].url.params["maxResults"] == "5"
+    # The fake advertises another page forever but repeats the same message.
+    # Search fills across provider pages only up to the configured bound.
+    assert len(lists) == inbox_chat.MAX_SEARCH_PAGES
+    assert lists[0].url.params["maxResults"] == "5"
+    assert all(r.url.params["maxResults"] == "4" for r in lists[1:])
+    assert data["coverage"]["provider_pages_read"] == inbox_chat.MAX_SEARCH_PAGES
+    assert data["next_cursor"]
     body = {"filters": data["filters"], "cursor": data["next_cursor"]}
     # A signed cursor cannot cross users or filters, nor cause an extra Gmail fetch.
     for owner, payload in [
@@ -562,9 +568,12 @@ def test_conversation_inbox_search_five_messages_signed_cursor_and_no_import(
             "/assistant/inbox-search-page", headers=auth_headers(owner), json=payload
         )
         assert denied.status_code == 409
-    assert len([r for r in setup.calls if r.url.path.endswith("/messages")]) == 1
+    assert len([r for r in setup.calls if r.url.path.endswith("/messages")]) == len(lists)
     next_page = db_client.post("/assistant/inbox-search-page", headers=auth_headers(1), json=body)
     assert next_page.status_code == 200
-    assert len([r for r in setup.calls if r.url.path.endswith("/messages")]) == 2
+    assert (
+        len([r for r in setup.calls if r.url.path.endswith("/messages")])
+        == len(lists) + inbox_chat.MAX_SEARCH_PAGES
+    )
     assert asyncio.run(_message_count(db_sessionmaker)) == 0
     assert db_client.post("/assistant/inbox-chat", json=request).status_code == 401
