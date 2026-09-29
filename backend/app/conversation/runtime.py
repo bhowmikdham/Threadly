@@ -507,6 +507,18 @@ def authorize_workflow(instruction, intent, compound):
         raise ValueError("Multiple requested operations require a complete compound proposal")
 
 
+def proposal_text(state):
+    return {
+        "planning": "I'm preparing the requested steps.",
+        "proposed": "Here is the proposed work for you to review.",
+        "failed": "I couldn't prepare this request. Please try again. Nothing was sent or booked.",
+        "needs_clarification": "I need a little more detail before preparing this request.",
+        "unsupported": "I couldn't prepare all the requested steps. Please revise the request.",
+        "expired": "This proposal has expired. Please ask again for an updated result.",
+        "consumed": "This proposal has already been continued. Check its task for the result.",
+    }.get(state, "Check the request status before continuing.")
+
+
 class Runtime:
     def __init__(self, owner, request, state, factory, lease=None):
         self.owner, self.request, self.state, self.factory = owner, request, state, factory
@@ -707,6 +719,10 @@ class Runtime:
             return await self.read(args.reference, args.scope)
         if name == "read_search_results":
             return await self.read_search_results(args.references)
+        if name == "check_day_availability":
+            from app.calendar.day_availability import answer
+
+            return await answer(self.owner, self.authoritative_instruction(), semantic=True)
         if name == "read_calendar":
             return await self.read_calendar(args.period)
         if name == "prepare_workflow":
@@ -1088,7 +1104,7 @@ class Runtime:
                     session,
                     {
                         "kind": "proposal",
-                        "text": "Here is the proposed work for you to review.",
+                        "text": proposal_text("planning"),
                         "proposal_id": row.id,
                     },
                 )
@@ -1101,7 +1117,7 @@ class Runtime:
             self.state["proposal_id"] = row.id
             return {
                 "kind": "proposal",
-                "text": "Here is the proposed work for you to review.",
+                "text": proposal_text(proposal["state"]),
                 "proposal": proposal,
                 "proposal_id": row.id,
             }

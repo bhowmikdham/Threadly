@@ -146,6 +146,7 @@ def test_routes_roundtrip_owner_grants_and_evidence(db_client, auth_headers, set
     assert result.status_code == 201, result.text
     evidence = result.json()
     assert evidence["coverage"] == "complete" and evidence["calendars"][0]["busy"] == []
+    assert evidence["calendars"][0]["display_name"] == "Private title"
     route = "/calendar/freebusy/" + evidence["id"]
     assert db_client.get(route, headers=h).status_code == 200
     assert db_client.get(route, headers=auth_headers(2)).status_code == 404
@@ -335,10 +336,7 @@ def test_calendar_incremental_consent_only_on_authenticated_reconnect(
     assert set(CALENDAR_SCOPES) <= set(scopes)
     assert "https://www.googleapis.com/auth/calendar.events" not in scopes
     body["capabilities"] = ["calendar_write"]
-    assert (
-        db_client.post("/auth/google/reconnect", json=body, headers=headers).status_code
-        == 409
-    )
+    assert db_client.post("/auth/google/reconnect", json=body, headers=headers).status_code == 409
     capability = db_client.get("/assistant/capabilities", headers=headers).json()
     by_id = {item["id"]: item for item in capability["capabilities"]}
     assert by_id["calendar_read"]["ready"] and by_id["calendar_list"]["ready"]

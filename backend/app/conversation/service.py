@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.api.errors import ApiError
 from app.config import get_settings
 from app.conversation import engine, store
-from app.conversation.runtime import Runtime
+from app.conversation.runtime import Runtime, proposal_text
 from app.db.engine import get_session_factory
 from app.db.models import Conversation
 
@@ -71,6 +71,7 @@ async def hydrate_response(owner, saved, factory):
                 status, value = await coordinator.interpret(row)
                 row = await command_plans.complete(session, owner, row.id, status, value)
             result["proposal"] = await command_plans.view(session, row)
+            result["text"] = proposal_text(result["proposal"]["state"])
             await session.commit()
     # No original search snippets are persisted or replayed from stale storage.
     if saved.get("trace") and any(

@@ -16,7 +16,14 @@ from app.model_client.conversation import ConversationModel, ConversationProvide
 from app.model_client.providers import ProviderError
 from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_config
 
-TERMINAL = {"respond", "prepare_workflow", "answer_question", "revise_draft", "read_calendar"}
+TERMINAL = {
+    "respond",
+    "prepare_workflow",
+    "answer_question",
+    "revise_draft",
+    "read_calendar",
+    "check_day_availability",
+}
 MAX_CALLS = 8
 RETRYABLE_PROVIDER_CODES = frozenset(
     {
@@ -359,7 +366,7 @@ async def run(context, runtime, model=None):
                             "The requested Calendar window is unsupported or combines "
                             "periods. Ask the user to choose today, tomorrow, this week, "
                             "or the next 7 days. Do not claim Calendar facts."
-                            if name == "read_calendar"
+                            if name in {"read_calendar", "check_day_availability"}
                             else "Use declared schema and user-supplied search terms. "
                             "Use valid references and exact quotes from read_email."
                         )

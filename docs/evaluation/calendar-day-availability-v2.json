@@ -1,0 +1,39 @@
+{
+  "release": "calendar-day-answer-1.1.0",
+  "conversation_release": "contextual-conversation-1.2.5",
+  "evidence": "Synthetic deterministic and model-tool replays, not live model quality evidence.",
+  "cases": [
+    {
+      "user_turn": "check if i am free on thursday",
+      "expected_date": "2026-10-01",
+      "decision": {
+        "tool": "check_day_availability",
+        "input": {}
+      }
+    },
+    {
+      "user_turn": "check my availability for thursday this week",
+      "expected_date": "2026-10-01",
+      "decision": {
+        "tool": "check_day_availability",
+        "input": {}
+      }
+    },
+    {
+      "user_turn": "Do I have anything on Thursday?",
+      "expected_date": "2026-10-01",
+      "decision": {
+        "tool": "check_day_availability",
+        "input": {}
+      }
+    },
+    {
+      "user_turn": "How busy is my Thursday looking?",
+      "expected_date": "2026-10-01",
+      "decision": {
+        "tool": "check_day_availability",
+        "input": {}
+      }
+    }
+  ]
+}
