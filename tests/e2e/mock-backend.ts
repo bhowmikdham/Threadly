@@ -139,7 +139,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
       if (
         body.instruction === "hey" ||
-        (/^show.*emails/i.test(body.instruction) &&
+        (/^(show|find)\b.*emails?\b/i.test(body.instruction) &&
           !/next page/.test(body.instruction))
       )
         p = "/assistant/inbox-chat"
@@ -177,7 +177,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     else if (p === "/assistant/inbox-chat") {
       if (body.instruction === "hey")
         data = { kind: "message", text: "Hey! What can I help you with?" }
-      else if (/show.*emails/i.test(body.instruction))
+      else if (/^(show|find)\b.*emails?\b/i.test(body.instruction))
         data = {
           kind: "search",
           search: {

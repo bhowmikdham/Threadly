@@ -563,15 +563,12 @@ function Assistant({
                     onClick={() => void c.selectActive()}>
                     <Icon name="mail" />
                     Ask about the open email
-                    {!openEmail && (
-                      <small className="suggestion-hint">Open an email first</small>
-                    )}
                     <Icon name="chevron" size={14} />
                   </button>
                   <button
                     disabled={inputBusy}
                     onClick={() => {
-                      setMessage("Show me emails about ")
+                      setMessage("Find an email about ")
                       input.current?.focus()
                       setSources(false)
                     }}>
@@ -672,7 +669,7 @@ function Assistant({
             <button
               disabled={inputBusy || c.contextLocked}
               onClick={() => {
-                setMessage("Show me emails about ")
+                setMessage("Find an email about ")
                 input.current?.focus()
                 setSources(false)
                 setContextOpen(false)

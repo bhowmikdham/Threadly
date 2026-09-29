@@ -127,6 +127,7 @@ Threadly offline preview
 Scripted prompts the fixture understands:
   hey                                  plain chat reply
   Show me all GYG emails               inbox cards, flight card, "show more"
+  Find an email about GYG              the same search, from the "Find an email" shortcut
   (then click a card to attach it)
   Summarise this thread.               summary result
   Make it shorter                      refinement of the active task
