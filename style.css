@@ -1790,6 +1790,24 @@ summary:focus-visible {
   font-size: 11px;
   color: var(--muted);
 }
+.connector-connect {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 550;
+}
+.connector-connect:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.connector-error {
+  margin: 6px 8px 0;
+  font-size: 11.5px;
+  color: var(--danger, #c5221f);
+}
 .connector-status.is-on {
   color: var(--text);
 }

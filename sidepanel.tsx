@@ -178,6 +178,7 @@ export default function SidePanel() {
                   preferencesState
                 )}
                 openSettings={() => setSettings(true)}
+                onAuth={refresh}
                 logout={logout}
                 theme={theme}
                 dark={dark}
@@ -239,6 +240,7 @@ function Assistant({
   capabilities,
   calendarStatus,
   openSettings,
+  onAuth,
   logout,
   theme,
   dark
@@ -247,6 +249,7 @@ function Assistant({
   capabilities: Capability[]
   calendarStatus: ReturnType<typeof schedulingReadiness>
   openSettings: () => void
+  onAuth: () => Promise<void>
   logout: () => void
   theme: () => void
   dark: boolean
@@ -262,7 +265,9 @@ function Assistant({
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
     [openEmail, setOpenEmail] = useState(false),
-    [approvalInfo, setApprovalInfo] = useState(false)
+    [approvalInfo, setApprovalInfo] = useState(false),
+    [connecting, setConnecting] = useState(""),
+    [connectError, setConnectError] = useState("")
   const recognition = useRef<any>(null),
     last = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
@@ -417,11 +422,35 @@ function Assistant({
       .filter((tool) => !tool.id.endsWith("_send"))
       .reduce<Record<string, Capability>>((services, tool) => {
         const service = tool.id.split("_")[0]
-        if (!services[service] || tool.id.endsWith("_read"))
-          services[service] = { ...tool, id: service }
+        if (!services[service] || tool.id === `${service}_read`)
+          services[service] = {
+            ...tool,
+            id: service,
+            // Calendar counts as connected only with both grants it needs.
+            ...(service === "calendar"
+              ? { ready: calendarReadReady(capabilities) }
+              : {})
+          }
         return services
       }, {})
   )
+  // Connect straight from the list, with the same Google permission request
+  // Settings uses; the rows update once the backend reports the new access.
+  const connect = async (service: string) => {
+    setConnecting(service)
+    setConnectError("")
+    try {
+      await bridge({
+        type: "LOGIN",
+        capabilities: [service === "calendar" ? "calendar_read" : "gmail_read"]
+      })
+      await onAuth()
+    } catch (e) {
+      setConnectError(errorText(e))
+    } finally {
+      setConnecting("")
+    }
+  }
   // Recent chats: one row per email (labelled by its subject), leaving out
   // what is already open here. Requests without an email stay one per ask.
   const openTasks = new Set(c.entries.map((e) => e.task?.task_id))
@@ -488,9 +517,24 @@ function Assistant({
           <span>
             <b>{calendarStatus.label}</b>
             <small>{calendarStatus.detail}</small>
+            {connectError && !menu && (
+              <small className="connector-error" role="alert">
+                {connectError}
+              </small>
+            )}
           </span>
           {calendarStatus.action && (
-            <button onClick={openSettings}>{calendarStatus.action}</button>
+            <button
+              disabled={!!connecting}
+              onClick={() =>
+                calendarStatus.state === "connect"
+                  ? void connect("calendar")
+                  : openSettings()
+              }>
+              {connecting === "calendar"
+                ? "Connecting…"
+                : calendarStatus.action}
+            </button>
           )}
         </div>
       )}
@@ -555,17 +599,28 @@ function Assistant({
                     <span className="connector-name">
                       {connectorNames[tool.id] || tool.id.replaceAll("_", " ")}
                     </span>
-                    <span
-                      className={`connector-status${tool.ready ? " is-on" : ""}`}>
-                      {tool.ready
-                        ? "Connected"
-                        : tool.status === "disabled"
-                          ? "Off"
-                          : "Not connected"}
-                    </span>
+                    {tool.ready || tool.status === "disabled" ? (
+                      <span
+                        className={`connector-status${tool.ready ? " is-on" : ""}`}>
+                        {tool.ready ? "Connected" : "Off"}
+                      </span>
+                    ) : (
+                      <button
+                        className="connector-connect"
+                        disabled={!!connecting}
+                        aria-label={`Connect ${connectorNames[tool.id] || tool.id}`}
+                        onClick={() => void connect(tool.id)}>
+                        {connecting === tool.id ? "Connecting…" : "Connect"}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
+              {connectError && (
+                <p className="connector-error" role="alert">
+                  {connectError}
+                </p>
+              )}
             </>
           )}
           <div className="menu-account">

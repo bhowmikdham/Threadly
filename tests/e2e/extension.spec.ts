@@ -364,6 +364,31 @@ test("an attached email can be detached directly from the composer", async () =>
   expect(turn?.body).toHaveProperty("context_snapshot_id", null)
   await page.setViewportSize({ width: 420, height: 900 })
 })
+test("a missing connector offers Connect in the menu, not only in Settings", async () => {
+  control.calendarConnected = false
+  try {
+    await page.reload()
+    await page
+      .getByRole("button", { name: "Conversation menu", exact: true })
+      .click()
+    await expect(
+      page.getByRole("button", { name: "Connect Google Calendar" })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: "Connect Gmail" })
+    ).toHaveCount(0)
+    await expect(page.locator(".connector-status.is-on")).toHaveText(
+      "Connected"
+    )
+    await page.screenshot({
+      path: path.join("test-results", "connectors-connect.png")
+    })
+    await page.getByRole("button", { name: "Close conversation menu" }).click()
+  } finally {
+    control.calendarConnected = true
+    await page.reload()
+  }
+})
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
   await page.setViewportSize({ width: 360, height: 900 })

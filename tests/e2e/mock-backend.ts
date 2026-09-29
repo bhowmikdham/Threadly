@@ -35,7 +35,7 @@ export type Call = {
   authorized: boolean
 }
 // Switches a test can flip to exercise failure paths.
-export type MockControl = { failLogout: boolean }
+export type MockControl = { failLogout: boolean; calendarConnected: boolean }
 export type MockBackend = {
   server: Server
   calls: Call[]
@@ -46,7 +46,7 @@ export type MockBackend = {
 export type Verify = (label: string, actual: unknown, expected: unknown) => void
 
 export function createMockBackend(verify: Verify = () => {}): MockBackend {
-  const control: MockControl = { failLogout: false }
+  const control: MockControl = { failLogout: false, calendarConnected: true }
   const calls: Call[] = [],
     tasks = new Map<string, any>(),
     artifacts = new Map<string, any>()
@@ -282,8 +282,8 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       data = {
         capabilities: [
           { id: "gmail_read", ready: true },
-          { id: "calendar_read", ready: true },
-          { id: "calendar_list", ready: true },
+          { id: "calendar_read", ready: control.calendarConnected },
+          { id: "calendar_list", ready: control.calendarConnected },
           { id: "gmail_send", ready: false, status: "disabled" }
         ]
       }
