@@ -79,10 +79,8 @@ export default function SidePanel() {
     <main className={dark ? "threadly dark" : "threadly"}>
       {(!user || settings) && (
         <header className="app-header">
-          <span className="wordmark">
-            <Logo height={9} />
-            Threadly
-          </span>
+          {/* Chrome's side-panel header already shows the Threadly name. */}
+          <span className="wordmark">{settings ? "Settings" : ""}</span>
           <button
             className="icon-button"
             aria-label={settings ? "Close settings" : "Settings"}
