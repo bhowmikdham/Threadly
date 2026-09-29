@@ -130,16 +130,17 @@ export default function SidePanel() {
   }
   return (
     <main className={dark ? "threadly dark" : "threadly"}>
-      {(!user || settings) && (
+      {/* Sign-in screen only: Chrome's panel header shows the name, and the
+          Settings page has its own heading and Back to chat. */}
+      {!user && !settings && (
         <header className="app-header">
-          {/* Chrome's side-panel header already shows the Threadly name. */}
-          <span className="wordmark">{settings ? "Settings" : ""}</span>
+          <span className="wordmark" />
           <button
             className="icon-button"
-            aria-label={settings ? "Close settings" : "Settings"}
-            title={settings ? "Close settings" : "Settings"}
-            onClick={() => setSettings(!settings)}>
-            <Icon name={settings ? "close" : "menu"} />
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => setSettings(true)}>
+            <Icon name="menu" />
           </button>
         </header>
       )}

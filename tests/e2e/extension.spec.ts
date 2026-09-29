@@ -411,9 +411,7 @@ test("settings use real capability and versioned preference contracts; history s
     calls.find((c) => c.path === "/calendar/preferences" && c.body)?.body
       .expected_version
   ).toBe(1)
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click()
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click()
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
