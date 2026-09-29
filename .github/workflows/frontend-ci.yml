@@ -22,9 +22,16 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - run: npm run build
       - run: npm run test:e2e
+      - run: npm run build
+        env:
+          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.example.test
+      - run: npx playwright test tests/e2e/public-origin.spec.ts
+        env:
+          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.example.test
+      - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: threadly-chrome-extension

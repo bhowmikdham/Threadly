@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react"
 
 import { bridge, errorText } from "../lib/api"
+import { requestBackendAccess } from "../lib/backend-access"
 import { type PreferencesState } from "../lib/scheduling-readiness"
-import { backendOrigin } from "../lib/security"
+import {
+  backendOrigin,
+  DEFAULT_BACKEND,
+  publishedBackendBuild
+} from "../lib/security"
 import type { Capability, User } from "../lib/types"
 import { CalendarSetup } from "./CalendarSetup"
 
@@ -50,6 +55,26 @@ export function Settings({
       </div>
       {user && (
         <>
+          {publishedBackendBuild && (
+            <section className="settings-section">
+              <h3>Threadly server</h3>
+              <p className="muted">
+                Reconnect if browser access to the Threadly server was removed.
+              </p>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  const access = requestBackendAccess(DEFAULT_BACKEND)
+                  void run(async () => {
+                    await access
+                    await onAuth()
+                    setMessage("Server connection ready.")
+                  })
+                }}>
+                Reconnect server
+              </button>
+            </section>
+          )}
           <CalendarSetup
             capabilities={capabilities}
             preferencesState={preferencesState}
@@ -118,56 +143,60 @@ export function Settings({
           </section>
         </>
       )}
-      <section className="settings-section">
-        <h3>Backend server</h3>
-        <label>
-          Server origin
-          <input
-            aria-label="Backend server"
-            value={origin}
-            onChange={(event) => setOrigin(event.target.value)}
-          />
-        </label>
-        <button
-          disabled={busy}
-          onClick={() => {
-            try {
-              const next = backendOrigin(origin)
-              const permission = next.startsWith("https:")
-                ? chrome.permissions.request({ origins: [next + "/*"] })
-                : Promise.resolve(true)
-              void permission
-                .then((ok) => {
-                  if (!ok) {
-                    setMessage("Server permission was not granted.")
-                    return
-                  }
-                  void run(async () => {
-                    await bridge({ type: "CONFIGURE", origin: next })
-                    await onAuth()
-                    setMessage("Server saved. Sign in to continue.")
+      {!publishedBackendBuild && (
+        <section className="settings-section">
+          <h3>Backend server</h3>
+          <label>
+            Server origin
+            <input
+              aria-label="Backend server"
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value)}
+            />
+          </label>
+          <button
+            disabled={busy}
+            onClick={() => {
+              try {
+                const next = backendOrigin(origin)
+                const permission = next.startsWith("https:")
+                  ? chrome.permissions.request({ origins: [next + "/*"] })
+                  : Promise.resolve(true)
+                void permission
+                  .then((ok) => {
+                    if (!ok) {
+                      setMessage("Server permission was not granted.")
+                      return
+                    }
+                    void run(async () => {
+                      await bridge({ type: "CONFIGURE", origin: next })
+                      await onAuth()
+                      setMessage("Server saved. Sign in to continue.")
+                    })
                   })
-                })
-                .catch((cause) => setMessage(errorText(cause)))
-            } catch (cause) {
-              setMessage(errorText(cause))
-            }
-          }}>
-          Save server
-        </button>
+                  .catch((cause) => setMessage(errorText(cause)))
+              } catch (cause) {
+                setMessage(errorText(cause))
+              }
+            }}>
+            Save server
+          </button>
+          <p className="muted">Changing servers signs you out.</p>
+          <details>
+            <summary>Google sign-in setup</summary>
+            <p>
+              Add this exact redirect URI to the backend’s Google Web
+              application client and server allowlist:
+            </p>
+            <code className="wrap">{redirect}</code>
+          </details>
+        </section>
+      )}
+      {publishedBackendBuild && !user && (
         <p className="muted">
-          For EC2 development, keep your localhost tunnel open. Changing servers
-          signs you out.
+          Sign in to manage your Google and Calendar access.
         </p>
-        <details>
-          <summary>Google sign-in setup</summary>
-          <p>
-            Add this exact redirect URI to the backend’s Google Web application
-            client and server allowlist:
-          </p>
-          <code className="wrap">{redirect}</code>
-        </details>
-      </section>
+      )}
       {message && <p role="status">{message}</p>}
     </section>
   )
