@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import jwt
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
@@ -12,16 +12,21 @@ from app.auth import crypto, google
 from app.config import get_settings
 from app.db import repositories as repo
 from app.db.engine import get_session_factory
-from app.db.models import User
+from app.db.models import GoogleOAuthSession, User
 
 _EXPIRY_SLACK = timedelta(seconds=120)
 
 
-def issue_session_jwt(user_id: int) -> str:
+def issue_session_jwt(user_id: int, account_version: int, session_version: int) -> str:
+    """Bind the bearer to one verified Google connection generation."""
+    if user_id <= 0 or account_version <= 0 or session_version <= 0:
+        raise ValueError("A live account generation is required")
     settings = get_settings()
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
+        "av": account_version,
+        "sv": session_version,
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_ttl_minutes),
     }
@@ -36,6 +41,7 @@ async def exchange_code(
     code_verifier: str | None = None,
     expected_user_id: int | None = None,
     expected_version: int | None = None,
+    expected_session_version: int | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> tuple[str, User]:
     """Exchange verified Google identity data without committing the caller session."""
@@ -54,12 +60,16 @@ async def exchange_code(
         raise ApiError(401, "oauth_exchange_failed", "Google account email is not verified.")
 
     if expected_user_id is not None:
+        if expected_session_version is None:
+            raise ApiError(401, "reauth_required", "Sign in with Google again.")
         current = await session.get(
             User, expected_user_id, with_for_update=True, populate_existing=True
         )
         if current is None or current.google_sub != info.sub:
             raise ApiError(409, "google_account_mismatch", "Reconnect the same Google account.")
         if current.google_account_version != expected_version:
+            raise ApiError(409, "google_connection_changed", "Google connection changed; retry.")
+        if current.threadly_session_version != expected_session_version:
             raise ApiError(409, "google_connection_changed", "Google connection changed; retry.")
 
     now = datetime.now(UTC)
@@ -79,7 +89,55 @@ async def exchange_code(
         google_connected=True,
         now=now,
     )
-    return issue_session_jwt(user.id), user
+    return issue_session_jwt(
+        user.id, user.google_account_version, user.threadly_session_version
+    ), user
+
+
+async def refresh_session_jwt(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    expected_account_version: int,
+    expected_session_version: int,
+) -> str:
+    """Mint only while the account still matches the authenticated bearer.
+
+    The user row lock serializes this check with disconnect and login. A token
+    minted just before disconnect is invalid as soon as disconnect commits.
+    """
+    user = await session.get(User, user_id, with_for_update=True, populate_existing=True)
+    if (
+        user is None
+        or not user.google_connected
+        or user.google_account_version != expected_account_version
+        or user.threadly_session_version != expected_session_version
+    ):
+        raise ApiError(401, "reauth_required", "Sign in with Google again.")
+    token = issue_session_jwt(user.id, user.google_account_version, user.threadly_session_version)
+    await session.rollback()  # release the lock without committing caller-owned changes
+    return token
+
+
+async def logout_threadly_session(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    expected_account_version: int,
+    expected_session_version: int,
+) -> None:
+    """Invalidate every bearer for this user without changing Google grants."""
+    user = await session.get(User, user_id, with_for_update=True, populate_existing=True)
+    if (
+        user is None
+        or not user.google_connected
+        or user.google_account_version != expected_account_version
+        or user.threadly_session_version != expected_session_version
+    ):
+        raise ApiError(401, "reauth_required", "Sign in with Google again.")
+    user.threadly_session_version += 1
+    await session.execute(delete(GoogleOAuthSession).where(GoogleOAuthSession.user_id == user_id))
+    await session.commit()
 
 
 async def get_valid_access_token(
@@ -167,7 +225,11 @@ async def _persist_refreshed_tokens(
 
 
 async def disconnect_google_account(
-    user_id: int, *, expected_version: int | None = None, expected_token_version: int | None = None
+    user_id: int,
+    *,
+    expected_version: int | None = None,
+    expected_session_version: int | None = None,
+    expected_token_version: int | None = None,
 ) -> bool:
     """Remove locally usable credentials, fenced against a stale refresh result."""
     async with get_session_factory()() as disconnect_session:
@@ -175,6 +237,10 @@ async def disconnect_google_account(
         if (
             user is None
             or (expected_version is not None and user.google_account_version != expected_version)
+            or (
+                expected_session_version is not None
+                and user.threadly_session_version != expected_session_version
+            )
             or (
                 user is not None
                 and expected_token_version is not None

@@ -4,7 +4,7 @@
 # - caddy: gets a profile so it simply doesn't start in dev
 services:
   api:
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-proxy-headers
     ports:
       - "8000:8000"
     volumes:

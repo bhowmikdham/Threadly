@@ -218,6 +218,7 @@ invocation or frontend integration. See the
 |--------|-------------------------|-------------------------|---------|
 | POST   | `/auth/google/exchange` | `code`, exact `redirect_uri`, one-use `state`, original `code_verifier` from the B01 handshake below | `{"jwt": "...", "user": {"id", "email", "name"}}` |
 | POST   | `/auth/refresh`         | — (valid JWT)           | `{"jwt": "..."}` |
+| POST   | `/auth/logout`          | — (valid JWT)           | `{"signed_out":true,"scope":"all_sessions"}`; Google remains connected |
 
 ### Health
 | Method | Path       | Returns |
@@ -476,7 +477,28 @@ The old stateless exchange input is superseded: missing state/verifier returns 4
 Both return `{state,authorization_url,expires_at}`. State is one-use, expires after
 ten minutes and is consumed before network exchange. `POST /auth/google/exchange`
 checks the original verifier, callback and state; the JWT/profile response is unchanged.
-Authenticated `POST /auth/google/disconnect` clears local Google credentials only.
+Authenticated `POST /auth/google/disconnect` clears local Google credentials and
+invalidates the current Threadly session generation. The response remains
+`{connected:false,provider_revocation:"not_requested"}`; Google grant revocation is
+not attempted. Protected routes and `/auth/refresh` return 401 `reauth_required`
+for that bearer after disconnect. JWTs issued before the generation claim was
+introduced also require one fresh Google login after deployment. New bearers are
+bound to the connected user's `google_account_version` and
+`threadly_session_version`; refresh rechecks both under the user row lock before
+returning a new JWT. `POST /auth/logout` advances only the Threadly generation,
+invalidating all current devices without removing Google access. See
+[Google lifecycle](google-capabilities.md).
+
+Unauthenticated `POST /auth/google/begin` and `/auth/google/exchange` count every
+bounded attempt (including schema-invalid requests) in PostgreSQL before creating
+state, consuming state or calling Google. Each observed peer has a one-minute fixed
+window (defaults: 20 begin and 30 exchange attempts); each route also has a
+300-attempt global window. At most 8 KiB of request body is accepted on `/auth`
+routes, including streamed requests. A 413 `request_too_large` or 429
+`oauth_rate_limited` retains the error envelope; 429 includes `Retry-After` seconds.
+If the shared limiter cannot reach its table, sign-in fails closed with 503
+`oauth_unavailable`. Raw `X-Forwarded-For` is ignored; public ingress must supply
+a trustworthy peer address.
 
 Domain-free staging may explicitly enable `GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK=true`.
 Only `http://127.0.0.1:8765/oauth/callback` then accepts HTTP, still requiring exact
