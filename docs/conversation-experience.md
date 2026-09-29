@@ -189,3 +189,16 @@ Current limits: up to 12 backend-retained exchanges, one active task and one
 search result set in working context; arbitrary long-running autonomous
 planning is not implemented. Semantic factual correctness still requires
 human assessment beyond exact-quote validation.
+
+
+## Calendar request recovery (2026-09-29)
+
+Failed and expired proposals render an honest status with a Try request again
+button. They do not show internal reason codes, ready-for-review wording or
+Continue controls. Retry submits a new request; external writes still require
+their separate exact approval. Historical failed cards receive the same rendering.
+The setup banner now says Calendar connected: saved preferences and OAuth
+readiness do not establish complete coverage for every provider read.
+
+Verification: 101 frontend tests passed, TypeScript check and production build
+passed. Built against merged frontend `ea905b1`, preserving the voice changes.

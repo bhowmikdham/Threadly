@@ -305,3 +305,40 @@ describe("reply details already known from the attached email", () => {
     expect(answer).not.toHaveBeenCalled()
   })
 })
+
+it.each(["failed", "expired"])(
+  "explains a %s proposal without internal errors or false review UI",
+  (state) => {
+    const submit = vi.fn()
+    render(
+      <TaskCard
+        entry={
+          {
+            id: "failed-proposal",
+            instruction: "check if i am free on thursday",
+            message: "Here is the proposed work for you to review.",
+            proposal: {
+              state,
+              request: { instruction: "check if i am free on thursday" },
+              result: { reason: "invalid_master_proposal" }
+            }
+          } as any
+        }
+        controller={{ submit }}
+      />
+    )
+    expect(
+      screen.queryByText("Here is the proposed work for you to review.")
+    ).toBeNull()
+    expect(screen.queryByText("Here’s what I’ll do")).toBeNull()
+    expect(
+      screen.queryByText(/invalid master proposal|invalid_master_proposal/)
+    ).toBeNull()
+    expect(
+      screen.queryByRole("button", { name: "Continue with these steps" })
+    ).toBeNull()
+    expect(screen.getByText("Nothing was sent or booked.")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Try request again" }))
+    expect(submit).toHaveBeenCalledWith("check if i am free on thursday")
+  }
+)

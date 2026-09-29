@@ -54,7 +54,7 @@ export function schedulingReadiness(
     }
   return {
     state: "ready" as const,
-    label: "Calendar ready",
+    label: "Calendar connected",
     detail: "Your selected calendars and working hours are saved.",
     action: "Review setup"
   }
