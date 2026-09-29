@@ -829,7 +829,7 @@ response is execution approval. Ordinary follow-up text uses another turn with t
 version. A retry must reuse identical request ID and the complete input, including whether
 optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
 
-In `contextual-conversation-1.2.2`, the model's `search_mail` tool accepts
+In `contextual-conversation-1.2.3`, the model's `search_mail` tool accepts
 `{query, sender_email?, date_phrase?, folder?, limit?}`; `sender_email` defaults to empty
 and `limit` defaults to 5, with 1–5 allowed. An explicit new “from
 person@example.com” request starts a fresh exact-sender search with an empty phrase
@@ -857,6 +857,15 @@ Task creation remains idempotent with the conversation turn request ID; it does 
 Source-linked compose with a user-authored `to` recipient also uses the typed `draft_new`
 workflow over that bound source. Missing-recipient and source-free compose requests keep
 their existing task routing behavior.
+For a pending compose clarification, the backend reconstructs the original purpose
+and subsequent user answers from the bounded conversation history before submitting
+the task. Only addresses explicitly given as To/Cc/Bcc or as an answer to a recipient
+question become recipient handles; each handle can be used only in its stated role.
+Unrelated prior addresses and addresses merely mentioned in the email topic cannot
+be selected. Cancellation or an independent new request clears the pending goal.
+A basic draft can proceed with one confirmed To recipient even when `gmail_send`
+is disabled. Drafting still creates only
+an unreviewed task/artifact; sending remains a separate approval and execution flow.
 
 `GET /assistant/conversations/{id}` returns `{conversation_id,version,history,expires_at,
 active_task_id,active_proposal_id,proposal,pending_request_id,context_snapshot_id}`. Each

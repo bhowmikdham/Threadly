@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.2.2`. Feature switch:
+Implementation release: `contextual-conversation-1.2.3`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
 `c23026e9a039`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
@@ -21,6 +21,24 @@ alongside current-search card grading. The
 pins the merged prompt, tools and case list. The v6 live result above remains
 historical evidence for `1.1.6`; live Bedrock replay of `1.2.2` is still pending
 and uses a new `contextual-conversation-live-v7` receipt identifier.
+
+Release `1.2.3` repairs conversational compose follow-ups. While an assistant
+clarification is open, the backend carries the original compose request and subsequent
+user-authored answers into the draft workflow. Recipient handles are scoped to that
+current request and its explicit To/Cc/Bcc roles, so an address from an unrelated
+earlier exchange or merely mentioned in the email topic cannot be selected as To.
+Cancellation and an independent new request end the earlier compose scope.
+The workflow authorizer accepts adjacent-letter transpositions in creation verbs (for
+example, `craete`) without granting instructions from mail content. Once the user has
+provided one To recipient, another free-text answer cannot defer a basic draft merely for
+optional talking points or send permission. A server-disabled send capability is not
+presented as something reconnecting can enable. Tool descriptions and a typed error
+also distinguish existing Calendar agenda reads from availability and meeting-slot
+workflows. The synthetic Hassan follow-up passed **2/2** Bedrock trials
+([targeted receipt](evaluation/contextual-conversation-hassan-v8.json)); the final
+all-case replay passed **24/24** in one trial
+([v8 receipt](evaluation/contextual-conversation-live-v8.json)). Both used fake mail,
+no live Google reads or writes, and do not establish general production accuracy.
 
 Release `1.1.5` kept search and reads on demand, made the quoted Gmail search
 behavior explicit to the model, and returned a latest-request answer for correction
@@ -150,7 +168,10 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
 - Source-linked compose requests with a user-authored recipient enter the typed `draft_new`
   workflow, so natural wording does not depend on the legacy UI phrase matcher. The draft
   remains unreviewed and cannot send mail. Compose requests without a bound recipient keep
-  the existing task route and its current recipient handling.
+  the existing task route and its current recipient handling. Clarification chains retain
+  their original user-authored compose purpose and user replies until work is prepared;
+  independent requests start a new scope. A single explicit recipient is enough to
+  prepare a basic draft without Gmail send permission.
 - A workflow may explicitly use `visible_thread` to cover the owned pinned capture.
   The model must read that scope first; `mail-N` references cannot expand to a thread.
   An older full-thread capture without a UI map remains addressable as a thread. Compound

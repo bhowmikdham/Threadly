@@ -119,10 +119,12 @@ TOOLS = {
     "read_calendar": (
         ReadCalendar,
         (
-            "Read the signed-in user's selected calendars on demand, only for an "
-            "agenda/event question. Periods are today, tomorrow, this local "
-            "Monday-Sunday week, or the next seven days. This is not a free/busy "
-            "slot search and cannot book or change events. Results can have "
+            "Read EXISTING Calendar events only for an agenda question such as "
+            "'What meetings are on my calendar tomorrow?'. NEVER use this tool "
+            "to find free slots or check availability: for 'Find me three free "
+            "slots tomorrow for a meeting', call prepare_workflow with "
+            "intent=plan_schedule directly. Agenda periods are today, tomorrow, "
+            "this local Monday-Sunday week, or the next seven days. Results can have "
             "partial coverage; private event details are redacted."
         ),
     ),
@@ -130,7 +132,10 @@ TOOLS = {
         PrepareWorkflow,
         (
             "Prepare a summary, draft, plan or scheduling proposal using existing "
-            "workflows. The default selected_message source_scope binds one email; "
+            "workflows. Use intent=plan_schedule DIRECTLY when the user asks for "
+            "free meeting slots or availability; do not first call read_calendar. "
+            "For 'Find me three free slots tomorrow for a meeting', use "
+            "intent=plan_schedule. The default selected_message source_scope binds one email; "
             "visible_thread is only for an explicitly requested workflow over the "
             "owned pinned capture and requires a matching read. Use compound=true "
             "for multiple dependent operations. Never "

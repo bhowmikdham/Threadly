@@ -43,6 +43,11 @@ Runtime invariants:
   not classify intents or concatenate synthetic prompts.
 - The coordinator reconstructs recent dialogue, the pinned message, ordered search
   results, active task/question, current artifact and live capabilities.
+- An open compose clarification retains the original user request and its user-authored
+  answers for the durable draft task. Recipient references are scoped to explicit
+  To/Cc/Bcc roles in that goal; a prior unrelated or incidentally mentioned address
+  and assistant-authored text grant no recipient authority.
+  Draft creation does not depend on Gmail send access.
 - Bedrock Flow assets remain specialist prompt experiments. The production master
   conversation loop uses the Converse tool-use API and invokes existing durable
   workflow services behind validated tools.

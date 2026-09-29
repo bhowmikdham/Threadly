@@ -30,6 +30,20 @@ from app.schemas.workflow import WorkflowRequest
 SEARCH_REFERENCE_LIMIT = 25
 SEARCH_READ_BODY_CHARS = 2000
 WORKFLOW_BINDING_ERROR = "workflow_binding_invalid"
+SCHEDULING_WORKFLOW_REQUIRED = "scheduling_workflow_required"
+
+
+def scheduling_request(instruction):
+    """Distinguish availability work from a read-only existing-events agenda."""
+
+    return bool(
+        re.search(
+            r"\b(?:free|available|availability|slots?|times? to meet)\b|"
+            r"\b(?:schedule|reschedule|book)\b.{0,50}\b(?:meeting|call|appointment)\b",
+            instruction,
+            re.I,
+        )
+    )
 
 
 def fresh_search_scope(latest_turn):
@@ -66,16 +80,87 @@ def _normalise_words(value):
     return " ".join(value.casefold().split())
 
 
-def user_recipient_references(user_text):
-    """Issue recipient handles only for addresses written by the user."""
+def _normalise_action_typos(value):
+    """Accept adjacent-letter transpositions in creation verbs, not arbitrary new intents."""
 
-    addresses = list(
-        dict.fromkeys(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", user_text))
-    )[:20]
+    verbs = ("create", "draft", "write", "compose", "prepare")
+
+    def correct(match):
+        word = match.group()
+        if word in verbs:
+            return word
+        for verb in verbs:
+            if len(word) == len(verb) and any(
+                word == verb[:i] + verb[i + 1] + verb[i] + verb[i + 2 :]
+                for i in range(len(verb) - 1)
+            ):
+                return verb
+        return word
+
+    return re.sub(r"\b[a-z]+\b", correct, _normalise_words(value))
+
+
+EMAIL_ADDRESS = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+
+
+def _recipient_question(value):
+    return bool(
+        re.search(
+            r"\b(?:email address|recipient address|address for|who (?:should|do) (?:i|we) "
+            r"(?:send|email)|who is (?:this|the) (?:email|message) (?:to|for))\b",
+            value,
+            re.I,
+        )
+    )
+
+
+def _user_recipient_entries(user_text, history=(), latest_turn=""):
+    """Return user-specified address and role pairs in their stated order."""
+
+    entries = [
+        (
+            "to" if match.group("role").casefold() == "email" else match.group("role").casefold(),
+            match.group("email"),
+        )
+        for match in re.finditer(
+            rf"\b(?P<role>to|cc|bcc|email)\s*:?[ \t]*"
+            rf"(?:[A-Za-z][A-Za-z .'-]{{0,45}}[ \t]+at[ \t]+|"
+            rf"[A-Za-z][A-Za-z .'-]{{0,45}}[ \t]*[<(][ \t]*|<)?"
+            rf"(?P<email>{EMAIL_ADDRESS})\b",
+            user_text,
+            re.I,
+        )
+    ]
+    if "\nUser follow-up:" in user_text and history:
+        chain = _open_compose_chain(history)
+        answers = [entry.get("user", "") for entry in chain[1:]] + [latest_turn]
+        questions = [entry.get("assistant", "") for entry in chain]
+        for question, answer in zip(questions, answers, strict=False):
+            if _recipient_question(question):
+                entries.extend(("to", address) for address in re.findall(EMAIL_ADDRESS, answer))
+    return entries
+
+
+def user_recipient_references(user_text, history=(), latest_turn=""):
+    """Issue handles for user-authored recipient roles, not incidental addresses."""
+
+    addresses = [address for _, address in _user_recipient_entries(user_text, history, latest_turn)]
+    addresses = list(dict.fromkeys(addresses))[:20]
     return {f"recipient-{i + 1}": address for i, address in enumerate(addresses)}
 
 
-def validate_workflow_bindings(args, loaded_references, recipient_references):
+def user_recipient_roles(user_text, history=(), latest_turn=""):
+    """Record which recipient role each user-authored address can occupy."""
+
+    roles = {role: set() for role in ("to", "cc", "bcc")}
+    for role, address in _user_recipient_entries(user_text, history, latest_turn):
+        roles[role].add(address)
+    return roles
+
+
+def validate_workflow_bindings(
+    args, loaded_references, recipient_references, allowed_recipient_roles=None
+):
     """Keep source provenance and recipient authority at the deterministic boundary."""
 
     if args.reference is not None and args.reference not in loaded_references:
@@ -99,6 +184,16 @@ def validate_workflow_bindings(args, loaded_references, recipient_references):
                 "Use recipient references only from user_recipient_refs. "
                 "Omit recipient references when the user supplied no address."
             ),
+        )
+    if allowed_recipient_roles is not None and any(
+        ref not in allowed_recipient_roles[role]
+        for role in ("to", "cc", "bcc")
+        for ref in getattr(args, role + "_refs")
+    ):
+        raise ApiError(
+            422,
+            WORKFLOW_BINDING_ERROR,
+            "Use recipient references only in the To, Cc or Bcc role specified by the user.",
         )
 
 
@@ -161,10 +256,97 @@ def _is_contextual_followup(value):
     )
 
 
+def _clarification_is_open(entry):
+    """Model questions keep their user-authored goal open even if mislabelled message."""
+
+    return entry.get("kind") == "clarification" or (
+        entry.get("kind") == "message" and entry.get("assistant", "").strip().endswith("?")
+    )
+
+
+def _open_compose_chain(history):
+    chain = []
+    for entry in reversed(history[-12:]):
+        if not _clarification_is_open(entry):
+            break
+        chain.append(entry)
+    chain.reverse()
+    if not chain:
+        return []
+    try:
+        authorize_workflow(chain[0].get("user", ""), "compose", False)
+    except ValueError:
+        return []
+    return chain
+
+
+def _revokes_compose_request(value):
+    folded = _normalise_words(value)
+    return bool(
+        (
+            re.search(
+                r"\b(?:no thanks|never ?mind|cancel(?: it| this)?|stop|changed my mind)\b",
+                folded[:100],
+            )
+            and not re.search(
+                r"\b(?:create|draft|write|compose|prepare)\b.{0,70}\b(?:email|e-mail|message)\b",
+                folded,
+            )
+        )
+        or re.search(
+            r"\b(?:do not|don't|never)\s+(?:create|draft|write|compose|prepare)\b",
+            folded,
+        )
+    )
+
+
+def _starts_independent_request(value):
+    """A new command supersedes a pending question rather than inheriting its recipient."""
+
+    text = _normalise_action_typos(value)
+    if re.fullmatch(
+        r"\s*(?:(?:yes|yep|sure|ok(?:ay)?|please)\s*[,!.]?\s*){0,2}"
+        r"(?:draft|write|compose|prepare|reply to|summari[sz]e)\s+(?:it|that)\s*[.! ]*",
+        text,
+    ):
+        return False
+    if (
+        _is_contextual_followup(value)
+        and not re.search(r"\b(?:new|another|different)\s+(?:email|message|task)\b", text)
+        and not re.search(r"\b(?:email|e-mail|message)\s+to\b", text)
+    ):
+        return False
+    if re.search(
+        r"\b(?:create|draft|write|compose|prepare|send)\b.{0,80}"
+        r"\b(?:email|e-mail|message|note)\b",
+        text[:140],
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:find|search|show|list|read|summari[sz]e|recap|reply|respond|"
+            r"schedule|reschedule|book|plan)\b",
+            text,
+        )
+        and len(text.split()) <= 24
+    )
+
+
 def authoritative_user_instruction(latest_turn, history):
     """Resolve bounded follow-ups using user-authored dialogue only."""
 
     latest = latest_turn.strip()
+    if _revokes_compose_request(latest):
+        return latest
+    if history and not _starts_independent_request(latest):
+        chain = _open_compose_chain(history)
+        if chain:
+            # A question chain carries the original user goal and all user
+            # answers, never assistant text, mail bodies or older addresses.
+            turns = [entry.get("user", "").strip() for entry in chain]
+            return "\n".join(
+                [turns[0]] + [f"User follow-up: {turn}" for turn in [*turns[1:], latest] if turn]
+            )
     previous = [entry.get("user", "").strip() for entry in history]
     previous = [value for value in previous if value]
     if previous and _is_contextual_followup(latest):
@@ -211,9 +393,60 @@ def unsupported_agenda_date(instruction):
     )
 
 
+def validate_agenda_request(instruction, period):
+    """Apply one agenda/scheduling boundary in production and model replay."""
+
+    instruction = instruction.casefold()
+    if not re.search(
+        r"\b(?:calendar|agenda|events?|meetings?|appointments?|schedule|busy|free|"
+        r"available|availability|slots?)\b",
+        instruction,
+    ):
+        raise ValueError("The user did not request Calendar information")
+    if scheduling_request(instruction):
+        raise ApiError(
+            422,
+            SCHEDULING_WORKFLOW_REQUIRED,
+            "Use prepare_workflow(intent=plan_schedule) for availability or meeting slots. "
+            "The scheduling task will ask for missing details if needed.",
+        )
+    if unsupported_agenda_date(instruction):
+        raise ValueError("Ask about an unsupported date or time before reading")
+    requested_periods = {
+        requested
+        for requested, pattern in (
+            ("today", r"\btoday\b"),
+            ("tomorrow", r"\btomorrow\b"),
+            ("this_week", r"\bthis week\b"),
+            (
+                "next_7_days",
+                r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
+            ),
+        )
+        if re.search(pattern, instruction)
+    }
+    if len(requested_periods) > 1:
+        raise ValueError("Ask which Calendar period to read")
+    if period == "tomorrow" and "tomorrow" not in instruction:
+        raise ValueError("Tomorrow was not requested")
+    if period == "this_week" and "this week" not in instruction:
+        raise ValueError("This week was not requested")
+    if period == "next_7_days" and not re.search(
+        r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
+        instruction,
+    ):
+        raise ValueError("A seven-day window was not requested")
+    if period == "today" and re.search(
+        r"\b(?:tomorrow|this week|next week|next 7 days)\b", instruction
+    ):
+        raise ValueError("Use the requested Calendar period")
+
+
 def authorize_workflow(instruction, intent, compound):
     """Require a user-authored request for every model-selected workflow class."""
-    value = _normalise_words(instruction)
+    if intent == "compose" and _revokes_compose_request(instruction.splitlines()[-1]):
+        raise ValueError("The user cancelled or declined composing")
+    value = _normalise_action_typos(instruction)
     operations = set()
     if re.search(r"\b(?:summari[sz]e|summary|recap)\b", value):
         operations.add("summarise")
@@ -248,7 +481,7 @@ def authorize_workflow(instruction, intent, compound):
         r"\b(?:schedule|reschedule|book)\b.{0,50}\b(?:meeting|call|time|appointment)\b|"
         r"\b(?:suggest|offer|propose)\b.{0,50}\b"
         r"(?:slots?|meeting times?|times? to meet|availability)\b|"
-        r"\b(?:give|find)\s+(?:me\s+)?(?:(?:one|two|three|\d+)\s+)?"
+        r"\b(?:give|find)\s+(?:me\s+)?(?:(?:a|an|some|one|two|three|\d+)\s+)?"
         r"(?:(?:free|available)\s+)?(?:slots?|times? to meet)\b|"
         r"\bfind\s+(?:my|our)\s+availability\b|"
         r"\b(?:are|am|is|will)\b.{0,35}\b(?:free|available)\b|"
@@ -284,9 +517,41 @@ class Runtime:
         self.fresh_search_done = False
         self.fresh_search_attempted = False
         self.active = self.artifact = None
-        # Addresses are exposed as backend-issued references, not writable model strings.
-        user_text = "\n".join([h["user"] for h in state["history"]] + [request.instruction])
-        self.recipients = user_recipient_references(user_text)
+        # Recipient references are scoped to the current user-authored goal, not
+        # every address mentioned earlier in this conversation.
+        self.goal_instruction = authoritative_user_instruction(
+            request.instruction, state["history"]
+        )
+        self.recipients = user_recipient_references(
+            self.goal_instruction, state["history"], request.instruction
+        )
+        role_addresses = user_recipient_roles(
+            self.goal_instruction, state["history"], request.instruction
+        )
+        self.recipient_roles = {
+            role: {ref for ref, address in self.recipients.items() if address in addresses}
+            for role, addresses in role_addresses.items()
+        }
+
+    def ready_compose_goal(self):
+        """A single-recipient draft goal should enter reviewable workflow, not send advice."""
+
+        if getattr(self, "active", None) or len(getattr(self, "recipients", {})) != 1:
+            return False
+        if not self.recipient_roles["to"]:
+            return False
+        if re.match(r"\s*(?:should|would)\s+(?:i|we)\b", self.goal_instruction, re.I):
+            return False
+        latest = _normalise_words(self.request.instruction)
+        if re.fullmatch(r"(?:thanks|thank you)[.! ]*", latest):
+            return False
+        if _revokes_compose_request(latest):
+            return False
+        try:
+            authorize_workflow(self.goal_instruction, "compose", False)
+        except ValueError:
+            return False
+        return True
 
     def _reset_previous_search(self):
         # A new explicit mailbox request supersedes old search references. The
@@ -301,11 +566,13 @@ class Runtime:
         """Build workflow input exclusively from bounded user-authored turns.
 
         Model-authored tool arguments and fetched email bodies are deliberately
-        excluded. A short deictic follow-up receives only the immediately previous
-        user turn so downstream planners can resolve "draft that" without granting
-        a source email authority over the request.
+        excluded. An open compose clarification carries its original purpose and
+        user answers; a short deictic follow-up otherwise receives the immediately
+        previous user turn. Neither path grants source email authority.
         """
-        return authoritative_user_instruction(self.request.instruction, self.state["history"])
+        return getattr(self, "goal_instruction", None) or authoritative_user_instruction(
+            self.request.instruction, self.state["history"]
+        )
 
     def conversation_provenance(self, instruction):
         from app.conversation.prompt import assets
@@ -357,6 +624,7 @@ class Runtime:
         async with self.factory() as session:
             user = await session.get(User, self.owner)
             caps = build_capabilities(user)
+            self.capabilities = caps
             task_context = None
             if self.state.get("active_task_id"):
                 from app.api.routes.assistant import task_view
@@ -399,6 +667,11 @@ class Runtime:
             "recent_dialogue": model_history(self.state["history"]),
             "history_limit": 12,
             "user_turn": self.request.instruction,
+            "current_user_goal": (
+                self.goal_instruction
+                if self.goal_instruction != self.request.instruction.strip()
+                else None
+            ),
             "user_recipient_refs": self.recipients,
             "selected_reference": "selected" if "selected" in self.state["refs"] else None,
             "selected_source_scopes": (
@@ -437,48 +710,7 @@ class Runtime:
     async def read_calendar(self, period):
         from app.calendar import agenda
 
-        instruction = self.authoritative_instruction().casefold()
-        if not re.search(
-            r"\b(?:calendar|agenda|events?|meetings?|appointments?|schedule|busy|free)\b",
-            instruction,
-        ):
-            raise ValueError("The user did not request Calendar information")
-        if re.search(
-            r"\b(?:free|available|availability|slots?|times? to meet)\b|"
-            r"\b(?:schedule|reschedule|book)\b.{0,50}\b(?:meeting|call|appointment)\b",
-            instruction,
-        ):
-            raise ValueError("Use the scheduling workflow for availability or booking")
-        if unsupported_agenda_date(instruction):
-            raise ValueError("Ask about an unsupported date or time before reading")
-        requested_periods = {
-            requested
-            for requested, pattern in (
-                ("today", r"\btoday\b"),
-                ("tomorrow", r"\btomorrow\b"),
-                ("this_week", r"\bthis week\b"),
-                (
-                    "next_7_days",
-                    r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
-                ),
-            )
-            if re.search(pattern, instruction)
-        }
-        if len(requested_periods) > 1:
-            raise ValueError("Ask which Calendar period to read")
-        if period == "tomorrow" and "tomorrow" not in instruction:
-            raise ValueError("Tomorrow was not requested")
-        if period == "this_week" and "this week" not in instruction:
-            raise ValueError("This week was not requested")
-        if period == "next_7_days" and not re.search(
-            r"\b(?:next|coming|upcoming)\b.{0,15}\b(?:7 days|seven days|week)\b",
-            instruction,
-        ):
-            raise ValueError("A seven-day window was not requested")
-        if period == "today" and re.search(
-            r"\b(?:tomorrow|this week|next week|next 7 days)\b", instruction
-        ):
-            raise ValueError("Use the requested Calendar period")
+        validate_agenda_request(self.authoritative_instruction(), period)
         result = await agenda.read(self.owner, period)
         return {
             "kind": "message",
@@ -796,7 +1028,9 @@ class Runtime:
     async def workflow(self, args):
         instruction = self.authoritative_instruction()
         authorize_workflow(instruction, args.intent, args.compound)
-        validate_workflow_bindings(args, set(self.loaded), set(self.recipients))
+        validate_workflow_bindings(
+            args, set(self.loaded), set(self.recipients), self.recipient_roles
+        )
         scope = args.source_scope
         if scope == "visible_thread" and args.reference != "selected":
             raise ValueError("Visible thread requires an owned pinned reference")
