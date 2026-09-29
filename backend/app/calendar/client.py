@@ -262,7 +262,7 @@ def _event_datetime(part, fallback_zone=None):
     return instants.pop()
 
 
-async def list_events(token, calendar_id, name, start, end, *, transport=None):
+async def list_events(token, calendar_id, name, start, end, *, transport=None, query=""):
     """One bounded events.list page; a continuation is explicit partial coverage."""
     body = await _request(
         "GET",
@@ -272,6 +272,7 @@ async def list_events(token, calendar_id, name, start, end, *, transport=None):
         params={
             "timeMin": start.isoformat(),
             "timeMax": end.isoformat(),
+            **({"q": query} if query else {}),
             "singleEvents": "true",
             "orderBy": "startTime",
             "showDeleted": "false",
@@ -294,9 +295,7 @@ async def list_events(token, calendar_id, name, start, end, *, transport=None):
     if more is not None and (not isinstance(more, str) or not more):
         raise invalid()
     try:
-        events = [
-            event for row in rows if (event := _agenda_event(row, fallback_zone)) is not None
-        ]
+        events = [event for row in rows if (event := _agenda_event(row, fallback_zone)) is not None]
     except (KeyError, TypeError, ValueError):
         raise invalid() from None
     return AgendaCalendar(

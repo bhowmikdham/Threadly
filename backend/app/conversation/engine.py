@@ -14,9 +14,10 @@ from app.assistant.summary import digest
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
+from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
 from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_config
 
-TERMINAL = {
+TERMINAL = set(CALENDAR_READ_TOOLS) | {
     "respond",
     "prepare_workflow",
     "answer_question",
@@ -192,7 +193,7 @@ async def run(context, runtime, model=None):
                             outcome = validate_response(arguments, runtime)
                         else:
                             outcome = await runtime.call(name, arguments)
-                        trace.append({"tool": name, "status": "ok"})
+                        trace.append({"tool": name, "status": outcome.get("error_code", "ok")})
                         if name in TERMINAL:
                             return {**outcome, "release": RELEASE, "trace": trace}
                         if name == "search_mail":

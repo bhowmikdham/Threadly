@@ -21,6 +21,7 @@ from app.capabilities.service import build_capabilities
 from app.config import get_settings
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.schemas.assistant import AssistantRequest, DraftOptions
+from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
 from app.schemas.continuation import TaskInputRequest
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import DraftRecipients, EditDraftRequest
@@ -361,7 +362,7 @@ def model_history(history):
             **entry,
             "assistant": "Calendar results were shown. Read Calendar again for current details.",
         }
-        if entry.get("source") in {"calendar_agenda", "calendar_availability"}
+        if entry.get("source") in {"calendar_agenda", "calendar_availability", "calendar_tools"}
         else entry
         for entry in history
     ]
@@ -523,6 +524,11 @@ class Runtime:
     def __init__(self, owner, request, state, factory, lease=None):
         self.owner, self.request, self.state, self.factory = owner, request, state, factory
         self.lease = lease
+        self.calendar_anchor = (
+            datetime.fromisoformat(state["calendar_read_anchor"])
+            if state.get("calendar_read_anchor")
+            else datetime.now(UTC)
+        )
         self.evidence, self.loaded, self.read_scopes = {}, {}, {}
         self.search_page = None
         self.fresh_search_scope = fresh_search_scope(request.instruction)
@@ -713,6 +719,16 @@ class Runtime:
         return await answer(self.owner, self.authoritative_instruction())
 
     async def call(self, name, args):
+        if name in CALENDAR_READ_TOOLS:
+            from app.calendar.conversation_tools import execute
+
+            return await execute(
+                self.owner,
+                name,
+                args,
+                self.authoritative_instruction(),
+                anchor=self.calendar_anchor,
+            )
         if name in {"search_mail", "more_mail"}:
             return await self.search(args if name == "search_mail" else None)
         if name == "read_email":

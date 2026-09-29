@@ -191,6 +191,11 @@ async def claim(session, owner, request):
     row.lease_id, row.lease_until = lease, now + LEASE
     if row.expires_at < now + LEASE:
         row.expires_at = now + LEASE
+    # Pin relative Calendar dates before any model/provider work, including crash retries.
+    if row.pending_request_id != request.request_id or "calendar_read_anchor" not in state:
+        state["calendar_read_anchor"] = now.isoformat()
+    compact(state)
+    row.state_enc = encode(state)
     row.pending_request_id, row.pending_hash = request.request_id, hashed
     return row, state, lease, None
 
@@ -206,7 +211,16 @@ async def complete(session, owner, request, lease, state, response):
     saved = {
         k: v
         for k, v in response.items()
-        if k not in {"search", "agenda", "calendar_availability", "task", "artifacts", "proposal"}
+        if k
+        not in {
+            "search",
+            "agenda",
+            "calendar_availability",
+            "calendar_tools",
+            "task",
+            "artifacts",
+            "proposal",
+        }
     }
     saved.update(conversation_id=row.id, version=row.version + 1)
     state["history"] = (
@@ -217,7 +231,9 @@ async def complete(session, owner, request, lease, state, response):
                 "assistant": saved.get("text", ""),
                 "kind": saved["kind"],
                 "source": (
-                    "calendar_agenda"
+                    "calendar_tools"
+                    if "calendar_tools" in response
+                    else "calendar_agenda"
                     if "agenda" in response
                     else "calendar_availability"
                     if "calendar_availability" in response
@@ -279,7 +295,16 @@ async def checkpoint(session, owner, request, lease, state, response):
     state["pending_result"] = {
         k: v
         for k, v in response.items()
-        if k not in {"search", "agenda", "calendar_availability", "task", "artifacts", "proposal"}
+        if k
+        not in {
+            "search",
+            "agenda",
+            "calendar_availability",
+            "calendar_tools",
+            "task",
+            "artifacts",
+            "proposal",
+        }
     }
     compact(state)
     row.state_enc = encode(state)

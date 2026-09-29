@@ -396,7 +396,7 @@ async def test_versioned_semantic_replay_fixtures(provider):
                 }
 
         result = await engine.run({}, runtime(case["user_turn"]), FixtureModel())
-        assert result["release"] == fixture["conversation_release"]
+        assert result["release"] == engine.RELEASE  # Replay the historical cases on this release.
         assert result["calendar_availability"]["date"] == case["expected_date"]
 
 

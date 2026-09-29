@@ -12,7 +12,13 @@ from app.calendar.time_resolution import day_start
 from app.capabilities.service import build_capabilities
 from app.db.engine import get_session_factory
 from app.db.models import CalendarPreference
-from app.schemas.calendar import AgendaCalendar, AgendaOut, AgendaPeriod, parse_instant
+from app.schemas.calendar import (
+    AgendaCalendar,
+    AgendaOut,
+    AgendaPeriod,
+    CalendarEventsOut,
+    parse_instant,
+)
 
 MAX_RETURNED_EVENTS = 50
 EVENT_ROLES = {"reader", "writer", "writerWithoutPrivateAccess", "owner"}
@@ -91,8 +97,8 @@ def render(result: AgendaOut):
         if event.all_day:
             when = event.start + " (all day)"
         else:
-            when = datetime.fromisoformat(event.start).astimezone(zone).strftime(
-                "%a %d %b, %I:%M %p"
+            when = (
+                datetime.fromisoformat(event.start).astimezone(zone).strftime("%a %d %b, %I:%M %p")
             )
         title = " ".join(event.summary.split())
         location = " — " + " ".join(event.location.split()) if event.location else ""
@@ -107,6 +113,21 @@ def render(result: AgendaOut):
 
 async def read(user_id, period: AgendaPeriod = "today", *, transport=None, anchor=None):
     """Fetch only the selected calendars and a single bounded page from each."""
+    return await _read(user_id, period, transport=transport, anchor=anchor)
+
+
+async def search(user_id, resolve_window, *, query="", transport=None, anchor=None):
+    return await _read(
+        user_id,
+        None,
+        resolve_window=resolve_window,
+        query=query,
+        transport=transport,
+        anchor=anchor,
+    )
+
+
+async def _read(user_id, period, *, resolve_window=None, query="", transport=None, anchor=None):
     async with get_session_factory()() as session:
         require_events(await service.account(session, user_id))
     token, account_version = await service._snapshot(user_id)
@@ -119,7 +140,11 @@ async def read(user_id, period: AgendaPeriod = "today", *, transport=None, ancho
         selected = list(pref.preferences["calendar_ids"])
         timezone = pref.preferences["timezone"]
         checked_at = anchor or await session.scalar(select(func.clock_timestamp()))
-    start, end = window(period, checked_at, timezone)
+    start, end = (
+        resolve_window(checked_at, timezone)
+        if resolve_window
+        else window(period, checked_at, timezone)
+    )
     # ACLs can change independently of OAuth grants. Never query an unselected ID.
     calendars = await client.list_calendars(token, transport=transport)
     visible = {item["id"]: item for item in calendars}
@@ -134,7 +159,13 @@ async def read(user_id, period: AgendaPeriod = "today", *, transport=None, ancho
         async with semaphore:
             try:
                 return await client.list_events(
-                    token, calendar_id, name, start, end, transport=transport
+                    token,
+                    calendar_id,
+                    name,
+                    start,
+                    end,
+                    transport=transport,
+                    **({"query": query} if query else {}),
                 )
             except ApiError as exc:
                 return unknown(
@@ -172,8 +203,8 @@ async def read(user_id, period: AgendaPeriod = "today", *, transport=None, ancho
     coverage = (
         "complete" if statuses == {"known"} else "unknown" if statuses == {"unknown"} else "partial"
     )
-    return AgendaOut(
-        period=period,
+    return (AgendaOut if period else CalendarEventsOut)(
+        period=period or "custom",
         timezone=timezone,
         start=start,
         end=end,

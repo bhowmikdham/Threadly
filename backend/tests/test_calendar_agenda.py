@@ -309,7 +309,8 @@ def test_supported_periods_are_not_blocked_by_date_guard(instruction):
 
 @pytest.mark.asyncio
 async def test_versioned_calendar_replay_fixtures_grade_period_and_scheduler_boundary():
-    from app.schemas.conversation import PrepareWorkflow, ReadCalendar
+    from app.schemas.calendar_tools import FindFreeTimes
+    from app.schemas.conversation import ReadCalendar
 
     cases = {case["id"]: case for case in evaluate.CASES}
     today = cases["calendar_today_agenda"]
@@ -329,7 +330,7 @@ async def test_versioned_calendar_replay_fixtures_grade_period_and_scheduler_bou
     slots = cases["calendar_slots_use_schedule"]
     runtime = evaluate.FixtureRuntime(slots, slots["turns"][0])
     result = await runtime.call(
-        "prepare_workflow", PrepareWorkflow(intent="plan_schedule", reference=None)
+        "find_free_times", FindFreeTimes(date_phrase="tomorrow")
     )
     assert evaluate.grade(slots, result, runtime.calls) == []
     incorrectly_read = evaluate.grade(

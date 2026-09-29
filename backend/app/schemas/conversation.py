@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from app.schemas.assistant import StrictModel
+from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
 from app.schemas.continuation import ClarificationAnswer
 from app.schemas.inbox_chat import InboxChatRequest
 
@@ -127,7 +128,8 @@ TOOLS = {
         "anything on tomorrow?'. Backend resolves the date from the user's words and "
         "returns verified busy periods. No proposal or approval needed. No arguments: "
         "never invent a date. Ask a clarification for missing or ambiguous days. For "
-        "meeting slots, time windows, booking or compound work use prepare_workflow.",
+        "meeting slots use find_free_times; time windows use find_busy_times. "
+        "Booking or compound work uses prepare_workflow.",
     ),
     "read_calendar": (
         ReadCalendar,
@@ -135,9 +137,8 @@ TOOLS = {
             "Read EXISTING Calendar events only for an agenda question such as "
             "'What meetings are on my calendar tomorrow?'. NEVER use this tool "
             "to find free slots or check availability. Use check_day_availability for "
-            "whole-day self checks. For 'Find me three free "
-            "slots tomorrow for a meeting', call prepare_workflow with "
-            "intent=plan_schedule directly. Agenda periods are today, tomorrow, "
+            "whole-day self checks. For free meeting slots use find_free_times directly. "
+            "Agenda periods are today, tomorrow, "
             "this local Monday-Sunday week, or the next seven days. Results can have "
             "partial coverage; private event details are redacted."
         ),
@@ -146,11 +147,11 @@ TOOLS = {
         PrepareWorkflow,
         (
             "Prepare a summary, draft, plan or scheduling proposal using existing "
-            "workflows. Use intent=plan_schedule DIRECTLY when the user asks for "
-            "free meeting slots or compound scheduling; do not first call read_calendar. "
+            "workflows. Use intent=plan_schedule for booking or compound scheduling. "
+            "Simple free-slot reads use find_free_times without a proposal. "
             "For a simple whole-day availability question use check_day_availability. "
-            "For 'Find me three free slots tomorrow for a meeting', use "
-            "intent=plan_schedule. The default selected_message source_scope binds one email; "
+            "Use find_free_times for 'Find me three free slots tomorrow for a meeting'. "
+            "The default selected_message source_scope binds one email; "
             "visible_thread is only for an explicitly requested workflow over the "
             "owned pinned capture and requires a matching read. Use compound=true "
             "for multiple dependent operations. Never "
@@ -185,6 +186,9 @@ TOOLS = {
         ),
     ),
 }
+
+
+TOOLS.update(CALENDAR_READ_TOOLS)
 
 
 def tool_config():
