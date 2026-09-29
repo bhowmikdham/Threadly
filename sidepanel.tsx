@@ -80,7 +80,7 @@ export default function SidePanel() {
       {(!user || settings) && (
         <header className="app-header">
           <span className="wordmark">
-            <Icon name="sparkle" />
+            <Logo height={9} />
             Threadly
           </span>
           <button
@@ -123,8 +123,8 @@ export default function SidePanel() {
           {!user && !settings && (
             <section className="welcome">
               <div>
-                <span className="welcome-mark">
-                  <Icon name="sparkle" size={32} />
+                <span className="welcome-mark welcome-logo">
+                  <Logo height={20} />
                 </span>
                 <h1>
                   A little less work.

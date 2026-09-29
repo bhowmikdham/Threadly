@@ -1790,3 +1790,8 @@ summary:focus-visible {
   margin: 2px 0 4px;
   font-size: 14px;
 }
+
+/* The sign-in screen carries the Threadly logo in ink, not the accent. */
+.welcome-logo {
+  color: var(--text);
+}
