@@ -1892,8 +1892,9 @@ summary:focus-visible {
   color: var(--text);
   font-weight: 550;
 }
-.draft-to {
+.draft-box .draft-to {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   margin: 0 0 8px;
@@ -1902,7 +1903,7 @@ summary:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
-.draft-to input {
+.draft-box .draft-to input {
   flex: 1;
   min-width: 0;
   padding: 2px 0;
@@ -1920,7 +1921,7 @@ summary:focus-visible {
 .draft-card .draft-body {
   display: block;
   width: 100%;
-  min-height: 7lh;
+  min-height: 4lh;
   margin: 0 0 12px;
   padding: 0;
   border: 0;
@@ -1933,7 +1934,7 @@ summary:focus-visible {
   field-sizing: content;
   outline: none;
 }
-.draft-to:focus-within {
+.draft-box .draft-to:focus-within {
   border-bottom-color: var(--muted);
 }
 .draft-actions {
