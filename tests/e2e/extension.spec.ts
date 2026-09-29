@@ -337,7 +337,7 @@ test("settings use real capability and versioned preference contracts; history s
       .or(page.getByText("Recent chats", { exact: true }))
   ).toBeVisible()
   await expect(
-    page.getByRole("button", { name: /Draft a reply/ }).first()
+    page.getByRole("button", { name: /Test receipt/ }).first()
   ).toBeVisible()
   await page
     .getByRole("button", { name: "Conversation menu", exact: true })

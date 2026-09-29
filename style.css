@@ -1739,3 +1739,54 @@ summary:focus-visible {
   margin-top: -35px;
   margin-left: 32px;
 }
+
+/* Recent chats: the email's subject, with the latest request beneath it. */
+.history-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+/* The attached-email chip shows the start of the subject; hover shows it all. */
+.composer-context .context-chip > span {
+  max-width: 22ch;
+}
+/* In this conversation: just the subject and who it came from. */
+.context-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.context-from svg {
+  flex: none;
+}
+.context-from span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.context-from small {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+}
+.context-picker .context-title {
+  margin: 2px 0 4px;
+  font-size: 14px;
+}

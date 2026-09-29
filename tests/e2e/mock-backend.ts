@@ -222,6 +222,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
           const change = body.instruction
             .trim()
             .replace(/^(also |and )?(mention|add|say|include)( that)? /i, "")
+            .replace(/^["“'](.*)["”']\.?$/, "$1")
             .replace(/[.!?]*$/, ".")
           body.intent_hint = draft.draft_envelope.reply ? "reply" : "compose"
           body.draft_options = {
@@ -479,7 +480,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       tasks.set(t.task_id, { ...finished, task_id: t.task_id, question: null })
       data = { ...generated, task_id: t.task_id, question: null }
     } else if (p === "/assistant/tasks")
-      data = { tasks: [...tasks.values()], next_cursor: null }
+      data = { tasks: [...tasks.values()].reverse(), next_cursor: null }
     else if (/^\/assistant\/tasks\/[^/]+$/.test(p))
       data = tasks.get(p.split("/").at(-1)!)
     else if (/^\/assistant\/artifacts\/[^/]+$/.test(p))

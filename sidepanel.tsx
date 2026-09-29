@@ -188,6 +188,7 @@ function Assistant({
     [sources, setSources] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
     [history, setHistory] = useState<any>(null),
+    [subjects, setSubjects] = useState<Record<string, string>>({}),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
     [openEmail, setOpenEmail] = useState(false),
@@ -241,6 +242,24 @@ function Assistant({
       input.current.style.height = `${Math.min(input.current.scrollHeight, 150)}px`
     }
   }, [message])
+  useEffect(() => {
+    const ids = [
+      ...new Set(
+        (history || [])
+          .map(
+            (t: any) => t.effective_context_snapshot_id || t.context_snapshot_id
+          )
+          .filter(Boolean)
+      )
+    ].filter((id: string) => !(id in subjects)) as string[]
+    for (const id of ids)
+      void api(`/assistant/context-snapshots/${encodeURIComponent(id)}`)
+        .then((snap) => api(`/threads/${encodeURIComponent(snap.thread_id)}`))
+        .then((t) =>
+          setSubjects((s) => ({ ...s, [id]: t.thread.subject || "" }))
+        )
+        .catch(() => setSubjects((s) => ({ ...s, [id]: "" })))
+  }, [history])
   const historyPage = async (more = false) => {
     try {
       const r = await api(
@@ -322,15 +341,26 @@ function Assistant({
     : "New conversation"
   // Sending is an approval step, not a connector, so it isn't listed here.
   const connectors = capabilities.filter((tool) => !tool.id.endsWith("_send"))
-  // Recent chats leaves out what is already open here and repeats of a request.
+  // Recent chats: one row per email (labelled by its subject), leaving out
+  // what is already open here. Requests without an email stay one per ask.
   const openTasks = new Set(c.entries.map((e) => e.task?.task_id))
-  const seen = new Set<string>()
-  const recent = (history || []).filter((t) => {
-    const text = t.instruction?.trim().toLowerCase()
-    if (openTasks.has(t.task_id) || seen.has(text)) return false
-    seen.add(text)
-    return true
-  })
+  const contextOf = (t: any): string =>
+    t.effective_context_snapshot_id || t.context_snapshot_id || ""
+  const newestFirst = [...(history || [])].sort(
+    (a: any, b: any) =>
+      Date.parse(b.created_at || b.updated_at || "") -
+        Date.parse(a.created_at || a.updated_at || "") || 0
+  )
+  const recent: { key: string; context: string; latest: any; count: number }[] =
+    []
+  for (const t of newestFirst) {
+    if (openTasks.has(t.task_id)) continue
+    const key =
+      contextOf(t) || `ask:${t.instruction?.trim().toLowerCase() || t.task_id}`
+    const group = recent.find((g) => g.key === key)
+    if (group) group.count += 1
+    else recent.push({ key, context: contextOf(t), latest: t, count: 1 })
+  }
   const firstName = user.name?.trim().split(/\s+/)[0] || ""
   const initials =
     (user.name || user.email)
@@ -504,16 +534,28 @@ function Assistant({
               </button>
             </div>
             {recent.length === 0 && <p>Your earlier chats will appear here.</p>}
-            {recent.map((t) => (
+            {recent.map(({ key, context, latest: t, count }) => (
               <button
                 className="history-row"
-                key={t.task_id}
+                key={key}
                 disabled={inputBusy}
                 onClick={() => {
                   void c.loadTask(t)
                   setHistory(null)
                 }}>
-                <span>{t.instruction}</span>
+                <span className="history-text">
+                  <span className="history-title">
+                    {context
+                      ? subjects[context] || "Email conversation"
+                      : t.instruction}
+                  </span>
+                  {context && (
+                    <small>
+                      {count > 1 ? `${count} requests · ` : ""}
+                      {t.instruction}
+                    </small>
+                  )}
+                </span>
                 <Icon name="chevron" size={14} />
               </button>
             ))}
@@ -620,15 +662,7 @@ function Assistant({
         {contextOpen && c.selection && (
           <ContextPicker
             selection={c.selection}
-            onChange={c.setSelection}
             close={() => setContextOpen(false)}
-            busy={inputBusy || c.contextLocked}
-            rewrite={(id) => {
-              void c.submit(
-                "Rewrite the selected message to be clearer and more concise, preserving its meaning.",
-                id
-              )
-            }}
           />
         )}
         {c.contextBlocked && !c.restoreFailed && (
@@ -712,7 +746,14 @@ function Assistant({
                 type="button"
                 className="context-chip"
                 disabled={c.busy}
-                title="View attached email details"
+                title={[
+                  c.selection.thread.subject,
+                  c.selection.messages.find(
+                    (m) => m.gmail_msg_id === c.selection.targetId
+                  )?.from_addr || c.selection.messages[0]?.from_addr
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 aria-label={`Attached email: ${c.selection.thread.subject}. View details`}
                 aria-expanded={contextOpen}
                 onClick={() => setContextOpen(!contextOpen)}>
