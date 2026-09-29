@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { addresses } from "../lib/api"
+import { needsCalendarSetup } from "../lib/scheduling-readiness"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
 import { Icon } from "./Icon"
@@ -76,7 +77,13 @@ export function TaskCard({
     autoReply =
       t?.state === "needs_clarification" &&
       !entry.error &&
-      knownReplyAnswer(entry, controller.selection)
+      knownReplyAnswer(entry, controller.selection),
+    calendarSetupNeeded = [
+      entry.errorCode,
+      t?.error_code,
+      p?.result?.reason,
+      t?.route?.decision?.reason
+    ].some(needsCalendarSetup)
   return (
     <article className="exchange" data-entry-id={entry.id}>
       <div className="user-message">{entry.instruction}</div>
@@ -159,8 +166,9 @@ export function TaskCard({
         )}
         {t?.state === "failed" && (
           <p role="alert">
-            I couldn’t finish this request. {t.error_code?.replaceAll("_", " ")}
-            .
+            {needsCalendarSetup(t.error_code)
+              ? "Calendar needs setup before this scheduling request can continue."
+              : `I couldn’t finish this request. ${t.error_code?.replaceAll("_", " ")}.`}
           </p>
         )}
         {t?.state === "unsupported" && !p && (
@@ -272,6 +280,17 @@ export function TaskCard({
           <p role="alert" className="warning">
             {entry.error}
           </p>
+        )}
+        {calendarSetupNeeded && controller.openCalendarSetup && (
+          <div className="calendar-recovery">
+            <p>
+              Connect Calendar and review your scheduling preferences, then try
+              this request again.
+            </p>
+            <button onClick={controller.openCalendarSetup}>
+              Open Calendar setup
+            </button>
+          </div>
         )}
       </div>
     </article>

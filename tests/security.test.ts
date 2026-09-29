@@ -57,6 +57,15 @@ describe("extension trust boundaries", () => {
       allowedRequest("/assistant/conversations/not-a-uuid", "DELETE")
     ).toBe(false)
   })
+  it("allows read-only Calendar agenda requests through the extension bridge", () => {
+    expect(allowedRequest("/calendar/agenda?period=today", "GET")).toBe(true)
+    expect(allowedRequest("/calendar/agenda?period=next_7_days", "GET")).toBe(
+      true
+    )
+    expect(allowedRequest("/calendar/agenda?period=today", "DELETE")).toBe(
+      false
+    )
+  })
   it("does not grant Gmail content scripts privileged backend access", () => {
     expect(
       trustedSender(

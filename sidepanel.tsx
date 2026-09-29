@@ -3,11 +3,16 @@ import { useEffect, useRef, useState } from "react"
 import "./style.css"
 
 import { ContextPicker } from "./components/ContextPicker"
-import { Icon, Logo } from "./components/Icon"
+import { GmailIcon, Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { api, bridge, errorText } from "./lib/api"
 import { gmailUrlShowsEmail } from "./lib/gmail-context"
+import {
+  calendarReadReady,
+  schedulingReadiness,
+  type PreferencesState
+} from "./lib/scheduling-readiness"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -16,21 +21,48 @@ export default function SidePanel() {
     [capabilities, setCapabilities] = useState<Capability[]>([]),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
+    [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
-    [dark, setDark] = useState(false)
+    [dark, setDark] = useState(false),
+    [preferencesState, setPreferencesState] =
+      useState<PreferencesState>("loading")
+  const authEpoch = useRef(0)
   const refresh = async () => {
+    const epoch = ++authEpoch.current
     const s = await bridge<any>({ type: "STATUS" })
+    if (epoch !== authEpoch.current) return
     setUser(s.user)
     if (s.user) {
       try {
         const c = await api("/assistant/capabilities")
+        if (epoch !== authEpoch.current) return
         setCapabilities(c.capabilities)
+        if (!calendarReadReady(c.capabilities)) {
+          setPreferencesState("missing")
+          return
+        }
+        setPreferencesState("loading")
+        try {
+          await api("/calendar/preferences")
+          if (epoch === authEpoch.current) setPreferencesState("ready")
+        } catch (e) {
+          if (epoch === authEpoch.current)
+            setPreferencesState(
+              e?.code === "calendar_preferences_missing"
+                ? "missing"
+                : "unavailable"
+            )
+        }
       } catch (e) {
+        if (epoch !== authEpoch.current) return
         if (e.status === 401) setUser(null)
         throw e
       }
-    } else setCapabilities([])
+    } else {
+      setCapabilities([])
+      setPreferencesState("missing")
+    }
   }
   useEffect(() => {
     void refresh()
@@ -45,8 +77,10 @@ export default function SidePanel() {
         changes.threadlySession &&
         !changes.threadlySession.newValue
       ) {
+        authEpoch.current++
         setUser(null)
         setCapabilities([])
+        setPreferencesState("missing")
       }
     }
     chrome.storage.onChanged.addListener(changed)
@@ -65,11 +99,30 @@ export default function SidePanel() {
     }
   }
   const logout = async () => {
-    await bridge({ type: "LOGOUT" })
-    setUser(null)
-    setCapabilities([])
-    setSettings(false)
+    authEpoch.current++
+    setSigningOut(true)
     setError("")
+    try {
+      const result = await bridge<{ serverRevoked: boolean }>({
+        type: "LOGOUT"
+      })
+      if (!result.serverRevoked)
+        setError(
+          "Signed out on this device, but Threadly could not confirm server sign-out. Other sessions may remain active. Sign in and sign out again when the server is reachable."
+        )
+    } catch {
+      // The worker may fail before replying. Do not leave its local token behind.
+      await chrome.storage.session.remove("threadlySession")
+      setError(
+        "Signed out on this device, but Threadly could not confirm server sign-out. Other sessions may remain active. Sign in and sign out again when the server is reachable."
+      )
+    } finally {
+      setUser(null)
+      setCapabilities([])
+      setPreferencesState("missing")
+      setSettings(false)
+      setSigningOut(false)
+    }
   }
   const theme = () => {
     setDark(!dark)
@@ -98,11 +151,15 @@ export default function SidePanel() {
         <>
           {settings && (
             <Settings
+              key={user?.id ?? "guest"}
               user={user}
               capabilities={capabilities}
+              preferencesState={preferencesState}
               onAuth={refresh}
               onClose={() => setSettings(false)}
-              onPreferences={() => {}}
+              onPreferences={(value) =>
+                setPreferencesState(value ? "ready" : "missing")
+              }
             />
           )}
           {user && (
@@ -111,6 +168,10 @@ export default function SidePanel() {
                 key={user.id}
                 user={user}
                 capabilities={capabilities}
+                calendarStatus={schedulingReadiness(
+                  capabilities,
+                  preferencesState
+                )}
                 openSettings={() => setSettings(true)}
                 logout={logout}
                 theme={theme}
@@ -131,9 +192,13 @@ export default function SidePanel() {
                 <p>Your email, your calendar, one conversation.</p>
                 <button
                   className="primary login-button"
-                  disabled={busy}
+                  disabled={busy || signingOut}
                   onClick={login}>
-                  {busy ? "Connecting…" : "Sign in with Google"}
+                  {signingOut
+                    ? "Signing out…"
+                    : busy
+                      ? "Connecting…"
+                      : "Sign in with Google"}
                 </button>
                 <p className="muted">
                   Read what matters. Find the words. Make time.
@@ -159,15 +224,15 @@ export default function SidePanel() {
     </main>
   )
 }
-// Friendly names for the backend capability ids shown as connectors.
+// Friendly names for the services behind the backend capability ids.
 const connectorNames: Record<string, string> = {
-  gmail_read: "Gmail",
-  calendar_read: "Google Calendar",
-  calendar_write: "Calendar booking"
+  gmail: "Gmail",
+  calendar: "Google Calendar"
 }
 function Assistant({
   user,
   capabilities,
+  calendarStatus,
   openSettings,
   logout,
   theme,
@@ -175,6 +240,7 @@ function Assistant({
 }: {
   user: User
   capabilities: Capability[]
+  calendarStatus: ReturnType<typeof schedulingReadiness>
   openSettings: () => void
   logout: () => void
   theme: () => void
@@ -339,7 +405,18 @@ function Assistant({
       : c.entries[0].instruction
     : "New conversation"
   // Sending is an approval step, not a connector, so it isn't listed here.
-  const connectors = capabilities.filter((tool) => !tool.id.endsWith("_send"))
+  // One row per service (gmail_read, calendar_read, calendar_list… become
+  // Gmail and Google Calendar); read access decides the status.
+  const connectors = Object.values(
+    capabilities
+      .filter((tool) => !tool.id.endsWith("_send"))
+      .reduce<Record<string, Capability>>((services, tool) => {
+        const service = tool.id.split("_")[0]
+        if (!services[service] || tool.id.endsWith("_read"))
+          services[service] = { ...tool, id: service }
+        return services
+      }, {})
+  )
   // Recent chats: one row per email (labelled by its subject), leaving out
   // what is already open here. Requests without an email stay one per ask.
   const openTasks = new Set(c.entries.map((e) => e.task?.task_id))
@@ -397,6 +474,20 @@ function Assistant({
           <Icon name="edit" />
         </button>
       </header>
+      <div
+        className={`calendar-status calendar-status-${calendarStatus.state}`}
+        role="status">
+        <Icon name="calendar" size={16} />
+        <span>
+          <b>{calendarStatus.label}</b>
+          {calendarStatus.state !== "ready" && (
+            <small>{calendarStatus.detail}</small>
+          )}
+        </span>
+        {calendarStatus.action && (
+          <button onClick={openSettings}>{calendarStatus.action}</button>
+        )}
+      </div>
       {menu && (
         <nav className="panel-menu" aria-label="Conversation menu">
           <div className="drawer-title">
@@ -617,7 +708,7 @@ function Assistant({
                   <button
                     disabled={inputBusy || !openEmail}
                     onClick={() => void c.selectActive()}>
-                    <Icon name="mail" />
+                    <GmailIcon />
                     Ask about the open email
                     <Icon name="chevron" size={14} />
                   </button>
@@ -648,7 +739,11 @@ function Assistant({
           </section>
         )}
         {c.entries.map((entry) => (
-          <TaskCard key={entry.id} entry={entry} controller={c} />
+          <TaskCard
+            key={entry.id}
+            entry={entry}
+            controller={{ ...c, openCalendarSetup: openSettings }}
+          />
         ))}
         <div ref={last} />
       </div>
@@ -711,7 +806,7 @@ function Assistant({
                 void c.selectActive()
                 setSources(false)
               }}>
-              <Icon name="mail" />
+              <GmailIcon />
               Use open Gmail thread
             </button>
             <button
@@ -774,7 +869,7 @@ function Assistant({
                 aria-label={`Attached email: ${c.selection.thread.subject}. View details`}
                 aria-expanded={contextOpen}
                 onClick={() => setContextOpen(!contextOpen)}>
-                <Icon name="mail" size={15} />
+                <GmailIcon size={15} />
                 <span>{c.selection.thread.subject}</span>
               </button>
               <button

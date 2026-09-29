@@ -28,13 +28,25 @@ const previewReply = [
   "Cheers"
 ]
 
-export type Call = { path: string; body: any }
-export type MockBackend = { server: Server; calls: Call[] }
+export type Call = {
+  path: string
+  body: any
+  method: string
+  authorized: boolean
+}
+// Switches a test can flip to exercise failure paths.
+export type MockControl = { failLogout: boolean }
+export type MockBackend = {
+  server: Server
+  calls: Call[]
+  control: MockControl
+}
 // Contract checks the fixture makes about incoming requests. The e2e suite
 // wires this to Playwright's expect; the preview only logs mismatches.
 export type Verify = (label: string, actual: unknown, expected: unknown) => void
 
 export function createMockBackend(verify: Verify = () => {}): MockBackend {
+  const control: MockControl = { failLogout: false }
   const calls: Call[] = [],
     tasks = new Map<string, any>(),
     artifacts = new Map<string, any>()
@@ -186,7 +198,12 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     let p = req.url!.split("?")[0]
     const conversational = p === "/assistant/conversation-turns"
     const originalTurn = conversational ? { ...body } : null
-    calls.push({ path: req.url!, body: body ? structuredClone(body) : body })
+    calls.push({
+      path: req.url!,
+      body: body ? structuredClone(body) : body,
+      method: req.method!,
+      authorized: Boolean(req.headers.authorization)
+    })
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
       if (
@@ -245,11 +262,28 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p === "/assistant/capabilities")
+    if (p === "/auth/logout") {
+      if (control.failLogout) {
+        res.statusCode = 503
+        data = {
+          error: { code: "service_unavailable", message: "Try again later." }
+        }
+      } else data = { signed_out: true, scope: "all_sessions" }
+    } else if (p === "/auth/refresh") {
+      data = {
+        jwt:
+          "header." +
+          Buffer.from(
+            JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+          ).toString("base64url") +
+          ".refreshed"
+      }
+    } else if (p === "/assistant/capabilities")
       data = {
         capabilities: [
           { id: "gmail_read", ready: true },
           { id: "calendar_read", ready: true },
+          { id: "calendar_list", ready: true },
           { id: "gmail_send", ready: false, status: "disabled" }
         ]
       }
@@ -607,5 +641,5 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     }
     res.end(JSON.stringify(data))
   }
-  return { server, calls }
+  return { server, calls, control }
 }
