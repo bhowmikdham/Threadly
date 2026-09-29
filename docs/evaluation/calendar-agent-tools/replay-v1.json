@@ -1,0 +1,13 @@
+{
+  "release": "contextual-conversation-1.3.0",
+  "policy": "calendar-conversation-reads-1.0.0",
+  "anchor": "2026-09-29T10:00:00Z",
+  "evidence": "Synthetic 10–11 AM busy block, Australia/Melbourne; saved 9–17 weekday hours with 15-minute buffers.",
+  "cases": [
+    {"id":"free-half-hour","user":"Find half an hour Thursday","tool":"find_free_times","arguments":{"date_phrase":"Thursday","duration_phrase":"half an hour"},"kind":"message","text":"11:15 AM"},
+    {"id":"busy-window","user":"Check Thursday from 9 am to 12 pm","tool":"find_busy_times","arguments":{"date_phrase":"Thursday","start_time":"9 am","end_time":"12 pm"},"kind":"message","text":"10:00 AM"},
+    {"id":"dropped-next","user":"Check next Thursday","tool":"find_busy_times","arguments":{"date_phrase":"Thursday"},"kind":"clarification","text":"date"},
+    {"id":"dropped-duration","user":"Find 45 minutes Thursday","tool":"find_free_times","arguments":{"date_phrase":"Thursday"},"kind":"clarification","text":"date"},
+    {"id":"ambiguous-clock","user":"Check Thursday from 4 to 5","tool":"find_busy_times","arguments":{"date_phrase":"Thursday","start_time":"4","end_time":"5"},"kind":"clarification","text":"AM/PM"}
+  ]
+}

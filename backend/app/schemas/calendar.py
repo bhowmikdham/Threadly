@@ -177,3 +177,7 @@ class AgendaOut(StrictModel):
     coverage: Literal["complete", "partial", "unknown"]
     calendars: list[AgendaCalendar] = Field(max_length=MAX_CALENDARS)
     total_returned: int = Field(ge=0, le=50)
+
+
+class CalendarEventsOut(AgendaOut):
+    period: Literal["custom"] = "custom"

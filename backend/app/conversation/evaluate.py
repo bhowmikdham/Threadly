@@ -63,9 +63,9 @@ CASES = [
     {
         "id": "calendar_slots_use_schedule",
         "turns": ["Find me three free slots tomorrow for a meeting"],
-        "kinds": ["proposal"],
-        "required": ["prepare_workflow"],
-        "forbid": ["read_calendar"],
+        "kinds": ["message"],
+        "required": ["find_free_times"],
+        "forbid": ["read_calendar", "prepare_workflow"],
     },
     {
         "id": "social_typo",
@@ -497,6 +497,22 @@ class FixtureRuntime:
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
+        if name == "find_free_times":
+            from app.calendar import conversation_tools as calendar_tools
+
+            # Provider-free selection fixture; interval correctness is tested through
+            # the real handler in test_calendar_conversation_tools.py.
+            checked = datetime(2026, 9, 23, 12, tzinfo=UTC)
+            start, end = calendar_tools.resolve_window(
+                args, self.instruction, checked, "Australia/Melbourne"
+            )
+            minutes = calendar_tools.duration(args.duration_phrase, self.instruction, 30)
+            return {
+                "kind": "message",
+                "text": f"Fixture free slots for {minutes}-minute meetings in "
+                f"{start.isoformat()} to {end.isoformat()}: 09:00, 09:30, 10:00. "
+                "These times are not reserved.",
+            }
         if name == "read_calendar":
             from app.calendar import agenda
             from app.schemas.calendar import AgendaCalendar, AgendaEvent, AgendaOut
@@ -842,8 +858,11 @@ def grade(case, response, calls, search_page=None):
             len(reads) != 1 or reads[0].get("period") != "tomorrow"
         ):
             failures.append("wrong_agenda_period")
-        if case_id == "calendar_slots_use_schedule" and workflow.get("intent") != "plan_schedule":
-            failures.append("slot_request_not_scheduled")
+        if case_id == "calendar_slots_use_schedule":
+            # Retain the historical case ID so previous receipts remain addressable.
+            slots = _tool_inputs(calls, "find_free_times")
+            if len(slots) != 1 or slots[0].get("date_phrase") != "tomorrow":
+                failures.append("slot_request_not_read_directly")
     elif case_id == "ordered_reference":
         reads = _read_references(calls)
         if "mail-2" not in reads:

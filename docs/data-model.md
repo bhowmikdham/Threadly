@@ -496,3 +496,20 @@ Downgrade refuses to drop retained conversations; disabling the feature is the s
 Calendar evidence JSON may now include nullable `display_name` on each calendar
 coverage entry, populated from the current owner-authorized Calendar list. Old
 evidence without that optional field remains compatible. No schema migration.
+
+### Calendar conversational read state (1.3.0)
+
+No migration or new table. The encrypted `Conversation.state_enc` object gains a
+`calendar_read_anchor` ISO timestamp set at the first claim of each turn. It is
+retained for crash retries with the same request ID/hash and replaced for a new
+turn; a legacy unfinished turn without this field acquires it on the next claim.
+This pins relative dates without trusting model timestamps. Existing leases,
+account ownership, request hashes and version checks remain authoritative.
+
+New Calendar read answers have history `source: calendar_tools`. Their display
+text is retained in encrypted history/receipts, but filtered out of model history.
+Transient `calendar_tools` observations are excluded from receipts/checkpoints;
+no provider event bodies/IDs or event cache are added. Free-slot/busy-time reads
+reuse owned `CalendarEvidence` with the existing preference/account versions and
+five-minute expiry. Returned conversational free slots are suggestions, not
+`CalendarSlotRequest` offers, reservations or approvals.

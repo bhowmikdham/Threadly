@@ -975,3 +975,54 @@ stored evidence without names remains readable; no migration is required.
 Failed and expired workflow proposals use status-appropriate conversation text,
 including when hydrating an interrupted turn. They do not claim work is ready
 for review. These changes do not grant permission to send or book.
+
+### Conversational Calendar read tools (release 1.3.0)
+
+`POST /assistant/conversation-turns` now exposes five additional model-selected,
+read-only tools. They return normal `kind: message` or a specific clarification,
+without a workflow proposal. Existing agenda/day tools and HTTP routes retain
+compatibility. No Calendar write is added or enabled.
+
+| Tool | Input | Scope |
+| --- | --- | --- |
+| `list_calendars` | `{}` | Calendar list on the authenticated user's connected account |
+| `search_calendar_events` | Date window, optional literal `query` | Existing events on saved selected calendars |
+| `find_busy_times` | Date window | Merged known busy intervals; unknown calendars explicitly reported |
+| `find_free_times` | Date window, optional literal `duration_phrase`, `limit` 1–3 | Free slots under saved working hours, buffers, notice and duration |
+| `find_overlapping_events` | Date window | Overlapping returned event entries, including all-day events; adjacency excluded |
+
+Date-window inputs are `date_phrase` and optional paired `start_time`/`end_time`.
+Every supplied phrase must appear in user-authored request context. Supported dates:
+today/tomorrow; bare, this or next weekday; this/next week; next 7 days; ISO date;
+or inclusive ISO-date range joined by `to`/`through`, at most 14 days. Bare weekdays
+mean the next occurrence; explicit next weekday means the following local
+Monday–Sunday week. Answers display resolved dates and the saved Calendar timezone.
+Clock windows apply to a single day and require unambiguous AM/PM or 24-hour HH:mm.
+DST gaps/folds, omitted temporal qualifiers and conflicting ranges clarify.
+Event reads allow the past 31 days through the next 90 days; availability reads
+require a future portion of the window. Freebusy buffer padding must also fit the
+existing 90-day provider bound. These tools do not check participants or rooms.
+
+For example, `find_free_times` with
+`{"date_phrase":"Thursday","duration_phrase":"half an hour"}` for the user request
+“Find half an hour Thursday” uses backend date/interval calculations and returns
+up to three 30-minute options. The times are not reserved or bookable action IDs.
+A subsequent booking requires the existing separate scheduling/approval flow.
+
+All Calendar read tools are terminal for a conversational turn: backend-rendered
+answers prevent provider event text from causing subsequent model tool execution.
+Searches use Google's `events.list` `q` parameter with source-bound literal terms;
+its match may be in title, description, location or participant fields. No arbitrary
+calendar ID, provider URL, write field or approval is accepted from the model.
+One page per selected calendar (25 events), 50 events overall, and 10 displayed
+events/overlaps/busy intervals bound results. Pagination/truncation is explicit
+partial coverage and asks for a narrower window. Private event details remain
+redacted. Overlapping entries can include copies of one meeting, so are labelled
+observations rather than guaranteed booking conflicts. Unknown coverage prevents
+free-slot suggestions; verified busy periods remain useful and visible.
+
+Transient `calendar_tools` metadata includes operation/check time, coverage, and
+freebusy evidence ID/expiry when available. It is omitted from persisted receipts;
+user-visible text remains in encrypted conversation history. Calendar-tagged
+history is withheld from subsequent model context and must be reread for fresh
+facts. Tool failures carry existing `error_code` values and never claim success.

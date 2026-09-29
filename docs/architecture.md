@@ -556,3 +556,36 @@ stored evidence without names remains readable; no migration is required.
 Failed and expired workflow proposals use status-appropriate conversation text,
 including when hydrating an interrupted turn. They do not claim work is ready
 for review. These changes do not grant permission to send or book.
+
+### Calendar agent read catalogue
+
+Conversation release `contextual-conversation-1.3.0` adds five typed direct reads
+in `schemas/calendar_tools.py`, dispatched by `conversation/runtime.py` to
+`calendar/conversation_tools.py`. This is the first connector-catalogue slice,
+reusing B12 access/evidence fences and B13 pure availability calculations.
+Semantic tool selection replaces the need for new intent regexes per phrasing;
+backend literal binding and temporal parsing constrain the selected parameters.
+The legacy day fast path and agenda tool remain compatible.
+
+Event searches reuse the owner-scoped agenda service with a bounded custom window
+and literal provider search query. Calendar/account/preference versions are
+rechecked after network IO, outside database transactions. Free-slot reads use
+saved preferences and normalized freebusy evidence; no model calculates dates,
+conflicts or free time. Every read produces a terminal deterministic answer.
+Provider descriptions/titles cannot invoke a later tool, and Calendar answers are
+removed from model history. The existing finite eight-call conversation budget
+still applies; no new scheduler, vector index, classifier, model or AWS resource
+is required.
+
+The conversation claim persists the Calendar date anchor before inference; retrying
+an unfinished request preserves its relative-date interpretation. Google evidence
+remains freshly checked and expired/stale context still fails closed. Prompt/tool
+snapshots and deterministic replay cases live in
+`docs/evaluation/calendar-agent-tools/`; historical 1.2.5 assets are retained.
+Live Bedrock selection quality and real Google ACL behavior are separate integration
+checks, not inferred from deterministic fixtures.
+
+Remaining connector slices: individual event reference/detail reads and bounded
+continuation, participant/common availability with explicit access, rooms, and
+approved create/update/delete/RSVP workflows. Existing create-event infrastructure
+is not made generally available by this read-only change.
