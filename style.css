@@ -1653,8 +1653,7 @@ summary:focus-visible {
 .clarification > button:hover:not(:disabled),
 .slot button:hover:not(:disabled) {
   border-color: var(--accent);
-  background: linear-gradient(145deg, #ffffff14, transparent 70%),
-    var(--hover);
+  background: linear-gradient(145deg, #ffffff14, transparent 70%), var(--hover);
 }
 .artifact .button-row button:active:not(:disabled),
 .artifact > button:active:not(:disabled) {
@@ -2165,4 +2164,62 @@ summary:focus-visible {
   box-shadow:
     0 2px 6px #0000004d,
     0 18px 40px -14px #000000b3;
+}
+
+/* Voice mode: the orb fills the panel while Threadly listens. */
+.voice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 42%, #efe7ff 0%, transparent 60%),
+    var(--bg);
+  animation: voice-in 0.22s ease-out;
+}
+.threadly.dark .voice-overlay {
+  background: radial-gradient(circle at 50% 42%, #2a2140 0%, transparent 60%),
+    var(--bg);
+}
+.voice-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.voice-orb {
+  width: min(260px, 70vw);
+  aspect-ratio: 1;
+}
+.voice-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.voice-transcript {
+  max-width: 320px;
+  min-height: 3lh;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text);
+}
+.voice-transcript span {
+  color: var(--muted);
+}
+@keyframes voice-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-overlay {
+    animation: none;
+  }
 }

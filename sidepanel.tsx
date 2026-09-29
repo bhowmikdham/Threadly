@@ -6,6 +6,7 @@ import { ContextPicker } from "./components/ContextPicker"
 import { GmailIcon, GoogleCalendarIcon, Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
+import { VoiceOrb } from "./components/VoiceOrb"
 import { api, bridge, errorText } from "./lib/api"
 import { requestBackendAccess } from "./lib/backend-access"
 import { gmailUrlShowsEmail } from "./lib/gmail-context"
@@ -268,8 +269,7 @@ function Assistant({
     [approvalInfo, setApprovalInfo] = useState(false),
     [connecting, setConnecting] = useState(""),
     [connectError, setConnectError] = useState("")
-  const recognition = useRef<any>(null),
-    last = useRef<HTMLDivElement>(null),
+  const last = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     atBottom = useRef(true),
@@ -278,7 +278,6 @@ function Assistant({
   const inputBusy = startupBusy || c.restoreFailed
   useEffect(() => {
     void c.selectActive(true)
-    return () => recognition.current?.abort()
   }, [])
   // "Ask about the open email" only makes sense while Gmail is showing an email.
   useEffect(() => {
@@ -364,43 +363,14 @@ function Assistant({
     atBottom.current = true
     void c.submit(text)
   }
-  const dictate = () => {
-    if (recording) {
-      recognition.current?.stop()
-      return
-    }
-    const Recognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
-    if (!Recognition) {
-      c.setError(
-        "Dictation isn’t available in this browser. You can type your request."
-      )
-      return
-    }
-    const r = new Recognition()
-    recognition.current = r
-    r.lang = navigator.language
-    r.interimResults = false
-    r.continuous = false
-    r.onresult = (e: any) =>
-      setMessage(
-        (old) => `${old}${old ? " " : ""}${e.results[0][0].transcript}`
-      )
-    r.onerror = () => {
-      c.setError(
-        "Couldn’t start dictation. Check microphone access or type your request."
-      )
-      setRecording(false)
-    }
-    r.onend = () => setRecording(false)
-    try {
-      r.start()
-      setRecording(true)
-    } catch {
-      c.setError("Couldn’t start the microphone.")
-      setRecording(false)
-    }
+  // The mic opens voice mode: the orb fills the panel while Threadly listens,
+  // and closing it puts what was said into the chat box.
+  const dictate = () => setRecording(true)
+  const voiceDone = (transcript: string, error?: string) => {
+    setRecording(false)
+    if (error) c.setError(error)
+    if (transcript) setMessage((old) => `${old}${old ? " " : ""}${transcript}`)
+    input.current?.focus()
   }
   const newChat = async () => {
     await c.newChat()
@@ -1019,6 +989,7 @@ function Assistant({
           Threadly can make mistakes. Review important details.
         </p>
       </div>
+      {recording && <VoiceOrb onClose={voiceDone} />}
     </>
   )
 }

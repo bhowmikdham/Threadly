@@ -54,7 +54,10 @@ test.beforeAll(async () => {
     headless: true,
     args: [
       `--disable-extensions-except=${extension}`,
-      `--load-extension=${extension}`
+      `--load-extension=${extension}`,
+      // A synthetic microphone (a steady tone) for the voice orb.
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream"
     ]
   })
   const worker =
@@ -363,6 +366,51 @@ test("an attached email can be detached directly from the composer", async () =>
     .at(-1)
   expect(turn?.body).toHaveProperty("context_snapshot_id", null)
   await page.setViewportSize({ width: 420, height: 900 })
+})
+test("the mic opens the voice orb, which hands what was said to the chat box", async () => {
+  await page.evaluate(() => {
+    class FakeRecognition {
+      onresult: any
+      onend: any
+      onerror: any
+      start() {
+        ;(window as any).fakeRecognizer = this
+      }
+      stop() {}
+    }
+    ;(window as any).SpeechRecognition = FakeRecognition
+    ;(window as any).webkitSpeechRecognition = FakeRecognition
+  })
+  await page.getByLabel("Your request").fill("")
+  await page.getByRole("button", { name: "Dictate request" }).click()
+  const dialog = page.getByRole("dialog", { name: "Voice input" })
+  await expect(dialog).toBeVisible()
+  expect(
+    await page.evaluate(
+      () =>
+        !!document
+          .querySelector<HTMLCanvasElement>("canvas.voice-orb")
+          ?.getContext("webgl")
+    )
+  ).toBe(true)
+  await page.evaluate(() =>
+    (window as any).fakeRecognizer.onresult({
+      results: [
+        Object.assign([{ transcript: "Summarise this thread" }], {
+          isFinal: true
+        })
+      ]
+    })
+  )
+  await expect(dialog.getByText("Summarise this thread")).toBeVisible()
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: path.join("test-results", "voice-orb.png") })
+  await page.getByRole("button", { name: "Close voice input" }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel("Your request")).toHaveValue(
+    "Summarise this thread"
+  )
+  await page.getByLabel("Your request").fill("")
 })
 test("a missing connector offers Connect in the menu, not only in Settings", async () => {
   control.calendarConnected = false
