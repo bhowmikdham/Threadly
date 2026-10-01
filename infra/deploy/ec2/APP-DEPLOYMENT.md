@@ -230,3 +230,10 @@ with the verified Threadly Elastic IP; add `A api` to that same address; preserv
 `CNAME www -> threadly.au`, nameservers and unrelated email/verification records.
 Record previous values. Check public DNS before requesting certificates. No DNS
 changes or deployment are implied by committing this configuration.
+
+### Ingress address allocation
+
+The API uses 172.30.247.3 and Caddy uses 172.30.247.2 on the dedicated
+172.30.247.0/29 network. Both addresses must be explicit: the API starts first,
+and automatic allocation would take the proxy address and prevent Caddy startup.
+Only the Caddy address is trusted for forwarded headers.
