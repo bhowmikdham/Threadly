@@ -1,0 +1,269 @@
+{
+  "release": "contextual-conversation-1.4.0",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+  "prompt_hash": "eca58c62148c566bec36bf146e47c30cd3944d9404dbc8f7fb95b635ce3984f4",
+  "tools_hash": "3dbbcf1dce79ad3d99901e7ba0ef78c982ba57de2157f8b3f64d835bcadcf005",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "anchor": "2026-10-01T12:19:00+00:00",
+  "live_google": false,
+  "external_writes": false,
+  "cases": [
+    {
+      "case": "abbreviation",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tmrw",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Friday, 2 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "misspelling",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tommorrow",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Friday, 2 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "ordinary",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tomorrow",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Friday, 2 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "paraphrase",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "the day following today",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Friday, 2 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "relative",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 2,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "the day after tomorrow",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Saturday, 3 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-03T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-04T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "weekday",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "weekday",
+              "weekday": 3,
+              "week": "next"
+            },
+            "date_phrase": "",
+            "date_source": "thursday next week",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Thursday, 8 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-08T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-09T00:00:00+11:00"
+      ]
+    },
+    {
+      "case": "clock",
+      "decisions": [
+        {
+          "tool": "find_busy_times",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tmrw",
+            "start_time": "14:00",
+            "end_time": "16:00",
+            "start_time_source": "2 pm",
+            "end_time_source": "4 pm"
+          }
+        }
+      ],
+      "text": "Your selected calendars only, Fri 2 Oct 2026, 2:00 PM AEST to Fri 2 Oct 2026, 4:00 PM AEST. Other people's availability has not been checked.\nNo busy time is recorded in this window.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "find_busy_times",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T14:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-02T16:00:00+10:00"
+      ]
+    }
+  ],
+  "passed": 7,
+  "total": 7
+}

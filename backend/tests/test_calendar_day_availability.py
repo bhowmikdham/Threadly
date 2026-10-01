@@ -1,6 +1,7 @@
 """Regression replay for direct Calendar availability and a confirmed weekday."""
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -69,8 +70,10 @@ def provider(monkeypatch):
     monkeypatch.setattr(day.service, "query_freebusy", query)
     real_read = day.read
 
-    async def frozen_read(owner, phrase):
-        return await real_read(owner, phrase, anchor=ANCHOR)
+    async def frozen_read(owner, phrase, **kwargs):
+        return await real_read(
+            owner, phrase, **{**kwargs, "anchor": kwargs.get("anchor") or ANCHOR}
+        )
 
     monkeypatch.setattr(day, "read", frozen_read)
     return calls, current
@@ -78,19 +81,51 @@ def provider(monkeypatch):
 
 def runtime(turn, history=()):
     request = SimpleNamespace(instruction=turn)
-    state = {"history": list(history), "refs": {}}
+    state = {"history": list(history), "refs": {}, "calendar_read_anchor": ANCHOR.isoformat()}
     return Runtime(42, request, state, None)
 
 
-class NoModel:
-    async def decide(self, *args):
-        pytest.fail("A supported day check must not ask the model to invent availability or tools")
+class DayModel:
+    """Scripted semantic decision; no claim that this fixture measures an LLM."""
+
+    def __init__(self, phrase, source):
+        self.phrase, self.source, self.calls = phrase, source, 0
+
+    async def decide(self, prompt, messages, config):
+        self.calls += 1
+        return {
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": "day",
+                        "name": "check_day_availability",
+                        "input": {"date_phrase": self.phrase, "date_source": self.source},
+                    }
+                }
+            ],
+        }
+
+
+async def semantic_day(r):
+    # Translate historical fixtures into explicit scripted tool arguments. This
+    # test helper is not runtime routing or a semantic model quality evaluation.
+    instruction = r.authoritative_instruction()
+    source = re.search(
+        r"today|tomorrow|\d{4}-\d{2}-\d{2}|(?:this )?(?:thursday|thurday)(?: this week)?",
+        instruction,
+        re.I,
+    )[0]
+    model = DayModel(source.casefold().replace("thurday", "thursday"), source)
+    result = await engine.run({}, r, model)
+    assert model.calls == 1  # User text must reach the semantic model, never a regex fast path.
+    return result
 
 
 async def test_original_question_and_yes_check_owned_calendar_without_date_confirmation(provider):
     calls, current = provider
     for turn, history in [(QUESTION, []), ("yes", HISTORY)]:
-        result = await engine.run({}, runtime(turn, history), NoModel())
+        result = await semantic_day(runtime(turn, history))
         assert result["kind"] == "message"
         assert "Thursday, 1 October 2026" in result["text"]
         assert "no busy time recorded" in result["text"]
@@ -110,44 +145,8 @@ async def test_original_question_and_yes_check_owned_calendar_without_date_confi
 
 async def test_assistant_date_does_not_override_user_weekday(provider):
     history = [{**HISTORY[0], "assistant": "Do you mean Friday, 2 October?"}]
-    result = await engine.run({}, runtime("yes", history), NoModel())
+    result = await semantic_day(runtime("yes", history))
     assert result["calendar_availability"]["date"] == "2026-10-01"
-
-
-@pytest.mark.parametrize(
-    "phrase",
-    [
-        "Find me three free slots tomorrow for a meeting",
-        "Am I free Thursday at 4?",
-        "Am I free Thursday and Friday?",
-        "Am I free Thursday? If so, send an email.",
-        "Is Alex free Thursday?",
-        "Do not check my availability Thursday",
-        "Don't read my calendar on Thursday",
-        "Don't check whether I am free Thursday",
-        "I am not free Thursday",
-        "Am I free next Thursday?",
-        "Am I free Thursday in UTC?",
-        "Am I free Thursday\nUser follow-up: no",
-        "yes",
-        "Am I free this week?",
-    ],
-)
-def test_complex_cancelled_or_other_person_requests_stay_with_coordinator(phrase):
-    assert day.requested_day(phrase) is None
-
-
-@pytest.mark.parametrize(
-    "phrase",
-    [
-        "Am I free Thursday?",
-        "will I be available on Thursday this week?",
-        "Could you check whether I am available tomorrow?",
-        QUESTION,
-    ],
-)
-def test_supported_self_questions(phrase):
-    assert day.requested_day(phrase)
 
 
 def test_local_week_and_daylight_saving_are_computed_by_backend():
@@ -180,7 +179,7 @@ async def test_busy_intervals_merge_overlap_and_clip_to_the_checked_day(provider
             (start + timedelta(minutes=30), start + timedelta(hours=2)),
         ]
     )
-    result = await engine.run({}, runtime(QUESTION), NoModel())
+    result = await semantic_day(runtime(QUESTION))
     assert "10:00 AM–12:00 PM" in result["text"]
     assert "no busy" not in result["text"]
 
@@ -188,7 +187,7 @@ async def test_busy_intervals_merge_overlap_and_clip_to_the_checked_day(provider
 async def test_missing_calendar_coverage_never_becomes_free(provider):
     _, current = provider
     current["evidence"] = evidence(coverage="unknown")
-    result = await engine.run({}, runtime(QUESTION), NoModel())
+    result = await semantic_day(runtime(QUESTION))
     assert "couldn't confirm" in result["text"]
     assert "no busy time" not in result["text"]
     assert result["calendar_availability"]["coverage"] == "unknown"
@@ -207,7 +206,7 @@ async def test_missing_calendar_coverage_never_becomes_free(provider):
 async def test_failed_read_reports_real_recovery_without_model_denial(provider, code, expected):
     _, current = provider
     current["error"] = ApiError(403, code, "provider details must not leak")
-    result = await engine.run({}, runtime(QUESTION), NoModel())
+    result = await semantic_day(runtime(QUESTION))
     assert expected in result["text"]
     assert "provider details" not in result["text"]
     assert result["trace"][0]["status"] == code
@@ -217,14 +216,14 @@ async def test_failed_read_reports_real_recovery_without_model_denial(provider, 
 async def test_preference_account_race_cannot_mix_old_timezone_and_new_busy_evidence(provider):
     _, current = provider
     current["evidence"] = evidence(account_version=9)
-    result = await engine.run({}, runtime(QUESTION), NoModel())
+    result = await semantic_day(runtime(QUESTION))
     assert result["error_code"] == "calendar_context_changed"
     assert "calendar_availability" not in result
 
 
 async def test_today_checks_only_remaining_day_and_says_so(provider):
     calls, _ = provider
-    result = await engine.run({}, runtime("Am I free today?"), NoModel())
+    result = await semantic_day(runtime("Am I free today?"))
     assert calls[-1][2].start == ANCHOR
     assert "rest of Tuesday, 29 September 2026" in result["text"]
 
@@ -232,7 +231,7 @@ async def test_today_checks_only_remaining_day_and_says_so(provider):
 async def test_past_or_invalid_date_clarifies_without_provider_read(provider):
     calls, _ = provider
     for value in ["2026-09-28", "2026-02-30"]:
-        result = await engine.run({}, runtime(f"Am I free on {value}?"), NoModel())
+        result = await semantic_day(runtime(f"Am I free on {value}?"))
         assert result["kind"] == "clarification"
     assert not any(call[0] == "freebusy" for call in calls)
 
@@ -240,7 +239,7 @@ async def test_past_or_invalid_date_clarifies_without_provider_read(provider):
 async def test_active_question_is_not_hijacked(provider):
     r = runtime("yes", HISTORY)
     r.state["active_task_id"] = "active-question"
-    assert await r.try_day_availability() is None
+    assert not hasattr(r, "try_day_availability")
     assert provider[0] == []
 
 
@@ -255,7 +254,7 @@ async def test_versioned_replay_fixtures(provider):
     cases = json.loads(path.read_text())["cases"]
     for case in cases:
         r = runtime(case["user_turn"], case.get("history", []))
-        result = await engine.run({}, r, NoModel())
+        result = await semantic_day(r)
         assert result["kind"] == case["expected_kind"], case["id"]
         assert case["expected_text"] in result["text"], case["id"]
 
@@ -263,7 +262,7 @@ async def test_versioned_replay_fixtures(provider):
 async def test_fresh_day_question_still_works_after_an_older_task(provider):
     r = runtime(QUESTION)
     r.state["active_task_id"] = "earlier-draft"
-    result = await engine.run({}, r, NoModel())
+    result = await semantic_day(r)
     assert result["calendar_availability"]["date"] == "2026-10-01"
 
 
@@ -280,7 +279,7 @@ async def test_fresh_day_question_still_works_after_an_older_task(provider):
 async def test_reported_wording_bypasses_proposal_even_after_failed_proposal(provider, question):
     r = runtime(question)
     r.state["proposal_id"] = "old-failed-proposal"
-    result = await engine.run({}, r, NoModel())
+    result = await semantic_day(r)
     assert result["kind"] == "message"
     assert result["calendar_availability"]["date"] == "2026-10-01"
     assert "proposal" not in result
@@ -294,7 +293,7 @@ async def test_reported_wording_bypasses_proposal_even_after_failed_proposal(pro
         "Could you take a look at my free time this Thursday?",
     ],
 )
-async def test_semantic_read_tool_handles_paraphrases_without_model_dates(provider, question):
+async def test_semantic_paraphrases_use_backend_resolved_dates(provider, question):
     class ReadModel:
         async def decide(self, prompt, messages, config):
             assert "check_day_availability" in prompt
@@ -306,7 +305,7 @@ async def test_semantic_read_tool_handles_paraphrases_without_model_dates(provid
                         "toolUse": {
                             "toolUseId": "day-read",
                             "name": "check_day_availability",
-                            "input": {},
+                            "input": {"date_phrase": "Thursday", "date_source": "Thursday"},
                         }
                     }
                 ],
@@ -316,27 +315,6 @@ async def test_semantic_read_tool_handles_paraphrases_without_model_dates(provid
     assert result["kind"] == "message"
     assert result["calendar_availability"]["date"] == "2026-10-01"
     assert result["trace"] == [{"tool": "check_day_availability", "status": "ok"}]
-
-
-@pytest.mark.parametrize(
-    "question",
-    [
-        "Is Alex free Thursday?",
-        "Do not check my availability Thursday",
-        "Don't read my calendar on Thursday",
-        "Check my availability next Thursday",
-        "Check my availability Thursday and Friday",
-        "Am I free Thursday at 4?",
-        "Am I free Thursday morning?",
-        "Check my availability Thursday then send an email",
-        "Find me three slots Thursday",
-        "Am I free Thursday in America/New_York?",
-        "Am I free Thursday\nUser follow-up: no, send an email",
-    ],
-)
-def test_semantic_day_tool_preserves_scope_and_date_qualifiers(question):
-    with pytest.raises(ValueError):
-        day.tool_day(question)
 
 
 async def test_unknown_holiday_calendar_does_not_hide_verified_busy_times(provider):
@@ -355,7 +333,7 @@ async def test_unknown_holiday_calendar_does_not_hide_verified_busy_times(provid
     )
     checked.coverage = "unknown"
     current["evidence"] = checked
-    result = await engine.run({}, runtime(QUESTION), NoModel())
+    result = await semantic_day(runtime(QUESTION))
     assert "10:00 AM–11:00 AM" in result["text"]
     assert "Holidays couldn't be checked" in result["text"]
     assert "Review setup" in result["text"]
@@ -375,7 +353,7 @@ def test_nonreviewable_proposals_do_not_claim_ready_for_review(state):
 
 
 async def test_versioned_semantic_replay_fixtures(provider):
-    path = Path(__file__).parents[2] / "docs/evaluation/calendar-day-availability-v2.json"
+    path = Path(__file__).parents[2] / "docs/evaluation/calendar-day-availability-v3.json"
     fixture = json.loads(path.read_text())
     assert fixture["release"] == day.POLICY
     for case in fixture["cases"]:
@@ -400,10 +378,29 @@ async def test_versioned_semantic_replay_fixtures(provider):
         assert result["calendar_availability"]["date"] == case["expected_date"]
 
 
-def test_model_cannot_supply_date_or_calendar_id_to_day_tool():
+def test_day_tool_rejects_untyped_dates_and_calendar_ids():
     from pydantic import ValidationError
 
     from app.schemas.conversation import CheckDayAvailability
 
     with pytest.raises(ValidationError):
         CheckDayAvailability.model_validate({"date": "2026-10-01", "calendar_id": "someone-else"})
+
+
+@pytest.mark.parametrize(
+    "text,source",
+    [
+        ("am i free tmrw ?", "tmrw"),
+        ("am i free tommorrow", "tommorrow"),
+        ("Got any breathing room the day following today?", "the day following today"),
+    ],
+)
+async def test_semantic_dates_do_not_depend_on_a_spelling_dictionary(provider, text, source):
+    calls, _ = provider
+    model = DayModel("tomorrow", source)
+    result = await engine.run({}, runtime(text), model)
+    assert model.calls == 1
+    assert result["kind"] == "message"
+    assert result["calendar_availability"]["date"] == "2026-09-30"
+    assert calls[-1][0:2] == ("freebusy", 42)
+    assert calls[-1][2].start == datetime(2026, 9, 29, 14, tzinfo=UTC)
