@@ -35,7 +35,11 @@ export type Call = {
   authorized: boolean
 }
 // Switches a test can flip to exercise failure paths.
-export type MockControl = { failLogout: boolean; calendarConnected: boolean }
+export type MockControl = {
+  failDisconnect?: boolean
+  failLogout: boolean
+  calendarConnected: boolean
+}
 export type MockBackend = {
   server: Server
   calls: Call[]
@@ -262,7 +266,17 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p === "/auth/logout") {
+    if (p === "/auth/google/disconnect") {
+      if (control.failDisconnect) {
+        res.statusCode = 503
+        data = {
+          error: {
+            code: "service_unavailable",
+            message: "Disconnect unavailable"
+          }
+        }
+      } else data = { connected: false, provider_revocation: "not_requested" }
+    } else if (p === "/auth/logout") {
       if (control.failLogout) {
         res.statusCode = 503
         data = {

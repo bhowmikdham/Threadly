@@ -9,10 +9,11 @@ import {
   publishedBackendBuild
 } from "../lib/security"
 import type { Capability, User } from "../lib/types"
-import { CalendarSetup } from "./CalendarSetup"
+import { ConnectorDetails, ConnectorList, type ConnectorId } from "./Connectors"
 
 export function Settings({
   user,
+  initialConnector = null,
   capabilities,
   preferencesState = "missing",
   onAuth,
@@ -20,12 +21,16 @@ export function Settings({
   onPreferences
 }: {
   user: User | null
+  initialConnector?: ConnectorId | null
   capabilities: Capability[]
   preferencesState?: PreferencesState
   onAuth: () => Promise<void>
   onClose: () => void
   onPreferences: (value: any | null) => void
 }) {
+  const [connector, setConnector] = useState<ConnectorId | null>(
+    initialConnector
+  )
   const [origin, setOrigin] = useState(""),
     [redirect, setRedirect] = useState(""),
     [busy, setBusy] = useState(false),
@@ -75,72 +80,26 @@ export function Settings({
               </button>
             </section>
           )}
-          <CalendarSetup
-            capabilities={capabilities}
-            preferencesState={preferencesState}
-            onAuth={onAuth}
-            onPreferences={onPreferences}
-          />
-          <section className="settings-section">
-            <h3>Google connection</h3>
-            <p className="muted">
-              Connected as {user.email}. Gmail and Calendar permissions are
-              requested separately.
-            </p>
-            <p className="connection-state">
-              Gmail:{" "}
-              {capabilities.find((capability) => capability.id === "gmail_read")
-                ?.ready
-                ? "Ready"
-                : "Reconnect needed"}
-            </p>
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await bridge({ type: "LOGIN", capabilities: ["gmail_read"] })
-                  await onAuth()
-                  setMessage("Gmail connection updated.")
-                })
-              }>
-              Reconnect Gmail
-            </button>
-            <details>
-              <summary>Optional sending and booking permissions</summary>
-              <p className="muted">
-                These require server pilot access. Connecting does not enable
-                automatic sends or bookings.
-              </p>
-              <div className="button-row">
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await bridge({
-                        type: "LOGIN",
-                        capabilities: ["gmail_send"]
-                      })
-                      await onAuth()
-                    })
-                  }>
-                  Connect sending
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await bridge({
-                        type: "LOGIN",
-                        capabilities: ["calendar_write"]
-                      })
-                      await onAuth()
-                    })
-                  }>
-                  Connect booking
-                </button>
-              </div>
-            </details>
-          </section>
+          {connector ? (
+            <ConnectorDetails
+              key={connector}
+              id={connector}
+              user={user}
+              capabilities={capabilities}
+              preferencesState={preferencesState}
+              onAuth={onAuth}
+              onPreferences={onPreferences}
+              onBack={() => setConnector(null)}
+            />
+          ) : (
+            <section className="settings-section">
+              <h3>Connectors</h3>
+              <ConnectorList
+                capabilities={capabilities}
+                onSelect={setConnector}
+              />
+            </section>
+          )}
         </>
       )}
       {!publishedBackendBuild && (

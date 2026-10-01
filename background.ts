@@ -1,3 +1,4 @@
+import { showUpdateNotice } from "./lib/extension-updates"
 import {
   allowedRequest,
   backendOrigin,
@@ -33,8 +34,22 @@ const protectStorage = async () => {
   })
 }
 void protectStorage()
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+  await showUpdateNotice(details, chrome.runtime.getManifest().version, {
+    read: async () =>
+      (await chrome.storage.local.get("lastUpdateNoticeVersion"))
+        .lastUpdateNoticeVersion,
+    save: async (version) =>
+      chrome.storage.local.set({ lastUpdateNoticeVersion: version }),
+    open: async () => {
+      await chrome.tabs.create({
+        url: chrome.runtime.getURL("tabs/updated.html")
+      })
+    }
+  }).catch(() => {
+    /* A notice failure must not interrupt storage migration. */
+  })
   // Historical frontend cached subject-derived badges without an account binding.
   const values = await chrome.storage.local.get()
   await chrome.storage.local.remove(
@@ -250,7 +265,36 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case "LOGIN":
         return login(message.capabilities)
+      case "DISCONNECT_GOOGLE": {
+        if (signingIn || signingOut)
+          throw new Error("Finish the current sign-in or sign-out first.")
+        signingOut = true
+        try {
+          const saved = await activeSession()
+          const result = await transport(
+            saved.origin,
+            "/auth/google/disconnect",
+            "POST",
+            undefined,
+            saved.jwt,
+            15000
+          )
+          if (result?.connected !== false)
+            throw new Error(
+              "The server did not confirm disconnection. Refresh status before trying again."
+            )
+          sessionGeneration++
+          await mutateSession(() =>
+            chrome.storage.session.remove("threadlySession")
+          )
+          return result
+        } finally {
+          signingOut = false
+        }
+      }
       case "LOGOUT": {
+        if (signingOut)
+          throw new Error("A sign-out or disconnect is already in progress.")
         // Clear the browser token immediately, even if the server cannot be reached.
         // This endpoint revokes Threadly sessions; it does not disconnect Google.
         sessionGeneration++

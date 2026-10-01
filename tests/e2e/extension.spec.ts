@@ -458,6 +458,43 @@ test("a missing connector offers Connect in the menu, not only in Settings", asy
     await page.reload()
   }
 })
+test("connected connectors open capability details and the update page is bundled", async () => {
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Manage Google Calendar" }).click()
+  await expect(
+    page.getByRole("heading", { name: "Skills", exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByText("Find availability", { exact: true })
+  ).toBeVisible()
+  await page.screenshot({
+    path: path.join("test-results", "connector-capabilities.png"),
+    fullPage: true
+  })
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click()
+  const update = await context.newPage()
+  await update.goto(new URL("tabs/updated.html", page.url()).href)
+  await expect(
+    update.getByRole("heading", { name: "Threadly was updated" })
+  ).toBeVisible()
+  await update
+    .getByRole("link", { name: "Privacy", exact: true })
+    .scrollIntoViewIfNeeded()
+  await expect(
+    update.getByRole("link", { name: "Privacy", exact: true })
+  ).toBeVisible()
+  await update.locator(".update-page").evaluate((element) => {
+    element.scrollTop = 0
+  })
+  await update.screenshot({
+    path: path.join("test-results", "updated-page.png"),
+    fullPage: true
+  })
+  await update.close()
+})
+
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
   await page.setViewportSize({ width: 360, height: 900 })
@@ -483,6 +520,8 @@ test("settings use real capability and versioned preference contracts; history s
     .click()
   await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
+  await page.getByRole("button", { name: "Manage Google Calendar" }).click()
+  await page.getByRole("tab", { name: "Manage connection" }).click()
   await page
     .getByRole("button", { name: "Load calendars and preferences" })
     .click()
@@ -591,6 +630,42 @@ test("logout never sends a retained token to a stale server origin", async () =>
   expect(calls.filter((c) => c.path === "/auth/logout")).toHaveLength(
     priorLogoutCalls
   )
+  expect(
+    await page.evaluate(async () =>
+      chrome.storage.session.get("threadlySession")
+    )
+  ).toEqual({})
+})
+
+test("disconnect preserves session on failure and clears it on confirmed success", async () => {
+  const jwt =
+    "header." +
+    Buffer.from(
+      JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString("base64url") +
+    ".signature"
+  await page.evaluate(
+    async ({ origin, jwt, user }) =>
+      chrome.storage.session.set({ threadlySession: { origin, jwt, user } }),
+    { origin, jwt, user }
+  )
+  control.failDisconnect = true
+  const send = () =>
+    page.evaluate(() =>
+      chrome.runtime.sendMessage({
+        channel: "threadly",
+        type: "DISCONNECT_GOOGLE"
+      })
+    )
+  expect((await send()).ok).toBe(false)
+  expect(
+    await page.evaluate(
+      async () =>
+        !!(await chrome.storage.session.get("threadlySession")).threadlySession
+    )
+  ).toBe(true)
+  control.failDisconnect = false
+  expect(await send()).toMatchObject({ ok: true, data: { connected: false } })
   expect(
     await page.evaluate(async () =>
       chrome.storage.session.get("threadlySession")

@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react"
 
 import "./style.css"
 
+import { ConnectorList, type ConnectorId } from "./components/Connectors"
 import { ContextPicker } from "./components/ContextPicker"
-import { GmailIcon, GoogleCalendarIcon, Icon, Logo } from "./components/Icon"
+import { GmailIcon, Icon, Logo } from "./components/Icon"
 import { Settings } from "./components/Settings"
 import { TaskCard } from "./components/TaskCard"
 import { VoiceOrb } from "./components/VoiceOrb"
@@ -28,6 +29,7 @@ export default function SidePanel() {
     [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
+    [connector, setConnector] = useState<ConnectorId | null>(null),
     [dark, setDark] = useState(false),
     [preferencesState, setPreferencesState] =
       useState<PreferencesState>("loading")
@@ -160,6 +162,7 @@ export default function SidePanel() {
             <Settings
               key={user?.id ?? "guest"}
               user={user}
+              initialConnector={connector}
               capabilities={capabilities}
               preferencesState={preferencesState}
               onAuth={refresh}
@@ -179,7 +182,10 @@ export default function SidePanel() {
                   capabilities,
                   preferencesState
                 )}
-                openSettings={() => setSettings(true)}
+                openSettings={(id) => {
+                  setConnector(id || null)
+                  setSettings(true)
+                }}
                 onAuth={refresh}
                 logout={logout}
                 theme={theme}
@@ -232,11 +238,6 @@ export default function SidePanel() {
     </main>
   )
 }
-// Friendly names for the services behind the backend capability ids.
-const connectorNames: Record<string, string> = {
-  gmail: "Gmail",
-  calendar: "Google Calendar"
-}
 function Assistant({
   user,
   capabilities,
@@ -250,7 +251,7 @@ function Assistant({
   user: User
   capabilities: Capability[]
   calendarStatus: ReturnType<typeof schedulingReadiness>
-  openSettings: () => void
+  openSettings: (connector?: ConnectorId) => void
   onAuth: () => Promise<void>
   logout: () => void
   theme: () => void
@@ -405,26 +406,6 @@ function Assistant({
       ? "New conversation"
       : c.entries[0].instruction
     : "New conversation"
-  // Sending is an approval step, not a connector, so it isn't listed here.
-  // One row per service (gmail_read, calendar_read, calendar_list… become
-  // Gmail and Google Calendar); read access decides the status.
-  const connectors = Object.values(
-    capabilities
-      .filter((tool) => !tool.id.endsWith("_send"))
-      .reduce<Record<string, Capability>>((services, tool) => {
-        const service = tool.id.split("_")[0]
-        if (!services[service] || tool.id === `${service}_read`)
-          services[service] = {
-            ...tool,
-            id: service,
-            // Calendar counts as connected only with both grants it needs.
-            ...(service === "calendar"
-              ? { ready: calendarReadReady(capabilities) }
-              : {})
-          }
-        return services
-      }, {})
-  )
   // Connect straight from the list, with the same Google permission request
   // Settings uses; the rows update once the backend reports the new access.
   const connect = async (service: string) => {
@@ -520,7 +501,7 @@ function Assistant({
               onClick={() =>
                 calendarStatus.state === "connect"
                   ? void connect("calendar")
-                  : openSettings()
+                  : openSettings("calendar")
               }>
               {connecting === "calendar"
                 ? "Connecting…"
@@ -574,45 +555,20 @@ function Assistant({
             <Icon name="trash" size={16} />
             Delete this conversation
           </button>
-          {connectors.length > 0 && (
-            <>
-              <p className="drawer-section">Connectors</p>
-              <ul className="connector-list">
-                {connectors.map((tool) => (
-                  <li key={tool.id}>
-                    <span className="connector-icon">
-                      {tool.id === "gmail" ? (
-                        <GmailIcon size={15} />
-                      ) : (
-                        <GoogleCalendarIcon size={15} />
-                      )}
-                    </span>
-                    <span className="connector-name">
-                      {connectorNames[tool.id] || tool.id.replaceAll("_", " ")}
-                    </span>
-                    {tool.ready || tool.status === "disabled" ? (
-                      <span
-                        className={`connector-status${tool.ready ? " is-on" : ""}`}>
-                        {tool.ready ? "Connected" : "Off"}
-                      </span>
-                    ) : (
-                      <button
-                        className="connector-connect"
-                        disabled={!!connecting}
-                        aria-label={`Connect ${connectorNames[tool.id] || tool.id}`}
-                        onClick={() => void connect(tool.id)}>
-                        {connecting === tool.id ? "Connecting…" : "Connect"}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {connectError && (
-                <p className="connector-error" role="alert">
-                  {connectError}
-                </p>
-              )}
-            </>
+          <p className="drawer-section">Connectors</p>
+          <ConnectorList
+            capabilities={capabilities}
+            connecting={connecting}
+            onConnect={(id) => void connect(id)}
+            onSelect={(id) => {
+              openSettings(id)
+              setMenu(false)
+            }}
+          />
+          {connectError && (
+            <p className="connector-error" role="alert">
+              {connectError}
+            </p>
           )}
           <div className="menu-account">
             {account && (
@@ -789,7 +745,10 @@ function Assistant({
           <TaskCard
             key={entry.id}
             entry={entry}
-            controller={{ ...c, openCalendarSetup: openSettings }}
+            controller={{
+              ...c,
+              openCalendarSetup: () => openSettings("calendar")
+            }}
           />
         ))}
         <div ref={last} />

@@ -177,3 +177,24 @@ See [conversation release](conversation-experience.md) for current checks.
   existing Google Web application client. EC2's exact callback allowlist is ready.
   Real Chrome consent, real Gmail editor insertion, and live send/booking are
   separate user-account acceptance steps; they are not implied by mock tests.
+
+## Connector management and release notices (0.2.0)
+
+Gmail and Calendar rows in the conversation menu and Settings are clickable.
+Each opens a capabilities tab with Skills, Tools and Data sources, plus a Manage
+connection tab. Readiness comes from `/assistant/capabilities`; unavailable writes
+are labelled rather than offered as unrestricted tools. Calendar availability also
+requires saved scheduling preferences. Stored grants do not constitute a live
+Google health check. Unsupported event editing/deletion/RSVP/rooms are named as
+unavailable; this UI does not add provider operations.
+
+Connection management reuses capability-specific reconnect and existing Calendar
+preferences. `DISCONNECT_GOOGLE` is a trusted extension-page message handled by the
+service worker using `POST /auth/google/disconnect`. Confirmation explicitly covers
+both Gmail and Calendar. Browser session state is removed after server-confirmed
+disconnection; a failed request reports an error. Disconnecting Threadly is distinct
+from removing Google's OAuth grant (a separate Google account link is provided).
+
+The bundled update page opens once per successful version upgrade. Store account,
+listing, callback verification and one-time unpacked migration requirements are in
+[the extension release guide](extension-releases.md).
