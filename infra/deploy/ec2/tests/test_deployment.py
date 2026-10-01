@@ -154,6 +154,16 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(mode, 'public-https')
         self.assertIn('LOCAL_HTTPS_READY https://api.example.test', result.stdout)
 
+    def test_public_one_off_checks_and_migrations_stay_off_ingress(self):
+        result, calls, _ = self.run_deploy(launch=True, domain='api.threadly.au')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        one_offs = [call for call in calls if call[:2] == ['docker', 'compose'] and 'run' in call]
+        self.assertEqual(len(one_offs), 3)
+        for call in one_offs:
+            files = [call[i + 1] for i, arg in enumerate(call) if arg == '-f']
+            self.assertEqual(len(files), 1, call)
+            self.assertTrue(files[0].endswith('/compose.staging.yml'))
+
     def test_public_network_collision_stops_before_any_application_change(self):
         result, calls, mode = self.run_deploy(
             public=True, domain='api.example.test', fail_network_overlap=True

@@ -237,3 +237,5 @@ The API uses 172.30.247.3 and Caddy uses 172.30.247.2 on the dedicated
 172.30.247.0/29 network. Both addresses must be explicit: the API starts first,
 and automatic allocation would take the proxy address and prevent Caddy startup.
 Only the Caddy address is trusted for forwarded headers.
+One-off preflight and migration containers use the base private Compose network,
+so they can run while the API owns its fixed ingress address.

@@ -92,7 +92,9 @@ if [[ "$DEPLOY_MODE" != private ]]; then
 fi
 printf '[1/5] Building the reviewed backend release.\n'
 "${APP_COMPOSE[@]}" build api
-"${APP_COMPOSE[@]}" run --rm --no-deps -T -v "$RELEASE_DIR/infra/deploy/ec2/preflight.py:/code/preflight.py:ro" api python /code/preflight.py
+# One-off checks/migrations use only the private network. The long-running API
+# owns its fixed ingress address, so these containers must not join ingress.
+"${COMPOSE[@]}" run --rm --no-deps -T -v "$RELEASE_DIR/infra/deploy/ec2/preflight.py:/code/preflight.py:ro" api python /code/preflight.py
 
 # Pull only missing dependencies. Record actual image IDs after deployment.
 # Avoid upgrading PostgreSQL/Chroma implicitly on every application release.
@@ -111,8 +113,8 @@ gzip -t "$BACKUP.partial"
 mv "$BACKUP.partial" "$BACKUP"
 
 printf '[3/5] Applying database migrations before starting application processes.\n'
-"${APP_COMPOSE[@]}" run --rm --no-deps -T api alembic upgrade head
-"${APP_COMPOSE[@]}" run --rm --no-deps -T api alembic current
+"${COMPOSE[@]}" run --rm --no-deps -T api alembic upgrade head
+"${COMPOSE[@]}" run --rm --no-deps -T api alembic current
 
 printf '[4/5] Starting API, Chroma, assistant and action workers (on-demand Gmail).\n'
 "${APP_COMPOSE[@]}" up -d --no-build --wait --wait-timeout 240 api assistant-worker action-worker
