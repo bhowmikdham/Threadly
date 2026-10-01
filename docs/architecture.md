@@ -589,3 +589,16 @@ Remaining connector slices: individual event reference/detail reads and bounded
 continuation, participant/common availability with explicit access, rooms, and
 approved create/update/delete/RSVP workflows. Existing create-event infrastructure
 is not made generally available by this read-only change.
+
+
+### threadly.au public entry point
+
+The opt-in `--public-launch` deployment adds a static homepage and extension
+installation guide on threadly.au, a www redirect, and the existing API on
+api.threadly.au. The frontend remains a Gmail browser extension; the site is not
+a separate authenticated web client. Its Google callback remains the stable
+extension's chromiumapp.org URI. The website serves bundled interactive demos with sample data, with no tracking
+code or access to the database network. Its local-storage theme preference and
+Google Fonts requests are separate from extension authentication. Launch details and readiness limits are in
+[the deployment runbook](../infra/deploy/ec2/APP-DEPLOYMENT.md#threadlyau-public-launch-mode).
+This source configuration is not evidence of a completed public rollout.

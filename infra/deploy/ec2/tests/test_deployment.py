@@ -16,7 +16,13 @@ name, args = Path(sys.argv[0]).name, sys.argv[1:]
 with open(os.environ['DEPLOY_CALLS'], 'a') as f:
     f.write(json.dumps([name, *args]) + '\n')
 if name == 'git':
-    if args[0] == 'clone': Path(args[-1]).mkdir(parents=True)
+    if args[0] == 'clone':
+        release = Path(args[-1])
+        release.mkdir(parents=True)
+        for page in ['index.html', 'install/index.html', 'privacy/index.html', 'terms/index.html']:
+            target = release / 'website' / page
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('__LAUNCH_CONTACT__' if os.environ.get('UNFINISHED_SITE') else 'Reviewed synthetic page')
     if 'get-url' in args: print('https://github.com/bhowmikdham/Threadly.git')
     if 'rev-parse' in args: print('a' * 40)
 elif name == 'stat': print('0:600')
@@ -32,23 +38,27 @@ elif name == 'docker':
     if 'alembic' in args and 'upgrade' in args and os.environ.get('FAIL_MIGRATION'): sys.exit(7)
     if 'up' in args and args[-1] == 'caddy' and os.environ.get('FAIL_CADDY'): sys.exit(8)
 elif name == 'curl':
-    if any(arg.startswith('https://') for arg in args) and os.environ.get('FAIL_PUBLIC_TLS'):
+    if any(arg.startswith('https://') for arg in args) and (os.environ.get('FAIL_PUBLIC_TLS') or (os.environ.get('FAIL_SITE_TLS') and any(arg == 'https://threadly.au/' for arg in args))):
         sys.exit(60)
 '''
 
 
 class DeploymentTests(unittest.TestCase):
     def run_deploy(self, fail=False, *, public=False, domain='', fail_caddy=False,
-                   fail_public_tls=False, fail_network_overlap=False, extra_args=()):
+                   fail_public_tls=False, fail_network_overlap=False, extra_args=(), launch=False,
+                   missing_bundle=False, unfinished_site=False, fail_site_tls=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             host = root / 'host'
             (host / 'secrets').mkdir(parents=True)
             (host / 'secrets/threadly.env').write_text(f'SYNTHETIC=true\nDOMAIN={domain}\n')
             (host / 'BOOTSTRAP_READY').touch()
+            if not missing_bundle:
+                (host / 'public-downloads').mkdir()
+                (host / 'public-downloads/threadly-extension.zip').write_bytes(b'synthetic fixture')
             bins = root / 'bin'
             bins.mkdir()
-            for name in ['git', 'docker', 'stat', 'mountpoint', 'flock', 'curl']:
+            for name in ['git', 'docker', 'stat', 'mountpoint', 'flock', 'curl', 'systemctl']:
                 p = bins / name
                 p.write_text(FAKE)
                 p.chmod(0o755)
@@ -64,13 +74,17 @@ class DeploymentTests(unittest.TestCase):
             script.write_text(source)
             log = root / 'calls.jsonl'
             args = ['bash', str(script), RELEASE]
-            if public:
+            if launch:
+                args.append('--public-launch')
+            elif public:
                 args.append('--public-https')
             args.extend(extra_args)
             result = subprocess.run(args, capture_output=True, text=True, check=False,
                 env={**os.environ, 'PATH': str(bins) + os.pathsep + os.environ['PATH'],
                      'DEPLOY_CALLS': str(log),
                      **({'FAIL_MIGRATION': '1'} if fail else {}),
+                     **({'UNFINISHED_SITE': '1'} if unfinished_site else {}),
+                     **({'FAIL_SITE_TLS': '1'} if fail_site_tls else {}),
                      **({'FAIL_CADDY': '1'} if fail_caddy else {}),
                      **({'FAIL_PUBLIC_TLS': '1'} if fail_public_tls else {}),
                      **({'FAIL_NETWORK_OVERLAP': '1'} if fail_network_overlap else {})})
@@ -95,6 +109,7 @@ class DeploymentTests(unittest.TestCase):
         self.assertTrue(any('ps' in c and '-q' in c and 'action-worker' in c for c in calls))
         self.assertIn('DEPLOYMENT_READY commit=' + RELEASE, result.stdout)
         self.assertEqual(mode, 'private')
+        self.assertFalse(any(c[0] == 'systemctl' for c in calls))
         self.assertIn('PRIVATE_TUNNEL_READY', result.stdout)
         self.assertFalse(any('up' in c and c[-1] == 'caddy' for c in calls))
         self.assertFalse(any(c[0] == 'curl' and any(arg.startswith('https://') for arg in c)
@@ -161,6 +176,39 @@ class DeploymentTests(unittest.TestCase):
                     start = next(i for i, c in enumerate(calls) if 'up' in c and c[-1] == 'caddy')
                     self.assertTrue(any(i > start and 'stop' in c and c[-1] == 'caddy'
                                         for i, c in enumerate(calls)))
+
+    def test_launch_checks_every_hostname_and_uses_website_override(self):
+        result, calls, mode = self.run_deploy(launch=True, domain='api.threadly.au')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(mode, 'public-launch')
+        self.assertIn(['systemctl', 'disable', '--now', 'threadly-autostop.timer'], calls)
+        start = next(c for c in calls if 'up' in c and c[-1] == 'caddy')
+        self.assertTrue(any(arg.endswith('/compose.public-launch.yml') for arg in start))
+        for url in ('https://api.threadly.au/healthz', 'https://threadly.au/', 'https://www.threadly.au/'):
+            self.assertTrue(any(c[0] == 'curl' and url in c for c in calls), url)
+
+    def test_unfinished_launch_cannot_stop_existing_application(self):
+        for options in ({'missing_bundle': True}, {'unfinished_site': True},
+                        {'domain': 'another.example.test'}):
+            with self.subTest(options=options):
+                result, calls, mode = self.run_deploy(
+                    launch=True, **{'domain': 'api.threadly.au', **options}
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIsNone(mode)
+                self.assertFalse(any('stop' in c or 'build' in c or 'up' in c for c in calls))
+
+    def test_site_certificate_failure_stops_public_ingress(self):
+        result, calls, mode = self.run_deploy(
+            launch=True, domain='api.threadly.au', fail_site_tls=True
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIsNone(mode)
+        self.assertIn('Public site TLS failed', result.stderr)
+        self.assertFalse(any(c[0] == 'systemctl' for c in calls))
+        start = next(i for i, c in enumerate(calls) if 'up' in c and c[-1] == 'caddy')
+        self.assertTrue(any(i > start and 'stop' in c and c[-1] == 'caddy'
+                            for i, c in enumerate(calls)))
 
     def test_unknown_mode_does_not_start_anything(self):
         result, calls, mode = self.run_deploy(extra_args=('--public',))

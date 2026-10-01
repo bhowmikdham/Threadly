@@ -1,0 +1,8 @@
+# Used only by deploy-app.sh --public-launch after the public HTTPS override.
+services:
+  caddy:
+    volumes:
+      - ../../caddy/Caddyfile.threadly-au:/etc/caddy/Caddyfile:ro
+      - ../../caddy/Caddyfile:/etc/caddy/api.Caddyfile:ro
+      - ../../../website:/srv/site:ro
+      - /srv/threadly-data/public-downloads:/srv/downloads:ro

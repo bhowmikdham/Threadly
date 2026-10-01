@@ -1,0 +1,27 @@
+# Keep the API's existing ingress and streaming behavior.
+import /etc/caddy/api.Caddyfile
+
+threadly.au {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    }
+    handle /downloads/threadly-extension.zip {
+        root * /srv/downloads
+        rewrite * /threadly-extension.zip
+        header Content-Disposition "attachment; filename=threadly-extension.zip"
+        file_server
+    }
+    handle {
+        root * /srv/site
+        file_server
+    }
+}
+
+www.threadly.au {
+    redir https://threadly.au{uri} permanent
+}
