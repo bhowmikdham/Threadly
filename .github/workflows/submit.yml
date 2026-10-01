@@ -6,6 +6,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.threadly.au
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
