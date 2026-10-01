@@ -193,3 +193,40 @@ For the combined MVP, use [MVP-ROLLOUT.md](MVP-ROLLOUT.md). It keeps mailbox syn
 retired, checks the assistant/action workers and documents explicit per-user pilot
 gates plus the contextual-conversation feature gate; the historical B06 compiled-gate
 description above no longer describes current pilot enablement.
+
+## threadly.au public launch mode
+
+`deploy-app.sh FULL_COMMIT --public-launch` extends the public HTTPS override with
+`compose.public-launch.yml` and `Caddyfile.threadly-au`. It serves the static
+`website/` at `https://threadly.au`, redirects `https://www.threadly.au` to the
+apex and keeps the API at `https://api.threadly.au`. Only Caddy publishes 443;
+API remains loopback and database/worker ports remain private. This mode requires
+exactly `DOMAIN=api.threadly.au` and verifies trusted certificates for all three
+names before recording success. HTTP port 80 remains closed.
+
+The extension download is a separately verified release artifact installed as
+`/srv/threadly-data/public-downloads/threadly-extension.zip`; that directory must
+contain only public distribution material, never environment files or backups.
+Caddy serves only this exact download path from that mount. Build from the pinned
+frontend commit with `PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au`,
+run the packaged-origin browser check, and record the bundle SHA-256 before copying.
+
+Launch preflight refuses missing pages, a missing download, or `__LAUNCH_` markers
+in unfinished owner/contact/privacy/terms drafts before stopping existing services.
+These checks do not establish Google verification or legal review. Public signup
+must be tested separately with an eligible new account. Update early-access copy
+only after the corresponding store/Google release has actually completed.
+
+After successful application/TLS checks, this mode disables
+`threadly-autostop.timer`, making the current instance available continuously
+with normal running-instance charges. It does not modify CloudFormation bootstrap
+for replacement instances. A private redeploy does not silently re-enable the
+timer; to deliberately restore timed staging, run
+`systemctl enable --now threadly-autostop.timer` through SSM. Existing private and
+API-only `--public-https` deployments do not change the timer.
+
+DNS plan (GoDaddy, confirmed domain threadly.au): replace only the parked `A @`
+with the verified Threadly Elastic IP; add `A api` to that same address; preserve
+`CNAME www -> threadly.au`, nameservers and unrelated email/verification records.
+Record previous values. Check public DNS before requesting certificates. No DNS
+changes or deployment are implied by committing this configuration.
