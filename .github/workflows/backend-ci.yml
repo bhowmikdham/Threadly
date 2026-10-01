@@ -44,6 +44,10 @@ jobs:
         run: |
           bash -n ../infra/deploy/ec2/deploy-app.sh
           python -m unittest discover -s ../infra/deploy/ec2/tests -q
+      - name: Validate real Docker ingress allocation
+        run: |
+          docker pull caddy:2.11.4
+          python ../infra/deploy/ec2/tests/smoke_ingress_allocation.py
       - name: Validate application Flow template offline
         run: |
           pip install cfn-lint==1.56.3
