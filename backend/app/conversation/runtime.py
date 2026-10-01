@@ -708,16 +708,6 @@ class Runtime:
             ),
         }
 
-    async def try_day_availability(self):
-        from app.calendar.day_availability import CONFIRMATION, answer
-
-        # Typed active work owns short confirmations; a fresh day question may still read.
-        if CONFIRMATION.fullmatch(self.request.instruction.strip()) and (
-            self.state.get("active_task_id") or self.state.get("proposal_id")
-        ):
-            return None
-        return await answer(self.owner, self.authoritative_instruction())
-
     async def call(self, name, args):
         if name in CALENDAR_READ_TOOLS:
             from app.calendar.conversation_tools import execute
@@ -738,7 +728,12 @@ class Runtime:
         if name == "check_day_availability":
             from app.calendar.day_availability import answer
 
-            return await answer(self.owner, self.authoritative_instruction(), semantic=True)
+            return await answer(
+                self.owner,
+                self.authoritative_instruction(),
+                window=args,
+                anchor=self.calendar_anchor,
+            )
         if name == "read_calendar":
             return await self.read_calendar(args.period)
         if name == "prepare_workflow":

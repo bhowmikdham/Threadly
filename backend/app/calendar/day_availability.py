@@ -10,64 +10,8 @@ from app.calendar.availability import merge
 from app.calendar.time_resolution import day_start
 from app.schemas.calendar import FreeBusyRequest
 
-POLICY = "calendar-day-answer-1.1.0"
+POLICY = "calendar-day-answer-2.0.0"
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-DAY = r"(?:monday|tuesday|wednesday|thursday|thurday|friday|saturday|sunday)"
-DATE = rf"(?:today|tomorrow|\d{{4}}-\d{{2}}-\d{{2}}|(?:this\s+)?{DAY}(?:\s+this\s+week)?)"
-# Fast path for common wording; semantic paraphrases use the model's read tool.
-QUESTION = re.compile(
-    r"(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?"
-    r"(?:(?:(?:tell\s+me|check|see)\s+(?:if|whether)\s+)?"
-    r"(?:am\s+i|i\s+am|i['’]m|will\s+i\s+be)\s+(?:free|available|busy)|"
-    r"(?:check|show|find)\s+(?:me\s+)?my\s+(?:availability|availabiloty))\s+"
-    rf"(?:(?:on|for)\s+)?(?:the\s+)?(?P<date>{DATE})[?.! ]*",
-    re.I,
-)
-CONFIRMATION = re.compile(r"(?:yes|yep|yeah|sure|ok(?:ay)?|please do|go ahead)[.! ]*", re.I)
-
-
-def requested_day(instruction):
-    """Recognize only standalone self-availability, never slot requests or compound actions.
-
-    Follow-ups must be a bare confirmation. Assistant-authored dates are not inputs.
-    More complex changes continue through the existing semantic coordinator.
-    """
-    parts = instruction.strip().split("\nUser follow-up: ")
-    if any(not CONFIRMATION.fullmatch(part.strip()) for part in parts[1:]):
-        return None
-    match = QUESTION.fullmatch(" ".join(parts[0].split()))
-    return match["date"].casefold().replace("thurday", "thursday") if match else None
-
-
-def tool_day(instruction):
-    """Extract dates only from user text; the semantic model supplies no date or IDs.
-
-    This tool is a whole-day self read, never a subset of compound work. Reject
-    windows/qualifiers we cannot preserve rather than silently widening the query.
-    """
-    parts = instruction.strip().split("\nUser follow-up: ")
-    if any(not CONFIRMATION.fullmatch(part.strip()) for part in parts[1:]):
-        raise ValueError("Ask for a standalone day-availability request")
-    text = " ".join(parts[0].casefold().split())
-    if not re.search(r"\b(?:i|my|me)\b", text) or re.search(
-        r"\b(?:send|draft|write|reply|book|invite|schedule|reschedule|slots?|"
-        r"someone|their|his|her|our|manager|colleague|team|cancel|stop|never|not)\b|don['’]t",
-        text,
-    ):
-        raise ValueError("Use the complete reviewed workflow for compound or other-person work")
-    matches = list(re.finditer(rf"\b{DATE}\b", text, re.I))
-    if len(matches) != 1:
-        raise ValueError("Ask which single day to check")
-    match = matches[0]
-    remainder = text[: match.start()] + text[match.end() :]
-    if re.search(
-        r"\b(?:next|last|following|previous|week|weekend|month|morning|afternoon|"
-        r"evening|tonight|noon|midnight|before|after|between|until|from|lunch|sunrise|sunset|utc|gmt|"
-        r"timezone|hours?|minutes?)\b|\d|/",
-        remainder,
-    ):
-        raise ValueError("Ask about the requested date or time window instead of dropping it")
-    return match[0].replace("thurday", "thursday")
 
 
 def resolve_day(phrase, anchor, timezone):
@@ -121,13 +65,21 @@ def render(evidence, timezone, day, *, remaining_day):
     return f"{prefix} has busy time: {intervals}.{suffix}" + (f"\n\n{warning}" if warning else "")
 
 
-async def read(user_id, phrase, *, anchor=None):
+async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
     """Use existing owner, grant, ACL, freshness and preference-version fences."""
     pref = await service.get_preferences(user_id)
     timezone = pref.preferences.timezone
     anchor = anchor or datetime.now(UTC)
     try:
-        day = resolve_day(phrase, anchor, timezone)
+        if window is not None:
+            from app.calendar.conversation_tools import resolve_window
+
+            start, end = resolve_window(window, instruction, anchor, timezone)
+            day = start.astimezone(ZoneInfo(timezone)).date()
+            if end.astimezone(ZoneInfo(timezone)).date() != day + timedelta(days=1):
+                raise ValueError("Whole-day availability requires exactly one day")
+        else:
+            day = resolve_day(phrase, anchor, timezone)
         zone = ZoneInfo(timezone)
         start = day_start(day, zone)
         end = day_start(day + timedelta(days=1), zone)
@@ -170,11 +122,21 @@ async def read(user_id, phrase, *, anchor=None):
     }
 
 
-async def answer(user_id, instruction, *, semantic=False):
-    phrase = tool_day(instruction) if semantic else requested_day(instruction)
-    if phrase is None:
-        return None
+async def answer(user_id, instruction, *, window, anchor=None):
+    if window.subject == "other":
+        return {
+            "kind": "message",
+            "text": (
+                "I can check your selected calendars, but I don't have access "
+                "to that person's availability."
+            ),
+        }
+    phrase = window.date_phrase
     try:
+        if window is not None:
+            return await read(
+                user_id, phrase, window=window, instruction=instruction, anchor=anchor
+            )
         return await read(user_id, phrase)
     except ApiError as exc:
         messages = {

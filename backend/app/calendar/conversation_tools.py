@@ -9,7 +9,7 @@ from app.calendar import agenda, availability, day_availability, service
 from app.calendar.time_resolution import day_start, parse_clock, wall_instants
 from app.schemas.calendar import FreeBusyRequest, parse_instant
 
-POLICY = "calendar-conversation-reads-1.0.0"
+POLICY = "calendar-conversation-reads-2.0.0"
 MAX_DISPLAY = 10
 WEEKDAY = r"(?:monday|tuesday|wednesday|thursday|thurday|friday|saturday|sunday)"
 DAY_PATTERN = rf"(?:(?:this|next) )?{WEEKDAY}(?: (?:this|next) week)?"
@@ -42,6 +42,26 @@ def validate_scope(args, instruction):
     remainder = normalized(instruction)
     for field in ("query", "date_phrase", "start_time", "end_time", "duration_phrase"):
         value = getattr(args, field, "")
+        if field in {"start_time", "end_time"}:
+            source = getattr(args, field + "_source", "")
+            if source:
+                # Typed clocks must preserve the same instant, not merely quote some text.
+                if parse_clock(source) != parse_clock(value):
+                    raise RequestClarification("The clock interpretation conflicts with your words")
+                value = source
+        if field == "date_phrase" and args.date_source:
+            value = args.date_source
+            # A source quote anchors a semantic date interpretation, but may not
+            # swallow separate clock, timezone, duration or external-action constraints.
+            if re.search(
+                r"\b(?:morning|afternoon|evening|noon|midnight|before|until|"
+                r"utc|gmt|timezone|hours?|minutes?|mins?|send|book|create|update|delete|"
+                r"reschedule|cancel|invite)\b|\d{1,2}:\d{2}|\d\s*(?:am|pm)\b|/",
+                value.casefold(),
+            ):
+                raise RequestClarification(
+                    "Keep clock and other constraints separate from the date"
+                )
         if value:
             # One field cannot consume another field's source span (for example,
             # a query containing the date must not hide a dropped time qualifier).
@@ -67,11 +87,36 @@ def validate_scope(args, instruction):
 
 def resolve_window(args, instruction, anchor, timezone):
     validate_scope(args, instruction)
-    phrase = literal(args.date_phrase, instruction).replace("thurday", "thursday")
+    # The model interprets language; only this canonical tool value is parsed.
+    # validate_scope already binds its separate source quote to user-authored text.
+    phrase = normalized(args.date_phrase)
     zone = ZoneInfo(timezone)
     today = anchor.astimezone(zone).date()
     span = re.fullmatch(r"(\d{4}-\d{2}-\d{2}) (?:to|through) (\d{4}-\d{2}-\d{2})", phrase)
-    if span:
+    if args.date is not None:
+        meaning = args.date
+        if meaning.kind == "relative":
+            first = today + timedelta(days=meaning.offset_days)
+            last = first + timedelta(days=meaning.days)
+        elif meaning.kind == "weekday":
+            offset = meaning.weekday - today.weekday()
+            if meaning.week == "upcoming":
+                offset %= 7
+            elif meaning.week == "next":
+                offset += 7
+            first = today + timedelta(days=offset)
+            last = first + timedelta(days=1)
+        elif meaning.kind == "week":
+            first = (
+                today
+                - timedelta(days=today.weekday())
+                + timedelta(days=7 if meaning.week == "next" else 0)
+            )
+            last = first + timedelta(days=7)
+        else:
+            first = date.fromisoformat(meaning.start)
+            last = date.fromisoformat(meaning.end or meaning.start) + timedelta(days=1)
+    elif span:
         first, last = date.fromisoformat(span[1]), date.fromisoformat(span[2]) + timedelta(days=1)
     elif phrase in {"this week", "next week"}:
         first = (
@@ -95,6 +140,11 @@ def resolve_window(args, instruction, anchor, timezone):
             )
         else:
             first = day_availability.resolve_day(phrase, anchor, timezone)
+        last = first + timedelta(days=1)
+    elif relative := re.fullmatch(r"in (\d{1,2}) days", phrase):
+        if not 0 <= int(relative[1]) <= 14:
+            raise RequestClarification("Choose a relative day within the next fourteen days")
+        first = today + timedelta(days=int(relative[1]))
         last = first + timedelta(days=1)
     elif phrase in {"today", "tomorrow"} or re.fullmatch(r"\d{4}-\d{2}-\d{2}", phrase):
         first = day_availability.resolve_day(phrase, anchor, timezone)
@@ -225,6 +275,14 @@ def render_events(result, *, overlaps=False, query=""):
 async def execute(owner, name, args, instruction, *, anchor=None):
     """Terminal, deterministic responses: provider prose never controls another tool call."""
     anchor = anchor or datetime.now(UTC)
+    if getattr(args, "subject", None) == "other":
+        return {
+            "kind": "message",
+            "text": (
+                "I can check your selected calendars, but I don't have access "
+                "to that person's availability."
+            ),
+        }
     try:
         if name == "list_calendars":
             result = await service.list_calendars(owner)

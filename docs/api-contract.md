@@ -1026,3 +1026,33 @@ freebusy evidence ID/expiry when available. It is omitted from persisted receipt
 user-visible text remains in encrypted conversation history. Calendar-tagged
 history is withheld from subsequent model context and must be reread for fresh
 facts. Tool failures carry existing `error_code` values and never claim success.
+
+
+### Semantic Calendar dates (conversation 1.4.0)
+
+The coordinator now interprets date language and calls Calendar tools with a structured
+`date` and literal `date_source`. Example: user “am i free tmrw?” →
+`check_day_availability({"subject":"self","date":{"kind":"relative","offset_days":1},"date_source":"tmrw"})`.
+Relative dates accept offset -31..90 and 1..14 days; weekdays use Monday=0..Sunday=6
+and `week: upcoming|this|next`; week queries use `this|next`; absolute dates use ISO
+`start` and optional inclusive `end`. Existing horizon and whole-day limits still apply.
+`date_phrase` remains accepted only for legacy literal calls and cannot be combined
+with `date`. Structured calls require a quoted user date source. The model interprets
+meaning; the backend computes dates/DST boundaries, reads only owned selected calendars,
+and reports actual coverage. Source quotation does not prove semantic interpretation
+correct: this is separately evaluated with live model replays.
+
+Conversation execution no longer routes user wording through the day-question regex
+fast path. The day tool takes the same date contract (no clock windows). Server-side
+scope checks still reject fabricated source quotes, dropped explicit clocks/qualifiers,
+invalid dates, excessive ranges and write fields. They are validation, not intent routing.
+No Google permission, endpoint, database schema or external-write enablement changes.
+
+Clock windows also separate literal `start_time_source`/`end_time_source` from their
+normalized `start_time`/`end_time`. Equivalent numeric clocks such as “2 pm”,
+“2:00 PM” and “14:00” may agree without string identity; a changed clock instant
+is rejected. Source fields are optional for legacy calls that copied clocks literally.
+
+Structured Calendar calls also require `subject: self|other`. An `other` subject returns
+an unsupported-access explanation before preference or provider reads. Provider account
+selection remains server-owned; arbitrary people/calendar IDs are never accepted.

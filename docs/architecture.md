@@ -602,3 +602,21 @@ code or access to the database network. Its local-storage theme preference and
 Google Fonts requests are separate from extension authentication. Launch details and readiness limits are in
 [the deployment runbook](../infra/deploy/ec2/APP-DEPLOYMENT.md#threadlyau-public-launch-mode).
 This source configuration is not evidence of a completed public rollout.
+
+
+### Semantic Calendar interpretation (1.4.0)
+
+All conversational availability requests now reach the semantic coordinator. The old
+natural-language day matcher and engine fast path are removed. Calendar tools separate
+a structured date meaning from its quoted user source. There is no spelling alias table.
+The deterministic backend resolves relative offsets, weekday/week selectors or explicit
+dates against the persisted request anchor and saved Calendar timezone, then enforces
+ownership, horizon, clock constraints and incomplete-coverage rules. Whole-day checks
+now use that same persisted anchor across retries. Legacy literal date-window calls remain
+compatible; model-facing instructions use structured dates.
+
+Versioned assets and deterministic replays are under `evaluation/calendar-agent-tools/`.
+`python -m app.conversation.calendar_evaluate --live --output <receipt.json>` exercises
+actual Bedrock tool selection and the real Calendar handlers with synthetic freebusy,
+without any Google access or writes. Failed attempts are retained as evidence; live-model
+results measure only the covered cases, not every possible phrasing.

@@ -1,0 +1,68 @@
+{
+  "release": "contextual-conversation-1.4.0",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+  "prompt_hash": "eca58c62148c566bec36bf146e47c30cd3944d9404dbc8f7fb95b635ce3984f4",
+  "tools_hash": "3dbbcf1dce79ad3d99901e7ba0ef78c982ba57de2157f8b3f64d835bcadcf005",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "anchor": "2026-10-01T12:19:00+00:00",
+  "live_google": false,
+  "external_writes": false,
+  "cases": [
+    {
+      "case": "cancelled",
+      "decisions": [],
+      "text": "Got it\u2014I won't check your calendar tomorrow. Let me know if you need help with anything else.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "respond",
+          "status": "ok"
+        }
+      ],
+      "starts": [],
+      "ends": []
+    },
+    {
+      "case": "other_person",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tomorrow",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "On your selected calendars, Friday, 2 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "passed": false,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    }
+  ],
+  "passed": 1,
+  "total": 2
+}

@@ -378,7 +378,7 @@ def test_search_service_rechecks_owner_and_preferences_after_google(db_sessionma
 async def test_versioned_tool_replay_cases(read_provider, monkeypatch):
     fixture = json.loads(
         (
-            Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools/replay-v1.json"
+            Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools/replay-v2.json"
         ).read_text()
     )
     assert fixture["release"] == engine.RELEASE
@@ -519,7 +519,7 @@ def test_committed_release_matches_current_prompt_and_tools():
     from app.schemas.conversation import tool_config
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
-    saved = json.loads((root / "contextual-conversation-1.3.0.json").read_text())
+    saved = json.loads((root / "contextual-conversation-1.4.0.json").read_text())
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())
     assert old["release"] == "contextual-conversation-1.2.5"
@@ -566,3 +566,146 @@ def test_omitted_clocks_and_invented_queries_cannot_widen_a_read(fields, instruc
 
     with pytest.raises(ValueError):
         tools.validate_scope(SearchCalendarEvents(**fields), instruction)
+
+
+@pytest.mark.parametrize("source", ["tmrw", "tommorrow", "the day following today", "mañana"])
+def test_semantic_date_meaning_is_independent_of_original_spelling(source):
+    start, end = tools.resolve_window(
+        CalendarWindow(date_phrase="tomorrow", date_source=source),
+        f"am i free {source}?",
+        datetime(2026, 10, 1, 12, 19, tzinfo=UTC),
+        ZONE,
+    )
+    assert start == datetime(2026, 10, 1, 14, tzinfo=UTC)
+    assert end == datetime(2026, 10, 2, 14, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "text,source",
+    [
+        ("am i free tmrw after 3 pm", "tmrw"),
+        ("am i free tmrw and Friday", "tmrw"),
+        ("am i free tmrw in America/New_York", "tmrw"),
+        ("am i free tmrw then book a meeting", "tmrw"),
+        ("am i free today", "tmrw"),
+        ("am i free tmrw after 3 pm", "tmrw after 3 pm"),
+    ],
+)
+def test_semantic_source_cannot_be_invented_or_drop_explicit_constraints(text, source):
+    with pytest.raises(ValueError):
+        tools.resolve_window(
+            CalendarWindow(date_phrase="tomorrow", date_source=source), text, ANCHOR, ZONE
+        )
+
+
+@pytest.mark.parametrize(
+    "zone,anchor,expected,hours",
+    [
+        (ZONE, "2026-10-03T12:00:00+00:00", "2026-10-03T14:00:00+00:00", 23),
+        (ZONE, "2026-10-01T15:00:00+00:00", "2026-10-02T14:00:00+00:00", 24),
+        ("America/Los_Angeles", "2026-10-01T01:00:00+00:00", "2026-10-01T07:00:00+00:00", 24),
+    ],
+)
+def test_semantic_tomorrow_uses_saved_timezone_and_dst(zone, anchor, expected, hours):
+    start, end = tools.resolve_window(
+        CalendarWindow(date_phrase="tomorrow", date_source="tmrw"),
+        "free tmrw",
+        datetime.fromisoformat(anchor),
+        zone,
+    )
+    assert start.isoformat() == expected
+    assert end - start == timedelta(hours=hours)
+
+
+def test_relative_day_offset_is_calculated_by_backend_not_model():
+    start, _ = tools.resolve_window(
+        CalendarWindow(date_phrase="in 2 days", date_source="the day after tomorrow"),
+        "Am I free the day after tomorrow?",
+        ANCHOR,
+        ZONE,
+    )
+    assert start == datetime(2026, 9, 30, 14, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "meaning,source,expected",
+    [
+        ({"kind": "relative", "offset_days": 1}, "tommorrow", "2026-09-29T14:00:00+00:00"),
+        (
+            {"kind": "relative", "offset_days": 2},
+            "the day after tomorrow",
+            "2026-09-30T14:00:00+00:00",
+        ),
+        (
+            {"kind": "weekday", "weekday": 3, "week": "next"},
+            "thursday next week",
+            "2026-10-07T13:00:00+00:00",
+        ),
+        ({"kind": "absolute", "start": "2026-10-01"}, "2026-10-01", "2026-09-30T14:00:00+00:00"),
+    ],
+)
+def test_structured_semantic_dates_are_resolved_without_phrase_grammar(meaning, source, expected):
+    args = CalendarWindow(subject="self", date=meaning, date_source=source)
+    start, _ = tools.resolve_window(args, f"Check my availability {source}", ANCHOR, ZONE)
+    assert start.isoformat() == expected
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"date": {"kind": "relative", "offset_days": 1}},
+        {"date": {"kind": "relative", "offset_days": 999}, "date_source": "tomorrow"},
+        {"date": {"kind": "weekday", "weekday": 7}, "date_source": "Sunday"},
+        {
+            "date": {"kind": "relative", "offset_days": 1},
+            "date_phrase": "today",
+            "date_source": "tomorrow",
+        },
+        {
+            "date": {"kind": "relative", "offset_days": 1, "calendar_id": "victim"},
+            "date_source": "tomorrow",
+        },
+    ],
+)
+def test_structured_calendar_dates_reject_unbounded_or_conflicting_input(fields):
+    with pytest.raises(ValidationError):
+        CalendarWindow.model_validate(fields)
+
+
+@pytest.mark.parametrize("start,end", [("14:00", "16:00"), ("2:00 PM", "4:00 PM")])
+def test_clock_meaning_may_be_normalized_without_requiring_identical_spelling(start, end):
+    args = CalendarWindow(
+        subject="self",
+        date={"kind": "relative", "offset_days": 1},
+        date_source="tmrw",
+        start_time=start,
+        end_time=end,
+        start_time_source="2 pm",
+        end_time_source="4 pm",
+    )
+    lo, hi = tools.resolve_window(args, "Am I free tmrw from 2 pm to 4 pm?", ANCHOR, ZONE)
+    assert lo == datetime(2026, 9, 30, 4, tzinfo=UTC)
+    assert hi - lo == timedelta(hours=2)
+    with pytest.raises(ValueError):
+        tools.resolve_window(
+            args.model_copy(update={"start_time": "15:00"}),
+            "Am I free tmrw from 2 pm to 4 pm?",
+            ANCHOR,
+            ZONE,
+        )
+
+
+async def test_other_person_scope_does_not_query_owners_calendar(read_provider):
+    from app.calendar.day_availability import answer
+    from app.schemas.conversation import CheckDayAvailability
+
+    args = CheckDayAvailability(
+        subject="other", date={"kind": "relative", "offset_days": 1}, date_source="tomorrow"
+    )
+    result = await answer(42, "Is Alex free tomorrow?", window=args, anchor=ANCHOR)
+    assert result["kind"] == "message" and "don't have access" in result["text"]
+    result = await tools.execute(
+        42, "find_busy_times", args, "Is Alex free tomorrow?", anchor=ANCHOR
+    )
+    assert result["kind"] == "message"
+    assert read_provider.calls == []

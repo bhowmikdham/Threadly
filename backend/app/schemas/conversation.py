@@ -2,10 +2,10 @@
 
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.schemas.assistant import StrictModel
-from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
+from app.schemas.calendar_tools import CALENDAR_READ_TOOLS, WINDOW_HELP, CalendarWindow
 from app.schemas.continuation import ClarificationAnswer
 from app.schemas.inbox_chat import InboxChatRequest
 
@@ -50,8 +50,12 @@ class ReadCalendar(StrictModel):
     period: Literal["today", "tomorrow", "this_week", "next_7_days"] = "today"
 
 
-class CheckDayAvailability(StrictModel):
-    pass
+class CheckDayAvailability(CalendarWindow):
+    @model_validator(mode="after")
+    def whole_day(self):
+        if self.start_time or self.end_time:
+            raise ValueError("Use find_busy_times for clock windows")
+        return self
 
 
 class Evidence(StrictModel):
@@ -123,13 +127,11 @@ TOOLS = {
     ),
     "check_day_availability": (
         CheckDayAvailability,
-        "Check the user's own availability for ONE whole day, such as 'check if I am free "
-        "on Thursday', 'check my availability for Thursday this week', or 'do I have "
-        "anything on tomorrow?'. Backend resolves the date from the user's words and "
-        "returns verified busy periods. No proposal or approval needed. No arguments: "
-        "never invent a date. Ask a clarification for missing or ambiguous days. For "
-        "meeting slots use find_free_times; time windows use find_busy_times. "
-        "Booking or compound work uses prepare_workflow.",
+        "Check the user's own availability for ONE whole day. Interpret informal wording "
+        "semantically and supply its date meaning and original date_source. Returns verified "
+        "busy periods without a proposal or approval. Ask only for genuinely missing or "
+        "ambiguous dates. For meeting slots use find_free_times; clock windows use "
+        "find_busy_times. Booking or compound work uses prepare_workflow." + WINDOW_HELP,
     ),
     "read_calendar": (
         ReadCalendar,

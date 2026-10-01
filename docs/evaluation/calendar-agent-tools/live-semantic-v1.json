@@ -1,0 +1,136 @@
+{
+  "release": "contextual-conversation-1.4.0",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+  "prompt_hash": "5b90651febbaad5339fc576bd31512a7d607e102fe4bfeddaa5e4c6dca4a5ac0",
+  "tools_hash": "97958c6348ce96a76f4a58246d33d0bee4d98b1761158be295e6c7a0bb08cba7",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "anchor": "2026-10-01T12:19:00+00:00",
+  "live_google": false,
+  "external_writes": false,
+  "cases": [
+    {
+      "case": "abbreviation",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "misspelling",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "ordinary",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "paraphrase",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-03T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "relative",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-03T00:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-04T00:00:00+10:00"
+      ]
+    },
+    {
+      "case": "weekday",
+      "passed": false,
+      "kind": "clarification",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [],
+      "ends": []
+    },
+    {
+      "case": "clock",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "invalid"
+        },
+        {
+          "tool": "find_busy_times",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T14:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-02T16:00:00+10:00"
+      ]
+    }
+  ],
+  "passed": 6,
+  "total": 7
+}

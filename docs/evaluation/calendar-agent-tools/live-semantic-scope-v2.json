@@ -1,0 +1,87 @@
+{
+  "release": "contextual-conversation-1.4.0",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+  "prompt_hash": "9e2de371d6d8a089551f41fcfaeef6db70e6a4e81305cb43c7f5646197e2c2cb",
+  "tools_hash": "012037e156eb2354e2fb262fbf747f51d3f229abefc161a0e6964ad2980fe991",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "anchor": "2026-10-01T12:19:00+00:00",
+  "live_google": false,
+  "external_writes": false,
+  "cases": [
+    {
+      "case": "other_person",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "subject": "other",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tomorrow",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "text": "I can check your selected calendars, but I don't have access to that person's availability.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "starts": [],
+      "ends": []
+    },
+    {
+      "case": "clock",
+      "decisions": [
+        {
+          "tool": "find_busy_times",
+          "arguments": {
+            "subject": "self",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tmrw",
+            "start_time": "14:00",
+            "end_time": "16:00",
+            "start_time_source": "2 pm",
+            "end_time_source": "4 pm"
+          }
+        }
+      ],
+      "text": "Your selected calendars only, Fri 2 Oct 2026, 2:00 PM AEST to Fri 2 Oct 2026, 4:00 PM AEST. Other people's availability has not been checked.\nNo busy time is recorded in this window.",
+      "passed": true,
+      "kind": "message",
+      "trace": [
+        {
+          "tool": "find_busy_times",
+          "status": "ok"
+        }
+      ],
+      "starts": [
+        "2026-10-02T14:00:00+10:00"
+      ],
+      "ends": [
+        "2026-10-02T16:00:00+10:00"
+      ]
+    }
+  ],
+  "passed": 2,
+  "total": 2
+}
