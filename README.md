@@ -28,7 +28,7 @@ the local development build, Settings lets you choose your backend. Its default
 is `http://127.0.0.1:8000`.
 
 To package for a public HTTPS API, set
-`PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://<your-api-host>` before
+`PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au` before
 `npm run build`. The packaged extension then uses that server exclusively and
 asks the user for access to that exact host on first sign-in. It does not expose
 backend addresses, EC2 instructions or Google OAuth setup in user settings.
@@ -183,3 +183,18 @@ See [conversation design and boundaries](docs/conversation-experience.md) and
 recovery behavior, evidence and remaining external setup.
 
 See [inbox chat behavior and checks](docs/inbox-chat.md) for the new discovery APIs and limits.
+
+## threadly.au release
+
+The store submission workflow pins `https://api.threadly.au` so a store build
+cannot accidentally ship the localhost default. The website currently distributes
+an early-access unpacked build; this does not establish store approval or public
+Google verification. Keep the stable extension identity and its existing
+`chromiumapp.org/oauth/callback` in Google and the backend allowlist.
+
+Release check (does not contact Google):
+
+```sh
+PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au npm run build
+PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au npx playwright test tests/e2e/public-origin.spec.ts
+```
