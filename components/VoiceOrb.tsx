@@ -233,7 +233,11 @@ export function VoiceOrb({
 }) {
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
-    [notice, setNotice] = useState("")
+    [notice, setNotice] = useState(""),
+    // Once Threadly speaks, the orb glides to the top so the chat, showing the
+    // reply as it would for a typed request, stays readable below it.
+    [docked, setDocked] = useState(false)
+  const overlay = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<Phase>("listening")
   const closed = useRef(false)
   const stop = useRef<() => void>(() => {})
@@ -247,6 +251,13 @@ export function VoiceOrb({
     stop.current()
     onClose(error)
   }
+  // Leave room for the docked orb above the conversation.
+  useEffect(() => {
+    const root = overlay.current?.closest(".threadly")
+    if (!docked || !root) return
+    root.classList.add("voice-docked")
+    return () => root.classList.remove("voice-docked")
+  }, [docked])
   useEffect(() => {
     const Recognition =
       (window as any).SpeechRecognition ||
@@ -290,6 +301,7 @@ export function VoiceOrb({
       }
       if (closed.current) return
       move("speaking")
+      setDocked(true)
       await speak(answer, (value) => (voice.level = value))
       if (!closed.current) listen()
     }
@@ -387,7 +399,8 @@ export function VoiceOrb({
   }, [])
   return (
     <div
-      className="voice-overlay"
+      ref={overlay}
+      className={`voice-overlay${docked ? " docked" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="Voice conversation">
