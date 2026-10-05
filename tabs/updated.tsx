@@ -10,28 +10,26 @@ export default function Updated() {
         <Logo height={40} />
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
-        <p className="update-intro">
-          A clearer view of your connections, right beside your inbox.
-        </p>
+        <p className="update-intro">A calmer space for your calendar.</p>
         <section>
-          <h2>Your connectors, in one place</h2>
+          <h2>Less clutter, clearer controls</h2>
           <p>
-            Click Gmail or Google Calendar in the conversation menu to see its
-            skills, tools and data sources.
+            Find your connections in the conversation menu. Compact skill pills
+            and expandable settings keep the essentials close.
           </p>
         </section>
         <section>
-          <h2>Know what’s ready</h2>
+          <h2>Calendar checks you can fix</h2>
           <p>
-            See which permissions are ready, which need your attention and which
-            actions aren’t available yet.
+            See which calendar could not be checked and review your selections
+            directly from the conversation.
           </p>
         </section>
         <section>
           <h2>You’re in control</h2>
           <p>
-            Reconnect your account, choose your calendars and working hours, or
-            disconnect Google from Threadly.
+            Review calendars after reconnecting, choose your working hours, and
+            save your changes. Threadly keeps your calendar choices explicit.
           </p>
         </section>
         <a

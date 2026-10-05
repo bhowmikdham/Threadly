@@ -1,6 +1,6 @@
 # Extension distribution and updates
 
-## Current state (0.2.0)
+## Current state (0.2.1)
 
 The public API is `https://api.threadly.au`. A store-ready build can be prepared,
 but no Chrome Web Store or Edge Add-ons publisher account or listing is configured.
@@ -93,3 +93,7 @@ and packaging passed. Screenshots use synthetic account/calendar data. The ZIP i
 0.2.0 preview, not a new store release; no version notice or publication is claimed.
 Live Google and backend deployment were not performed. A website ZIP does not update an
 installed unpacked extension; load the reviewed package explicitly when releasing it.
+
+Version 0.2.1 packages the Calendar refresh after explicit deployment authorization.
+The installed developer bundle and website download are updated separately from the
+backend; existing store publication remains unconfigured.
