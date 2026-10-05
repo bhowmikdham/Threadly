@@ -105,7 +105,12 @@ flowchart TD
   a new conversation.
 - An uncertain turn is retried with the identical request ID and body. Another
   message and any change to its email source are blocked until that turn resolves
-  or the user starts a new chat.
+  or the user starts a new chat. A tool-limit response retains that exact retry.
+  If an older browser lost the original body, the panel offers explicit recovery
+  using the server's pending request ID and version. It restores saved work as
+  an assistant result. Cancellation is offered separately only after the server
+  reports no saved result, and is still subject to the backend's active-lease and
+  linked-work checks. Neither recovery nor cancellation approves an event.
   A changed or unavailable pinned email asks for an explicit new source or for
   the user to continue without email context.
 - Draft editing preserves immutable revisions, invalidates old outgoing review,
@@ -202,6 +207,45 @@ readiness do not establish complete coverage for every provider read.
 
 Verification: 101 frontend tests passed, TypeScript check and production build
 passed. Built against merged frontend `ea905b1`, preserving the voice changes.
+
+### Interrupted conversations (2026-10-05)
+
+The reported sequence was a time-first booking (`book 2 pm tmrw for doctors
+appointment`) reaching `conversation_tool_limit`, followed by an availability
+question getting stuck on `conversation_retry_required`. The client now preserves
+the exact frozen booking request after a tool-limit error and reconciles the
+pending server request before offering a retry. It never replays a new question
+under an older request ID.
+
+For legacy chats with no matching local request body, **Recover unfinished
+response** calls `POST /assistant/conversations/{id}/recover` with
+`pending_request_id`, `expected_version`, and `operation: "recover"`. Only a
+`conversation_result_unavailable` response makes **Cancel unfinished request**
+available; that separate click uses `operation: "cancel"`. Busy, changed, or
+linked-work responses keep the chat blocked. A dropped recovery response can be
+replayed with the same request identity. Returned conversation ID, recovered
+request ID, and resulting version must match before the client resumes the chat.
+
+Recovered tasks, proposals, and event actions use the existing typed cards and
+approval controls. They do not fabricate a user instruction from saved output.
+In particular, only a confirmed succeeded action displays **Event created**;
+queued, uncertain, failed, and cancelled actions retain their own status.
+
+This frontend change is based on merged settings PR #90 (`ee115b3`) and leaves
+its Connectors/CSS implementation intact. Legacy recovery requires the separate
+backend Calendar wording/recovery follow-up and its `/recover` endpoint. The
+client keeps unfinished work blocked if that endpoint is unavailable. The backend
+owns booking interpretation, date/time normalization and timed availability;
+fake-API frontend checks are not evidence of live model interpretation.
+
+Local verification: 152 unit/controller tests, 31 packaged Chromium scenarios,
+TypeScript, formatting, local and public-origin builds passed. The public-origin
+scenario is skipped in the local build and checked separately against the public
+build. All 29 release-tool tests passed. Browser recovery cases cover the exact
+booking retry, explicit cancellation after busy/no-result responses, same-chat
+2 p.m. availability follow-up, and saved assistant-only recovery. Controller
+cases additionally cover saved event/task work, concurrent work, dropped recovery
+responses and mismatched ownership/version. No real Google writes were used.
 
 ## Direct Calendar events and approval menu (0.2.3)
 

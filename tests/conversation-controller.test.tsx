@@ -128,6 +128,123 @@ describe("backend-owned conversation", () => {
     ).toBe(true)
     expect(stored.at(-1)[0]["threadlyConversation:1"].pendingTurn).toBeNull()
   })
+  it("preserves a tool-limited booking for exact retry and then permits an availability question", async () => {
+    const calls: any[] = []
+    let limited = true
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (
+      m: any
+    ) => {
+      calls.push(m)
+      if (limited)
+        return {
+          ok: false,
+          error: {
+            code: "conversation_tool_limit",
+            message:
+              "I reached the limit for this request. Try a smaller question.",
+            status: 422
+          }
+        }
+      return {
+        ok: true,
+        data: respond(m, {
+          text:
+            m.body.expected_version === 0
+              ? "I couldn't prepare this event yet. I haven't confirmed a booking."
+              : "That time is available.",
+          ...(m.body.expected_version === 0
+            ? { error_code: "calendar_event_not_prepared" }
+            : {})
+        })
+      }
+    }) as any)
+    const { result } = renderHook(() => useAssistant(user))
+    await act(async () => {
+      await result.current.submit("book 2 pm tmrw for doctors appointment")
+    })
+    const issued = { ...calls[0].body }
+    expect(result.current.canRetry(result.current.entries[0])).toBe(true)
+    expect(result.current.entries[0].error).toContain("same details")
+    expect(result.current.entries[0].error).not.toMatch(
+      /smaller|new conversation/
+    )
+    expect(result.current.contextLocked).toBe(true)
+    await act(async () => {
+      await result.current.submit("am i free at 2 pm tmrw?")
+    })
+    expect(calls).toHaveLength(1)
+    limited = false
+    await act(async () => {
+      await result.current.retry(result.current.entries[0])
+    })
+    expect(calls[1].body).toEqual(issued)
+    expect(result.current.error).toBe("")
+    expect(result.current.entries[0].errorCode).toBe(
+      "calendar_event_not_prepared"
+    )
+    expect(result.current.entries[0].calendarActionId).toBeUndefined()
+    expect(result.current.canRetry(result.current.entries[0])).toBe(false)
+    expect(result.current.contextLocked).toBe(false)
+    await act(async () => {
+      await result.current.submit("am i free at 2 pm tmrw?")
+    })
+    expect(calls[2].body).toMatchObject({
+      conversation_id: issued.conversation_id,
+      expected_version: 1,
+      instruction: "am i free at 2 pm tmrw?",
+      timezone: issued.timezone
+    })
+    expect(calls[2].body.request_id).not.toBe(issued.request_id)
+    expect(result.current.entries).toHaveLength(2)
+    expect(result.current.entries[1].message).toBe("That time is available.")
+    expect(calls.every((c) => c.path === "/assistant/conversation-turns")).toBe(
+      true
+    )
+  })
+  it("does not repeatedly replay a new question when the server owns an older unfinished turn", async () => {
+    const calls: any[] = []
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (
+      m: any
+    ) => {
+      calls.push(m)
+      if (m.path === "/assistant/conversation-turns")
+        return {
+          ok: false,
+          error: {
+            code: "conversation_retry_required",
+            message: "Retry the unfinished message first.",
+            status: 409
+          }
+        }
+      return {
+        ok: true,
+        data: {
+          conversation_id: calls[0].body.conversation_id,
+          version: 0,
+          history: [],
+          pending_request_id: "older-booking"
+        }
+      }
+    }) as any)
+    const { result } = renderHook(() => useAssistant(user))
+    await act(async () => {
+      await result.current.submit("am i free at 2 pm tmrw?")
+    })
+    expect(calls).toHaveLength(2)
+    expect(calls[1].path).toBe(
+      `/assistant/conversations/${calls[0].body.conversation_id}`
+    )
+    expect(result.current.canRetry(result.current.entries[0])).toBe(false)
+    expect(result.current.entries[0].error).toContain(
+      "Another unfinished message"
+    )
+    await act(async () => {
+      await result.current.retry(result.current.entries[0])
+    })
+    expect(calls).toHaveLength(2)
+    const stored = (chrome.storage.session.set as any).mock.calls
+    expect(stored.at(-1)[0]["threadlyConversation:1"].pendingTurn).toBeNull()
+  })
   it("does not change email context while an unfinished turn needs retry", async () => {
     const key = "threadlyConversation:1"
     const saved: Record<string, any> = {}

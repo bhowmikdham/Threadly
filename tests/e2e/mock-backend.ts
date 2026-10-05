@@ -36,6 +36,15 @@ export type Call = {
 }
 // Switches a test can flip to exercise failure paths.
 export type MockControl = {
+  strandedConversation?: {
+    id: string
+    requestId: string
+    version: number
+    saved?: boolean
+    busy?: boolean
+    resolved?: boolean
+  }
+  failConversationToolLimit?: boolean
   failDisconnect?: boolean
   failRefresh?: number
   failLogout: boolean
@@ -216,11 +225,35 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       method: req.method!,
       authorized: Boolean(req.headers.authorization)
     })
+    if (conversational && control.failConversationToolLimit) {
+      res.statusCode = 422
+      res.setHeader("Content-Type", "application/json")
+      res.setHeader("Access-Control-Allow-Origin", "*")
+      res.end(
+        JSON.stringify({
+          error: {
+            code: "conversation_tool_limit",
+            message:
+              "I reached the limit for this request. Try a smaller question."
+          }
+        })
+      )
+      return
+    }
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
-      if (body.instruction === "Create Focus at 2pm tomorrow")
+      if (
+        [
+          "Create Focus at 2pm tomorrow",
+          "book 2 pm tmrw for doctors appointment"
+        ].includes(body.instruction)
+      )
         p = "/fixture/calendar-create"
-      else if (body.instruction === "am i free on the tuesday")
+      else if (
+        ["am i free on the tuesday", "am i free at 2 pm tmrw?"].includes(
+          body.instruction
+        )
+      )
         p = "/fixture/calendar-answer"
       else if (
         body.instruction === "hey" ||
@@ -278,7 +311,60 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p.endsWith("/calendar-approval")) {
+    const stranded = control.strandedConversation
+    if (stranded && p === `/assistant/conversations/${stranded.id}`) {
+      data = {
+        conversation_id: stranded.id,
+        version: stranded.version,
+        history: [],
+        pending_request_id: stranded.resolved ? null : stranded.requestId
+      }
+    } else if (
+      stranded &&
+      p === `/assistant/conversations/${stranded.id}/recover`
+    ) {
+      verify(
+        "recovery owns the original request",
+        body.pending_request_id,
+        stranded.requestId
+      )
+      verify(
+        "recovery uses the fetched version",
+        body.expected_version,
+        stranded.version
+      )
+      const code = stranded.busy
+        ? "conversation_busy"
+        : body.operation === "recover" && !stranded.saved
+          ? "conversation_result_unavailable"
+          : null
+      if (code) {
+        res.statusCode = 409
+        data = {
+          error: {
+            code,
+            message:
+              code === "conversation_busy"
+                ? "The response is still being prepared. Try shortly."
+                : "No result was saved."
+          }
+        }
+      } else {
+        stranded.resolved = true
+        data = {
+          conversation_id: stranded.id,
+          recovered_request_id: stranded.requestId,
+          version: stranded.version + 1,
+          kind: "message",
+          text: stranded.saved
+            ? "Your saved response is available again."
+            : "The unfinished request was cancelled. You can continue this chat.",
+          error_code: stranded.saved
+            ? undefined
+            : "conversation_request_cancelled"
+        }
+      }
+    } else if (p.endsWith("/calendar-approval")) {
       const cid = p.split("/")[3]
       const previous = calendarPermissions.get(cid) || {
         mode: "ask",
@@ -314,7 +400,11 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
             calendar_name: "Personal calendar",
             send_updates: "none",
             event: {
-              summary: "Focus",
+              summary:
+                originalTurn.instruction ===
+                "book 2 pm tmrw for doctors appointment"
+                  ? "doctors appointment"
+                  : "Focus",
               location: "",
               description: "",
               attendees: [],

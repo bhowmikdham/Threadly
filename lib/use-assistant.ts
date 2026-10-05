@@ -35,6 +35,14 @@ type PendingTurn = {
   body: Readonly<ConversationTurnBody>
 }
 
+type ConversationRecovery = {
+  conversationId: string
+  requestId: string
+  version: number
+  canCancel: boolean
+  message: string
+}
+
 type SelectionReference = {
   threadId: string
   threadVersion: number
@@ -101,6 +109,7 @@ export function useAssistant(user: User) {
     [contextBlocked, setContextBlocked] = useState(false),
     [restoring, setRestoring] = useState(true),
     [restoreFailed, setRestoreFailed] = useState(false)
+  const [recovery, setRecovery] = useState<ConversationRecovery | null>(null)
   const mounted = useRef(true),
     polling = useRef(new Set<string>()),
     submitting = useRef(false),
@@ -112,6 +121,18 @@ export function useAssistant(user: User) {
     pinnedCapture = useRef<{ selection: Selection; id: string } | null>(null),
     storageQueue = useRef<Promise<void>>(Promise.resolve())
   const storageKey = `threadlyConversation:${user.id}`
+  const unresolvedTurn = () => Boolean(retryTurn.current || recovery)
+  const offerRecovery = (value: any) => {
+    if (!value.pending_request_id) return
+    setRecovery({
+      conversationId: value.conversation_id,
+      requestId: value.pending_request_id,
+      version: value.version,
+      canCancel: false,
+      message:
+        "An earlier response is unfinished. Recover any saved result before continuing this chat."
+    })
+  }
   const queueStorage = (write: () => Promise<void> | undefined) => {
     const next = storageQueue.current
       .catch(() => undefined)
@@ -321,6 +342,7 @@ export function useAssistant(user: User) {
             }
           }
         }
+        if (value.pending_request_id && !retryTurn.current) offerRecovery(value)
         setEntries(restoredEntries)
         const pendingEmailWithoutSelection =
           typeof retryTurn.current?.body.context_snapshot_id === "string" &&
@@ -516,7 +538,7 @@ export function useAssistant(user: User) {
     }
   }
   const selectActive = async (quiet = false) => {
-    if (retryTurn.current) {
+    if (unresolvedTurn()) {
       if (!quiet)
         setError(
           "Retry the unfinished message or start a new conversation before changing its email."
@@ -549,7 +571,7 @@ export function useAssistant(user: User) {
     }
   }
   const selectThread = async (id: string) => {
-    if (retryTurn.current) {
+    if (unresolvedTurn()) {
       setError(
         "Retry the unfinished message or start a new conversation before changing its email."
       )
@@ -578,7 +600,7 @@ export function useAssistant(user: User) {
   }
   const chooseEmail = async (mail: InboxResult) => {
     if (busy) return
-    if (retryTurn.current) {
+    if (unresolvedTurn()) {
       setError(
         "Retry the unfinished message or start a new conversation before changing its email."
       )
@@ -615,7 +637,7 @@ export function useAssistant(user: User) {
   }
   const activeSearch = () => [...entries].reverse().find((e) => e.inbox)
   const canPage = (entry: Entry) =>
-    !retryTurn.current &&
+    !unresolvedTurn() &&
     !contextBlocked &&
     activeSearch()?.id === entry.id &&
     Boolean(entry.inbox?.next_cursor)
@@ -665,8 +687,12 @@ export function useAssistant(user: User) {
       )
       return
     }
-    if (retryTurn.current) {
-      setError("Retry the unfinished message, or start a new conversation.")
+    if (unresolvedTurn()) {
+      setError(
+        recovery
+          ? "Recover the unfinished response before continuing, or start a new chat."
+          : "Retry the unfinished message, or start a new conversation."
+      )
       return
     }
     submitting.current = true
@@ -771,15 +797,19 @@ export function useAssistant(user: User) {
       throw new Error(
         "The server returned an inconsistent conversation version."
       )
-    conversation.current = {
-      id: turn.conversation_id,
-      version: Math.max(conversation.current.version, turn.version)
-    }
     if ("context_snapshot_id" in body) {
       contextCleared.current = false
       selectionOverride.current = null
     }
+    await completeTurn(id, turn)
+  }
+  const completeTurn = async (id: string, turn: any) => {
+    conversation.current = {
+      id: turn.conversation_id,
+      version: Math.max(conversation.current.version, turn.version)
+    }
     retryTurn.current = null
+    setRecovery(null)
     update(id, {
       pending: false,
       message: turn.text,
@@ -832,8 +862,13 @@ export function useAssistant(user: User) {
   const reconcileTurnError = async (id: string, failure: any) => {
     let message = errorText(failure)
     const pending = retryTurn.current
+    if (failure?.code === "conversation_tool_limit" && pending?.id === id)
+      message =
+        "Threadly couldn't finish this request. Retry response to continue with the same details."
     if (
-      failure?.code === "conversation_version_conflict" &&
+      ["conversation_version_conflict", "conversation_retry_required"].includes(
+        failure?.code
+      ) &&
       pending?.id === id
     ) {
       try {
@@ -856,8 +891,9 @@ export function useAssistant(user: User) {
           latest.pending_request_id !== pending.body.request_id
         ) {
           retryTurn.current = null
+          offerRecovery(latest)
           message =
-            "Another unfinished message owns this conversation. Review the chat or start a new one."
+            "Another unfinished message owns this conversation. Recover that response before sending this question again."
           try {
             await saveConversation(null)
           } catch (e) {
@@ -891,7 +927,8 @@ export function useAssistant(user: User) {
     } else if (
       pending?.id === id &&
       ((failure?.status === 404 && pending.body.expected_version > 0) ||
-        failure?.status === 422 ||
+        (failure?.status === 422 &&
+          failure?.code !== "conversation_tool_limit") ||
         ["conversation_account_changed", "idempotency_conflict"].includes(
           failure?.code
         ))
@@ -910,6 +947,7 @@ export function useAssistant(user: User) {
     if (submitting.current || retryTurn.current?.id !== entry.id) return
     submitting.current = true
     setBusy(true)
+    setError("")
     update(entry.id, { pending: true, error: undefined, errorCode: undefined })
     try {
       await saveConversation(retryTurn.current)
@@ -919,6 +957,64 @@ export function useAssistant(user: User) {
     } finally {
       submitting.current = false
       setBusy(false)
+    }
+  }
+  const recoverConversation = async (operation: "recover" | "cancel") => {
+    const pending = recovery
+    if (
+      !pending ||
+      submitting.current ||
+      (operation === "cancel" && !pending.canCancel) ||
+      pending.conversationId !== conversation.current.id
+    )
+      return
+    submitting.current = true
+    setBusy(true)
+    setError("")
+    try {
+      const turn = await api(
+        `/assistant/conversations/${pending.conversationId}/recover`,
+        {
+          pending_request_id: pending.requestId,
+          expected_version: pending.version,
+          operation
+        }
+      )
+      if (
+        turn.conversation_id !== pending.conversationId ||
+        turn.recovered_request_id !== pending.requestId ||
+        turn.version !== pending.version + 1
+      )
+        throw new Error(
+          "The saved response could not be matched to this chat. Reopen Threadly to refresh it."
+        )
+      // Saved work is an assistant result, never a reconstructed user instruction.
+      setEntries((old) =>
+        old.some((entry) => entry.id === pending.requestId)
+          ? old
+          : [...old, { id: pending.requestId, instruction: "" }]
+      )
+      await completeTurn(pending.requestId, turn)
+    } catch (e) {
+      setRecovery({
+        ...pending,
+        canCancel:
+          e?.code === "conversation_result_unavailable" ||
+          (pending.canCancel &&
+            ![
+              "conversation_result_available",
+              "conversation_work_exists",
+              "conversation_pending_changed",
+              "conversation_version_conflict"
+            ].includes(e?.code)),
+        message:
+          e?.code === "conversation_result_unavailable"
+            ? "No response was saved. You can cancel this unfinished request to continue. Threadly will check for linked work first."
+            : errorText(e)
+      })
+    } finally {
+      submitting.current = false
+      if (mounted.current) setBusy(false)
     }
   }
   const deleteChat = async () => {
@@ -941,6 +1037,7 @@ export function useAssistant(user: User) {
       }
       conversation.current = { id: requestId(), version: 0 }
       retryTurn.current = null
+      setRecovery(null)
       contextRevision.current += 1
       selectionOverride.current = null
       setRestoreFailed(false)
@@ -1085,6 +1182,7 @@ export function useAssistant(user: User) {
       setError("")
       conversation.current = { id: requestId(), version: 0 }
       retryTurn.current = null
+      setRecovery(null)
       contextRevision.current += 1
       selectionOverride.current = null
       pinnedCapture.current = null
@@ -1165,7 +1263,7 @@ export function useAssistant(user: User) {
     entries,
     selection,
     setSelection: (value: Selection | null) => {
-      if (retryTurn.current) {
+      if (unresolvedTurn()) {
         setError(
           "Retry the unfinished message or start a new conversation before changing its email."
         )
@@ -1184,7 +1282,7 @@ export function useAssistant(user: User) {
     },
     contextBlocked,
     clearContext: () => {
-      if (retryTurn.current) {
+      if (unresolvedTurn()) {
         setError(
           "Retry the unfinished message or start a new conversation before detaching its email."
         )
@@ -1202,7 +1300,9 @@ export function useAssistant(user: User) {
     busy,
     restoring,
     restoreFailed,
-    contextLocked: Boolean(retryTurn.current),
+    contextLocked: unresolvedTurn(),
+    recovery,
+    recoverConversation,
     pendingUsesHiddenEmail:
       typeof retryTurn.current?.body.context_snapshot_id === "string" &&
       !selection,
@@ -1236,6 +1336,7 @@ export function useAssistant(user: User) {
         }
         conversation.current = { id: requestId(), version: 0 }
         retryTurn.current = null
+        setRecovery(null)
         contextRevision.current += 1
         selectionOverride.current = null
         setRestoreFailed(false)
