@@ -155,7 +155,11 @@ async def propose(
         or artifact.revision != expected_revision
     ):
         raise ApiError(409, "revision_conflict", "Use the current completed artifact.")
-    kinds = {"draft"} if action_type == "send_email" else {"schedule_options", "availability"}
+    kinds = (
+        {"draft"}
+        if action_type == "send_email"
+        else {"schedule_options", "availability", "calendar_event"}
+    )
     if artifact.payload.get("kind") not in kinds:
         raise ApiError(409, "action_artifact_mismatch", "Artifact cannot support this action type.")
     now = await session.scalar(select(func.clock_timestamp()))

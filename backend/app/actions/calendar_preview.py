@@ -159,6 +159,10 @@ async def blockers(session, owner, action):
     if action.expires_at <= await session.scalar(select(func.clock_timestamp())):
         result.append("action_expired")
     try:
+        if action.source_versions.get("direct"):
+            from app.calendar.event_creation import blockers as direct_blockers
+
+            return result + await direct_blockers(session, owner, action)
         user = await ready_account(session, owner)
         selection, neg, thread, selected, query = await selection_source(
             session, owner, action.source_versions["selection_id"]
@@ -206,7 +210,10 @@ async def view(session, owner, action_id):
         "approval_available": action.state == "proposed" and not reasons and enabled(owner),
         "result": action.result,
         "error_code": action.error_code,
-        "authorization": "separate_exact_event_approval",
+        "authorization": "chat_permission"
+        if action.source_versions.get("approval_mode") == "always"
+        else "separate_exact_event_approval",
+        "calendar_name": action.payload.get("calendar_name"),
         "atomic_with_email": False,
     }
 

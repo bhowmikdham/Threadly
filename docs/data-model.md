@@ -544,3 +544,24 @@ Every renewal rechecks the live user under the existing row lock, so disconnect,
 logout and account changes invalidate saved credentials. The extension's durable
 record is origin-bound and restricted to trusted extension contexts; its mailbox
 content and transient conversation state are not moved into durable storage.
+
+
+### Chat Calendar approval and direct event candidates (1.5.0)
+
+Migration `c061026e9041` follows `c33026e9a040`. `conversations` adds
+`calendar_approval_mode` (ask/always, default ask), `calendar_approval_version`
+(default 0) and nullable `calendar_approval_session_version`. Existing rows remain
+Ask. The mode is independent from turn versions and fenced by the User lock at
+mutation and write dispatch. A new sign-in generation makes an old grant ineffective.
+Downgrade removes these fields; it does not remove action audit records.
+
+Direct events use an immutable `calendar_event` artifact in a completed
+`direct-calendar-event-1.0.0` task, then existing `AssistantAction`, exact
+`ActionApproval`, `ActionJob` and `ActionAttempt` records. Sources include
+`direct`, conversation ID, account/subject/preferences/session versions and saved
+approval mode/version. Always permission is checked again before dispatch. Stable
+request-derived task/artifact/provider IDs and a transactional conversation checkpoint
+prevent duplicate candidates after an interrupted response. The frozen event and its
+exact hash remain the authorization target; no new external-write executor exists.
+Pending user event details (15-minute expiry) stay in encrypted conversation state;
+complete event previews are not duplicated into conversation receipts/history.

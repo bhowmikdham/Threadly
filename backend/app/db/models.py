@@ -1088,6 +1088,10 @@ class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
         CheckConstraint("version >= 0", name="ck_conversation_version"),
+        CheckConstraint(
+            "calendar_approval_mode IN ('ask','always') AND calendar_approval_version >= 0",
+            name="ck_conversation_calendar_approval",
+        ),
         Index("ix_conversations_expiry", "expires_at"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -1100,3 +1104,6 @@ class Conversation(TimestampMixin, Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     pending_request_id: Mapped[str | None] = mapped_column(String(36))
     pending_hash: Mapped[str | None] = mapped_column(String(64))
+    calendar_approval_mode: Mapped[str] = mapped_column(String(16), server_default="ask")
+    calendar_approval_version: Mapped[int] = mapped_column(server_default="0")
+    calendar_approval_session_version: Mapped[int | None]

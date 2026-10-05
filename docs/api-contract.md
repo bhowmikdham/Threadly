@@ -1103,3 +1103,44 @@ and the fixed deadline as `exp`. Access expiry is capped at that deadline.
 Expired, tampered and revoked credentials return 401. All responses remain
 no-store. Logout, disconnect, account replacement and deletion invalidate the
 renewal credential through the existing live `av`/`sv` checks and locked refresh.
+
+
+### Direct Calendar events and chat approval (conversation 1.5.0)
+
+`prepare_calendar_event` is a terminal conversation tool for a user-requested,
+one-time event without an email context. It accepts literal user title, location,
+description, attendee addresses and calendar name; structured `date` with
+`date_source`, normalized `time` with `time_source`, and optional literal
+`duration_phrase`. Missing title/date/time prompts retain user details and the
+original date anchor for 15 minutes. `continue_previous: true` fills that pending
+request. Unrelated completed turns clear it. Unsupported recurrence or end-time
+constraints are clarified. Saved Calendar timezone and default duration apply;
+explicit times may fall outside working hours. Dates are bounded to the next 90 days.
+
+The result has `kind: calendar_event`, `calendar_action_id` and a fresh
+`calendar_action` using the existing Calendar action API. The preview includes the
+resolved start/end/timezone, destination name, guests and invitation behavior.
+History retains only the action ID; clients reread its status on restore. A queued
+or uncertain event is never described as created. Missing event write scope returns
+`calendar_write_scope_required` and `calendar_connection_required: true` for setup.
+
+Authenticated UI control, unavailable to the model:
+
+- `GET /assistant/conversations/{uuid}/calendar-approval` →
+  `{mode: "ask" | "always", version: integer, scope: "calendar_events_this_chat"}`.
+  An unused chat defaults to ask without creating a record.
+- `PUT` the same path with `{mode, expected_version}` saves a versioned setting;
+  stale versions return 409, another owner's chat returns 404. Chat retention
+  limits apply. The mode is bound to the account and current sign-in generation.
+- Ask mode creates a proposed exact payload for the existing `/calendar-actions/{id}/approve`
+  endpoint. Always mode uses the saved chat permission to create the same exact
+  approval record and queue the same worker; the model cannot supply authorization.
+  It includes sending invitations to explicitly supplied email addresses.
+- Switching to Ask, deleting the chat, signing out, or changing account/preferences
+  prevents queued automatic events from dispatching. Events already dispatched
+  reconcile by exact provider ID; revocation cannot recall them. New chats ask again.
+
+Calendar writes still require the pilot allowlist, enabled reconciliation and Google
+`calendar.events` consent, alongside existing Calendar read/list grants. The worker
+rechecks live destination ACL and selected-calendar free/busy immediately before
+insertion. No automatic overwrite of busy time or unknown calendar coverage occurs.
