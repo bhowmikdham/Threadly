@@ -27,9 +27,9 @@ Google OAuth is not configured on the last confirmed staging deployment.
 | `POST /auth/google/reconnect` | Existing JWT; same request plus optional `capabilities` | Same result, bound to the current user and account version |
 | `POST /auth/google/exchange` | `code`, `redirect_uri`, returned `state`, original `code_verifier` | Existing `{jwt,user:{id,email,name}}` response |
 | `POST /auth/google/disconnect` | Existing JWT; no body | `{connected:false,provider_revocation:"not_requested"}` |
-| `POST /auth/logout` | Existing JWT; no body | `{signed_out:true,scope:"all_sessions"}`; Google grant remains connected |
+| `POST /auth/logout` | Valid access or scoped renewal JWT; no body | `{signed_out:true,scope:"all_sessions"}`; Google grant remains connected |
 | `GET /assistant/capabilities` | Existing JWT; no user ID input | Owned account, capability list and reconnect contract |
-| `POST /auth/refresh` | Live, generation-bound JWT | Threadly JWT renewal after a locked account check; does not refresh Google grants |
+| `POST /auth/refresh` | Live generation-bound access or scoped renewal JWT | Access/renewal pair after a locked account check; preserves fixed renewal expiry and does not refresh Google grants |
 
 For each login, a future client generates a random RFC 7636 verifier (43–128 valid
 characters), keeps it private and sends its base64url SHA-256 challenge to `begin`.
@@ -231,3 +231,9 @@ Google identity, and authenticated reconnect still rejects a different subject.
 Optional `calendar_events_read` adds event-detail visibility to the existing
 Calendar list/free-busy grant. See [on-demand agenda](calendar-agenda.md). External/Testing Google
 consent and the local SSM-only API still limit who can connect in practice.
+
+Persistent-login renewal credentials are accepted only by refresh/logout. They
+carry `token_use=refresh`, positive account/session generations and a fixed
+expiry (default 30 days). They cannot authorize capabilities, Calendar, Gmail or
+Google reconnect/disconnect directly. All existing revocation rules above apply.
+See the persistent-login contract in `api-contract.md`.

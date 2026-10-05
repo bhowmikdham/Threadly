@@ -17,20 +17,63 @@ from app.db.models import GoogleOAuthSession, User
 _EXPIRY_SLACK = timedelta(seconds=120)
 
 
-def issue_session_jwt(user_id: int, account_version: int, session_version: int) -> str:
+def issue_session_jwt(
+    user_id: int, account_version: int, session_version: int, *, expires_at: int | None = None
+) -> str:
     """Bind the bearer to one verified Google connection generation."""
     if user_id <= 0 or account_version <= 0 or session_version <= 0:
         raise ValueError("A live account generation is required")
     settings = get_settings()
     now = datetime.now(UTC)
+    deadline = expires_at or int((now + timedelta(days=settings.session_refresh_days)).timestamp())
     payload = {
         "sub": str(user_id),
         "av": account_version,
         "sv": session_version,
         "iat": now,
-        "exp": now + timedelta(minutes=settings.jwt_ttl_minutes),
+        "token_use": "access",
+        "session_exp": deadline,
+        "exp": min(
+            now + timedelta(minutes=settings.jwt_ttl_minutes),
+            datetime.fromtimestamp(deadline, UTC),
+        ),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def issue_refresh_jwt(
+    user_id: int, account_version: int, session_version: int, *, expires_at: int | None = None
+) -> str:
+    """A renewal-only credential; never accepted by application/Google routes.
+
+    Renewal keeps the original expiry. Account and session generations make sign-out,
+    disconnect and another login invalidate this credential immediately.
+    """
+    if user_id <= 0 or account_version <= 0 or session_version <= 0:
+        raise ValueError("A live account generation is required")
+    settings = get_settings()
+    now = datetime.now(UTC)
+    return jwt.encode(
+        {
+            "sub": str(user_id),
+            "av": account_version,
+            "sv": session_version,
+            "token_use": "refresh",
+            "iat": now,
+            "exp": expires_at or now + timedelta(days=settings.session_refresh_days),
+        },
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def refresh_token_for(access_token: str) -> str:
+    """Issue a renewal credential with the same fixed deadline as this new access token."""
+    settings = get_settings()
+    payload = jwt.decode(access_token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+    return issue_refresh_jwt(
+        int(payload["sub"]), payload["av"], payload["sv"], expires_at=payload["session_exp"]
+    )
 
 
 async def exchange_code(
@@ -100,6 +143,7 @@ async def refresh_session_jwt(
     user_id: int,
     expected_account_version: int,
     expected_session_version: int,
+    refresh_expires_at: int | None = None,
 ) -> str:
     """Mint only while the account still matches the authenticated bearer.
 
@@ -114,7 +158,14 @@ async def refresh_session_jwt(
         or user.threadly_session_version != expected_session_version
     ):
         raise ApiError(401, "reauth_required", "Sign in with Google again.")
-    token = issue_session_jwt(user.id, user.google_account_version, user.threadly_session_version)
+    if refresh_expires_at is not None and refresh_expires_at <= int(datetime.now(UTC).timestamp()):
+        raise ApiError(401, "token_expired", "Sign in with Google again.")
+    token = issue_session_jwt(
+        user.id,
+        user.google_account_version,
+        user.threadly_session_version,
+        expires_at=refresh_expires_at,
+    )
     await session.rollback()  # release the lock without committing caller-owned changes
     return token
 

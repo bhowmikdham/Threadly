@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentSession
+from app.api.deps import CurrentSession, RenewalSession
 from app.api.errors import ApiError
 from app.auth import flow, service
 from app.auth.limits import OAuthIngressRoute
@@ -67,6 +67,7 @@ class UserOut(BaseModel):
 
 class ExchangeOut(BaseModel):
     jwt: str
+    refresh_token: str
     user: UserOut
 
 
@@ -111,7 +112,9 @@ async def google_exchange(body: ExchangeIn, session: DB) -> ExchangeOut:
     )
     await session.commit()
     return ExchangeOut(
-        jwt=token, user=UserOut(id=user.id, email=user.email, name=user.display_name)
+        jwt=token,
+        user=UserOut(id=user.id, email=user.email, name=user.display_name),
+        refresh_token=service.refresh_token_for(token),
     )
 
 
@@ -129,6 +132,7 @@ async def google_disconnect(authenticated: CurrentSession):
 
 class RefreshOut(BaseModel):
     jwt: str
+    refresh_token: str
 
 
 class LogoutOut(BaseModel):
@@ -137,7 +141,7 @@ class LogoutOut(BaseModel):
 
 
 @router.post("/logout", response_model=LogoutOut)
-async def logout(authenticated: CurrentSession, session: DB) -> LogoutOut:
+async def logout(authenticated: RenewalSession, session: DB) -> LogoutOut:
     await service.logout_threadly_session(
         session,
         user_id=authenticated.user_id,
@@ -148,12 +152,12 @@ async def logout(authenticated: CurrentSession, session: DB) -> LogoutOut:
 
 
 @router.post("/refresh", response_model=RefreshOut)
-async def refresh(authenticated: CurrentSession, session: DB) -> RefreshOut:
-    return RefreshOut(
-        jwt=await service.refresh_session_jwt(
-            session,
-            user_id=authenticated.user_id,
-            expected_account_version=authenticated.account_version,
-            expected_session_version=authenticated.session_version,
-        )
+async def refresh(authenticated: RenewalSession, session: DB) -> RefreshOut:
+    token = await service.refresh_session_jwt(
+        session,
+        user_id=authenticated.user_id,
+        expected_account_version=authenticated.account_version,
+        expected_session_version=authenticated.session_version,
+        refresh_expires_at=authenticated.refresh_expires_at,
     )
+    return RefreshOut(jwt=token, refresh_token=service.refresh_token_for(token))

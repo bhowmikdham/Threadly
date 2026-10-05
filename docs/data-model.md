@@ -534,3 +534,13 @@ conversation expiry apply. Completion clears this record when the turn did not
 continue a Calendar read. Valid retries retain it through recoverable failures;
 idempotent request receipts still prevent duplicate reads for the same turn. No
 schema migration or extension storage change is needed.
+
+### Persistent login credentials
+
+No database schema or additional Google token storage is introduced. The renewal
+JWT is a bearer credential with a fixed expiry and the same user/account/session
+generations as the access JWT. New access JWTs also bind the fixed session expiry.
+Every renewal rechecks the live user under the existing row lock, so disconnect,
+logout and account changes invalidate saved credentials. The extension's durable
+record is origin-bound and restricted to trusted extension contexts; its mailbox
+content and transient conversation state are not moved into durable storage.

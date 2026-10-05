@@ -28,7 +28,7 @@ cached results may still come from legacy inference.
 ## Conventions
 
 - Base URL: `https://<DOMAIN>` (dev: `http://localhost:8000`)
-- Auth: `Authorization: Bearer <session JWT>` on protected routes. Auth begin/exchange are public; reconnect, disconnect and session refresh require JWT.
+- Auth: `Authorization: Bearer <session JWT>` on protected routes. Auth begin/exchange are public; reconnect and disconnect require an access JWT; session refresh/logout also accept the scoped renewal JWT.
 - Content type: JSON unless stated
 - IDs: Gmail thread/message ids are passed as opaque strings
 
@@ -217,8 +217,8 @@ invocation or frontend integration. See the
 | Method | Path                    | Body                    | Returns |
 |--------|-------------------------|-------------------------|---------|
 | POST   | `/auth/google/exchange` | `code`, exact `redirect_uri`, one-use `state`, original `code_verifier` from the B01 handshake below | `{"jwt": "...", "user": {"id", "email", "name"}}` |
-| POST   | `/auth/refresh`         | — (valid JWT)           | `{"jwt": "..."}` |
-| POST   | `/auth/logout`          | — (valid JWT)           | `{"signed_out":true,"scope":"all_sessions"}`; Google remains connected |
+| POST   | `/auth/refresh`         | — (valid access or renewal JWT) | `{"jwt":"...","refresh_token":"..."}` |
+| POST   | `/auth/logout`          | — (valid access or renewal JWT)           | `{"signed_out":true,"scope":"all_sessions"}`; Google remains connected |
 
 ### Health
 | Method | Path       | Returns |
@@ -1085,3 +1085,21 @@ A retry preserves the requested day and uses the current clock for remaining-day
 availability. Unknown coverage remains unknown; retrying does not suppress failed
 calendars. An unrelated completed turn closes the active Calendar request. Legacy
 conversations lacking a reliable original date may require one clarification.
+
+### Persistent extension login
+
+Google exchange and `/auth/refresh` now return an additional `refresh_token`. This
+is a Threadly renewal JWT, not a Google credential. The extension retains the pair
+in local extension storage restricted to trusted extension contexts. Renewal uses
+`Authorization: Bearer <refresh_token>` only on `/auth/refresh` or `/auth/logout`.
+Every other protected endpoint rejects renewal credentials. A valid legacy access
+JWT can bootstrap the pair without another Google consent flow.
+
+Access tokens retain `JWT_TTL_MINUTES` (default 24 hours). Renewal is bounded by
+`SESSION_REFRESH_DAYS` (default 30, allowed 1–90); renewal never advances the
+original deadline, even when called with an access token. New access tokens carry
+`token_use: access` and `session_exp`; renewal tokens carry `token_use: refresh`
+and the fixed deadline as `exp`. Access expiry is capped at that deadline.
+Expired, tampered and revoked credentials return 401. All responses remain
+no-store. Logout, disconnect, account replacement and deletion invalidate the
+renewal credential through the existing live `av`/`sv` checks and locked refresh.
