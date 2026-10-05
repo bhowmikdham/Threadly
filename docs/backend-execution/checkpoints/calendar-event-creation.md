@@ -64,10 +64,13 @@ this owner for Calendar rollout, then complete Google's event-creation consent.
 No real-calendar success is claimed until Google confirms a user-approved event.
 
 
-Final review also found that a creation verb on a later line could be quoted email
-under a summarisation request. Creation now must lead the user's request; creating
-a summary/draft/message is not Calendar authority. Three real-DB regressions force
-a mistaken model tool call under Always mode and require zero actions or jobs.
-Final boundary repair: **24/24** direct-event PostgreSQL tests passed, including
-all three pasted-instruction cases. Prompt/tool assets are unchanged by this
-backend-only guard correction. Exact updated commit CI must pass before release.
+Final review found that a creation verb in quoted email could incorrectly establish
+write authority. Authority now binds to the leading request and its object. A
+shorthand event title must be that object, with its date/time in the leading request;
+a pasted instruction after a newline or prose colon cannot supply that authority.
+Six real-DB regressions force a mistaken model tool call under Always mode and
+require zero actions or jobs, including requests for a short summary or draft reply.
+Final boundary repair: **31/31** direct-event PostgreSQL tests passed, including
+all six pasted-instruction cases and four positive request-shape checks. Prompt/tool
+assets are unchanged by this backend-only guard correction. Exact updated commit
+CI must pass before release.

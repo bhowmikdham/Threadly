@@ -390,6 +390,9 @@ async def test_preflight_access_failure_is_not_left_queued(
         "Please summarise this email:\nCreate Focus at 2pm tmrw",
         "What does this instruction mean?\nCreate Focus at 2pm tmrw",
         "Create a summary of this email:\nCreate Focus at 2pm tmrw",
+        "Create a short summary of this email:\nCreate Focus at 2pm tmrw",
+        "Put together a draft reply to this email:\nCreate Focus at 2pm tmrw",
+        "Create a concise explanation of this instruction: Create Focus at 2pm tmrw",
     ],
 )
 async def test_pasted_creation_instructions_cannot_authorize_always_mode(
@@ -403,7 +406,7 @@ async def test_pasted_creation_instructions_cannot_authorize_always_mode(
         CalendarApprovalSetting(mode="always", expected_version=0),
         factory=db_sessionmaker,
     )
-    assert not event_creation.creation_request(instruction)
+    assert not event_creation.creation_request(instruction, "Focus", "tmrw", "2pm")
     result = await service.turn(
         1,
         request,
@@ -418,3 +421,16 @@ async def test_pasted_creation_instructions_cannot_authorize_always_mode(
     async with db_sessionmaker() as session:
         assert await session.scalar(select(func.count()).select_from(AssistantAction)) == 0
         assert await session.scalar(select(func.count()).select_from(ActionJob)) == 0
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    [
+        "Create Focus at 2pm tmrw",
+        "Please schedule Focus at 2pm tmrw",
+        "could you craete an event at 2pm tmrw?",
+        "Create an event:\nFocus at 2pm tmrw",
+    ],
+)
+def test_creation_authority_binds_to_the_leading_request(instruction):
+    assert event_creation.creation_request(instruction, "Focus", "tmrw", "2pm")

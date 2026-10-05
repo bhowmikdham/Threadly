@@ -30,26 +30,40 @@ from app.schemas.calendar_tools import CalendarWindow
 POLICY = "direct-calendar-event-1.0.0"
 
 
-def creation_request(text):
+def creation_request(text, title="", date_source="", time_source=""):
     text = text.casefold().replace("craete", "create").replace("creat ", "create ")
     if re.search(r"\b(?:don't|do not|never|cancel|delete|remove|reschedule|update)\b", text):
         return False
-    if re.search(
-        r"\b(?:create|add|put)\s+(?:(?:for me|a|an|the|this)\s+)*"
-        r"(?:summary|summaries|draft|reply|email|message|explanation|translation|instructions?)\b",
-        text,
-    ):
+    # Only the leading request can confer authority. Pasted text after a newline
+    # or a prose colon is data. A 24-hour clock's colon is not a prose delimiter.
+    leading = re.split(r"\n|(?<!\d):(?!\d)", text.strip(), maxsplit=1)[0]
+    match = re.match(
+        r"^\s*(?:(?:please|hey)[, ]+)?"
+        r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
+        r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
+        r"(?:create|add|book|schedule|put|block)\s+"
+        r"(?:(?:me|a|an|the|my|new|single|one-time)\s+)*(?P<object>.+)",
+        leading,
+    )
+    if not match:
         return False
-    # Creation must be the user's leading request. A later line can be pasted
-    # email, quoted instructions or other data, and cannot authorize a write.
+    target = match["object"]
+    if re.match(
+        r"(?:calendar\s+)?(?:event|meeting|appointment|call|time block)"
+        r"(?:[?.!]*$|\s+(?:called|named|titled|at|on|for|with|tomorrow|today)\b)",
+        target,
+    ):
+        return True
+    # Shorthand such as "Create Focus at 2pm tmrw" must bind the actual
+    # candidate title as the verb's object, with its date/time in this request.
+    # A title/time found only inside the pasted email cannot meet this check.
     return bool(
-        re.search(
-            r"^\s*(?:(?:please|hey)[, ]+)?"
-            r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
-            r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
-            r"(?:create|add|book|schedule|put|block)\s+",
-            text,
-        )
+        title
+        and date_source
+        and time_source
+        and re.match(re.escape(title.casefold()) + r"(?!\w)", target)
+        and date_source.casefold() in leading
+        and time_source.casefold() in leading
     )
 
 
@@ -146,7 +160,7 @@ async def prepare(runtime, args):
             }
         )
         args = PrepareCalendarEvent.model_validate(values)
-    if not creation_request(text):
+    if not creation_request(text, args.title, args.date_source, args.time_source):
         raise RequestClarification("Tell me the event you want to create.")
     try:
         source_fields(args, text)

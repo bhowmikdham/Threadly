@@ -75,7 +75,7 @@ class SyntheticRuntime:
                         **args.model_dump(exclude_unset=True),
                     }
                 )
-            assert creation_request(text)
+            assert creation_request(text, args.title, args.date_source, args.time_source)
             source_fields(args, text)
             assert args.title == self.case["title"]
             assert args.attendees == self.case.get("guests", [])
