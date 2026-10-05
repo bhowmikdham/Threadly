@@ -546,3 +546,46 @@ async def test_mentions_and_quoted_ordinals_do_not_select_a_calendar(
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 0
         assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0
+
+
+@pytest.mark.parametrize("mode", ["ask", "always"])
+async def test_choice_expiring_during_calendar_read_returns_unavailable_without_action(
+    destinations, db_sessionmaker, monkeypatch, mode
+):
+    chat, result = await options(db_sessionmaker, mode)
+    async with db_sessionmaker() as db:
+        state = store.decode(await db.get(Conversation, chat))
+        expires = datetime.fromisoformat(state["calendar_event_request"]["expires_at"])
+
+    class Clock(datetime):
+        value = expires - timedelta(seconds=1)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value.astimezone(tz) if tz else cls.value.replace(tzinfo=None)
+
+    monkeypatch.setattr(event_choices, "datetime", Clock)
+    original = event_choices.service.list_calendars
+    calls = []
+
+    async def delayed_read(owner):
+        calls.append(owner)
+        calendars = await original(owner)
+        Clock.value = expires
+        return calendars
+
+    monkeypatch.setattr(event_choices.service, "list_calendars", delayed_read)
+    body = SelectCalendarChoice(
+        request_id=str(uuid4()), expected_version=result["version"],
+        choice_id=result["calendar_choices"]["choices"][2]["choice_id"],
+    )
+    reply = await service.choose_calendar(1, chat, body, factory=db_sessionmaker)
+    assert reply["error_code"] == "calendar_choice_unavailable"
+    assert "calendar_action" not in reply
+    replay = await service.choose_calendar(1, chat, body, factory=db_sessionmaker)
+    assert replay == reply and calls == [1]
+    async with db_sessionmaker() as db:
+        assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 0
+        assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0
+        row = await db.get(Conversation, chat)
+        assert row.pending_request_id is None and row.calendar_approval_mode == mode

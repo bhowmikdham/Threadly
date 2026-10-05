@@ -160,3 +160,31 @@ previous run; it excludes this added test. See
 [the additional evidence](../../evaluation/calendar-event-language/reported-phrase-kelly.json).
 The installed package/server version was not confirmed and no deployment occurred.
 Draft review is [PR #94](https://github.com/bhowmikdham/Threadly/pull/94).
+
+
+## 1.7.3 review follow-up (6 October Melbourne)
+
+- Reproduced two expiry-during-list failures (`None.get` in destination resolution)
+  under Ask and Always; return `calendar_choice_unavailable` with no action/job and
+  replayable completion when expiry occurs during the read.
+- Kelly replay used inconsistent clocks and failed once real time passed its
+  frozen expiry. It now freezes store, creation, choices and guard clocks together.
+- Reproduced both exact Ashu forms falling through to prose because “could you
+  help me create” was not recognized. Direct policy `1.1.1` extends only that
+  leading request prefix; content, quote, negative and permission guards remain.
+- Replay retains 18:00 on 6 October Melbourne, literal `meeting with Ashu`, no
+  inferred email/invitation, and Ask through three synthetic 429s and a retry of
+  the same request. A fully specified request returns a proposed event rather
+  than asking for an unnecessary attendee address.
+- Release `contextual-conversation-1.7.3` has a new immutable asset snapshot;
+  historical 1.7.2 assets/evidence remain. No prompt/tool schema, migration,
+  Google scope, provider retry-policy or write-worker change.
+- Focused affected suite: **215 passed, 0 failed/skipped**, 78.25 seconds on
+  isolated PostgreSQL 16, synthetic Google and scripted model responses.
+- Final full-suite/exact-head CI results are recorded in PR #94, separate from
+  the previous head's green 1,775-test run. Local evidence:
+  `/tmp/threadly-calendar-173-focused.xml` and `/tmp/threadly-calendar-173-full.xml`.
+- Independent precision repair PR #96 is unchanged at `7a590d9`; its exact-head
+  CI passed with 1,692 tests. No merge, deployment or real event operation occurred.
+- The observed production Bedrock 429s are a separate operational limitation;
+  these synthetic retry tests do not claim live model availability was restored.

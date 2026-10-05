@@ -27,7 +27,7 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.1.0"
+POLICY = "direct-calendar-event-1.1.1"
 
 
 def creation_target(text):
@@ -42,6 +42,7 @@ def creation_target(text):
         r"^\s*(?:(?:please|hey)[, ]+)?"
         r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
         r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
+        r"(?:help\s+me\s+(?:to\s+)?)?"
         r"(?:create|add|book|schedule|reserve|put|block)\s+"
         r"(?:(?:me|a|an|the|my|new|single|one-time)\s+)*(?P<object>.+)",
         leading,

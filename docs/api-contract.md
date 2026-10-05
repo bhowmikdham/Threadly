@@ -1252,3 +1252,10 @@ are checkpointed for `/recover`; recovering never upgrades Ask into approval.
 The current picker UI must consume `calendar_choices` and send the selection endpoint;
 labels must not be converted to model instructions. The matching frontend picker
 release is an integration dependency for the clickable controls.
+
+
+Conversation release 1.7.3 retains “could you help me create…” as a direct event
+request, including missing-title follow-ups after a provider-unavailable retry.
+If calendar choices expire during their ACL read, selection returns terminal
+`calendar_choice_unavailable` without creating an action; exact retries replay
+that result. Ask/Always and all existing request/account/version fences remain.

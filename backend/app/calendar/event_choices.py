@@ -131,6 +131,8 @@ def ordinal(value):
 
 def resolve(state, rows, preference_version, account_version, name=""):
     value = pending(state)
+    if value is None:
+        return None, unavailable()
     saved = value.get("calendar_choices", {})
     selected = value.get("selected_calendar")
     index = ordinal(name) if name else None

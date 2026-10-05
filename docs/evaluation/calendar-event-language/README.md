@@ -1,14 +1,14 @@
 # Calendar creation, choices and interrupted-chat recovery
 
-Release `contextual-conversation-1.7.2` combines the merged shared-mail context
+Release `contextual-conversation-1.7.3` preserves the merged shared-mail context
 with Calendar language/continuation fixes, a timed availability read, explicit
 chat recovery and structured destination selection. Direct creation policy is
-`direct-calendar-event-1.1.0`; Calendar reads are `calendar-conversation-reads-2.1.0`.
+`direct-calendar-event-1.1.1`; Calendar reads are `calendar-conversation-reads-2.1.0`.
 
-**Verified:** 1,774 backend tests passed, zero failed/skipped, against isolated
+**Historical 1.7.2 verification:** 1,774 backend tests passed, zero failed/skipped, against isolated
 PostgreSQL 16. Ruff (`app tests tools`), MVP asset checks, planning/handoff validators
 and diff checks passed. Runtime tested: `2c9f5de7d79d3011af4056149d70106f5cfd2cbf`.
-The JSON [verification record](verification-1.7.2.json) includes the current asset
+The JSON [verification record](verification-1.7.2.json) includes that release's asset
 hashes and individual focused case IDs from that full run. Tests use synthetic
 Google transports and scripted model decisions; this is not a live model-quality
 or live Calendar acceptance score.
@@ -30,7 +30,8 @@ anchors across midnight. Previously supplied relative dates retain their anchor;
 newly supplied date words use the new turn's clock.
 
 The original 1.5.1 and combined 1.7.1 snapshots/replays remain immutable. The final
-1.7.2 snapshot matches runtime byte-for-byte through the asset equality test;
+1.7.2 snapshot remains unchanged; the new 1.7.3 snapshot matches runtime through
+the asset equality test;
 `replay-v3.json` combines the previous read fixtures and new single-start cases.
 Historical 1.5.0, 1.6.0 and 1.7.0 files elsewhere in evaluation are unchanged.
 
@@ -48,3 +49,13 @@ decision is rejected; the typed event retains the literal title, no inferred att
 email, no notifications and Ask state. No runtime/prompt/tool change was required.
 This additional test is **not included** in the earlier 1,774-test total. Installed
 extension/server version remains unconfirmed; this follow-up was not deployed.
+
+
+The 1.7.3 follow-up recognizes leading “help me create” requests under the existing
+source boundary, returns `calendar_choice_unavailable` when a request expires
+while calendars are loading, and freezes all creation clocks in midnight replays.
+[Replay and verification](reported-phrases-1.7.3.json) covers the exact Ashu request,
+three synthetic 429s followed by the same-request retry, no invented attendee,
+Ask preservation, quoted/content negatives and expiry in Ask/Always. The model
+still chooses typed tools; the backend validates fields, permission and action state.
+The live provider's 429 capacity issue is not resolved by these local guards.

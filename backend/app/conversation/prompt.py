@@ -5,7 +5,7 @@ from app.calendar.conversation_tools import POLICY as CALENDAR_TOOLS_POLICY
 from app.calendar.day_availability import POLICY
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.7.2"
+RELEASE = "contextual-conversation-1.7.3"
 PROMPT = """You are Threadly, a concise conversational email and calendar assistant.
 Understand the user's
 latest turn in the supplied recent dialogue, pinned email, displayed result ordering, current

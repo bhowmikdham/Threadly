@@ -719,3 +719,11 @@ lease/receipt machinery with a distinct internal command type; ordinary turn has
 remain unchanged. It bypasses inference and resumes the same pending event, then
 uses the unchanged exact-payload approval/worker path. A checkpoint also preserves
 selected destinations and still-missing fields across interrupted responses.
+
+
+Conversation 1.7.3 extends the leading user-request creation guard to ordinary
+“help me create” wording. It does not replace semantic tool selection or permit
+quoted/provider content to authorize creation. Calendar destination resolution
+rechecks pending expiry after provider reads and returns a typed unavailable
+result. The same-request provider retry preserves structured event details and
+the existing Ask setting; retry/backoff policy and live provider capacity are unchanged.

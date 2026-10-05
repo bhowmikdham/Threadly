@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy import func, select
 
-from app.calendar import conversation_guard, event_creation, permissions
+from app.calendar import conversation_guard, event_choices, event_creation, permissions
 from app.calendar.time_resolution import parse_clock
 from app.conversation import engine, service
 from app.db.models import ActionJob, AssistantAction, Conversation
@@ -449,6 +449,8 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
 
     monkeypatch.setattr(store, "datetime", Frozen)
     monkeypatch.setattr(event_creation, "datetime", Frozen)
+    monkeypatch.setattr(event_choices, "datetime", Frozen)
+    monkeypatch.setattr(conversation_guard, "datetime", Frozen)
     await ready(db_sessionmaker)
     request = turn("create me a event at 4pm tmrw for a meeting with kelly")
     result = await service.turn(
