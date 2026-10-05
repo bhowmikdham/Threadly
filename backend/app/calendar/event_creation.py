@@ -34,9 +34,17 @@ def creation_request(text):
     text = text.casefold().replace("craete", "create").replace("creat ", "create ")
     if re.search(r"\b(?:don't|do not|never|cancel|delete|remove|reschedule|update)\b", text):
         return False
+    if re.search(
+        r"\b(?:create|add|put)\s+(?:(?:for me|a|an|the|this)\s+)*"
+        r"(?:summary|summaries|draft|reply|email|message|explanation|translation|instructions?)\b",
+        text,
+    ):
+        return False
+    # Creation must be the user's leading request. A later line can be pasted
+    # email, quoted instructions or other data, and cannot authorize a write.
     return bool(
         re.search(
-            r"(?:^|\n)\s*(?:(?:please|hey)[, ]+)?"
+            r"^\s*(?:(?:please|hey)[, ]+)?"
             r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
             r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
             r"(?:create|add|book|schedule|put|block)\s+",

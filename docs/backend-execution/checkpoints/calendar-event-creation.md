@@ -26,7 +26,7 @@ stopped instead of remaining Queued. API, architecture, data and privacy docs up
 
 - PostgreSQL 16 disposable instance on local port 64727, Python 3.14 local:
   initial full suite: 1,633 passed / 2 failed (old release fixture references).
-  Updated fixture references and preserved historical assets. Final affected suite:
+  Updated fixture references and preserved historical assets. Affected suite before the final boundary repair:
   **100 passed**, no skips: Calendar creation/actions/conversation tools/migrations.
 - New creation tests: exact approval, two-owner access, stale mode versions, missing
   title continuation, missing grant, session/mode/preferences/deletion fences,
@@ -62,3 +62,12 @@ unchanged. Production preflight confirmed the requesting owner (ID 1) is connect
 has Calendar preferences, and has not granted `calendar.events` yet. Enable only
 this owner for Calendar rollout, then complete Google's event-creation consent.
 No real-calendar success is claimed until Google confirms a user-approved event.
+
+
+Final review also found that a creation verb on a later line could be quoted email
+under a summarisation request. Creation now must lead the user's request; creating
+a summary/draft/message is not Calendar authority. Three real-DB regressions force
+a mistaken model tool call under Always mode and require zero actions or jobs.
+Final boundary repair: **24/24** direct-event PostgreSQL tests passed, including
+all three pasted-instruction cases. Prompt/tool assets are unchanged by this
+backend-only guard correction. Exact updated commit CI must pass before release.
