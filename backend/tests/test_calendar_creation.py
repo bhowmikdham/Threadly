@@ -434,3 +434,56 @@ async def test_pasted_creation_instructions_cannot_authorize_always_mode(
 )
 def test_creation_authority_binds_to_the_leading_request(instruction):
     assert event_creation.creation_request(instruction, "Focus", "tmrw", "2pm")
+
+
+@pytest.mark.parametrize(
+    "instruction,title",
+    [
+        ("Create a short email saying Create Focus at 2pm tmrw", "short email"),
+        ("Create a short email saying Create Focus at 2pm tmrw", "short email saying Create Focus"),
+        (
+            "Create a concise explanation of the sentence 'Create Focus at 2pm tmrw'",
+            "concise explanation",
+        ),
+        ("Create concise explanation at 2pm tmrw", "concise explanation"),
+        ("Create draft at 2pm tmrw", "draft"),
+        ("Create a short email at 2pm tmrw", "short email"),
+    ],
+)
+async def test_non_calendar_object_cannot_be_promoted_by_model_title(
+    configured, db_sessionmaker, instruction, title
+):
+    await ready(db_sessionmaker)
+    request = turn(instruction)
+    await permissions.set_mode(
+        1,
+        request.conversation_id,
+        CalendarApprovalSetting(mode="always", expected_version=0),
+        factory=db_sessionmaker,
+    )
+    result = await service.turn(
+        1,
+        request,
+        factory=db_sessionmaker,
+        model=Model(
+            tool("prepare_calendar_event", **{**ARGS, "title": title}),
+            tool("respond", kind="clarification", text="Should I only draft that content?"),
+        ),
+    )
+    assert result["kind"] == "clarification"
+    assert not any(c.url.path.endswith("/events") for c in configured[0])
+    async with db_sessionmaker() as session:
+        assert await session.scalar(select(func.count()).select_from(AssistantAction)) == 0
+        assert await session.scalar(select(func.count()).select_from(ActionJob)) == 0
+
+
+@pytest.mark.parametrize(
+    "instruction,title",
+    [
+        ("Schedule Budget review at 2pm tmrw", "Budget review"),
+        ("Create an event called Draft at 2pm tmrw", "Draft"),
+        ("Create an event called Email catchup at 2pm tmrw", "Email catchup"),
+    ],
+)
+def test_clear_event_requests_allow_content_like_titles(instruction, title):
+    assert event_creation.creation_request(instruction, title, "tmrw", "2pm")

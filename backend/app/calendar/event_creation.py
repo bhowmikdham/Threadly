@@ -54,14 +54,22 @@ def creation_request(text, title="", date_source="", time_source=""):
         target,
     ):
         return True
-    # Shorthand such as "Create Focus at 2pm tmrw" must bind the actual
-    # candidate title as the verb's object, with its date/time in this request.
-    # A title/time found only inside the pasted email cannot meet this check.
+    # Shorthand is a bounded scheduling command: a title immediately followed
+    # by its time/date clause. A prose/content object is not event authority,
+    # irrespective of which literal span the model chooses as its title.
+    # Content-like event titles remain available with an explicit "event called".
+    if re.search(
+        r"\b(?:summary|summaries|draft|reply|email|message|explanation|translation|"
+        r"instructions?|sentence|paragraph|essay|document|description|response|story|"
+        r"poem|code|script)\b",
+        target,
+    ):
+        return False
     return bool(
         title
         and date_source
         and time_source
-        and re.match(re.escape(title.casefold()) + r"(?!\w)", target)
+        and re.match(re.escape(title.casefold()) + r"\s+(?:at|on|tomorrow|today)\b", target)
         and date_source.casefold() in leading
         and time_source.casefold() in leading
     )

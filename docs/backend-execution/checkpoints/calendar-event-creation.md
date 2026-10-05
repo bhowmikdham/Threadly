@@ -70,7 +70,15 @@ shorthand event title must be that object, with its date/time in the leading req
 a pasted instruction after a newline or prose colon cannot supply that authority.
 Six real-DB regressions force a mistaken model tool call under Always mode and
 require zero actions or jobs, including requests for a short summary or draft reply.
-Final boundary repair: **31/31** direct-event PostgreSQL tests passed, including
+Final boundary repair: **40/40** direct-event PostgreSQL tests passed, including
 all six pasted-instruction cases and four positive request-shape checks. Prompt/tool
 assets are unchanged by this backend-only guard correction. Exact updated commit
 CI must pass before release.
+
+A second adversarial check varied the model-selected title to the content object
+(e.g. "short email"). Shorthand now requires the literal title immediately followed
+by a timing clause and rejects content/document objects regardless of title choice.
+Explicit event requests can still use titles such as "Draft" or "Email catchup".
+Six more real-DB title-variation regressions and three positive checks passed.
+The initial full CI at 71552b4 completed with **1,636 passed**, but is superseded;
+release waits for the final guard commit's complete CI.
