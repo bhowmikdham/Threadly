@@ -7,7 +7,7 @@ import {
 } from "../lib/scheduling-readiness"
 import type { Capability, User } from "../lib/types"
 import { CalendarSetup } from "./CalendarSetup"
-import { GmailIcon, GoogleCalendarIcon } from "./Icon"
+import { GmailIcon, GoogleCalendarIcon, Icon } from "./Icon"
 
 export type ConnectorId = "gmail" | "calendar"
 export const connectorNames = { gmail: "Gmail", calendar: "Google Calendar" }
@@ -44,11 +44,13 @@ export function ConnectorList({
                   <GoogleCalendarIcon size={19} />
                 )}
               </span>
-              <span className="connector-name">{connectorNames[id]}</span>
-              <span className={`connector-status${ready ? " is-on" : ""}`}>
-                {ready ? "Connected" : "Not connected"}
+              <span className="connector-label">
+                <span className="connector-name">{connectorNames[id]}</span>
+                <span className={`connector-status${ready ? " is-on" : ""}`}>
+                  {ready ? "Connected" : "Not connected"}
+                </span>
               </span>
-              <span aria-hidden="true">›</span>
+              <Icon name="chevron" size={16} />
             </button>
             {!ready && onConnect && (
               <button
@@ -131,6 +133,13 @@ export function ConnectorDetails({
   const [message, setMessage] = useState("")
   const [revision, setRevision] = useState(0)
   const ready = connectorReady(id, capabilities)
+  const features = skills[id].map((feature) => ({
+    ...feature,
+    status: featureStatus(feature, capabilities, preferencesState)
+  }))
+  const permissionNeeded = features.some(
+    (feature) => feature.status === "Permission needed"
+  )
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
     setMessage("")
@@ -154,7 +163,7 @@ export function ConnectorDetails({
       className="connector-detail"
       aria-label={`${connectorNames[id]} connector`}>
       <button className="connector-back" onClick={onBack}>
-        ‹ Connections
+        <Icon name="chevron" size={14} /> Connections
       </button>
       <div className="connector-detail-heading">
         <span className="connector-icon">
@@ -169,28 +178,34 @@ export function ConnectorDetails({
           <p className="muted">{user.email}</p>
         </div>
       </div>
-      <p className={`connector-status${ready ? " is-on" : ""}`}>
-        {ready ? "Connected" : "Not connected"}
-      </p>
-      <ul className="capability-chips" aria-label="Skills">
-        {skills[id].map((feature) => {
-          const status = featureStatus(feature, capabilities, preferencesState)
-          return (
-            <li
-              key={feature.name}
-              className={status === "Available" ? "available" : "unavailable"}
-              title={status}>
-              <span>{feature.name}</span>
-              {status !== "Available" && (
-                <span className="skill-status" aria-label={status}>
-                  ·
-                </span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {id === "calendar" ? (
+      {id === "gmail" && (
+        <p className="connector-description">
+          Find messages, understand a thread, and prepare a reply.
+        </p>
+      )}
+      <div className="connector-main-action">
+        <span className={`connector-status${ready ? " is-on" : ""}`}>
+          {ready ? "Connected" : "Not connected"}
+        </span>
+        {(ready || id === "gmail") && (
+          <button
+            className={ready ? "quiet-button" : "primary"}
+            disabled={busy}
+            aria-label={`${ready ? "Reconnect" : "Connect"} ${connectorNames[id]}`}
+            onClick={() =>
+              void reconnect(id === "gmail" ? "gmail_read" : "calendar_read")
+            }>
+            {ready ? "Reconnect" : `Connect ${connectorNames[id]}`}
+          </button>
+        )}
+        {busy && <span role="status">Updating connection…</span>}
+      </div>
+      {message && (
+        <p role="status" className="setup-message connector-feedback">
+          {message}
+        </p>
+      )}
+      {id === "calendar" && (
         <CalendarSetup
           key={revision}
           capabilities={capabilities}
@@ -198,16 +213,27 @@ export function ConnectorDetails({
           onAuth={onAuth}
           onPreferences={onPreferences}
         />
-      ) : (
-        <p className="connector-description">
-          Find messages, understand a thread, and prepare a reply.
-        </p>
       )}
+      <details className="connection-disclosure connector-features">
+        <summary>
+          What Threadly can do
+          {permissionNeeded && <span>Permission needed for some features</span>}
+        </summary>
+        <ul className="connector-feature-list" aria-label="Skills">
+          {features.map((feature) => (
+            <li key={feature.name}>
+              <span>{feature.name}</span>
+              <span className="skill-status">{feature.status}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
       {id === "calendar" &&
         capabilities.some(
           (c) => c.id === "calendar_write" && c.enabled && !c.ready
         ) && (
           <div className="calendar-write-setup">
+            <h3>Event creation</h3>
             <p>
               Create events from this chat, with approval before each event by
               default.
@@ -219,19 +245,12 @@ export function ConnectorDetails({
             </button>
           </div>
         )}
-      <details className="connection-disclosure">
+      <details className="connection-disclosure connector-account">
         <summary>Account & permissions</summary>
         <p className="muted">
           Access granted to Threadly by this Google account.
         </p>
         <div className="connection-actions">
-          <button
-            disabled={busy}
-            onClick={() =>
-              void reconnect(id === "gmail" ? "gmail_read" : "calendar_read")
-            }>
-            {ready ? "Reconnect" : "Connect"} {connectorNames[id]}
-          </button>
           {id === "calendar" &&
             !capabilities.some(
               (c) => c.id === "calendar_events_read" && c.ready
@@ -296,11 +315,6 @@ export function ConnectorDetails({
           Privacy
         </a>
       </p>
-      {message && (
-        <p role="status" className="setup-message">
-          {message}
-        </p>
-      )}
     </section>
   )
 }
