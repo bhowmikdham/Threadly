@@ -513,3 +513,9 @@ no provider event bodies/IDs or event cache are added. Free-slot/busy-time reads
 reuse owned `CalendarEvidence` with the existing preference/account versions and
 five-minute expiry. Returned conversational free slots are suggestions, not
 `CalendarSlotRequest` offers, reservations or approvals.
+
+
+Calendar recovery adds no tables or migrations. `PreferencesOut.needs_review` is computed
+from the existing preference account/policy versions. Encrypted conversation history
+entries may additionally contain nullable `error_code`; the field contains a server error
+identifier, not Calendar provider payloads. Existing history without this field still loads.

@@ -39,25 +39,30 @@ async def account(session, user_id, *, lock=False, expected=None):
     return user
 
 
-def pref_view(row):
+def pref_view(row, account_version=None):
     return PreferencesOut(
         version=row.version,
         account_version=row.account_version,
         policy_version=row.policy_version,
         preferences=row.preferences,
+        needs_review=(
+            row.policy_version != POLICY_VERSION
+            or (account_version is not None and row.account_version != account_version)
+        ),
     )
 
 
 async def get_preferences(user_id):
     async with get_session_factory()() as session:
-        if await session.get(User, user_id) is None:
+        user = await session.get(User, user_id)
+        if user is None:
             raise ApiError(401, "unauthorized", "Unknown user.")
         row = await session.get(CalendarPreference, user_id)
         if row is None:
             raise ApiError(
                 404, "calendar_preferences_missing", "Save scheduling preferences first."
             )
-        return pref_view(row)
+        return pref_view(row, user.google_account_version)
 
 
 async def _snapshot(user_id):
@@ -113,12 +118,14 @@ async def save_preferences(user_id, body):
 def check_pref(row, expected, account_version):
     if row is None:
         raise ApiError(404, "calendar_preferences_missing", "Save scheduling preferences first.")
-    if (
-        row.version != expected
-        or row.account_version != account_version
-        or row.policy_version != POLICY_VERSION
-    ):
+    if row.version != expected:
         raise conflict()
+    if row.account_version != account_version or row.policy_version != POLICY_VERSION:
+        raise ApiError(
+            409,
+            "calendar_preferences_stale",
+            "Your Calendar connection changed. Review and save your calendars again.",
+        )
 
 
 async def query_freebusy(user_id, body):

@@ -15,7 +15,7 @@ Successful responses carry `Cache-Control: no-store`.
 | Route | Request | Response |
 |---|---|---|
 | `GET /calendar/calendars` | None | `account_version`, `checked_at`, `calendars` |
-| `GET /calendar/preferences` | None | Saved `version`, `account_version`, `policy_version`, `preferences`; 404 before first save |
+| `GET /calendar/preferences` | None | Saved `version`, `account_version`, `policy_version`, `preferences`, `needs_review`; 404 before first save |
 | `PUT /calendar/preferences` | `expected_version`, complete `preferences` | Same saved preference shape; first save uses version 0 |
 | `POST /calendar/freebusy` | `expected_preferences_version`, offset-aware `start`, `end` | 201: saved evidence; always uses the authenticated owner's selected calendar set |
 | `GET /calendar/freebusy/{evidence_id}` | UUID | Same evidence while current/unexpired; owner mismatch 404, stale/expired 409 |
@@ -54,7 +54,20 @@ allowed only for an end. Split overnight work into two day entries. Overlapping
 periods are rejected; adjacent periods are valid. Saving advances the version even
 for identical content. There is no implicit calendar/timezone/working-day default.
 Current policy is `calendar-read-1.0.0`; preferences must be re-saved after an account
-permission version changes. GET preferences remains available to review old settings.
+permission version changes. GET preferences remains available to review old settings and
+returns `needs_review: true` when its account or policy version is stale. Stale saved
+preferences reject reads with `calendar_preferences_stale` (409); retrying unchanged
+settings cannot repair them. The user must explicitly review and save, which rechecks
+current CalendarList access and advances the preference version. A concurrent version
+change still returns `calendar_context_changed`; ownership and evidence fences remain.
+
+Whole-day conversational reads restart once on `calendar_context_changed`, including
+re-reading preferences and resolving the date in the current timezone. They never retry
+writes, stale preferences, or permission failures. Incomplete day answers preserve known
+busy time and include `error_code: calendar_coverage_incomplete` so the client can link
+straight to calendar selection. Calendar names remain provider data, not instructions.
+Recovery codes persist in encrypted dialogue and idempotency receipts; raw calendar
+availability evidence remains transient and excluded from conversation storage.
 
 Example free/busy body (use current future dates when testing):
 
@@ -202,3 +215,19 @@ multi-intent templates must remain unsupported until those handlers exist.
 The later [on-demand agenda read](calendar-agenda.md) adds an optional event-read
 grant and bounded event previews. It does not change free/busy evidence semantics,
 selected-calendar authority, or the exact approval required for booking.
+
+## Recovery validation — 5 October 2026
+
+On branch `codex/calendar-read-recovery` (base `b13b274`): the day-availability,
+Calendar service, agenda and conversation regression run passed 193 tests. The broader
+Calendar suite then passed 218 tests, including a new retry/timezone-change case.
+Both runs used a disposable localhost PostgreSQL 16 database with
+`THREADLY_REQUIRE_TEST_DB=1`, fake Google transport and scripted model decisions.
+Changed Python files passed Ruff. No test was skipped in either run.
+
+Covered: stale account/policy flags, explicit re-save, no stale provider reads,
+owner isolation, bounded retries, new timezone/date bounds, incomplete holiday coverage,
+and recovery codes surviving encrypted history and idempotent replay.
+No migration, new OAuth scope, model prompt or flow change is required. Live Google
+consent, live model evaluation and deployment were not run. Release the paired extension
+changes from `codex/calendar-settings-refresh-ui` to expose the recovery buttons.

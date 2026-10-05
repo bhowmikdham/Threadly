@@ -242,6 +242,7 @@ async def complete(session, owner, request, lease, state, response):
                 "task_id": saved.get("task_id"),
                 "proposal_id": saved.get("proposal_id"),
                 "request_id": request.request_id,
+                "error_code": saved.get("error_code"),
             }
         ]
     )[-HISTORY_LIMIT:]

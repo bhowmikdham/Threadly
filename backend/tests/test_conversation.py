@@ -1638,3 +1638,28 @@ async def test_recipient_roles_are_reference_bound(configured, db_sessionmaker):
     assert result["task"]["draft_input"]["to"] == ["alex@example.test"]
     assert result["task"]["draft_input"]["cc"] == ["bob@example.test"]
     assert result["task"]["draft_input"]["bcc"] == ["cathy@example.test"]
+
+
+async def test_calendar_recovery_code_survives_history_and_idempotent_replay(
+    configured, db_sessionmaker, monkeypatch
+):
+    from app.calendar import day_availability
+
+    async def answer(*args, **kwargs):
+        return {
+            "kind": "message",
+            "text": "Review calendars to complete this check.",
+            "error_code": "calendar_coverage_incomplete",
+            "calendar_availability": {"coverage": "unknown"},
+        }
+
+    monkeypatch.setattr(day_availability, "answer", answer)
+    r = request().model_copy(update={"instruction": "Am I free tomorrow?"})
+    model = Model(tool("check_day_availability", date_phrase="tomorrow", date_source="tomorrow"))
+    async with source_data.source_scope():
+        first = await service.turn(1, r, factory=db_sessionmaker, model=model)
+        replay = await service.turn(1, r, factory=db_sessionmaker, model=Model())
+    assert first["error_code"] == replay["error_code"] == "calendar_coverage_incomplete"
+    restored = await service.get(1, r.conversation_id, db_sessionmaker)
+    assert restored["history"][0]["error_code"] == "calendar_coverage_incomplete"
+    assert "calendar_availability" not in restored["history"][0]

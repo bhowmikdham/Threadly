@@ -1056,3 +1056,18 @@ is rejected. Source fields are optional for legacy calls that copied clocks lite
 Structured Calendar calls also require `subject: self|other`. An `other` subject returns
 an unsupported-access explanation before preference or provider reads. Provider account
 selection remains server-owned; arbitrary people/calendar IDs are never accepted.
+
+
+### Calendar settings recovery (October 2026)
+
+`GET/PUT /calendar/preferences` now add `needs_review: boolean`. GET preserves saved
+selections for review while flagging an outdated account or policy version. A read with
+such preferences returns 409 `calendar_preferences_stale`; explicit versioned PUT is
+required to revalidate them. Ordinary concurrent changes retain `calendar_context_changed`.
+The whole-day availability tool retries that concurrent-change error once from a fresh
+preference snapshot, re-resolving the date/timezone. No write is retried.
+
+An incomplete day response includes `error_code: calendar_coverage_incomplete` alongside
+its text and transient evidence. The extension uses this code for “Review calendars”.
+History entries now preserve nullable `error_code` so recovery also works after reopening
+or replaying a chat. This does not persist raw availability metadata or widen Google access.

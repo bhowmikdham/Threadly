@@ -620,3 +620,11 @@ Versioned assets and deterministic replays are under `evaluation/calendar-agent-
 actual Bedrock tool selection and the real Calendar handlers with synthetic freebusy,
 without any Google access or writes. Failed attempts are retained as evidence; live-model
 results measure only the covered cases, not every possible phrasing.
+
+
+Calendar connection recovery distinguishes outdated saved preferences from a concurrent
+read race. Preferences expose `needs_review` and retain strict owner/account/policy/version
+checks. Only a whole-day read may restart once after a concurrent change; the new attempt
+loads fresh preferences and recomputes the day. Incomplete calendar coverage remains
+unknown. A bounded recovery code is carried through encrypted conversation history for
+client navigation; no background import, new scope, or external write is introduced.

@@ -400,3 +400,39 @@ def test_bounded_lookback_supports_recent_event_buffers(
     assert result.status_code == status, result.text
     if status == 201:
         assert datetime.fromisoformat(result.json()["start"]) == start
+
+
+@pytest.mark.parametrize("change", ["account", "policy"])
+def test_stale_preferences_are_reviewable_and_rebind_only_on_save(
+    db_client, db_sessionmaker, auth_headers, setup, change
+):
+    headers = auth_headers(1)
+    saved = db_client.put("/calendar/preferences", headers=headers, json=save_body())
+    assert saved.json()["needs_review"] is False
+    initial = saved.json()["preferences"]
+
+    async def invalidate():
+        async with db_sessionmaker() as session:
+            if change == "account":
+                user = await session.get(User, 1)
+                user.google_account_version += 1
+            else:
+                pref = await session.get(CalendarPreference, 1)
+                pref.policy_version = "previous-policy"
+            await session.commit()
+
+    asyncio.run(invalidate())
+    stale = db_client.get("/calendar/preferences", headers=headers).json()
+    assert stale["needs_review"] is True
+    assert stale["preferences"] == initial
+    before = len(setup.calls)
+    result = db_client.post("/calendar/freebusy", headers=headers, json=window())
+    assert result.status_code == 409
+    assert result.json()["error"]["code"] == "calendar_preferences_stale"
+    assert len(setup.calls) == before  # No Google read with stale settings.
+    assert db_client.get("/calendar/preferences", headers=auth_headers(2)).status_code == 404
+    resaved = db_client.put("/calendar/preferences", headers=headers, json=save_body(1))
+    assert resaved.json()["needs_review"] is False
+    assert resaved.json()["version"] == 2
+    body = {**window(), "expected_preferences_version": 2}
+    assert db_client.post("/calendar/freebusy", headers=headers, json=body).status_code == 201

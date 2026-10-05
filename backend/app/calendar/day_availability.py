@@ -45,9 +45,9 @@ def render(evidence, timezone, day, *, remaining_day):
         names = [" ".join(c.display_name.split())[:80] for c in unavailable if c.display_name]
         subject = ", ".join(names) if names else "some selected calendars"
         warning = (
-            f"I couldn't confirm your full availability on {label}: {subject} couldn't be checked. "
-            "Open Review setup to check those calendar selections, or try again. "
-            "Unchecked calendars may contain additional busy time."
+            f"I couldn't confirm your full availability on {label}. "
+            f"{subject} couldn't be checked. Review calendars to fix this; "
+            "they may contain additional busy time."
         )
     prefix = f"On your selected calendars, {scope} ({timezone})"
     if not busy:
@@ -106,7 +106,7 @@ async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
         or evidence.account_version != pref.account_version
     ):
         raise service.conflict()
-    return {
+    result = {
         "kind": "message",
         "text": render(evidence, timezone, day, remaining_day=remaining_day),
         "calendar_availability": {
@@ -120,6 +120,9 @@ async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
             "evidence_id": evidence.id,
         },
     }
+    if evidence.coverage != "complete" or any(c.status != "known" for c in evidence.calendars):
+        result["error_code"] = "calendar_coverage_incomplete"
+    return result
 
 
 async def answer(user_id, instruction, *, window, anchor=None):
@@ -133,11 +136,17 @@ async def answer(user_id, instruction, *, window, anchor=None):
         }
     phrase = window.date_phrase
     try:
-        if window is not None:
-            return await read(
-                user_id, phrase, window=window, instruction=instruction, anchor=anchor
-            )
-        return await read(user_id, phrase)
+        # A concurrent settings update can be recovered by starting a fresh read.
+        # Re-resolve the entire day in the new timezone; never reuse old evidence.
+        # Persistent stale preferences are a different error and are never retried.
+        for attempt in range(2):
+            try:
+                return await read(
+                    user_id, phrase, window=window, instruction=instruction, anchor=anchor
+                )
+            except ApiError as exc:
+                if exc.code != "calendar_context_changed" or attempt:
+                    raise
     except ApiError as exc:
         messages = {
             "calendar_preferences_missing": (
@@ -150,7 +159,10 @@ async def answer(user_id, instruction, *, window, anchor=None):
                 "Reconnect Calendar in settings, then check your selected calendars."
             ),
             "calendar_context_changed": (
-                "Your Calendar settings changed during this check. Please try again."
+                "Your Calendar settings changed again. Review calendars, then try again."
+            ),
+            "calendar_preferences_stale": (
+                "Your Calendar connection changed. Review and save your calendars, then ask again."
             ),
             "calendar_window_invalid": "Choose a future date within the next 90 days.",
         }
