@@ -75,6 +75,38 @@ class DownloadReleaseTests(unittest.TestCase):
         self.assertEqual(release.update(self.root, self.get), "unchanged")
         self.assertEqual(self.calls, [release.FEED_URL])
 
+    def test_version_metadata_matches_the_served_zip(self):
+        release.update(self.root, self.get)
+        self.assertEqual(release.read_json(self.public.with_suffix(".json")),
+                         {"version": "0.2.0", "sha256": release.digest(self.data)})
+
+    def test_version_metadata_is_bootstrapped_even_when_feed_is_offline(self):
+        def offline(url, limit):
+            raise TimeoutError("offline")
+        with self.assertRaises(TimeoutError):
+            release.update(self.root, offline)
+        self.assertEqual(release.read_json(self.public.with_suffix(".json")),
+                         {"version": "0.1.0", "sha256": release.digest(self.old_data)})
+
+    def test_label_is_hidden_during_swap_and_restored_on_rollback(self):
+        def get(url, limit):
+            if url.startswith(release.PUBLIC_URL + "?"):
+                self.assertFalse(self.public.with_suffix(".json").exists())
+                return b"failed public check"
+            return self.get(url, limit)
+        with self.assertRaises(ValueError):
+            release.update(self.root, get)
+        self.assertEqual(release.read_json(self.public.with_suffix(".json")),
+                         {"version": "0.1.0", "sha256": release.digest(self.old_data)})
+
+    def test_crash_recovery_repairs_version_metadata(self):
+        release.update(self.root, self.get)
+        (self.state / "pending.json").write_bytes(release.encode({"previous": None, "candidate": self.meta}))
+        self.meta["version"] = "0.0.9"
+        release.update(self.root, self.get)
+        self.assertEqual(release.read_json(self.public.with_suffix(".json")),
+                         {"version": "0.1.0", "sha256": release.digest(self.old_data)})
+
     def test_checksum_mismatch_leaves_old_download(self):
         self.data += b"tampered"
         with self.assertRaisesRegex(ValueError, "checksum or size"):

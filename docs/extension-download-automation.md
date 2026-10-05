@@ -36,6 +36,13 @@ failed builds or invalid packages leave the existing download in place. A commit
 that merges during the final swap may leave the just-tested build live briefly;
 the next successful frontend release is picked up by the next poll.
 
+The updater also writes `threadly-extension.json` beside the public ZIP, containing
+only its manifest version and SHA-256. The website serves this as
+`/downloads/threadly-extension.json` with no caching and reads it to display the
+download version. It is generated from the installed ZIP even when the release
+feed is unavailable, removed during swaps, and restored with the old ZIP on
+rollback or crash recovery. Website labels hide if this metadata is unavailable.
+
 The GitHub job confirms **publication of the feed**, not host deployment. Check the
 public hash and the service result to establish that the website has updated.
 
@@ -54,8 +61,8 @@ sudo journalctl -u threadly-extension-download.service -n 30 --no-pager
 
 Install after the workflow has published its first feed; otherwise the service
 will report a missing feed and retry on its next timer run. The installer requires
-the existing data mount and download, and refuses unexpected contents of the
-public download directory. It creates a dedicated `threadly-release` system user,
+the existing data mount and download, and allows only the ZIP and its version JSON
+in the public download directory. It creates a dedicated `threadly-release` system user,
 with write access only to the public download directory and release state.
 Root owns the updater code and service definitions. systemd denies writes elsewhere
 and access to home directories; the updater never executes downloaded code.
