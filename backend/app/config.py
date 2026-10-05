@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     secret_key: str = "dev-insecure-change-me-needs-32-bytes!"  # override in prod (.env)
     jwt_ttl_minutes: int = 1440
+    session_refresh_days: int = Field(default=30, ge=1, le=90)
     jwt_algorithm: str = "HS256"
 
     @model_validator(mode="after")

@@ -98,7 +98,7 @@ Rules encoded by this topology:
 - Cloud-model input masks email/phone/card-like tokens first. This is not full
   anonymisation: configured providers still process the remaining requested content.
 - Data stores are off-the-shelf containers; we own the schema, not the images.
-- Voice/API keys live server-side only. The extension holds a session JWT, nothing else.
+- Voice/API keys live server-side only. The extension holds Threadly access and scoped renewal JWTs; Google credentials remain server-side.
 
 ## Inside the api container — module map
 
@@ -653,3 +653,15 @@ active request. Older conversations can recover the prior Calendar user instruct
 from history/receipts; relative-date recovery requires the possible original anchors
 to fall on one local day. Otherwise the assistant asks for the date once.
 Versioned assets and replay evidence: `evaluation/calendar-agent-tools/followup-context.md`.
+
+### Extension login persistence
+
+The extension stores only its origin-bound Threadly identity/credential pair in
+trusted local extension storage, which survives extension reloads and browser
+restarts. Google access/refresh tokens remain encrypted on the backend. A scoped
+renewal JWT can refresh access or sign out, but cannot call application/Google
+connection routes. Its fixed deadline is preserved in renewed access credentials
+to prevent extending the session through the legacy access-token refresh path.
+Revocation remains server-owned through the existing account/session generations;
+no migration or model change is needed. Transient connection failures retain the
+local session for retry; a confirmed current-session 401 clears it.
