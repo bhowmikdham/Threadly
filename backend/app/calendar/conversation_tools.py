@@ -8,8 +8,9 @@ from app.api.errors import ApiError
 from app.calendar import agenda, availability, day_availability, service
 from app.calendar.time_resolution import day_start, parse_clock, wall_instants
 from app.schemas.calendar import FreeBusyRequest, parse_instant
+from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "calendar-conversation-reads-2.0.0"
+POLICY = "calendar-conversation-reads-2.1.0"
 MAX_DISPLAY = 10
 WEEKDAY = r"(?:monday|tuesday|wednesday|thursday|thurday|friday|saturday|sunday)"
 DAY_PATTERN = rf"(?:(?:this|next) )?{WEEKDAY}(?: (?:this|next) week)?"
@@ -40,9 +41,9 @@ def literal(value, instruction):
 def validate_scope(args, instruction):
     """Check source-bound parameters and prevent silently dropping temporal qualifiers."""
     remainder = normalized(instruction)
-    for field in ("query", "date_phrase", "start_time", "end_time", "duration_phrase"):
+    for field in ("query", "date_phrase", "start_time", "end_time", "at_time", "duration_phrase"):
         value = getattr(args, field, "")
-        if field in {"start_time", "end_time"}:
+        if field in {"start_time", "end_time", "at_time"}:
             source = getattr(args, field + "_source", "")
             if source:
                 # Typed clocks must preserve the same instant, not merely quote some text.
@@ -56,7 +57,7 @@ def validate_scope(args, instruction):
             if re.search(
                 r"\b(?:morning|afternoon|evening|noon|midnight|before|until|"
                 r"utc|gmt|timezone|hours?|minutes?|mins?|send|book|create|update|delete|"
-                r"reschedule|cancel|invite)\b|\d{1,2}:\d{2}|\d\s*(?:am|pm)\b|/",
+                r"reschedule|cancel|invite)\b|\d{1,2}:\d{2}|\d\s*[ap]\.?\s*m\b|/",
                 value.casefold(),
             ):
                 raise RequestClarification(
@@ -76,7 +77,7 @@ def validate_scope(args, instruction):
         r"morning|afternoon|evening|weekend|month|year|noon|midnight|before|after|until|"
         r"utc|gmt|timezone|hours?|minutes?|mins?|send|book|create|update|delete|"
         r"reschedule|cancel|invite)\b|\b(?:at|from|to|between|on)\s+\d|"
-        r"\d{1,2}:\d{2}|\d\s*(?:am|pm)\b|[A-Za-z]+/[A-Za-z_]+",
+        r"\d{1,2}:\d{2}|\d\s*[ap]\.?\s*m\b|[A-Za-z]+/[A-Za-z_]+",
         remainder,
     ):
         raise RequestClarification(
@@ -170,6 +171,37 @@ def resolve_window(args, instruction, anchor, timezone, *, date_anchor=None):
     if start >= end or start < anchor - timedelta(days=31) or end > anchor + timedelta(days=90):
         raise RequestClarification("Choose an ordered window within the supported Calendar horizon")
     return start, end
+
+
+def resolve_single_start(args, instruction, preferences, anchor, date_anchor=None):
+    validate_scope(args, instruction)
+    trimmed = instruction
+    for value in (args.at_time_source, args.duration_phrase):
+        if value:
+            quoted = literal(value, trimmed)
+            trimmed = re.sub(r"(?<!\w)" + re.escape(quoted) + r"(?!\w)", " ", normalized(trimmed))
+    window = CalendarWindow.model_validate(
+        {
+            key: value
+            for key, value in args.model_dump().items()
+            if key in CalendarWindow.model_fields
+        }
+    )
+    lo, hi = resolve_window(window, trimmed, anchor, preferences.timezone, date_anchor=date_anchor)
+    zone = ZoneInfo(preferences.timezone)
+    if (hi.astimezone(zone).date() - lo.astimezone(zone).date()).days != 1:
+        raise RequestClarification("Choose one day for that time")
+    clocks = parse_clock(args.at_time)
+    if len(clocks) != 1:
+        raise RequestClarification("Is that AM or PM?")
+    starts = wall_instants(lo.astimezone(zone).date(), clocks[0], zone)
+    if len(starts) != 1:
+        raise RequestClarification("That local time is ambiguous or does not exist")
+    minutes = duration(args.duration_phrase, instruction, preferences.default_duration_minutes)
+    start = starts[0]
+    if start <= anchor:
+        raise RequestClarification("Choose a future time to check")
+    return start, start + timedelta(minutes=minutes), minutes
 
 
 def duration(phrase, instruction, default):
@@ -332,9 +364,15 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             }
         pref = await service.get_preferences(owner)
         preferences = pref.preferences
-        start, end = resolve_window(
-            args, instruction, anchor, preferences.timezone, date_anchor=date_anchor
-        )
+        is_single = name == "check_time_availability"
+        if is_single:
+            start, end, single_minutes = resolve_single_start(
+                args, instruction, preferences, anchor, date_anchor
+            )
+        else:
+            start, end = resolve_window(
+                args, instruction, anchor, preferences.timezone, date_anchor=date_anchor
+            )
         if end <= anchor:
             raise RequestClarification("Availability requires a future window")
         start = max(start, anchor)
@@ -369,6 +407,9 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             f"to {display(end, preferences.timezone)}. "
             "Other people's availability has not been checked."
         ]
+        if is_single:
+            duration_source = "requested" if args.duration_phrase else "saved default"
+            lines.append(f"Checking your {duration_source} {single_minutes}-minute duration.")
         if is_free:
             lines.append(
                 f"Using {minutes}-minute meetings and your saved working hours, "
@@ -413,6 +454,17 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             "text": "\n".join(lines),
             "calendar_tools": {
                 "operation": name,
+                **(
+                    {
+                        "date": start.astimezone(ZoneInfo(preferences.timezone)).date().isoformat(),
+                        "start": start.isoformat(),
+                        "end": end.isoformat(),
+                        "timezone": preferences.timezone,
+                        "duration_minutes": single_minutes,
+                    }
+                    if is_single
+                    else {}
+                ),
                 "coverage": evidence.coverage,
                 "evidence_id": evidence.id,
                 "checked_at": evidence.checked_at.isoformat(),

@@ -27,10 +27,10 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.0.0"
+POLICY = "direct-calendar-event-1.0.1"
 
 
-def creation_request(text, title="", date_source="", time_source=""):
+def creation_target(text):
     text = text.casefold().replace("craete", "create").replace("creat ", "create ")
     if re.search(r"\b(?:don't|do not|never|cancel|delete|remove|reschedule|update)\b", text):
         return False
@@ -41,13 +41,18 @@ def creation_request(text, title="", date_source="", time_source=""):
         r"^\s*(?:(?:please|hey)[, ]+)?"
         r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
         r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
-        r"(?:create|add|book|schedule|put|block)\s+"
+        r"(?:create|add|book|schedule|reserve|put|block)\s+"
         r"(?:(?:me|a|an|the|my|new|single|one-time)\s+)*(?P<object>.+)",
         leading,
     )
-    if not match:
+    return match["object"] if match else None
+
+
+def creation_request(text, title="", date_source="", time_source=""):
+    target = creation_target(text)
+    if not target:
         return False
-    target = match["object"]
+    leading = re.split(r"\n|(?<!\d):(?!\d)", text.casefold().strip(), maxsplit=1)[0]
     if re.match(
         r"(?:calendar\s+)?(?:event|meeting|appointment|call|time block)"
         r"(?:[?.!]*$|\s+(?:called|named|titled|at|on|for|with|tomorrow|today)\b)",
@@ -65,6 +70,18 @@ def creation_request(text, title="", date_source="", time_source=""):
         target,
     ):
         return False
+    # Time-first spoken requests are still literal user-origin scheduling commands.
+    # Match the whole request so pasted prose cannot become an event title.
+    if time_source and date_source:
+        timing = (
+            rf"(?:(?:at|for)\s+)?{re.escape(time_source.casefold())}\s+"
+            rf"(?:(?:on|for)\s+)?{re.escape(date_source.casefold())}"
+        )
+        suffix = rf"\s+for\s+(?:(?:a|an|my)\s+)?{re.escape(title.casefold())}" if title else ""
+        if re.fullmatch(timing + r"[?.!]*", target) or re.fullmatch(
+            timing + suffix + r"[?.!]*", target
+        ):
+            return True
     return bool(
         title
         and date_source
@@ -105,7 +122,7 @@ def source_fields(args, text):
         r"timezone|utc|gmt|hours?|minutes?|mins?|tomorrow|today|tonight|"
         r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|invite)\b|"
         r"\b(?:at|from|to|between|on)\s+\d|\d{1,2}:\d{2}|"
-        r"\d\s*(?:am|pm)\b|[^\s@]+@[^\s@]+|[A-Za-z]+/[A-Za-z_]+",
+        r"\d\s*[ap]\.?\s*m\b|[^\s@]+@[^\s@]+|[A-Za-z]+/[A-Za-z_]+",
         remainder,
     ):
         raise RequestClarification(
@@ -164,7 +181,7 @@ async def prepare(runtime, args):
             {
                 k: v
                 for k, v in args.model_dump(exclude_unset=True).items()
-                if k != "continue_previous"
+                if k != "continue_previous" and v not in (None, "", [])
             }
         )
         args = PrepareCalendarEvent.model_validate(values)

@@ -868,7 +868,7 @@ is disabled. Drafting still creates only
 an unreviewed task/artifact; sending remains a separate approval and execution flow.
 
 `GET /assistant/conversations/{id}` returns `{conversation_id,version,history,expires_at,
-active_task_id,active_proposal_id,proposal,pending_request_id,context_snapshot_id}`. Each
+active_task_id,active_proposal_id,proposal,pending_request_id,pending_recovery,context_snapshot_id}`. Each
 history item is `{user,assistant,kind,task_id,proposal_id,request_id}`; older rows may lack
 the newer identifiers. It does not include model tool transcripts or search cards.
 `DELETE` returns `{deleted:true,tasks_retained:true}` and is owner-scoped and idempotent;
@@ -1144,3 +1144,54 @@ Calendar writes still require the pilot allowlist, enabled reconciliation and Go
 `calendar.events` consent, alongside existing Calendar read/list grants. The worker
 rechecks live destination ACL and selected-calendar free/busy immediately before
 insertion. No automatic overwrite of busy time or unknown calendar coverage occurs.
+
+
+### Spoken Calendar requests and interrupted chat recovery (conversation 1.5.1)
+
+Direct event creation also accepts time-first requests such as `book 2 p.m. tomorrow
+for doctor's appointment`. Dotted AM/PM has the same meaning as plain AM/PM. Pending
+follow-ups retain supplied slots when the model emits empty optional defaults.
+Recognized event requests must pass through typed preparation; prose is not evidence
+of creation. Status replies read the owned action's current state. Exhausted Calendar
+preparation completes the turn with HTTP 200, `kind: message` and
+`error_code: calendar_event_not_prepared`, retaining unexpired missing-field context.
+No event, approval or job is inferred from that response.
+
+`check_time_availability` is a terminal read tool for `am i free at 2 pm tmrw?`.
+It takes the existing date/subject fields, normalized `at_time`, exact
+`at_time_source`, and optional literal `duration_phrase`. It rejects paired clock
+fields, ambiguous/nonexistent wall times, dropped constraints and multi-day windows.
+The checked interval uses and displays the requested duration or saved meeting
+duration. Transient `calendar_tools` adds resolved `date`, `start`, `end`, `timezone`
+and `duration_minutes`; incomplete coverage never establishes free time. A later
+`retry_calendar_read` preserves that civil date/time and reads current selections.
+
+Authenticated `POST /assistant/conversations/{id}/recover` accepts:
+
+```json
+{"pending_request_id":"issued-request-uuid","expected_version":0,"operation":"recover"}
+```
+
+`operation` is `recover` or `cancel`. Use the owned GET's pending ID/version.
+GET's `pending_recovery` is null without a pending request; otherwise it contains
+`active` and `has_saved_result` booleans. These are observations, not permission to
+cancel. POST rechecks owner, version, pending ID/hash, lease and linked work.
+
+- Recover finalizes a checkpointed result and hydrates the current task/proposal/action.
+- If no result was saved, 409 `conversation_result_unavailable` permits the UI to offer
+  a separate explicit Cancel action. Cancel succeeds only for a released/expired lease
+  with no checkpointed result or linked work. It returns `kind: message` and
+  `error_code: conversation_request_cancelled`. It does not cancel a Calendar event.
+- Active leases return 409 `conversation_busy`; changed IDs/versions return
+  `conversation_pending_changed`/`conversation_version_conflict` and require a reload.
+  `conversation_result_available` requires recovery; `conversation_work_exists`
+  preserves linked work for review. None of these errors clears the pending request.
+- A successful response includes `recovered_request_id`, conversation ID and version.
+  Original issued-key retries replay the receipt, including when the original turn
+  completed concurrently; no new turn or duplicate action is created. The original
+  request hash remains bound. Recovered history has `recovered: true` and `user: ""`;
+  display an assistant-only result rather than inventing user instructions.
+
+Recovery is a UI operation, unavailable to model tools. It never approves or dispatches
+provider work. Saved tasks/actions retain existing execution and uncertain-outcome
+reconciliation. A late worker with the old lease cannot commit its candidate.

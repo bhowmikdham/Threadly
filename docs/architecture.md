@@ -678,3 +678,25 @@ the user session and does not authorize email, changes to existing events or del
 Both modes use the existing exact-payload approval/job/attempt state machine and
 read-before-retry recovery. Revocation shares the dispatch account lock. A failed
 preflight that exhausts its retry policy becomes visibly stopped rather than Queued.
+
+
+### Spoken Calendar inputs and interrupted conversation recovery
+
+Conversation 1.5.1 routes recognized time-first Calendar requests through the existing
+exact-payload preparation path and reads durable action state for status questions.
+The backend accepts dotted meridiems, preserves pending slots through empty model
+defaults and emits a terminal, replayable failure after bounded preparation exhaustion.
+The new single-start availability tool computes a displayed interval from the user's
+clock and saved or explicit duration; date and clock constraints remain source-bound.
+It retains the resolved civil date for subsequent checks and never treats partial
+coverage as confirmed availability.
+
+The authenticated conversation recovery endpoint uses User then Conversation locks.
+It finalizes checkpointed work or cancels a childless request only after the lease has
+expired/released and the issued ID/version/hash still match. Cancellation checks all
+existing task/plan/proposal/input/edit/action request keys and saves an exact-hash
+receipt before releasing the pending turn. Candidate mutations and their conversation
+checkpoint share a transaction; losing the old lease rolls that transaction back.
+GET recovery hints are observations, with all decisions rechecked by POST. Hydration
+reads current owned action/task state after the transaction. This does not grant
+Google access, approve actions, retry unknown writes or cancel existing provider work.

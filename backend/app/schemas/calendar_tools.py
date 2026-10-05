@@ -76,6 +76,18 @@ class CalendarWindow(StrictModel):
         return self
 
 
+class CheckTimeAvailability(CalendarWindow):
+    at_time: str = Field(min_length=1, max_length=20)
+    at_time_source: str = Field(min_length=1, max_length=40)
+    duration_phrase: str = Field(default="", max_length=40)
+
+    @model_validator(mode="after")
+    def single_start(self):
+        if self.start_time or self.end_time:
+            raise ValueError("Use at_time for a single-start availability check")
+        return self
+
+
 class SearchCalendarEvents(CalendarWindow):
     query: str = Field(default="", max_length=200)
 
@@ -86,6 +98,14 @@ class FindFreeTimes(CalendarWindow):
 
 
 CALENDAR_READ_TOOLS = {
+    "check_time_availability": (
+        CheckTimeAvailability,
+        "Check SELF availability starting at one supplied clock time, e.g. 'am I free at "
+        "2 pm tmrw?'. Use at_time='14:00', at_time_source='2 pm', structured date and "
+        "date_source='tmrw'. Empty duration_phrase uses the saved meeting duration and "
+        "shows the checked interval. Do not invent an end time or use a whole-day tool. "
+        "No booking. Preserve an explicitly supplied duration.",
+    ),
     "list_calendars": (
         ListCalendars,
         "List the connected user's accessible calendars. Does not change calendar selections.",
@@ -136,7 +156,13 @@ WINDOW_HELP = (
 )
 
 for _name, (_schema, _description) in list(CALENDAR_READ_TOOLS.items()):
+    help_text = WINDOW_HELP
+    if _name == "check_time_availability":
+        help_text = WINDOW_HELP.split("Copy both")[0] + (
+            "Supply only at_time and its literal at_time_source, plus optional duration_phrase. "
+            "Do not supply start_time/end_time. The backend computes and displays the interval."
+        )
     CALENDAR_READ_TOOLS[_name] = (
         _schema,
-        _description + (WINDOW_HELP if _name != "list_calendars" else " Terminal read."),
+        _description + (help_text if _name != "list_calendars" else " Terminal read."),
     )

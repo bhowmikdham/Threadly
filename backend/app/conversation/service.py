@@ -105,6 +105,14 @@ async def get(owner, identifier, factory=None):
             "active_proposal_id": state.get("proposal_id"),
             "proposal": proposal,
             "pending_request_id": row.pending_request_id,
+            "pending_recovery": (
+                {
+                    "active": bool(row.lease_until and row.lease_until > datetime.now(UTC)),
+                    "has_saved_result": bool(state.get("pending_result")),
+                }
+                if row.pending_request_id
+                else None
+            ),
             "context_snapshot_id": state["refs"].get("selected", {}).get("context_id"),
         }
 

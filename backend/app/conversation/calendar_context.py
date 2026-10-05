@@ -11,6 +11,7 @@ KEY = "calendar_read_request"
 WINDOW_TOOLS = frozenset(
     {
         "check_day_availability",
+        "check_time_availability",
         "search_calendar_events",
         "find_busy_times",
         "find_free_times",
@@ -151,7 +152,9 @@ async def read(runtime, name, args, *, previous=None):
         arguments = args.model_dump(mode="json")
         # Pin the resolved civil day, not the relative word "tomorrow". A later
         # retry (including a timezone preference change) still means this date.
-        resolved_day = result.get("calendar_availability", {}).get("date")
+        resolved_day = result.get("calendar_availability", {}).get("date") or result.get(
+            "calendar_tools", {}
+        ).get("date")
         if resolved_day:
             arguments.update(date={"kind": "absolute", "start": resolved_day}, date_phrase="")
             arguments["date_source"] = args.date_source or args.date_phrase

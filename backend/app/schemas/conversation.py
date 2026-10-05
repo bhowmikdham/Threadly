@@ -23,6 +23,14 @@ class ConversationTurn(InboxChatRequest):
     active_task_id: str | None = Field(default=None, max_length=36)
 
 
+class RecoverConversation(StrictModel):
+    pending_request_id: str = Field(
+        pattern=r"^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+    )
+    expected_version: int = Field(ge=0)
+    operation: Literal["recover", "cancel"]
+
+
 class CalendarApprovalSetting(StrictModel):
     mode: Literal["ask", "always"]
     expected_version: int = Field(ge=0)
@@ -186,8 +194,7 @@ TOOLS = {
         "busy periods without a proposal or approval. Ask only for genuinely missing or "
         "ambiguous dates. For meeting slots use find_free_times; clock windows use "
         "find_busy_times. Direct event creation uses prepare_calendar_event; "
-        "compound work uses prepare_workflow."
-        + WINDOW_HELP,
+        "compound work uses prepare_workflow." + WINDOW_HELP,
     ),
     "read_calendar": (
         ReadCalendar,

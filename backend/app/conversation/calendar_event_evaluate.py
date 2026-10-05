@@ -9,7 +9,7 @@ from app.calendar.event_creation import creation_request, source_fields
 from app.config import get_settings
 from app.conversation import engine
 from app.conversation.evaluate import validate_live_preflight
-from app.conversation.prompt import PROMPT, assets
+from app.conversation.prompt import PROMPT, RELEASE, assets
 from app.schemas.conversation import tool_config
 
 CASES = [
@@ -190,7 +190,7 @@ def main():
         raise SystemExit("Use --live for bounded synthetic Bedrock decisions")
     validate_live_preflight(get_settings())
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.with_name("contextual-conversation-1.5.0.json").write_text(
+    args.output.with_name(f"{RELEASE}.json").write_text(
         json.dumps({**assets(), "prompt": PROMPT, "tools": tool_config()}, indent=2) + "\n"
     )
     result = asyncio.run(evaluate())
