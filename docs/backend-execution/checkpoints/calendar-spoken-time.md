@@ -57,10 +57,10 @@ It does not invent an end time, widen to a whole day or claim incomplete coverag
 ## Version/integration notes
 
 The original follow-up snapshot `contextual-conversation-1.5.1` is retained. The
-current combined release is `contextual-conversation-1.7.1`, preserving shared mail
+current combined release is `contextual-conversation-1.7.2`, preserving shared mail
 context 1.7.0 plus this Calendar follow-up. Direct creation policy is
-`direct-calendar-event-1.0.1`; timed reads are `calendar-conversation-reads-2.1.0`.
-Historical 1.5.0, 1.5.1, 1.6.0 and 1.7.0 assets remain unchanged. Combined replay and
+`direct-calendar-event-1.1.0`; timed reads are `calendar-conversation-reads-2.1.0`.
+Historical 1.5.0, 1.5.1, 1.6.0, 1.7.0 and 1.7.1 assets remain unchanged. Combined replay and
 fresh verification are required; no edits were made to another chat's checkout.
 
 ## Prior release authorization (historical only)
@@ -79,3 +79,53 @@ disposable PostgreSQL, fake model/provider. The old-base full run was deliberate
 interrupted after #89 merged; it is not counted as a complete pass. A fresh combined
 run and the final status-supersession regressions are in progress. No live model-quality or live Google success is claimed for this follow-up.
 A separate human-created canonical-order event was reported verified; it is untouched.
+
+## Clickable Calendar choice contract — implemented, final verification in progress
+
+A Calendar creation clarification/owned conversation GET adds nullable
+`calendar_choices: {choices: [{choice_id: UUID, label: string, access: "editable"}], expires_at: ISO8601}`.
+Only current selected calendars with event-write ACL are offered; order is authoritative.
+Use the surrounding conversation `version`, not label text, for clicks. No provider
+calendar ID is exposed in the choice payload. GET choices are hints; selection rechecks.
+
+`POST /assistant/conversations/{conversation_id}/calendar-choice` accepts
+`{request_id: UUID, expected_version: integer, choice_id: UUID}`. Retain/retry this exact
+body on transport failure. The backend resumes the pending event without a model call,
+preserving supplied fields and validating the issued choice against chat/account,
+expiry, preferences and current ACL. Ordinary turn version/busy/retry conflicts remain
+409; existing recovery can recover a checkpointed selection result with the issued ID.
+
+Success is the ordinary versioned conversation response: `kind: calendar_event` plus
+`calendar_action`/ID when complete, or `kind: clarification` for remaining fields.
+Unavailable/expired choices complete with `error_code: calendar_choice_unavailable`;
+changed preferences/options complete with `calendar_choices_changed` and fresh choices
+where available. These are terminal HTTP 200 responses with the new conversation version;
+no action is created until a valid choice is resolved. Repeated same-key clicks replay
+one result. Ask still requires separate exact-payload approval; Always applies only the
+already saved chat grant. Selection itself does not switch approval modes.
+
+Display recovered results as assistant-only. The client must not turn a chosen label
+into a new chat instruction, select automatically, or reinterpret an ordinal itself.
+
+
+## Additional reported multi-turn reproduction
+
+- After unsupported deletion, `could you create Meeting at4pm` → `tomorrow` →
+  calendar email or `3rd one` previously drifted into reads/listing and lost state.
+- Compact `at4pm` violated the literal clock boundary. Missing-day title-first requests
+  were rejected before retaining authority; later added date words were incorrectly
+  required in the original leading line. Creation now freezes that original authority,
+  retains independently source-bound fields, and asks only the missing field.
+- A read tool selected for a creation reply is now rejected with typed preparation
+  feedback. Explicit calendar discovery is a supported detour and retains state.
+- Display order is stored; email/ID lookup is limited to owned eligible calendars.
+  Editable ACL is not labelled busy-only. Clicks bypass inference, preserve a chosen
+  destination through missing-field replies, and checkpoint clarification results.
+- Review covers quoted ordinal mentions, stale/reordered/duplicate/cross-chat choices,
+  duplicate clicks, cancellation, old-success/new-failure status and late-commit fencing.
+
+Focused combined 1.7.2 regression before the final quoted-selection guard: 222 passed,
+zero skipped, 67.81 seconds. Earlier combined 1.7.1 full suite: 1,754 passed, zero
+skipped, 554.58 seconds. That full result precedes the picker; the final full 1.7.2 run
+is underway and will replace the current verification headline. No model/provider
+live quality result is implied by these synthetic tests.

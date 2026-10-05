@@ -320,11 +320,17 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             result = await service.list_calendars(owner)
             rows = result["calendars"]
             lines = ["Calendars available on your connected account:"]
-            lines += [
-                f"• {clean(row['summary']) or 'Untitled calendar'} "
-                f"({'busy-time access' if row['can_read_busy'] else 'not readable'})"
-                for row in rows[:MAX_DISPLAY]
-            ]
+            for row in rows[:MAX_DISPLAY]:
+                access = (
+                    "editable"
+                    if row.get("event_write_acl")
+                    else "read-only"
+                    if row.get("access_role") == "reader"
+                    else "busy-time access"
+                    if row["can_read_busy"]
+                    else "not readable"
+                )
+                lines.append(f"• {clean(row['summary']) or 'Untitled calendar'} ({access})")
             if not rows:
                 lines.append("No calendars were returned.")
             if len(rows) > MAX_DISPLAY:
@@ -452,6 +458,9 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
         return {
             "kind": "message",
             "text": "\n".join(lines),
+            **(
+                {"error_code": "calendar_coverage_incomplete"} if is_single and not complete else {}
+            ),
             "calendar_tools": {
                 "operation": name,
                 **(

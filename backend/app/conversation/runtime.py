@@ -675,6 +675,8 @@ class Runtime:
                     "proposal_id": proposal.id,
                     "proposal": await command_plans.view(session, proposal),
                 }
+        from app.calendar import event_choices
+
         return {
             "now": datetime.now(UTC).isoformat(),
             "timezone": self.request.timezone,
@@ -683,7 +685,7 @@ class Runtime:
             "recent_dialogue": model_history(self.state["history"]),
             "previous_calendar_request": calendar_context.model_context(self.state),
             "remembered_email_sources": mail_context.model_context(self.state),
-            "pending_calendar_event": self.state.get("calendar_event_request"),
+            "pending_calendar_event": event_choices.model_context(self.state),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -710,6 +712,11 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        if name == "list_calendars":
+            from app.calendar import event_choices
+
+            if event_choices.pending(self.state):
+                return await event_choices.show(self)
         if name == "prepare_calendar_event":
             from app.calendar.event_creation import prepare
 
@@ -722,7 +729,10 @@ class Runtime:
             from app.calendar.conversation_tools import execute
 
             return await execute(
-                self.owner, name, args, self.authoritative_instruction(),
+                self.owner,
+                name,
+                args,
+                self.authoritative_instruction(),
                 anchor=self.calendar_anchor,
             )
         if name in {"search_mail", "more_mail"}:

@@ -577,7 +577,7 @@ Pending user event details (15-minute expiry) stay in encrypted conversation sta
 complete event previews are not duplicated into conversation receipts/history.
 
 
-### Conversation recovery and timed reads (1.5.1)
+### Conversation recovery and timed reads (1.7.2)
 
 No table or migration is added. Recovery finalizes `state_enc.pending_result` into
 an existing bounded receipt with the original request ID/hash and next conversation
@@ -590,6 +590,17 @@ retention, encryption, ownership and compaction limits apply.
 
 `calendar_read_request` can also retain `check_time_availability` with its literal
 clock source, duration and resolved civil date. It stores no provider event content,
-busy intervals or new calendar identifiers. Direct creation policy 1.0.1 still uses
+busy intervals or new calendar identifiers. Direct creation policy 1.1.0 still uses
 the same immutable artifacts/actions and exact approval records introduced in 1.5.0;
 previously queued payloads are not reinterpreted.
+
+
+Pending creation additionally retains its original validated user request/field sources,
+a bounded list of previous user-supplied calendar names, and optionally up to ten
+`calendar_choices` (opaque choice ID, owned provider calendar ID and display label,
+account/preference versions). `selected_calendar` stores the explicitly chosen
+identity and versions while other event fields are clarified. This metadata remains
+in the encrypted, expiring conversation state; no event contents are cached. Provider
+IDs and internal authority metadata are excluded from model context/public choices.
+Choice references share the pending event's 15-minute expiry and current turn version;
+current ACL is rechecked at selection and again before eventual event dispatch.

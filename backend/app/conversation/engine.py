@@ -128,9 +128,7 @@ async def run(context, runtime, model=None):
                     # requested operation before reserving a proposal.
                     calls += len(requests)
                     try:
-                        if (
-                            request := getattr(runtime, "request", None)
-                        ) and conversation_guard.creation_turn(request.instruction):
+                        if conversation_guard.requires_preparation(runtime):
                             raise conversation_guard.CalendarPreparationRequired
                         arguments = _merge_prepare_workflows(requests)
                         key = digest({"tool": "prepare_workflow", "input": arguments.model_dump()})
@@ -188,11 +186,16 @@ async def run(context, runtime, model=None):
                             raise ValueError("Unknown tool")
                         if name in TERMINAL and len(requests) != 1:
                             raise ValueError("Use a terminal tool alone after observations")
-                        if (
-                            name in {"prepare_workflow", "answer_question"}
-                            and (request := getattr(runtime, "request", None))
-                            and conversation_guard.creation_turn(request.instruction)
-                        ):
+                        if name in (
+                            set(CALENDAR_READ_TOOLS)
+                            | {
+                                "prepare_workflow",
+                                "answer_question",
+                                "read_calendar",
+                                "check_day_availability",
+                                "retry_calendar_read",
+                            }
+                        ) and conversation_guard.requires_preparation(runtime):
                             raise conversation_guard.CalendarPreparationRequired
                         arguments = TOOLS[name][0].model_validate(values)
                         key = digest({"tool": name, "input": arguments.model_dump(mode="json")})

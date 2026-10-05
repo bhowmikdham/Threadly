@@ -689,7 +689,7 @@ preflight that exhausts its retry policy becomes visibly stopped rather than Que
 
 ### Spoken Calendar inputs and interrupted conversation recovery
 
-Conversation 1.5.1 routes recognized time-first Calendar requests through the existing
+Conversation 1.7.2 routes recognized time-first Calendar requests through the existing
 exact-payload preparation path and reads durable action state for status questions.
 The backend accepts dotted meridiems, preserves pending slots through empty model
 defaults and emits a terminal, replayable failure after bounded preparation exhaustion.
@@ -707,3 +707,15 @@ checkpoint share a transaction; losing the old lease rolls that transaction back
 GET recovery hints are observations, with all decisions rechecked by POST. Hydration
 reads current owned action/task state after the transaction. This does not grant
 Google access, approve actions, retry unknown writes or cancel existing provider work.
+
+
+Calendar creation now freezes its original user authority independently from later
+missing-field answers. Read tools cannot consume those creation replies; explicit
+Calendar discovery offers editable destinations while keeping event details. A
+new independent availability question can still switch to the Calendar read path.
+Backend-issued opaque choice IDs resolve against saved display order and fresh ACL,
+account and preference checks. The selection endpoint enters the existing conversation
+lease/receipt machinery with a distinct internal command type; ordinary turn hashes
+remain unchanged. It bypasses inference and resumes the same pending event, then
+uses the unchanged exact-payload approval/worker path. A checkpoint also preserves
+selected destinations and still-missing fields across interrupted responses.

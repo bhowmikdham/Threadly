@@ -24,7 +24,7 @@ def creation_turn(text):
         r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{4}-\d{2}-\d{2})\b",
         target,
     )
-    if not clock or not day:
+    if not clock and not day:
         return False
     # Derive candidate spans solely to ask for the proper tool. They never become
     # event fields or grant permission. The tool must supply independently checked fields.
@@ -34,7 +34,10 @@ def creation_turn(text):
     if len(time_first) >= 2:
         candidates.append(re.sub(r"[?.!]+$", "", time_first[-1]))
     candidates.append("")
-    return any(creation_request(text, title, day[0], clock[0].strip()) for title in candidates)
+    return any(
+        creation_request(text, title, day[0] if day else "", clock[0].strip() if clock else "")
+        for title in candidates
+    )
 
 
 def pending_event(runtime):
@@ -58,6 +61,17 @@ def pending_reply(text, pending):
         return False
     # A short answer to the retained event's missing field should use its tool.
     return not text.rstrip().endswith("?")
+
+
+def requires_preparation(runtime):
+    request = getattr(runtime, "request", None)
+    return bool(
+        request
+        and (
+            creation_turn(request.instruction)
+            or pending_reply(request.instruction, pending_event(runtime))
+        )
+    )
 
 
 def status_question(text, has_event):

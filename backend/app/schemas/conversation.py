@@ -23,6 +23,22 @@ class ConversationTurn(InboxChatRequest):
     active_task_id: str | None = Field(default=None, max_length=36)
 
 
+class SelectCalendarChoice(StrictModel):
+    request_id: str = Field(
+        pattern=r"^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+    )
+    expected_version: int = Field(ge=0)
+    choice_id: str = Field(
+        pattern=r"^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+    )
+
+
+class CalendarChoiceTurn(ConversationTurn):
+    # Internal UI command. Keep ordinary ConversationTurn hashes unchanged so
+    # previously issued model-turn retries remain compatible.
+    calendar_choice_id: str
+
+
 class RecoverConversation(StrictModel):
     pending_request_id: str = Field(
         pattern=r"^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
