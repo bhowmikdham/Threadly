@@ -82,7 +82,7 @@ export default function SidePanel() {
       .then((s) => setDark(s.darkMode === true))
     const changed = (changes: any, area: string) => {
       if (
-        area === "session" &&
+        area === "local" &&
         changes.threadlySession &&
         !changes.threadlySession.newValue
       ) {
@@ -122,6 +122,7 @@ export default function SidePanel() {
         )
     } catch {
       // The worker may fail before replying. Do not leave its local token behind.
+      await chrome.storage.local.remove("threadlySession")
       await chrome.storage.session.remove("threadlySession")
       setError(
         "Signed out on this device, but Threadly could not confirm server sign-out. Other sessions may remain active. Sign in and sign out again when the server is reachable."

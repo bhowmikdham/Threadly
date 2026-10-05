@@ -94,7 +94,7 @@ test.beforeAll(async () => {
   await page.evaluate(
     async ({ origin, jwt, user }) => {
       await chrome.storage.local.set({ backendOrigin: origin })
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         threadlySession: { jwt, user, origin }
       })
     },
@@ -640,7 +640,7 @@ test("server logout failure clears the browser session and warns about remaining
     ".signature"
   await page.evaluate(
     async ({ origin, jwt, user }) => {
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         threadlySession: { jwt, user, origin }
       })
     },
@@ -659,9 +659,7 @@ test("server logout failure clears the browser session and warns about remaining
     "could not confirm server sign-out"
   )
   expect(
-    await page.evaluate(async () =>
-      chrome.storage.session.get("threadlySession")
-    )
+    await page.evaluate(async () => chrome.storage.local.get("threadlySession"))
   ).toEqual({})
   control.failLogout = false
 })
@@ -670,7 +668,7 @@ test("logout never sends a retained token to a stale server origin", async () =>
   const priorLogoutCalls = calls.filter((c) => c.path === "/auth/logout").length
   await page.evaluate(
     async ({ user }) => {
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         threadlySession: {
           jwt: "retained-token",
           user,
@@ -688,9 +686,7 @@ test("logout never sends a retained token to a stale server origin", async () =>
     priorLogoutCalls
   )
   expect(
-    await page.evaluate(async () =>
-      chrome.storage.session.get("threadlySession")
-    )
+    await page.evaluate(async () => chrome.storage.local.get("threadlySession"))
   ).toEqual({})
 })
 
@@ -703,7 +699,7 @@ test("disconnect preserves session on failure and clears it on confirmed success
     ".signature"
   await page.evaluate(
     async ({ origin, jwt, user }) =>
-      chrome.storage.session.set({ threadlySession: { origin, jwt, user } }),
+      chrome.storage.local.set({ threadlySession: { origin, jwt, user } }),
     { origin, jwt, user }
   )
   control.failDisconnect = true
@@ -718,15 +714,13 @@ test("disconnect preserves session on failure and clears it on confirmed success
   expect(
     await page.evaluate(
       async () =>
-        !!(await chrome.storage.session.get("threadlySession")).threadlySession
+        !!(await chrome.storage.local.get("threadlySession")).threadlySession
     )
   ).toBe(true)
   control.failDisconnect = false
   expect(await send()).toMatchObject({ ok: true, data: { connected: false } })
   expect(
-    await page.evaluate(async () =>
-      chrome.storage.session.get("threadlySession")
-    )
+    await page.evaluate(async () => chrome.storage.local.get("threadlySession"))
   ).toEqual({})
 })
 
@@ -739,7 +733,7 @@ test("concurrent token refresh cannot restore a signed-out session", async () =>
     ".signature"
   await page.evaluate(
     async ({ origin, jwt, user }) => {
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         threadlySession: { jwt, user, origin }
       })
     },
@@ -747,9 +741,9 @@ test("concurrent token refresh cannot restore a signed-out session", async () =>
   )
   const worker = context.serviceWorkers()[0]
   await worker.evaluate(() => {
-    const originalSet = chrome.storage.session.set.bind(chrome.storage.session)
-    const originalRemove = chrome.storage.session.remove.bind(
-      chrome.storage.session
+    const originalSet = chrome.storage.local.set.bind(chrome.storage.local)
+    const originalRemove = chrome.storage.local.remove.bind(
+      chrome.storage.local
     )
     const state = {
       waiting: false,
@@ -757,7 +751,7 @@ test("concurrent token refresh cannot restore a signed-out session", async () =>
       release: null as (() => void) | null
     }
     ;(globalThis as any).__threadlySessionRace = state
-    chrome.storage.session.set = async (items) => {
+    chrome.storage.local.set = async (items) => {
       if (items.threadlySession?.jwt?.endsWith(".refreshed")) {
         state.waiting = true
         await new Promise<void>((resolve) => {
@@ -766,7 +760,7 @@ test("concurrent token refresh cannot restore a signed-out session", async () =>
       }
       return originalSet(items)
     }
-    chrome.storage.session.remove = async (keys) => {
+    chrome.storage.local.remove = async (keys) => {
       state.removeStarted = true
       return originalRemove(keys)
     }
@@ -799,9 +793,7 @@ test("concurrent token refresh cannot restore a signed-out session", async () =>
   )
   await Promise.all([pendingRequest, pendingLogout])
   expect(
-    await page.evaluate(async () =>
-      chrome.storage.session.get("threadlySession")
-    )
+    await page.evaluate(async () => chrome.storage.local.get("threadlySession"))
   ).toEqual({})
 })
 
