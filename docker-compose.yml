@@ -21,7 +21,9 @@ services:
   api:
     build: ./backend
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      -.env
+      - /srv/threadly-data/secrets/threadly.env
     expose:
       - "8000"             # reachable only inside threadly_net (caddy proxies to it)
     volumes:
