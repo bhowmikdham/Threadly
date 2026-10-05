@@ -22,7 +22,7 @@ services:
     build: ./backend
     restart: unless-stopped
     env_file:
-      -.env
+      - .env
       - /srv/threadly-data/secrets/threadly.env
     expose:
       - "8000"             # reachable only inside threadly_net (caddy proxies to it)
@@ -40,7 +40,9 @@ services:
     command: python -m app.assistant.worker
     profiles: ["assistant"]
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - /srv/threadly-data/secrets/threadly.env
     volumes:
       - ./ml:/ml:ro
     depends_on:
@@ -53,7 +55,9 @@ services:
     command: python -m app.actions.worker
     profiles: ["actions"]
     restart: unless-stopped
-    env_file: .env
+    env_file: 
+      - .env
+      - /srv/threadly-data/secrets/threadly.env
     depends_on:
       postgres:
         condition: service_healthy
