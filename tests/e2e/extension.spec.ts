@@ -110,6 +110,54 @@ test.afterAll(async () => {
   await new Promise<void>((r) => server?.close(() => r()))
   if (profile) await rm(profile, { recursive: true, force: true })
 })
+test("Calendar approval menu and exact event card in the built extension", async () => {
+  await expect(
+    page.getByRole("button", { name: "Calendar approval: Ask for approval" })
+  ).toBeVisible()
+  await page.getByLabel("Your request").fill("Create Focus at 2pm tomorrow")
+  await page.getByLabel("Your request").press("Enter")
+  const card = page.getByRole("region", { name: "Calendar event" }).last()
+  await expect(card.getByRole("heading", { name: "Focus" })).toBeVisible()
+  await expect(card.getByRole("button", { name: "Create event" })).toBeVisible()
+  await page.screenshot({ path: "/tmp/threadly-event-review.png" })
+  await card.getByRole("button", { name: "Create event" }).click()
+  await expect(card.getByText("Event created", { exact: true })).toBeVisible()
+  await page
+    .getByRole("button", { name: "Calendar approval: Ask for approval" })
+    .click()
+  await expect(
+    page.getByRole("menuitemradio", { name: /Ask for approval/ })
+  ).toHaveAttribute("aria-checked", "true")
+  await page.screenshot({ path: "/tmp/threadly-calendar-approval-menu.png" })
+  await page.getByRole("menuitemradio", { name: /Always allow/ }).click()
+  await expect(
+    page.getByRole("button", { name: "Calendar approval: Always allow" })
+  ).toBeVisible()
+  await page.getByLabel("Your request").fill("Create Focus at 2pm tomorrow")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page
+      .getByRole("region", { name: "Calendar event" })
+      .last()
+      .getByText("Event created", { exact: true })
+  ).toBeVisible()
+  expect(
+    calls.filter(
+      (c) =>
+        c.path.endsWith("/approve") && c.path.includes("/calendar-actions/")
+    )
+  ).toHaveLength(1)
+  await page
+    .getByRole("button", { name: "Calendar approval: Always allow" })
+    .click()
+  await page.getByRole("menuitemradio", { name: /Ask for approval/ }).click()
+  await expect(
+    page.getByRole("button", { name: "Calendar approval: Ask for approval" })
+  ).toBeVisible()
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  calls.length = 0
+})
+
 test("real extension bridge: selected summary, answer and edited reply without send", async () => {
   await page.getByLabel("Your request").fill("hey")
   await page.getByLabel("Your request").press("Enter")
@@ -512,7 +560,7 @@ test("Calendar recovery is clear, compact and usable at 320px", async () => {
   ).toBeChecked()
   await expect(
     page.getByRole("list", { name: "Skills" }).locator("li")
-  ).toHaveCount(3)
+  ).toHaveCount(4)
   await expect(page.getByText("Threadly server", { exact: true })).toHaveCount(
     0
   )

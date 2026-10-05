@@ -80,7 +80,12 @@ const skills: Record<ConnectorId, Feature[]> = {
       requires: [...calendar, "calendar_events_read"],
       preferences: true
     },
-    { name: "Plan meetings", requires: calendar, preferences: true }
+    { name: "Plan meetings", requires: calendar, preferences: true },
+    {
+      name: "Create events",
+      requires: [...calendar, "calendar_write"],
+      preferences: true
+    }
   ]
 }
 export function featureStatus(
@@ -198,6 +203,22 @@ export function ConnectorDetails({
           Find messages, understand a thread, and prepare a reply.
         </p>
       )}
+      {id === "calendar" &&
+        capabilities.some(
+          (c) => c.id === "calendar_write" && c.enabled && !c.ready
+        ) && (
+          <div className="calendar-write-setup">
+            <p>
+              Create events from this chat, with approval before each event by
+              default.
+            </p>
+            <button
+              disabled={busy}
+              onClick={() => void reconnect("calendar_write")}>
+              Enable event creation
+            </button>
+          </div>
+        )}
       <details className="connection-disclosure">
         <summary>Account & permissions</summary>
         <p className="muted">
@@ -224,9 +245,7 @@ export function ConnectorDetails({
           {capabilities
             .filter(
               (c) =>
-                c.id === (id === "gmail" ? "gmail_send" : "calendar_write") &&
-                c.enabled &&
-                !c.ready
+                id === "gmail" && c.id === "gmail_send" && c.enabled && !c.ready
             )
             .map((c) => (
               <button
@@ -235,12 +254,13 @@ export function ConnectorDetails({
                 onClick={() => void reconnect(c.id)}>
                 {id === "gmail"
                   ? "Allow sending after review"
-                  : "Allow booking after review"}
+                  : "Enable event creation"}
               </button>
             ))}
         </div>
         <p className="muted">
-          Sending mail and booking meetings require your review.
+          Email sending requires review. Calendar events ask for approval unless
+          you choose Always allow in the current chat.
         </p>
         <p className="muted">
           Disconnecting signs you out of Threadly and disconnects both Gmail and

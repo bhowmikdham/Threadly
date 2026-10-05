@@ -76,6 +76,7 @@ const validSelectionReference = (value: any): value is SelectionReference =>
       value.selectedIds.includes(value.targetId)))
 
 type ConversationHistoryItem = {
+  calendar_action_id?: string
   error_code?: string
   user: string
   assistant: string
@@ -258,7 +259,8 @@ export function useAssistant(user: User) {
           id: h.request_id || `restored-${i}`,
           instruction: h.user,
           message: h.assistant,
-          errorCode: h.error_code
+          errorCode: h.error_code,
+          calendarActionId: h.calendar_action_id
         }))
         const pending = saved.pendingTurn
           ? pendingTurn(saved.pendingTurn.id, saved.pendingTurn.body)
@@ -789,7 +791,9 @@ export function useAssistant(user: User) {
       artifacts: turn.artifacts,
       conversationVersion: turn.version,
       error: undefined,
-      errorCode: turn.error_code
+      errorCode: turn.error_code,
+      calendarAction: turn.calendar_action,
+      calendarActionId: turn.calendar_action_id
     })
     try {
       await saveConversation(null)
@@ -1155,6 +1159,8 @@ export function useAssistant(user: User) {
       )
     )
   return {
+    conversationId: conversation.current.id,
+    rememberConversation: () => saveConversation(),
     email: user.email,
     entries,
     selection,

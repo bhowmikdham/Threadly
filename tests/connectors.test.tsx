@@ -53,7 +53,7 @@ it("makes both connected and disconnected rows manageable", () => {
 it("shows compact skills and puts Calendar preferences directly on the page", () => {
   render(<ConnectorDetails {...props} id="calendar" />)
   const skills = screen.getByRole("list", { name: "Skills" })
-  expect(within(skills).getAllByRole("listitem")).toHaveLength(3)
+  expect(within(skills).getAllByRole("listitem")).toHaveLength(4)
   expect(screen.queryByText("Available")).toBeNull()
   expect(screen.getByText("Find availability").closest("li")!.title).toBe(
     "Available"

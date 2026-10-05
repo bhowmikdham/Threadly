@@ -74,6 +74,7 @@ export function schedulingReadiness(
 }
 
 const SETUP_ERRORS = new Set([
+  "calendar_write_scope_required",
   "calendar_connection_required",
   "calendar_access_denied",
   "calendar_preferences_missing",

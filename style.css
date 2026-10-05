@@ -2425,3 +2425,122 @@ summary:focus-visible {
   font-size: 12px;
   line-height: 1.6;
 }
+
+.composer {
+  position: relative;
+}
+.calendar-permission {
+  grid-column: 4;
+  grid-row: 2;
+  width: 28px;
+}
+.calendar-permission > .icon-button {
+  width: 28px;
+}
+.permission-popover {
+  position: absolute;
+  z-index: 12;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: min(310px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px #0002;
+}
+.permission-popover [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px;
+  border: 0;
+  text-align: left;
+  border-radius: 11px;
+}
+.permission-popover strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.permission-popover small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.permission-caption {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 6px 10px;
+}
+.permission-check {
+  width: 14px;
+  margin-left: auto;
+}
+.permission-error {
+  font-size: 12px;
+  padding: 0 10px;
+}
+.permission-active {
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.calendar-event-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  margin: 10px 0;
+}
+.calendar-event-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.calendar-event-card h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  margin: 14px 0 8px;
+  overflow-wrap: anywhere;
+}
+.calendar-event-card p {
+  margin: 8px 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.calendar-event-card .muted {
+  font-size: 12px;
+}
+.calendar-event-description {
+  white-space: pre-wrap;
+}
+.calendar-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.calendar-event-actions button {
+  min-height: 40px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.calendar-write-setup {
+  margin: 18px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 350px) {
+  .calendar-permission {
+    grid-column: 3;
+  }
+}

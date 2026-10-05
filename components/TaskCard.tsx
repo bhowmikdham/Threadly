@@ -4,6 +4,7 @@ import { addresses } from "../lib/api"
 import { needsCalendarSetup } from "../lib/scheduling-readiness"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
+import { CalendarEventCard } from "./CalendarEventCard"
 import { Icon } from "./Icon"
 import { InboxCards } from "./InboxCards"
 
@@ -89,6 +90,7 @@ export function TaskCard({
       <div className="user-message">{entry.instruction}</div>
       <div className="assistant-message">
         {entry.message &&
+          !entry.calendarActionId &&
           (!p || p.state === "proposed" || p.state === "consumed") && (
             <p className="chat-response">{entry.message}</p>
           )}
@@ -104,6 +106,12 @@ export function TaskCard({
           <button onClick={() => controller.retry(entry)}>
             Retry response
           </button>
+        )}
+        {entry.calendarActionId && (
+          <CalendarEventCard
+            id={entry.calendarActionId}
+            initial={entry.calendarAction}
+          />
         )}
         {entry.inbox && <InboxCards entry={entry} controller={controller} />}
         {entry.notice && <p className="muted">{entry.notice}</p>}
