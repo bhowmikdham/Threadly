@@ -19,6 +19,7 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
+from app.conversation import calendar_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.schemas.assistant import AssistantRequest, DraftOptions
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
@@ -524,6 +525,7 @@ class Runtime:
     def __init__(self, owner, request, state, factory, lease=None):
         self.owner, self.request, self.state, self.factory = owner, request, state, factory
         self.lease = lease
+        self.calendar_reparse = None
         self.calendar_anchor = (
             datetime.fromisoformat(state["calendar_read_anchor"])
             if state.get("calendar_read_anchor")
@@ -683,6 +685,7 @@ class Runtime:
             # Keep UI history, but never pass provider-authored agenda details as
             # instructions or remembered facts to the next model decision.
             "recent_dialogue": model_history(self.state["history"]),
+            "previous_calendar_request": calendar_context.model_context(self.state),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -709,14 +712,15 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        if name == "retry_calendar_read":
+            return await calendar_context.retry(self)
+        if name in calendar_context.WINDOW_TOOLS:
+            return await calendar_context.read(self, name, args)
         if name in CALENDAR_READ_TOOLS:
             from app.calendar.conversation_tools import execute
 
             return await execute(
-                self.owner,
-                name,
-                args,
-                self.authoritative_instruction(),
+                self.owner, name, args, self.authoritative_instruction(),
                 anchor=self.calendar_anchor,
             )
         if name in {"search_mail", "more_mail"}:
@@ -725,15 +729,6 @@ class Runtime:
             return await self.read(args.reference, args.scope)
         if name == "read_search_results":
             return await self.read_search_results(args.references)
-        if name == "check_day_availability":
-            from app.calendar.day_availability import answer
-
-            return await answer(
-                self.owner,
-                self.authoritative_instruction(),
-                window=args,
-                anchor=self.calendar_anchor,
-            )
         if name == "read_calendar":
             return await self.read_calendar(args.period)
         if name == "prepare_workflow":

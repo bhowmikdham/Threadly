@@ -519,3 +519,18 @@ Calendar recovery adds no tables or migrations. `PreferencesOut.needs_review` is
 from the existing preference account/policy versions. Encrypted conversation history
 entries may additionally contain nullable `error_code`; the field contains a server error
 identifier, not Calendar provider payloads. Existing history without this field still loads.
+
+### Calendar request continuation (1.4.1)
+
+`Conversation.state_enc` may contain one `calendar_read_request`: tool name, original
+user instruction, validated typed arguments, original date anchor and last request ID.
+Whole-day results canonicalize the saved date to the backend-resolved civil date.
+Legacy recovery temporarily stores null arguments plus the conversation creation
+timestamp as a conservative lower bound on the original anchor. No events, busy
+intervals, calendar IDs or provider prose are added to this request record.
+
+The existing owner/version/lease checks, encryption, bounded state and seven-day
+conversation expiry apply. Completion clears this record when the turn did not
+continue a Calendar read. Valid retries retain it through recoverable failures;
+idempotent request receipts still prevent duplicate reads for the same turn. No
+schema migration or extension storage change is needed.

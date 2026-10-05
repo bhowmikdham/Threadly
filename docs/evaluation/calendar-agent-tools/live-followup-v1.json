@@ -1,0 +1,196 @@
+{
+  "release": "contextual-conversation-1.4.1",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+  "prompt_hash": "60ec5ea67bfd557349e658f2ce349b337bfb810c09d1fbe9e42aa7b5f92796f2",
+  "tools_hash": "29839abf81878748475a64ec59f191be7631e36818013a9bc1f97ceef058a1ff",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "anchor": "2026-10-05T06:55:00+00:00",
+  "live_google": false,
+  "external_writes": false,
+  "initial_request": "seeded through real handler; follow-up decision uses live model",
+  "cases": [
+    {
+      "case": "check_now",
+      "user_turn": "check now",
+      "decisions": [
+        {
+          "tool": "retry_calendar_read",
+          "arguments": {}
+        }
+      ],
+      "starts": [
+        "2026-10-06T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-07T00:00:00+11:00"
+      ],
+      "text": "On your selected calendars, Tuesday, 6 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "trace": [
+        {
+          "tool": "retry_calendar_read",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case": "repaired",
+      "user_turn": "I've fixed it, check again",
+      "decisions": [
+        {
+          "tool": "retry_calendar_read",
+          "arguments": {}
+        }
+      ],
+      "starts": [
+        "2026-10-06T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-07T00:00:00+11:00"
+      ],
+      "text": "On your selected calendars, Tuesday, 6 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "trace": [
+        {
+          "tool": "retry_calendar_read",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case": "paraphrase",
+      "user_turn": "Could you give it another go?",
+      "decisions": [
+        {
+          "tool": "retry_calendar_read",
+          "arguments": {}
+        }
+      ],
+      "starts": [
+        "2026-10-06T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-07T00:00:00+11:00"
+      ],
+      "text": "On your selected calendars, Tuesday, 6 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "trace": [
+        {
+          "tool": "retry_calendar_read",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case": "legacy",
+      "user_turn": "check now",
+      "decisions": [
+        {
+          "tool": "retry_calendar_read",
+          "arguments": {}
+        },
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "subject": "self",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1,
+              "days": 1
+            },
+            "date_phrase": "",
+            "date_source": "tmrw",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "starts": [
+        "2026-10-06T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-07T00:00:00+11:00"
+      ],
+      "text": "On your selected calendars, Tuesday, 6 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "trace": [
+        {
+          "tool": "retry_calendar_read",
+          "status": "calendar_retry_interpretation_required"
+        },
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case": "new_day",
+      "user_turn": "What about Friday instead?",
+      "decisions": [
+        {
+          "tool": "check_day_availability",
+          "arguments": {
+            "subject": "self",
+            "date": {
+              "kind": "weekday",
+              "weekday": 4,
+              "week": "upcoming"
+            },
+            "date_phrase": "",
+            "date_source": "Friday",
+            "start_time": "",
+            "end_time": "",
+            "start_time_source": "",
+            "end_time_source": ""
+          }
+        }
+      ],
+      "starts": [
+        "2026-10-09T00:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-10T00:00:00+11:00"
+      ],
+      "text": "On your selected calendars, Friday, 9 October 2026 (Australia/Melbourne) has no busy time recorded.",
+      "trace": [
+        {
+          "tool": "check_day_availability",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case": "clock",
+      "user_turn": "check now",
+      "decisions": [
+        {
+          "tool": "retry_calendar_read",
+          "arguments": {}
+        }
+      ],
+      "starts": [
+        "2026-10-06T14:00:00+11:00"
+      ],
+      "ends": [
+        "2026-10-06T16:00:00+11:00"
+      ],
+      "text": "Your selected calendars only, Tue 6 Oct 2026, 2:00 PM AEDT to Tue 6 Oct 2026, 4:00 PM AEDT. Other people's availability has not been checked.\nUsing 30-minute meetings and your saved working hours, buffers and minimum notice.\n\u2022 Tue 6 Oct 2026, 2:00 PM AEDT\u2013Tue 6 Oct 2026, 2:30 PM AEDT\n\u2022 Tue 6 Oct 2026, 2:30 PM AEDT\u2013Tue 6 Oct 2026, 3:00 PM AEDT\n\u2022 Tue 6 Oct 2026, 3:00 PM AEDT\u2013Tue 6 Oct 2026, 3:30 PM AEDT\nThese times are not reserved.",
+      "trace": [
+        {
+          "tool": "retry_calendar_read",
+          "status": "ok"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "passed": 6,
+  "total": 6
+}

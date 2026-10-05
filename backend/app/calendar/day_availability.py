@@ -65,7 +65,7 @@ def render(evidence, timezone, day, *, remaining_day):
     return f"{prefix} has busy time: {intervals}.{suffix}" + (f"\n\n{warning}" if warning else "")
 
 
-async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
+async def read(user_id, phrase, *, anchor=None, window=None, instruction="", date_anchor=None):
     """Use existing owner, grant, ACL, freshness and preference-version fences."""
     pref = await service.get_preferences(user_id)
     timezone = pref.preferences.timezone
@@ -74,12 +74,14 @@ async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
         if window is not None:
             from app.calendar.conversation_tools import resolve_window
 
-            start, end = resolve_window(window, instruction, anchor, timezone)
+            start, end = resolve_window(
+                window, instruction, anchor, timezone, date_anchor=date_anchor
+            )
             day = start.astimezone(ZoneInfo(timezone)).date()
             if end.astimezone(ZoneInfo(timezone)).date() != day + timedelta(days=1):
                 raise ValueError("Whole-day availability requires exactly one day")
         else:
-            day = resolve_day(phrase, anchor, timezone)
+            day = resolve_day(phrase, date_anchor or anchor, timezone)
         zone = ZoneInfo(timezone)
         start = day_start(day, zone)
         end = day_start(day + timedelta(days=1), zone)
@@ -125,7 +127,7 @@ async def read(user_id, phrase, *, anchor=None, window=None, instruction=""):
     return result
 
 
-async def answer(user_id, instruction, *, window, anchor=None):
+async def answer(user_id, instruction, *, window, anchor=None, date_anchor=None):
     if window.subject == "other":
         return {
             "kind": "message",
@@ -142,7 +144,8 @@ async def answer(user_id, instruction, *, window, anchor=None):
         for attempt in range(2):
             try:
                 return await read(
-                    user_id, phrase, window=window, instruction=instruction, anchor=anchor
+                    user_id, phrase, window=window, instruction=instruction, anchor=anchor,
+                    date_anchor=date_anchor,
                 )
             except ApiError as exc:
                 if exc.code != "calendar_context_changed" or attempt:
