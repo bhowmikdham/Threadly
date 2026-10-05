@@ -199,6 +199,7 @@ async def test_missing_calendar_coverage_never_becomes_free(provider):
         ("calendar_connection_required", "Connect Calendar read access"),
         ("calendar_preferences_missing", "Choose your calendars and timezone"),
         ("calendar_context_changed", "settings changed"),
+        ("calendar_preferences_stale", "Review and save your calendars"),
         ("calendar_access_denied", "Reconnect Calendar"),
         ("calendar_upstream_failed", "Calendar check failed"),
     ],
@@ -336,7 +337,8 @@ async def test_unknown_holiday_calendar_does_not_hide_verified_busy_times(provid
     result = await semantic_day(runtime(QUESTION))
     assert "10:00 AM–11:00 AM" in result["text"]
     assert "Holidays couldn't be checked" in result["text"]
-    assert "Review setup" in result["text"]
+    assert "Review calendars" in result["text"]
+    assert result["error_code"] == "calendar_coverage_incomplete"
     assert "no busy time recorded" not in result["text"]
     assert "private-provider-id" not in result["text"]
     assert result["calendar_availability"]["coverage"] == "unknown"
@@ -404,3 +406,69 @@ async def test_semantic_dates_do_not_depend_on_a_spelling_dictionary(provider, t
     assert result["calendar_availability"]["date"] == "2026-09-30"
     assert calls[-1][0:2] == ("freebusy", 42)
     assert calls[-1][2].start == datetime(2026, 9, 29, 14, tzinfo=UTC)
+
+
+async def test_transient_preference_race_restarts_whole_read_once(provider, monkeypatch):
+    calls, _ = provider
+    original = day.service.query_freebusy
+    attempts = 0
+
+    async def query(owner, body):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise day.service.conflict()
+        return await original(owner, body)
+
+    monkeypatch.setattr(day.service, "query_freebusy", query)
+    result = await semantic_day(runtime(QUESTION))
+    assert "error_code" not in result
+    assert attempts == 2
+    assert len([call for call in calls if call[0] == "preferences"]) == 2
+
+
+async def test_stale_saved_preferences_are_not_retried(provider):
+    calls, current = provider
+    current["error"] = ApiError(409, "calendar_preferences_stale", "Review")
+    result = await semantic_day(runtime(QUESTION))
+    assert result["error_code"] == "calendar_preferences_stale"
+    assert len([call for call in calls if call[0] == "freebusy"]) == 1
+
+
+async def test_continuous_settings_race_is_bounded(provider):
+    calls, current = provider
+    current["error"] = day.service.conflict()
+    result = await semantic_day(runtime(QUESTION))
+    assert result["error_code"] == "calendar_context_changed"
+    assert len([call for call in calls if call[0] == "freebusy"]) == 2
+
+
+async def test_retry_recomputes_day_with_new_preference_timezone(provider, monkeypatch):
+    snapshots = [
+        SimpleNamespace(
+            version=3,
+            account_version=2,
+            preferences=SimpleNamespace(timezone="Australia/Melbourne"),
+        ),
+        SimpleNamespace(
+            version=4, account_version=2, preferences=SimpleNamespace(timezone="America/New_York")
+        ),
+    ]
+    reads = []
+
+    async def prefs(owner):
+        return snapshots.pop(0)
+
+    async def query(owner, body):
+        reads.append(body)
+        if len(reads) == 1:
+            raise day.service.conflict()
+        return evidence(version=4).model_copy(update={"start": body.start, "end": body.end})
+
+    monkeypatch.setattr(day.service, "get_preferences", prefs)
+    monkeypatch.setattr(day.service, "query_freebusy", query)
+    result = await semantic_day(runtime(QUESTION))
+    assert result["calendar_availability"]["timezone"] == "America/New_York"
+    assert reads[1].expected_preferences_version == 4
+    assert reads[1].start == datetime(2026, 10, 1, 4, tzinfo=UTC)
+    assert reads[1].end == datetime(2026, 10, 2, 4, tzinfo=UTC)

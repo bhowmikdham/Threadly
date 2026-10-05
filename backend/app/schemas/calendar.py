@@ -117,6 +117,7 @@ class PreferencesOut(StrictModel):
     account_version: int
     policy_version: str
     preferences: Preferences
+    needs_review: bool = False
 
 
 class FreeBusyOut(StrictModel):
