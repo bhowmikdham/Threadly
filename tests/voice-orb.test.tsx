@@ -64,6 +64,21 @@ describe("voice conversation", () => {
     expect(screen.getByRole("status").textContent).toBe("Listening…")
     expect(recognizer.start).toHaveBeenCalledTimes(2)
   })
+  it("docks the orb once it has spoken, so the chat stays readable", async () => {
+    const { container } = render(
+      <VoiceOrb
+        respond={vi.fn().mockResolvedValue("You have two new emails.")}
+        onClose={vi.fn()}
+      />
+    )
+    expect(container.querySelector(".docked")).toBeNull()
+    say("What's new in my inbox")
+    await act(() => vi.advanceTimersByTimeAsync(1300))
+    await act(() => vi.advanceTimersByTimeAsync(20))
+    // Back to listening, but still docked.
+    expect(screen.getByRole("status").textContent).toBe("Listening…")
+    expect(container.querySelector(".voice-overlay.docked")).not.toBeNull()
+  })
   it("ignores what it hears while it is speaking", async () => {
     let answer: (v: string) => void = () => {}
     const respond = vi.fn(() => new Promise<string>((r) => (answer = r)))
