@@ -202,3 +202,27 @@ readiness do not establish complete coverage for every provider read.
 
 Verification: 101 frontend tests passed, TypeScript check and production build
 passed. Built against merged frontend `ea905b1`, preserving the voice changes.
+
+## Direct Calendar events and approval menu (0.2.3)
+
+The composer shield opens two choices: Ask for approval (default) and Always
+allow for Calendar events in this chat. The setting is saved on the backend,
+versioned, and bound to the signed-in account. New chats ask again; email still
+needs approval. A failed save is reread and never optimistically shown as granted.
+
+Direct event results use a compact card with title, resolved date/time/timezone,
+destination and any guest invitations. Create approves its exact payload. Queued,
+creating, confirmed, stopped and uncertain outcomes have separate wording. History
+stores the action ID and reloads current status rather than reusing stale success
+text. Polling is bounded, with a manual Refresh status action.
+
+Calendar settings show Create events as a skill and an Enable event creation
+button when the backend pilot permits it but Google consent is missing. Granting
+Calendar access does not enable Always allow. Google reconnection invalidates
+old account-bound chats; start a fresh chat after completing the connection.
+
+Validation for 0.2.3: 128 frontend unit tests, 22 offline browser tests and the
+separate production-origin browser test passed; all 29 release-packaging tests
+passed. Type checking and the public build passed. A deferred-response regression
+covers switching chats during an approval save; stale results cannot change the
+new chat's displayed mode. Visual review covered the compact event card and menu.

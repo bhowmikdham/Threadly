@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
+import { CalendarApprovalMenu } from "./components/CalendarApprovalMenu"
+
 import "./style.css"
 
 import { ConnectorList, type ConnectorId } from "./components/Connectors"
@@ -271,7 +273,7 @@ function Assistant({
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
     [openEmail, setOpenEmail] = useState(false),
-    [approvalInfo, setApprovalInfo] = useState(false),
+    [permissionSaving, setPermissionSaving] = useState(false),
     [connecting, setConnecting] = useState(""),
     [connectError, setConnectError] = useState("")
   const last = useRef<HTMLDivElement>(null),
@@ -280,7 +282,7 @@ function Assistant({
     atBottom = useRef(true),
     positionedSearch = useRef<string | null>(null)
   const startupBusy = c.busy || c.restoring
-  const inputBusy = startupBusy || c.restoreFailed
+  const inputBusy = startupBusy || c.restoreFailed || permissionSaving
   useEffect(() => {
     void c.selectActive(true)
   }, [])
@@ -398,6 +400,7 @@ function Assistant({
     input.current?.focus()
   }
   const newChat = async () => {
+    if (permissionSaving) return
     await c.newChat()
     setHistory(null)
     setContextOpen(false)
@@ -478,7 +481,7 @@ function Assistant({
           className="icon-button"
           aria-label="New chat"
           title="New chat"
-          disabled={startupBusy}
+          disabled={startupBusy || permissionSaving}
           onClick={() => void newChat()}>
           <Icon name="edit" />
         </button>
@@ -530,7 +533,7 @@ function Assistant({
           <button
             className="drawer-new-chat"
             onClick={() => void newChat()}
-            disabled={startupBusy}>
+            disabled={startupBusy || permissionSaving}>
             <Icon name="edit" size={16} />
             New conversation
           </button>
@@ -842,21 +845,6 @@ function Assistant({
             )}
           </div>
         )}
-        {approvalInfo && (
-          <div className="approval-info" role="status">
-            <Icon name="shield" />
-            <span>
-              Suggestions first. You review the exact email or event before
-              anything is sent or booked.
-            </span>
-            <button
-              className="icon-button"
-              aria-label="Close approval info"
-              onClick={() => setApprovalInfo(false)}>
-              <Icon name="close" size={14} />
-            </button>
-          </div>
-        )}
         <form className="composer" onSubmit={send}>
           {c.selection && (
             <div
@@ -950,14 +938,12 @@ function Assistant({
               onClick={dictate}>
               <Icon name="mic" size={17} />
             </button>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Approval information"
-              title="You’re in control"
-              onClick={() => setApprovalInfo(!approvalInfo)}>
-              <Icon name="shield" size={17} />
-            </button>
+            <CalendarApprovalMenu
+              conversationId={c.conversationId}
+              disabled={c.restoring || c.restoreFailed}
+              remember={c.rememberConversation}
+              onSaving={setPermissionSaving}
+            />
             <button
               className="send-button"
               type="submit"

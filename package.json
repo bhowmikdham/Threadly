@@ -1,7 +1,7 @@
 {
   "name": "threadly-extension",
   "displayName": "Threadly",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Threadly Gmail assistant connected to the reviewed backend workflows.",
   "author": "Threadly contributors",
   "scripts": {

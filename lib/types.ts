@@ -81,7 +81,32 @@ export interface InboxPage {
   next_cursor: string | null
   coverage: { complete: boolean; page_size: number }
 }
+export interface CalendarAction {
+  action_id: string
+  state: string
+  version: number
+  payload_hash: string
+  approval_available: boolean
+  blockers: string[]
+  authorization: string
+  preview: {
+    calendar_id: string
+    calendar_name?: string
+    send_updates: string
+    event: {
+      summary: string
+      description: string
+      location: string
+      start: { dateTime: string; timeZone: string }
+      end: { dateTime: string; timeZone: string }
+      attendees: { email: string }[]
+    }
+  }
+}
 export interface Entry {
+  calendarAction?: CalendarAction
+  calendarActionId?: string
+
   id: string
   instruction: string
   evidence?: { reference: string; quote: string }[]

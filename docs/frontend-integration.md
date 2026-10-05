@@ -209,3 +209,17 @@ from removing Google's OAuth grant (a separate Google account link is provided).
 The bundled update page opens once per successful version upgrade. Store account,
 listing, callback verification and one-time unpacked migration requirements are in
 [the extension release guide](extension-releases.md).
+
+### Calendar event creation (0.2.3)
+
+- Composer approval control uses `GET/PUT /assistant/conversations/{id}/calendar-approval`.
+  PUT carries `mode` and `expected_version`. It persists the chat pointer before
+  the permission mutation, uses server-confirmed state and reports read/write errors.
+- A conversation result can include `calendar_action_id` and `calendar_action`.
+  The card rereads `/assistant/calendar-actions/{id}`, including on history restore,
+  and echoes exact `version`/`payload_hash` on explicit approval.
+- Always mode is selected only through the UI; conversation text cannot set it.
+  The backend binds and revalidates the permission and remains the execution owner.
+- API deployment with conversation release 1.5.0 is required. Legacy review flows
+  and email approvals are unchanged. Browser tests use a synthetic API and create
+  no real events or invitations.

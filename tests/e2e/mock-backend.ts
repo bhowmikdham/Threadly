@@ -198,6 +198,11 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       )
     })
   )
+  const calendarPermissions = new Map<
+    string,
+    { mode: string; version: number }
+  >()
+  const directEvents = new Map<string, any>()
   async function handle(req: IncomingMessage, res: ServerResponse) {
     let raw = ""
     for await (const chunk of req) raw += chunk
@@ -213,7 +218,9 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     })
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
-      if (body.instruction === "am i free on the tuesday")
+      if (body.instruction === "Create Focus at 2pm tomorrow")
+        p = "/fixture/calendar-create"
+      else if (body.instruction === "am i free on the tuesday")
         p = "/fixture/calendar-answer"
       else if (
         body.instruction === "hey" ||
@@ -271,7 +278,78 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p === "/fixture/calendar-answer") {
+    if (p.endsWith("/calendar-approval")) {
+      const cid = p.split("/")[3]
+      const previous = calendarPermissions.get(cid) || {
+        mode: "ask",
+        version: 0
+      }
+      if (req.method === "PUT") {
+        verify("permission version", body.expected_version, previous.version)
+        calendarPermissions.set(cid, {
+          mode: body.mode,
+          version: previous.version + 1
+        })
+      }
+      data = calendarPermissions.get(cid) || previous
+    } else if (p === "/fixture/calendar-create") {
+      const always =
+        calendarPermissions.get(originalTurn.conversation_id)?.mode === "always"
+      const id = `direct-${directEvents.size + 1}`
+      data = {
+        kind: "calendar_event",
+        calendar_action_id: id,
+        calendar_action: {
+          action_id: id,
+          state: always ? "succeeded" : "proposed",
+          version: 1,
+          payload_hash: "event-hash",
+          blockers: [],
+          approval_available: !always,
+          authorization: always
+            ? "chat_permission"
+            : "separate_exact_event_approval",
+          preview: {
+            calendar_id: "primary",
+            calendar_name: "Personal calendar",
+            send_updates: "none",
+            event: {
+              summary: "Focus",
+              location: "",
+              description: "",
+              attendees: [],
+              start: {
+                dateTime: "2026-10-06T03:00:00Z",
+                timeZone: "Australia/Melbourne"
+              },
+              end: {
+                dateTime: "2026-10-06T03:30:00Z",
+                timeZone: "Australia/Melbourne"
+              }
+            }
+          }
+        }
+      }
+      directEvents.set(id, data.calendar_action)
+    } else if (p.startsWith("/assistant/calendar-actions/direct-")) {
+      const id = p.split("/")[3]
+      data = directEvents.get(id)
+      if (p.endsWith("/approve")) {
+        verify(
+          "exact Calendar payload hash",
+          body.payload_hash,
+          data.payload_hash
+        )
+        verify("exact Calendar version", body.expected_version, data.version)
+        data = {
+          ...data,
+          state: "succeeded",
+          approval_available: false,
+          version: data.version + 1
+        }
+        directEvents.set(id, data)
+      }
+    } else if (p === "/fixture/calendar-answer") {
       data = {
         kind: "message",
         text: "I couldn't confirm your full availability on Tuesday, 6 October 2026. Holidays in India couldn't be checked. Review calendars to fix this; they may contain additional busy time.",
