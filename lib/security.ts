@@ -30,7 +30,7 @@ export const DEFAULT_BACKEND = backendOrigin(
 export const publishedBackendBuild = DEFAULT_BACKEND.startsWith("https:")
 export function allowedPath(path: string) {
   if (
-    !/^\/(auth|assistant|calendar|threads|commitments)(\/|\?|$)/.test(path) &&
+    !/^\/(auth|assistant|calendar|threads|commitments|voice)(\/|\?|$)/.test(path) &&
     path !== "/readyz"
   )
     return false

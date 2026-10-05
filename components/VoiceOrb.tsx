@@ -243,7 +243,7 @@ export async function speak(text: string, onLevel: (level: number) => void) {
   let ctx: AudioContext | undefined
   let frame = 0
   try {
-    const reply = await api<{ audio: string }>("/assistant/voice/speak", {
+    const reply = await api<{ audio: string }>("/voice/speak", {
       text
     })
     if (session.cancelled) return
