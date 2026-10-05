@@ -153,3 +153,69 @@ it("restores current event state and never offers another insert after an uncert
   expect(screen.queryByRole("button", { name: "Create event" })).toBeNull()
   expect(screen.getByText(/don't create a duplicate/)).toBeTruthy()
 })
+
+it.each([
+  ["proposed", "Ready to review"],
+  ["approved", "Queued"],
+  ["executing", "Creating event…"],
+  ["outcome_unknown", "Waiting for confirmation"],
+  ["failed", "Couldn't create event"],
+  ["cancelled", "Cancelled"]
+])(
+  "renders %s from the action record instead of a prose completion claim",
+  async (state, label) => {
+    const action = { ...event, state, approval_available: state === "proposed" }
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: action
+    })
+    render(
+      <TaskCard
+        entry={{
+          id: "booking",
+          instruction: "book 2 pm tmrw for doctors appointment",
+          message: "Done! Your event was created.",
+          calendarActionId: action.action_id,
+          calendarAction: action
+        }}
+        controller={{}}
+      />
+    )
+    await screen.findByText(label, { exact: true })
+    expect(screen.queryByText("Done! Your event was created.")).toBeNull()
+    expect(screen.queryByText("Event created", { exact: true })).toBeNull()
+    expect(
+      Boolean(screen.queryByRole("button", { name: "Create event" }))
+    ).toBe(state === "proposed")
+    expect(
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.every(([m]: any) => m.method === "GET")
+    ).toBe(true)
+  }
+)
+
+it("shows missing Calendar write consent as an actionable result without starting OAuth", async () => {
+  const openCalendarSetup = vi.fn()
+  render(
+    <TaskCard
+      entry={{
+        id: "consent",
+        instruction: "book 2 pm tmrw for doctors appointment",
+        message:
+          "Enable Calendar event creation, then I can prepare this event.",
+        errorCode: "calendar_write_scope_required"
+      }}
+      controller={{ openCalendarSetup }}
+    />
+  )
+  expect(
+    screen.getByText(
+      "Enable Calendar event creation, then I can prepare this event."
+    )
+  ).toBeTruthy()
+  expect(screen.queryByLabelText("Calendar event")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Review calendars" }))
+  expect(openCalendarSetup).toHaveBeenCalledOnce()
+  expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+})

@@ -282,7 +282,8 @@ function Assistant({
     atBottom = useRef(true),
     positionedSearch = useRef<string | null>(null)
   const startupBusy = c.busy || c.restoring
-  const inputBusy = startupBusy || c.restoreFailed || permissionSaving
+  const inputBusy =
+    startupBusy || c.restoreFailed || permissionSaving || Boolean(c.recovery)
   useEffect(() => {
     void c.selectActive(true)
   }, [])
@@ -407,10 +408,13 @@ function Assistant({
     setMessage("")
     setMenu(false)
   }
-  const title = c.entries.length
-    ? /^(hi|hey|hello)[.!?]?$/i.test(c.entries[0].instruction.trim())
+  const firstInstruction = c.entries.find(
+    (entry) => entry.instruction
+  )?.instruction
+  const title = firstInstruction
+    ? /^(hi|hey|hello)[.!?]?$/i.test(firstInstruction.trim())
       ? "New conversation"
-      : c.entries[0].instruction
+      : firstInstruction
     : "New conversation"
   // Connect straight from the list, with the same Google permission request
   // Settings uses; the rows update once the backend reports the new access.
@@ -681,7 +685,7 @@ function Assistant({
             )}
           </section>
         )}
-        {!c.entries.length && !history && !contextOpen && (
+        {!c.entries.length && !history && !contextOpen && !c.recovery && (
           <section className="conversation-start">
             <span className="welcome-mark">
               <Icon name="sparkle" size={29} />
@@ -757,6 +761,23 @@ function Assistant({
             }}
           />
         ))}
+        {c.recovery && (
+          <section className="task-status" aria-label="Unfinished response">
+            <p role="status">{c.recovery.message}</p>
+            <button
+              disabled={startupBusy}
+              onClick={() => void c.recoverConversation("recover")}>
+              Recover unfinished response
+            </button>
+            {c.recovery.canCancel && (
+              <button
+                disabled={startupBusy}
+                onClick={() => void c.recoverConversation("cancel")}>
+                Cancel unfinished request
+              </button>
+            )}
+          </section>
+        )}
         <div ref={last} />
       </div>
       {c.error && (

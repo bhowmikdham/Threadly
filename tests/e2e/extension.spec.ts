@@ -158,6 +158,162 @@ test("Calendar approval menu and exact event card in the built extension", async
   calls.length = 0
 })
 
+test("tool-limit recovery retains the booking and Ask approval before a later availability question", async () => {
+  control.failConversationToolLimit = true
+  await page
+    .getByLabel("Your request")
+    .fill("book 2 pm tmrw for doctors appointment")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByText(
+      "Threadly couldn't finish this request. Retry response to continue with the same details."
+    )
+  ).toBeVisible()
+  await expect(
+    page.getByText(/Start a new conversation to continue/)
+  ).toHaveCount(0)
+  const issued = calls.find(
+    (c) => c.path === "/assistant/conversation-turns"
+  )!.body
+  control.failConversationToolLimit = false
+  await page
+    .getByRole("button", { name: "Retry response", exact: true })
+    .click()
+  const card = page.getByRole("region", { name: "Calendar event" }).last()
+  await expect(
+    card.getByRole("heading", { name: "doctors appointment" })
+  ).toBeVisible()
+  await expect(
+    card.getByRole("button", { name: "Create event", exact: true })
+  ).toBeVisible()
+  await expect(card.getByText("Event created", { exact: true })).toHaveCount(0)
+  const turnCalls = calls.filter(
+    (c) => c.path === "/assistant/conversation-turns"
+  )
+  expect(turnCalls).toHaveLength(2)
+  expect(turnCalls[1].body).toEqual(issued)
+  expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
+  await page.getByLabel("Your request").fill("am i free at 2 pm tmrw?")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByRole("button", { name: "Review calendars" })
+  ).toBeVisible()
+  const next = calls
+    .filter((c) => c.path === "/assistant/conversation-turns")
+    .at(-1)!.body
+  expect(next).toMatchObject({
+    conversation_id: issued.conversation_id,
+    expected_version: 1,
+    instruction: "am i free at 2 pm tmrw?"
+  })
+  expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  calls.length = 0
+})
+
+test("an older stranded chat can be safely cancelled before the exact availability follow-up", async () => {
+  const id = "00000000-0000-4000-8000-000000000010"
+  const requestId = "00000000-0000-4000-8000-000000000011"
+  control.strandedConversation = { id, requestId, version: 0, busy: true }
+  await page.evaluate(async (id) => {
+    await chrome.storage.session.set({
+      "threadlyConversation:1": { id, version: 0 }
+    })
+  }, id)
+  await page.reload()
+  const recovery = page.getByRole("region", { name: "Unfinished response" })
+  await expect(recovery).toBeVisible()
+  await expect(page.getByLabel("Your request")).toBeDisabled()
+  await expect(
+    recovery.getByRole("button", { name: "Cancel unfinished request" })
+  ).toHaveCount(0)
+  await recovery
+    .getByRole("button", { name: "Recover unfinished response" })
+    .click()
+  await expect(
+    recovery.getByText("The response is still being prepared. Try shortly.")
+  ).toBeVisible()
+  await expect(page.getByLabel("Your request")).toBeDisabled()
+  control.strandedConversation.busy = false
+  await recovery
+    .getByRole("button", { name: "Recover unfinished response" })
+    .click()
+  await expect(
+    recovery.getByRole("button", { name: "Cancel unfinished request" })
+  ).toBeVisible()
+  expect(
+    calls.filter(
+      (c) => c.path.endsWith("/recover") && c.body.operation === "cancel"
+    )
+  ).toHaveLength(0)
+  await recovery
+    .getByRole("button", { name: "Cancel unfinished request" })
+    .click()
+  await expect(recovery).toHaveCount(0)
+  await expect(
+    page.getByText(
+      "The unfinished request was cancelled. You can continue this chat."
+    )
+  ).toBeVisible()
+  await expect(page.locator(".user-message")).toHaveCount(0)
+  await page.getByLabel("Your request").fill("am i free at 2 pm tmrw?")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByRole("button", { name: "Review calendars" })
+  ).toBeVisible()
+  const turn = calls
+    .filter((c) => c.path === "/assistant/conversation-turns")
+    .at(-1)!
+  expect(turn.body).toMatchObject({
+    conversation_id: id,
+    expected_version: 1,
+    instruction: "am i free at 2 pm tmrw?"
+  })
+  expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false)
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  control.strandedConversation = undefined
+  calls.length = 0
+})
+
+test("recovering a saved response does not fabricate a user message or cancel existing work", async () => {
+  const id = "00000000-0000-4000-8000-000000000020"
+  control.strandedConversation = {
+    id,
+    requestId: "00000000-0000-4000-8000-000000000021",
+    version: 0,
+    saved: true
+  }
+  await page.evaluate(async (id) => {
+    await chrome.storage.session.set({
+      "threadlyConversation:1": { id, version: 0 }
+    })
+  }, id)
+  await page.reload()
+  await page
+    .getByRole("button", { name: "Recover unfinished response" })
+    .click()
+  await expect(
+    page.getByText("Your saved response is available again.")
+  ).toBeVisible()
+  await expect(page.locator(".user-message")).toHaveCount(0)
+  await expect(page.getByLabel("Your request")).toBeEnabled()
+  expect(
+    calls
+      .filter((c) => c.path.endsWith("/recover"))
+      .map((c) => c.body.operation)
+  ).toEqual(["recover"])
+  expect(
+    calls.some(
+      (c) =>
+        c.path.endsWith("/approve") ||
+        c.path === "/assistant/conversation-turns"
+    )
+  ).toBe(false)
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  control.strandedConversation = undefined
+  calls.length = 0
+})
+
 test("real extension bridge: selected summary, answer and edited reply without send", async () => {
   await page.getByLabel("Your request").fill("hey")
   await page.getByLabel("Your request").press("Enter")

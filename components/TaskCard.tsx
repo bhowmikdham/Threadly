@@ -87,7 +87,9 @@ export function TaskCard({
     ].some(needsCalendarSetup)
   return (
     <article className="exchange" data-entry-id={entry.id}>
-      <div className="user-message">{entry.instruction}</div>
+      {entry.instruction && (
+        <div className="user-message">{entry.instruction}</div>
+      )}
       <div className="assistant-message">
         {entry.message &&
           !entry.calendarActionId &&
