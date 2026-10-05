@@ -77,7 +77,7 @@ def main():
                 "Enable the matching read reconciliation control before pilot writes."
             )
         print(
-            "Pilot-only writes configured; each action still requires exact user approval."
+            "Pilot-only writes configured; each action requires exact authorization."
         )
     else:
         print(

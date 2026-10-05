@@ -48,7 +48,9 @@ async def claim_one(factory, *, transport=None):
             seconds=120
         )
         job.state, job.lease_token, job.lease_expires_at = (
-            "running", claim.lease_token, lease_expires_at
+            "running",
+            claim.lease_token,
+            lease_expires_at,
         )
         job.attempts += 1
         return claim
@@ -222,7 +224,9 @@ async def reconcile_one(factory, *, transport=None, token_loader=None):
             seconds=120
         )
         job.state, job.lease_token, job.lease_expires_at = (
-            "running", claim.lease_token, lease_expires_at
+            "running",
+            claim.lease_token,
+            lease_expires_at,
         )
         dispatch = worker.Dispatch(claim, attempt.id, action.version, executor.frozen(action))
         expected_identity = action.source_versions["google_subject"]
@@ -239,6 +243,23 @@ async def reconcile_one(factory, *, transport=None, token_loader=None):
         outcome = executor.Outcome("outcome_unknown", "calendar_reconciliation_unavailable")
     await finish(factory, dispatch, outcome, reconciliation=True)
     return True
+
+
+async def preflight_error(factory, claim, code):
+    # Transient token errors retain the existing bounded retry. A held Calendar
+    # job has not inserted anything and must not remain visibly "Queued" forever.
+    await worker.preflight_error(factory, claim, code)
+    async with factory.begin() as session:
+        _, action, job = await worker.locked(session, claim)
+        if action.state == "approved" and job.state == "held":
+            await service.stop_before_dispatch(
+                session,
+                claim.user_id,
+                action.id,
+                expected_version=action.version,
+                state="superseded",
+            )
+            action.error_code = code
 
 
 async def run_once(factory=None, *, transport=None, token_loader=None):
@@ -265,7 +286,7 @@ async def _run_once(factory=None, *, transport=None, token_loader=None):
             claim.user_id, await references(claim.user_id, [claim.action_id], factory=factory)
         )
     except ApiError as exc:
-        await worker.preflight_error(factory, claim, exc.code)
+        await preflight_error(factory, claim, exc.code)
         return True
     prepared = await prepare(factory, claim, transport=transport)
     if prepared is None:
@@ -275,7 +296,7 @@ async def _run_once(factory=None, *, transport=None, token_loader=None):
         token = await token_for(factory, claim.user_id, token_loader)
         code = await executor.preflight(token, payload, prefs, transport=transport)
     except ApiError as error:
-        await worker.preflight_error(factory, claim, error.code)
+        await preflight_error(factory, claim, error.code)
         return True
     dispatch = await prepare(
         factory, claim, transport=transport, dispatch=True, preflight_code=code

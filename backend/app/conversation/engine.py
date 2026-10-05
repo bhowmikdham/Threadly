@@ -19,6 +19,7 @@ from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_confi
 
 TERMINAL = set(CALENDAR_READ_TOOLS) | {
     "respond",
+    "prepare_calendar_event",
     "prepare_workflow",
     "answer_question",
     "revise_draft",
