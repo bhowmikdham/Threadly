@@ -10,26 +10,26 @@ export default function Updated() {
         <Logo height={40} />
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
-        <p className="update-intro">A calmer space for your calendar.</p>
+        <p className="update-intro">Pick up where you left off.</p>
         <section>
-          <h2>Less clutter, clearer controls</h2>
+          <h2>Stay signed in</h2>
           <p>
-            Find your connections in the conversation menu. Compact skill pills
-            and expandable settings keep the essentials close.
+            Reload Threadly or restart your browser without signing in again.
+            Your login can renew for up to 30 days after sign-in.
           </p>
         </section>
         <section>
-          <h2>Calendar checks you can fix</h2>
+          <h2>A smoother return</h2>
           <p>
-            See which calendar could not be checked and review your selections
-            directly from the conversation.
+            A temporary connection problem keeps your login ready to retry.
+            Signing out removes it from this browser.
           </p>
         </section>
         <section>
-          <h2>You’re in control</h2>
+          <h2>Updating from an older version?</h2>
           <p>
-            Review calendars after reconnecting, choose your working hours, and
-            save your changes. Threadly keeps your calendar choices explicit.
+            Sign in once if prompted. Threadly will remember that login across
+            future reloads and browser restarts.
           </p>
         </section>
         <a

@@ -11,6 +11,7 @@ import {
 
 type Session = {
   jwt: string
+  refresh_token?: string
   user: { id: number; email: string; name: string | null }
   origin: string
 }
@@ -18,6 +19,7 @@ let signingIn = false
 let signingOut = false
 let sessionGeneration = 0
 let refreshing: Promise<string> | null = null
+let refreshGeneration = -1
 let sessionWriteTail: Promise<void> = Promise.resolve()
 function mutateSession<T>(operation: () => Promise<T>): Promise<T> {
   const result = sessionWriteTail.then(operation)
@@ -33,8 +35,20 @@ const protectStorage = async () => {
     accessLevel: "TRUSTED_CONTEXTS"
   })
 }
-void protectStorage()
+const storageReady = (async () => {
+  await protectStorage()
+  const saved = (await chrome.storage.local.get("threadlySession"))
+    .threadlySession
+  const legacy = (await chrome.storage.session.get("threadlySession"))
+    .threadlySession
+  if (!saved && legacy)
+    await chrome.storage.local.set({ threadlySession: legacy })
+  await chrome.storage.session.remove("threadlySession")
+})()
+// Every message awaits this promise; startup failure must not leak an unhandled rejection.
+void storageReady.catch(() => {})
 chrome.runtime.onInstalled.addListener(async (details) => {
+  await storageReady
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
   await showUpdateNotice(details, chrome.runtime.getManifest().version, {
     read: async () =>
@@ -65,8 +79,7 @@ async function settings() {
 }
 async function session(): Promise<Session | null> {
   return (
-    (await chrome.storage.session.get("threadlySession")).threadlySession ||
-    null
+    (await chrome.storage.local.get("threadlySession")).threadlySession || null
   )
 }
 async function transport(
@@ -146,14 +159,15 @@ async function activeSession() {
   } catch {
     /* Server verifies the token; malformed local state cannot bypass it. */
   }
-  if (expiry * 1000 - Date.now() < 120000) {
-    if (!refreshing)
-      refreshing = transport(
+  if (!saved.refresh_token || expiry * 1000 - Date.now() < 120000) {
+    if (!refreshing || refreshGeneration !== generation) {
+      refreshGeneration = generation
+      const pending: Promise<string> = transport(
         origin,
         "/auth/refresh",
         "POST",
         undefined,
-        saved.jwt
+        saved.refresh_token || saved.jwt
       )
         .then((data) =>
           mutateSession(async () => {
@@ -164,21 +178,51 @@ async function activeSession() {
               current.jwt !== saved.jwt
             )
               throw new Error("Your session changed. Sign in again.")
-            await chrome.storage.session.set({
-              threadlySession: { ...saved, jwt: data.jwt }
+            await chrome.storage.local.set({
+              threadlySession: {
+                ...saved,
+                jwt: data.jwt,
+                refresh_token: data.refresh_token || saved.refresh_token
+              }
             })
             return data.jwt
           })
         )
         .finally(() => {
-          refreshing = null
+          if (refreshing === pending) refreshing = null
         })
-    saved.jwt = await refreshing
+      refreshing = pending
+    }
+    try {
+      saved.jwt = await refreshing
+    } catch (error) {
+      if (error.status === 401 && !(await discardSession(saved, generation)))
+        throw Object.assign(
+          new Error("Your session changed. Please try again."),
+          {
+            code: "session_changed",
+            status: 409
+          }
+        )
+      throw error
+    }
   }
   if (generation !== sessionGeneration)
     throw new Error("Your session changed. Sign in again.")
   return saved
 }
+async function discardSession(expected: Session, generation: number) {
+  return mutateSession(async () => {
+    const current = await session()
+    if (generation !== sessionGeneration || current?.jwt !== expected.jwt)
+      return false
+    sessionGeneration++
+    await chrome.storage.local.remove("threadlySession")
+    await chrome.storage.session.remove("threadlySession")
+    return true
+  })
+}
+
 async function login(capabilities?: string[]) {
   if (signingIn || signingOut)
     throw new Error("A sign-in or sign-out is already in progress.")
@@ -228,7 +272,7 @@ async function login(capabilities?: string[]) {
     await mutateSession(async () => {
       if (generation !== sessionGeneration || origin !== (await settings()))
         throw new Error("Session changed during login. Start again.")
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         threadlySession: { ...result, origin }
       })
     })
@@ -253,7 +297,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   )
     return false
   void (async () => {
-    await protectStorage()
+    await storageReady
     switch (message.type) {
       case "STATUS": {
         const s = await session()
@@ -285,7 +329,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             )
           sessionGeneration++
           await mutateSession(() =>
-            chrome.storage.session.remove("threadlySession")
+            chrome.storage.local.remove("threadlySession")
           )
           return result
         } finally {
@@ -302,6 +346,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         try {
           const previous = await mutateSession(async () => {
             const saved = await session()
+            await chrome.storage.local.remove("threadlySession")
             await chrome.storage.session.remove("threadlySession")
             return saved
           })
@@ -314,7 +359,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             "/auth/logout",
             "POST",
             undefined,
-            previous.jwt,
+            previous.refresh_token || previous.jwt,
             10000
           )
           return { serverRevoked: result?.signed_out === true }
@@ -336,6 +381,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         sessionGeneration++
         await mutateSession(async () => {
           await chrome.storage.local.set({ backendOrigin: origin })
+          await chrome.storage.local.remove("threadlySession")
           await chrome.storage.session.clear()
         })
         return { origin }
@@ -364,8 +410,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           message.path.startsWith("/sync/")
         )
           throw new Error("Use the dedicated sign-in controls.")
+        const generation = sessionGeneration
+        let s: Session | undefined
         try {
-          const s = await activeSession()
+          s = await activeSession()
           return await transport(
             s.origin,
             message.path,
@@ -374,8 +422,18 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             s.jwt
           )
         } catch (error) {
-          if (error.status === 401)
-            await chrome.storage.session.remove("threadlySession")
+          if (
+            error.status === 401 &&
+            s &&
+            !(await discardSession(s, generation))
+          )
+            throw Object.assign(
+              new Error("Your session changed. Please try again."),
+              {
+                code: "session_changed",
+                status: 409
+              }
+            )
           throw error
         }
       }

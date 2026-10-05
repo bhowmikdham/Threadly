@@ -39,9 +39,9 @@ sequenceDiagram
 
 | Panel control              | Backend contract                                             | Completion / guard                                                                     |
 | -------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Sign in                    | `/auth/google/begin`, `/auth/google/exchange`                | PKCE, one-use state, exact callback; JWT kept in trusted extension session storage     |
+| Sign in                    | `/auth/google/begin`, `/auth/google/exchange`                | PKCE, one-use state, exact callback; credentials kept in trusted extension local storage     |
 | Connect Gmail/Calendar     | `/auth/google/reconnect`                                     | Explicit capability; account binding remains backend-owned                             |
-| Session maintenance        | `/auth/refresh`                                              | Refresh before expiry; clear session on 401                                            |
+| Session maintenance        | `/auth/refresh`                                              | Renew access after expiry within the fixed session lifetime; clear only the rejected session                                            |
 | Connection status          | `GET /assistant/capabilities`                                | Show actual account readiness; never infer send authority from Gmail read scope        |
 | Use open Gmail thread      | content-script metadata → `GET /threads/{id}`                | Provider IDs only; validate account where visible; no DOM body import                  |
 | Ordinary chat, inbox search and follow-ups | `POST /assistant/conversation-turns` | Exact user text, versioned conversation ID/request ID, timezone and owned source/task references; backend decides whether to answer, search, page or prepare work |
@@ -65,8 +65,19 @@ sequenceDiagram
 
 ## State, privacy and failure handling
 
-- JWTs use trusted `chrome.storage.session`, so content scripts cannot read them.
-  Google refresh tokens and client secrets remain on EC2.
+- Threadly access and renewal credentials use `chrome.storage.local` restricted
+  to `TRUSTED_CONTEXTS` before any storage migration or request handling. They
+  survive extension reloads and browser restarts; content scripts cannot read
+  them. Google refresh tokens and client secrets remain on EC2.
+- Access renews with the scoped Threadly credential, including after access
+  expiry, within the server's fixed 30-day default session deadline. Legacy
+  valid access credentials can upgrade. A temporary server/network failure
+  retains the session; a current-session 401 clears it. A late rejection cannot
+  erase a newer login. Renewal and queued writes cannot undo sign-out.
+- Available legacy session storage is migrated at worker startup. An upgrade
+  from an older extension may require one fresh sign-in because Chrome clears
+  that old temporary storage when reloading/updating the extension; see the
+  [Chrome storage lifecycle](https://developer.chrome.com/docs/extensions/reference/api/storage).
 - No mailbox cache is written to extension storage. The panel holds loaded email
   text in memory while open. `chrome.storage.session` retains the current
   conversation ID/version and, while a request is uncertain, the exact user
@@ -77,7 +88,7 @@ sequenceDiagram
   conversation history is encrypted and bounded to 12 exchanges with a seven-day
   expiry; answers and short evidence quotes may contain email-derived content.
   Generated task artifacts remain in their existing durable records.
-- Settings and action identifiers are the only durable extension data. Action
+- Credentials, settings and action identifiers are durable extension data. Action
   references are namespaced by backend origin and backend user ID. Reopening a
   draft/booking reloads the authoritative action status, not a cached payload.
 - Normal content scripts have no privileged backend bridge. API requests reject

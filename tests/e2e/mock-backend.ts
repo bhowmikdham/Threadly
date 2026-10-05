@@ -37,6 +37,7 @@ export type Call = {
 // Switches a test can flip to exercise failure paths.
 export type MockControl = {
   failDisconnect?: boolean
+  failRefresh?: number
   failLogout: boolean
   calendarConnected: boolean
   calendarSelection?: string[]
@@ -294,14 +295,27 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         }
       } else data = { signed_out: true, scope: "all_sessions" }
     } else if (p === "/auth/refresh") {
-      data = {
-        jwt:
-          "header." +
-          Buffer.from(
-            JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
-          ).toString("base64url") +
-          ".refreshed"
-      }
+      if (control.failRefresh) {
+        res.statusCode = control.failRefresh
+        data = {
+          error: {
+            code:
+              control.failRefresh === 401
+                ? "reauth_required"
+                : "service_unavailable",
+            message: "Session renewal unavailable"
+          }
+        }
+      } else
+        data = {
+          refresh_token: "synthetic-renewal-token",
+          jwt:
+            "header." +
+            Buffer.from(
+              JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+            ).toString("base64url") +
+            ".refreshed"
+        }
     } else if (p === "/assistant/capabilities")
       data = {
         capabilities: [
