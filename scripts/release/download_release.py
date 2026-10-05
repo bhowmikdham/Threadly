@@ -163,6 +163,15 @@ def read_json(path):
     return json.loads(path.read_bytes()) if path.exists() else None
 
 
+def publish_version(public, data, manifest):
+    """Expose only the version and checksum of the ZIP currently being served."""
+    version_parts(manifest["version"])
+    path = public.with_suffix(".json")
+    payload = encode({"version": manifest["version"], "sha256": digest(data)})
+    if not path.exists() or path.read_bytes() != payload:
+        atomic_write(path, payload)
+
+
 def update(root=DEFAULT_ROOT, get=fetch):
     root = Path(root)
     state = root / "extension-releases"
@@ -182,15 +191,17 @@ def update_locked(state, public, get):
     # Recover an interrupted swap before fetching any new remote state.
     pending = read_json(pending_path)
     if pending:
+        public.with_suffix(".json").unlink(missing_ok=True)
         atomic_write(public, previous_zip.read_bytes())
         if pending["previous"] is None:
             current_path.unlink(missing_ok=True)
         else:
             atomic_write(current_path, encode(pending["previous"]))
         pending_path.unlink()
-    meta = validate_metadata(json.loads(get(FEED_URL, 16384)))
     old_data = public.read_bytes()
     old_manifest = inspect_zip(old_data)
+    publish_version(public, old_data, old_manifest)
+    meta = validate_metadata(json.loads(get(FEED_URL, 16384)))
     if version_parts(meta["version"]) < version_parts(old_manifest["version"]):
         return "unchanged: website already has a newer extension version"
     current = read_json(current_path)
@@ -214,17 +225,20 @@ def update_locked(state, public, get):
     data = get(package_url(meta), MAX_ZIP)
     if len(data) != meta["bytes"] or digest(data) != meta["sha256"]:
         raise ValueError("Release checksum or size mismatch")
-    inspect_zip(data, meta["version"])
+    manifest = inspect_zip(data, meta["version"])
     check_head()
     atomic_write(previous_zip, old_data)
     atomic_write(state / "previous.json", encode(current))
     atomic_write(pending_path, encode({"previous": current, "candidate": meta}))
     try:
+        # Hide the label during the swap rather than label new bytes as the old version.
+        public.with_suffix(".json").unlink(missing_ok=True)
         atomic_write(public, data)
         served = get(f"{PUBLIC_URL}?release={meta['sha256']}", MAX_ZIP)
         if digest(served) != meta["sha256"]:
             raise ValueError("Website download verification failed")
         atomic_write(current_path, encode(meta))
+        publish_version(public, data, manifest)
         pending_path.unlink()
     except BaseException:
         atomic_write(public, old_data)
@@ -232,6 +246,7 @@ def update_locked(state, public, get):
             current_path.unlink(missing_ok=True)
         else:
             atomic_write(current_path, encode(current))
+        publish_version(public, old_data, old_manifest)
         pending_path.unlink(missing_ok=True)
         raise
     return f"published {meta['version']} ({meta['commit']})"

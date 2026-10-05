@@ -9,7 +9,7 @@ public_dir=/srv/threadly-data/public-downloads
 [[ -d "$public_dir" && ! -L "$public_dir" ]] || die 'Invalid public download directory.'
 [[ -f "$public_dir/threadly-extension.zip" && ! -L "$public_dir/threadly-extension.zip" ]] || die 'Existing public ZIP is missing or a symlink.'
 # This directory is dedicated to public downloads, not application or secret files.
-if find "$public_dir" -mindepth 1 -maxdepth 1 ! -name threadly-extension.zip -print -quit | grep -q .; then
+if find "$public_dir" -mindepth 1 -maxdepth 1 ! -name threadly-extension.zip ! -name threadly-extension.json -print -quit | grep -q .; then
   echo 'Unexpected entries in public-downloads; inspect before changing ownership.' >&2
   exit 1
 fi
