@@ -1,0 +1,30 @@
+{
+  "release": "contextual-conversation-1.7.2",
+  "runtime_commit": "2c9f5de7d79d3011af4056149d70106f5cfd2cbf",
+  "previous_draft_head": "8bd80c685b4f4f3f8a74452625763e239b2ad56e",
+  "runtime_changed": false,
+  "input": "create me a event at 4pm tmrw for a meeting with kelly",
+  "anchor_utc": "2026-10-05T13:17:00Z",
+  "anchor_local": "2026-10-06T00:17:00+11:00",
+  "expected_start_local": "2026-10-07T16:00:00+11:00",
+  "timezone": "Australia/Melbourne",
+  "expected_title": "meeting with kelly",
+  "expected_attendees": [],
+  "expected_send_updates": "none",
+  "expected_state": "proposed",
+  "wrong_model_tool_rejected": "find_busy_times",
+  "corrected_tool": "prepare_calendar_event",
+  "mode": "scripted model and simulated Google transport, isolated PostgreSQL",
+  "live_model_run": false,
+  "live_google_run": false,
+  "external_writes": false,
+  "command": "THREADLY_REQUIRE_TEST_DB=1 THREADLY_TEST_DB=<isolated-postgresql-dsn> python -m pytest -q backend/tests/test_calendar_event_language.py::test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar_read",
+  "verification": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 1.27
+  },
+  "prior_full_suite": "The prior 1,774-test result excludes this newly added test. Runtime files are unchanged; no fresh full-suite total is claimed.",
+  "installed_version": "unconfirmed; no deployment performed"
+}

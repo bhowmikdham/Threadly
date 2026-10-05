@@ -39,3 +39,12 @@ workers and uncertain-outcome reconciliation remain authoritative. The matching
 frontend picker is [PR #93](https://github.com/bhowmikdham/Threadly/pull/93).
 No real event creation/deletion, production mutation or new live-model evaluation
 was performed for this follow-up.
+
+
+A subsequent [exact-phrase regression](reported-phrase-kelly.json) passed separately
+(1 test, no skips): `create me a event at 4pm tmrw for a meeting with kelly` at
+00:17 Melbourne on 6 October resolves to 16:00 on 7 October. A wrong Calendar-read
+decision is rejected; the typed event retains the literal title, no inferred attendee
+email, no notifications and Ask state. No runtime/prompt/tool change was required.
+This additional test is **not included** in the earlier 1,774-test total. Installed
+extension/server version remains unconfirmed; this follow-up was not deployed.

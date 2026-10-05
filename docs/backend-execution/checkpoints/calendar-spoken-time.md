@@ -146,3 +146,17 @@ live quality result is implied by these synthetic tests.
   The earlier recovery UI PR #91 was independently merged by its owner.
 - Next gate: review the backend draft and paired picker integration before release.
   Existing queued actions keep their original payload/version/approval.
+
+
+## Post-review exact phrase (6 October, 00:17 Melbourne)
+
+`create me a event at 4pm tmrw for a meeting with kelly` is now a replayable regression.
+At anchor `2026-10-05T13:17Z`, a wrong model `find_busy_times` call is rejected and the
+prepared event is `meeting with kelly`, 7 October 16:00 Melbourne, no attendee email,
+`send_updates=none`, proposed/Ask, no action job and no Google event insertion.
+**1 additional targeted test passed**, no failed/skipped, in 1.27 seconds. No runtime,
+prompt or tool change was needed. Preserve the prior 1,774 full-suite result as the
+previous run; it excludes this added test. See
+[the additional evidence](../../evaluation/calendar-event-language/reported-phrase-kelly.json).
+The installed package/server version was not confirmed and no deployment occurred.
+Draft review is [PR #94](https://github.com/bhowmikdham/Threadly/pull/94).

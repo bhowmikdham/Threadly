@@ -434,3 +434,58 @@ async def test_new_unfinished_event_never_reports_an_older_booking_as_its_succes
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 1
         assert (await db.get(AssistantAction, old["calendar_action_id"])).state == "succeeded"
+
+
+async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar_read(
+    configured, db_sessionmaker, monkeypatch
+):
+    from app.conversation import store
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value = cls(2026, 10, 5, 13, 17, tzinfo=UTC)
+            return value.astimezone(tz) if tz else value.replace(tzinfo=None)
+
+    monkeypatch.setattr(store, "datetime", Frozen)
+    monkeypatch.setattr(event_creation, "datetime", Frozen)
+    await ready(db_sessionmaker)
+    request = turn("create me a event at 4pm tmrw for a meeting with kelly")
+    result = await service.turn(
+        1,
+        request,
+        factory=db_sessionmaker,
+        model=Model(
+            tool(
+                "find_busy_times",
+                subject="self",
+                date={"kind": "relative", "offset_days": 1},
+                date_source="tmrw",
+            ),
+            tool(
+                "prepare_calendar_event",
+                title="meeting with kelly",
+                date={"kind": "relative", "offset_days": 1},
+                date_source="tmrw",
+                time="16:00",
+                time_source="4pm",
+            ),
+        ),
+    )
+    assert result["trace"][0]["reason"] == "calendar_preparation_required"
+    assert result["kind"] == "calendar_event"
+    action = result["calendar_action"]
+    assert action["state"] == "proposed"
+    event = action["preview"]["event"]
+    assert event["summary"] == "meeting with kelly"
+    local_start = datetime.fromisoformat(event["start"]["dateTime"]).astimezone(
+        ZoneInfo("Australia/Melbourne")
+    )
+    assert local_start == datetime(2026, 10, 7, 16, tzinfo=ZoneInfo("Australia/Melbourne"))
+    assert event["attendees"] == []
+    async with db_sessionmaker() as db:
+        saved = await db.get(AssistantAction, result["calendar_action_id"])
+        assert saved.payload["send_updates"] == "none"
+        assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 1
+        assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0
+    assert not any(call.url.path.endswith("/events") for call in configured[0])
