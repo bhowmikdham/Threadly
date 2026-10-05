@@ -1071,3 +1071,17 @@ An incomplete day response includes `error_code: calendar_coverage_incomplete` a
 its text and transient evidence. The extension uses this code for “Review calendars”.
 History entries now preserve nullable `error_code` so recovery also works after reopening
 or replaying a chat. This does not persist raw availability metadata or widen Google access.
+
+### Calendar read follow-ups (conversation 1.4.1)
+
+The conversation request/response envelope is unchanged. After a Calendar answer,
+“check now” or “try again” can repeat the prior read without resupplying its date.
+The internal `retry_calendar_read` tool has no arguments: the backend loads only
+the authenticated conversation's saved request, checks current Calendar selections
+and returns fresh evidence with the existing coverage/error fields. It cannot
+authorize an event write. Explicit new dates use a new Calendar read instead.
+
+A retry preserves the requested day and uses the current clock for remaining-day
+availability. Unknown coverage remains unknown; retrying does not suppress failed
+calendars. An unrelated completed turn closes the active Calendar request. Legacy
+conversations lacking a reliable original date may require one clarification.

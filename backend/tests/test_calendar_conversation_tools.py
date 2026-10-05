@@ -378,7 +378,7 @@ def test_search_service_rechecks_owner_and_preferences_after_google(db_sessionma
 async def test_versioned_tool_replay_cases(read_provider, monkeypatch):
     fixture = json.loads(
         (
-            Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools/replay-v2.json"
+            Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools/replay-v3.json"
         ).read_text()
     )
     assert fixture["release"] == engine.RELEASE
@@ -519,7 +519,7 @@ def test_committed_release_matches_current_prompt_and_tools():
     from app.schemas.conversation import tool_config
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
-    saved = json.loads((root / "contextual-conversation-1.4.0.json").read_text())
+    saved = json.loads((root / "contextual-conversation-1.4.1.json").read_text())
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())
     assert old["release"] == "contextual-conversation-1.2.5"

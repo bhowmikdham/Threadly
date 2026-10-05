@@ -46,6 +46,10 @@ class ReadSearchResults(StrictModel):
     )
 
 
+class RetryCalendarRead(StrictModel):
+    pass
+
+
 class ReadCalendar(StrictModel):
     period: Literal["today", "tomorrow", "this_week", "next_7_days"] = "today"
 
@@ -124,6 +128,14 @@ TOOLS = {
             "relevant messages from promotions and cite exact returned text. "
             "Cannot read the pinned selection or widen results to a thread."
         ),
+    ),
+    "retry_calendar_read": (
+        RetryCalendarRead,
+        "Repeat the previous Calendar read with fresh provider data and current saved "
+        "calendar selections. Preserve its original date, clock window, duration and "
+        "search scope. Use for contextual retries such as 'check now' or 'try again' "
+        "after a Calendar answer or connection repair. Never use for a new date, "
+        "different person, unrelated goal or event write. Call alone.",
     ),
     "check_day_availability": (
         CheckDayAvailability,

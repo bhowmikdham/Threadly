@@ -24,6 +24,7 @@ TERMINAL = set(CALENDAR_READ_TOOLS) | {
     "revise_draft",
     "read_calendar",
     "check_day_availability",
+    "retry_calendar_read",
 }
 MAX_CALLS = 8
 RETRYABLE_PROVIDER_CODES = frozenset(

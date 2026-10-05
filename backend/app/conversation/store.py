@@ -11,6 +11,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.auth.crypto import decrypt_token, encrypt_token
 from app.config import get_settings
+from app.conversation import calendar_context
 from app.db.models import Conversation, User
 
 TTL = timedelta(days=7)
@@ -191,6 +192,12 @@ async def claim(session, owner, request):
     row.lease_id, row.lease_until = lease, now + LEASE
     if row.expires_at < now + LEASE:
         row.expires_at = now + LEASE
+    # Older conversations kept the request text/trace but not typed Calendar arguments.
+    # Recover that intent only when its original local date can still be established.
+    if "calendar_read_request" not in state:
+        previous = calendar_context.legacy_context(state, row.created_at)
+        if previous:
+            state["calendar_read_request"] = previous
     # Pin relative Calendar dates before any model/provider work, including crash retries.
     if row.pending_request_id != request.request_id or "calendar_read_anchor" not in state:
         state["calendar_read_anchor"] = now.isoformat()
@@ -257,6 +264,10 @@ async def complete(session, owner, request, lease, state, response):
         ]
     )[-HISTORY_LIMIT:]
     state.pop("pending_result", None)
+    # A new topic closes the active Calendar request. Retrying a read stamps the
+    # same request context with this turn ID without retaining old provider facts.
+    if state.get("calendar_read_request", {}).get("last_request_id") != request.request_id:
+        state.pop("calendar_read_request", None)
     compact(state, preserve_receipt_id=request.request_id)
     row.state_enc = encode(state)
     row.version += 1

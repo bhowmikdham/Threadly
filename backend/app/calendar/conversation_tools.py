@@ -85,13 +85,13 @@ def validate_scope(args, instruction):
         )
 
 
-def resolve_window(args, instruction, anchor, timezone):
+def resolve_window(args, instruction, anchor, timezone, *, date_anchor=None):
     validate_scope(args, instruction)
     # The model interprets language; only this canonical tool value is parsed.
     # validate_scope already binds its separate source quote to user-authored text.
     phrase = normalized(args.date_phrase)
     zone = ZoneInfo(timezone)
-    today = anchor.astimezone(zone).date()
+    today = (date_anchor or anchor).astimezone(zone).date()
     span = re.fullmatch(r"(\d{4}-\d{2}-\d{2}) (?:to|through) (\d{4}-\d{2}-\d{2})", phrase)
     if args.date is not None:
         meaning = args.date
@@ -139,7 +139,7 @@ def resolve_window(args, instruction, anchor, timezone):
                 + timedelta(days=7 + day_availability.WEEKDAYS.index(weekday))
             )
         else:
-            first = day_availability.resolve_day(phrase, anchor, timezone)
+            first = day_availability.resolve_day(phrase, date_anchor or anchor, timezone)
         last = first + timedelta(days=1)
     elif relative := re.fullmatch(r"in (\d{1,2}) days", phrase):
         if not 0 <= int(relative[1]) <= 14:
@@ -147,7 +147,7 @@ def resolve_window(args, instruction, anchor, timezone):
         first = today + timedelta(days=int(relative[1]))
         last = first + timedelta(days=1)
     elif phrase in {"today", "tomorrow"} or re.fullmatch(r"\d{4}-\d{2}-\d{2}", phrase):
-        first = day_availability.resolve_day(phrase, anchor, timezone)
+        first = day_availability.resolve_day(phrase, date_anchor or anchor, timezone)
         last = first + timedelta(days=1)
     else:
         raise RequestClarification("Unsupported Calendar date")
@@ -272,7 +272,7 @@ def render_events(result, *, overlaps=False, query=""):
     return "\n".join(lines)
 
 
-async def execute(owner, name, args, instruction, *, anchor=None):
+async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=None):
     """Terminal, deterministic responses: provider prose never controls another tool call."""
     anchor = anchor or datetime.now(UTC)
     if getattr(args, "subject", None) == "other":
@@ -312,7 +312,9 @@ async def execute(owner, name, args, instruction, *, anchor=None):
             validate_scope(args, instruction)
             result = await agenda.search(
                 owner,
-                lambda checked, zone: resolve_window(args, instruction, anchor, zone),
+                lambda checked, zone: resolve_window(
+                    args, instruction, anchor, zone, date_anchor=date_anchor
+                ),
                 query=getattr(args, "query", ""),
             )
             return {
@@ -330,7 +332,9 @@ async def execute(owner, name, args, instruction, *, anchor=None):
             }
         pref = await service.get_preferences(owner)
         preferences = pref.preferences
-        start, end = resolve_window(args, instruction, anchor, preferences.timezone)
+        start, end = resolve_window(
+            args, instruction, anchor, preferences.timezone, date_anchor=date_anchor
+        )
         if end <= anchor:
             raise RequestClarification("Availability requires a future window")
         start = max(start, anchor)

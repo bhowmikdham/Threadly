@@ -636,3 +636,20 @@ checks. Only a whole-day read may restart once after a concurrent change; the ne
 loads fresh preferences and recomputes the day. Incomplete calendar coverage remains
 unknown. A bounded recovery code is carried through encrypted conversation history for
 client navigation; no background import, new scope, or external write is introduced.
+
+### Calendar follow-up context (conversation 1.4.1)
+
+A bounded, owner-scoped Calendar request now survives a completed read, including
+partial coverage and connection failures. The semantic coordinator selects
+`retry_calendar_read` for follow-ups such as “check now”; runtime reuses the
+original user instruction and typed date/window, then rereads current preferences
+and Google evidence. Whole-day answers pin the backend-resolved civil date. The
+original date anchor and the fresh read clock are separate: a retry after midnight
+still checks the requested day, while elapsed availability is clipped to now.
+
+The remembered request contains no provider results. Calendar answer history
+remains masked before model inference, and an unrelated completed turn clears the
+active request. Older conversations can recover the prior Calendar user instruction
+from history/receipts; relative-date recovery requires the possible original anchors
+to fall on one local day. Otherwise the assistant asks for the date once.
+Versioned assets and replay evidence: `evaluation/calendar-agent-tools/followup-context.md`.
