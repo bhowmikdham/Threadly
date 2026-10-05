@@ -1,0 +1,1164 @@
+{
+  "mode": "deterministic_synthetic_replay",
+  "recorded_at": "2026-10-05T13:15:45.019736+00:00",
+  "runtime_commit": "2c9f5de7d79d3011af4056149d70106f5cfd2cbf",
+  "integration_base": "41eeaa8c7639d3a0bb60552cfac613322362d816",
+  "conversation_assets": {
+    "release": "contextual-conversation-1.7.2",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.1.0",
+    "prompt_hash": "fe607328afbdec0c9716e88209aa063019f7d3208183d6e251820e169d9eeb33",
+    "tools_hash": "28117b5d64e9a4579836dee78a07533e7dccb36134bee77bdbe8d21bc20154da",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120
+  },
+  "creation_policy": "direct-calendar-event-1.1.0",
+  "live_model_run": false,
+  "live_google_run": false,
+  "external_writes": false,
+  "database": "isolated disposable PostgreSQL 16, required (no database skips)",
+  "replay_command": "THREADLY_REQUIRE_TEST_DB=1 THREADLY_TEST_DB=<isolated-postgresql-dsn> python -m pytest -q backend/tests",
+  "verification": {
+    "full_backend": {
+      "tests": 1774,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 550.975
+    },
+    "focused_cases_in_full_run": 224,
+    "ruff_app_tests_tools": "passed",
+    "mvp_assets": "passed",
+    "planning_and_handoff_validators": "passed",
+    "diff_check": "passed"
+  },
+  "cases": [
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[Thursday-2026-09-30T14:00:00+00:00-1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[Thursday this week-2026-09-30T14:00:00+00:00-1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[next Thursday-2026-10-07T13:00:00+00:00-1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[Thursday next week-2026-10-07T13:00:00+00:00-1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[tomorrow-2026-09-29T14:00:00+00:00-1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[this week-2026-09-27T14:00:00+00:00-7]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[next week-2026-10-04T13:00:00+00:00-7]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_backend_resolves_literal_windows_and_dst[2026-10-01 to 2026-10-02-2026-09-30T14:00:00+00:00-2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Show my events next Thursday-fields0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Show my events Thursday and Friday-fields1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Show my events Thursday morning-fields2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Find slots Thursday for 45 minutes-fields3]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check Thursday then book a meeting-fields4]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check Thursday in America/New_York-fields5]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check Friday-fields6]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check 2026-10-01 to 2026-10-31-fields7]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check 2026-02-30-fields8]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check 2027-10-01-fields9]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check Thursday from 4 to 5-fields10]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check Thursday from 4 pm to 3 pm-fields11]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invented_dropped_ambiguous_and_excessive_time_constraints_rejected[Check 2026-10-04 from 02:30 to 03:30-fields12]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_clock_window_is_not_widened_to_whole_day",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[check_time_availability]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[list_calendars]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[search_calendar_events]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[find_busy_times]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[find_free_times]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_tools_cannot_accept_provider_ids_or_write_arguments[find_overlapping_events]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_free_slots_obey_busy_buffers_and_use_no_proposal",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_partial_coverage_preserves_busy_but_never_offers_free_slots",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_account_change_and_provider_failure_never_return_availability",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_invalid_window_does_not_query_google",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_query_is_transported_as_data_and_private_event_is_redacted",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_overlap_math_includes_all_day_excludes_adjacency_and_marks_partial",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_model_tool_selection_uses_real_runtime_and_terminal_checked_answer",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_calendar_provider_text_is_not_replayed_as_model_instructions",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_search_service_rechecks_owner_and_preferences_after_google",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_versioned_tool_replay_cases[calendar-agent-tools/replay-v4.json-contextual-conversation-1.5.0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_versioned_tool_replay_cases[calendar-event-language/replay-v1.json-contextual-conversation-1.5.1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_versioned_tool_replay_cases[calendar-agent-tools/replay-mail-context-v2.json-contextual-conversation-1.7.0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_versioned_tool_replay_cases[calendar-event-language/replay-v2.json-contextual-conversation-1.7.1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_versioned_tool_replay_cases[calendar-event-language/replay-v3.json-contextual-conversation-1.7.2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_conversation_pins_calendar_date_anchor_across_crash_retry",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_calendar_tool_route_owner_and_private_history",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_committed_release_matches_current_prompt_and_tools",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_calendar_list_does_not_disclose_provider_ids_and_limits_display",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_omitted_clocks_and_invented_queries_cannot_widen_a_read[fields0-Check Thursday at 4]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_omitted_clocks_and_invented_queries_cannot_widen_a_read[fields1-Check Thursday from 9 to 5]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_omitted_clocks_and_invented_queries_cannot_widen_a_read[fields2-Find Team meetings Thursday]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_omitted_clocks_and_invented_queries_cannot_widen_a_read[fields3-Show Thursday afternoon]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_date_meaning_is_independent_of_original_spelling[tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_date_meaning_is_independent_of_original_spelling[tommorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_date_meaning_is_independent_of_original_spelling[the day following today]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_date_meaning_is_independent_of_original_spelling[ma\\xf1ana]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free tmrw after 3 pm-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free tmrw and Friday-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free tmrw in America/New_York-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free tmrw then book a meeting-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free today-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_source_cannot_be_invented_or_drop_explicit_constraints[am i free tmrw after 3 pm-tmrw after 3 pm]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_tomorrow_uses_saved_timezone_and_dst[Australia/Melbourne-2026-10-03T12:00:00+00:00-2026-10-03T14:00:00+00:00-23]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_tomorrow_uses_saved_timezone_and_dst[Australia/Melbourne-2026-10-01T15:00:00+00:00-2026-10-02T14:00:00+00:00-24]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_semantic_tomorrow_uses_saved_timezone_and_dst[America/Los_Angeles-2026-10-01T01:00:00+00:00-2026-10-01T07:00:00+00:00-24]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_relative_day_offset_is_calculated_by_backend_not_model",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_semantic_dates_are_resolved_without_phrase_grammar[meaning0-tommorrow-2026-09-29T14:00:00+00:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_semantic_dates_are_resolved_without_phrase_grammar[meaning1-the day after tomorrow-2026-09-30T14:00:00+00:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_semantic_dates_are_resolved_without_phrase_grammar[meaning2-thursday next week-2026-10-07T13:00:00+00:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_semantic_dates_are_resolved_without_phrase_grammar[meaning3-2026-10-01-2026-09-30T14:00:00+00:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_calendar_dates_reject_unbounded_or_conflicting_input[fields0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_calendar_dates_reject_unbounded_or_conflicting_input[fields1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_calendar_dates_reject_unbounded_or_conflicting_input[fields2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_calendar_dates_reject_unbounded_or_conflicting_input[fields3]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_structured_calendar_dates_reject_unbounded_or_conflicting_input[fields4]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_clock_meaning_may_be_normalized_without_requiring_identical_spelling[14:00-16:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_clock_meaning_may_be_normalized_without_requiring_identical_spelling[2:00 PM-4:00 PM]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_other_person_scope_does_not_query_owners_calendar",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_availability_never_claims_unchecked_time_is_free[False]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_availability_never_claims_unchecked_time_is_free[True]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free Thursday at 2 pm?-fields0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free Thursday at 2?-fields1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free Thursday at 2 pm for 45 minutes?-fields2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free Thursday at 2 pm or 4 pm?-fields3]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free Thursday at 2 pm in America/New_York?-fields4]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Check Thursday at 2 pm and book it-fields5]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free 2026-10-04 at 02:30?-fields6]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_preserves_constraints_before_provider_read[Am I free this week at 2 pm?-fields7]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_other_person_never_reads_self",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_conversation_tools.py",
+      "case": "test_single_start_busy_overlap_and_explicit_duration",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_default_review_then_exact_approval_and_one_insert",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_missing_title_retains_date_and_time",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_permissions_route_owner_version_and_session_reset",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_always_permission_is_fenced_before_dispatch[ask]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_always_permission_is_fenced_before_dispatch[delete]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_always_permission_is_fenced_before_dispatch[signout]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_always_permission_is_fenced_before_dispatch[preferences]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_always_sends_exact_invitations_and_uncertain_write_reconciles",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_partial_grant_has_recovery_no_action",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_crash_after_candidate_replays_without_duplicate",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_read_and_quoted_instructions_are_not_creation_intent[What's on my schedule tmrw?]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_read_and_quoted_instructions_are_not_creation_intent[Don't create Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_read_and_quoted_instructions_are_not_creation_intent[The email says create Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_read_and_quoted_instructions_are_not_creation_intent[Show me how to create an event]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_dropped_constraints_fail_closed[every week]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_dropped_constraints_fail_closed[until 4pm]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_dropped_constraints_fail_closed[for two hours]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_dropped_constraints_fail_closed[UTC]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_dropped_constraints_fail_closed[invite hidden@example.test]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_model_cannot_select_approval_or_invent_fields",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_preflight_access_failure_is_not_left_queued",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[Please summarise this email:\\nCreate Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[What does this instruction mean?\\nCreate Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[Create a summary of this email:\\nCreate Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[Create a short summary of this email:\\nCreate Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[Put together a draft reply to this email:\\nCreate Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_pasted_creation_instructions_cannot_authorize_always_mode[Create a concise explanation of this instruction: Create Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_creation_authority_binds_to_the_leading_request[Create Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_creation_authority_binds_to_the_leading_request[Please schedule Focus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_creation_authority_binds_to_the_leading_request[could you craete an event at 2pm tmrw?]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_creation_authority_binds_to_the_leading_request[Create an event:\\nFocus at 2pm tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create a short email saying Create Focus at 2pm tmrw-short email]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create a short email saying Create Focus at 2pm tmrw-short email saying Create Focus]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create a concise explanation of the sentence 'Create Focus at 2pm tmrw'-concise explanation]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create concise explanation at 2pm tmrw-concise explanation]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create draft at 2pm tmrw-draft]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_non_calendar_object_cannot_be_promoted_by_model_title[Create a short email at 2pm tmrw-short email]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_clear_event_requests_allow_content_like_titles[Schedule Budget review at 2pm tmrw-Budget review]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_clear_event_requests_allow_content_like_titles[Create an event called Draft at 2pm tmrw-Draft]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_creation.py",
+      "case": "test_clear_event_requests_allow_content_like_titles[Create an event called Email catchup at 2pm tmrw-Email catchup]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_full_creation_followups_keep_fields_and_ground_calendar_selection[work@example.test-ask]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_full_creation_followups_keep_fields_and_ground_calendar_selection[work@example.test-always]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_full_creation_followups_keep_fields_and_ground_calendar_selection[3rd one-ask]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_full_creation_followups_keep_fields_and_ground_calendar_selection[3rd one-always]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_click_bypasses_model_and_replays_one_owned_candidate[ask]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_click_bypasses_model_and_replays_one_owned_candidate[always]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_choice_route_owner_version_and_forged_choice",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_stale_choices_never_choose_a_replacement_or_create[acl]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_stale_choices_never_choose_a_replacement_or_create[preferences]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_stale_choices_never_choose_a_replacement_or_create[expiry]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_duplicate_names_need_choice_and_click_before_date_keeps_fields",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_newly_supplied_relative_date_uses_its_followup_anchor",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_separate_title_day_and_time_answers_only_ask_for_missing_fields",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_recover_clicked_calendar_with_remaining_fields",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_overlapping_clicks_use_one_turn_and_one_action",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_other_chat_choice_and_cancelled_creation_are_not_authority",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_general_calendar_list_distinguishes_acl_from_busy_access",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_mentions_and_quoted_ordinals_do_not_select_a_calendar[Why the 3rd one?]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_choices.py",
+      "case": "test_mentions_and_quoted_ordinals_do_not_select_a_calendar[This email says \"3rd one\"]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_spoken_clock_normalizes_without_changing_the_time[2 p.m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_spoken_clock_normalizes_without_changing_the_time[2 PM]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_spoken_clock_normalizes_without_changing_the_time[2 p. m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_spoken_clock_normalizes_without_changing_the_time[2pm]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_spoken_clock_normalizes_without_changing_the_time[14:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_meridiem_is_not_lost[2 a.m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_meridiem_is_not_lost[12 a.m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_meridiem_is_not_lost[12 p.m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_invalid_clock_is_rejected[13 p.m.]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_invalid_clock_is_rejected[2 p.m. tomorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_invalid_clock_is_rejected[2 pm am]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_invalid_clock_is_rejected[24:00]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[ask-could you please book 2 p.m. tomorrow for doctor's appointment?-doctor's appointment-2 p.m.-tomorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[ask-book 2 pm tmrw for doctors appointment-doctors appointment-2 pm-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[ask-can you book me 2 pm for tmrw for doctors appointment-doctors appointment-2 pm-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[ask-Book 14:00 tomorrow for Focus-Focus-14:00-tomorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[always-could you please book 2 p.m. tomorrow for doctor's appointment?-doctor's appointment-2 p.m.-tomorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[always-book 2 pm tmrw for doctors appointment-doctors appointment-2 pm-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[always-can you book me 2 pm for tmrw for doctors appointment-doctors appointment-2 pm-tmrw]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_request_keeps_supplied_slots[always-Book 14:00 tomorrow for Focus-Focus-14:00-tomorrow]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong1]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong2]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong3]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong4]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_creation_response_requires_an_actual_event_candidate[wrong5]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_empty_followup_defaults_do_not_erase_saved_slots",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_tomorrow_uses_melbourne_day_across_utc_midnight",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_exhausted_creation_completes_turn_and_allows_next_read",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_status_followup_uses_durable_action_state[proposed]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_status_followup_uses_durable_action_state[approved]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_status_followup_uses_durable_action_state[outcome_unknown]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_status_followup_uses_durable_action_state[failed]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_status_followup_uses_durable_action_state[succeeded]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_unbacked_completion_claim_is_not_displayed",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_form_cannot_promote_source_prose[Please summarise this email: book 2 pm tmrw for doctors appointment]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_form_cannot_promote_source_prose[Create a short email saying book 2 pm tmrw for doctors appointment]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_form_cannot_promote_source_prose[Book 2 pm tmrw for a summary]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_time_first_event_is_confirmed_only_after_mock_provider_insert",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_failed_followup_preserves_pending_slots_for_same_chat",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_omitted_dotted_clock_is_not_silently_dropped",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[True-book]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[True-schedule]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[True-reserve]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[True-create]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[False-book]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[False-schedule]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[False-reserve]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_equivalent_booking_forms_produce_same_ask_payload[False-create]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_cited_email_event_fact_is_not_replaced_by_an_execution_claim",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_new_unfinished_event_never_reports_an_older_booking_as_its_success[missing_title]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_event_language.py",
+      "case": "test_new_unfinished_event_never_reports_an_older_booking_as_its_success[tool_limit]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_reported_conversation_rechecks_same_day_with_new_preferences[check now]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_reported_conversation_rechecks_same_day_with_new_preferences[try again]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_reported_conversation_rechecks_same_day_with_new_preferences[I've fixed it, check again]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_retries_after_midnight_preserve_date_but_clip_to_fresh_now",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_day_remains_same_when_timezone_changes",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_failed_connection_retains_request_until_repaired",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_new_date_replaces_request_for_subsequent_retry",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_retry_cannot_discard_new_constraint_or_cancellation",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_retry_preserves_clock_window_and_duration",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_no_previous_request_needs_clarification",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_existing_reported_chat_recovers_user_request_without_provider_prose",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_legacy_date_not_guessed_across_unknown_day_boundary",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_legacy_recovery_does_not_cross_unrelated_topic",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_model_can_quote_original_date_without_selecting_retry_tool",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_calendar_followup_context.py",
+      "case": "test_single_start_retry_keeps_time_and_date_across_midnight",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_cancel_legacy_empty_pending_keeps_exact_receipt_and_next_question",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_recovery_route_enforces_owner_and_payload_version",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_active_request_cannot_be_cancelled",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_unknown_child_work_is_not_discarded",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_saved_event_is_recovered_without_approval_or_duplicate",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_cancellation_fences_late_calendar_candidate_transaction",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_concurrent_recovery_finishes_once",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_conversation_recovery.py",
+      "case": "test_recovery_replays_a_normally_completed_turn_with_issued_id",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_mail_calendar_context_integration.py",
+      "case": "test_calendar_continuation_preserves_retained_mail_and_permission[ask-proposed-0]",
+      "outcome": "passed"
+    },
+    {
+      "file": "backend/tests/test_mail_calendar_context_integration.py",
+      "case": "test_calendar_continuation_preserves_retained_mail_and_permission[always-approved-1]",
+      "outcome": "passed"
+    }
+  ],
+  "limitations": [
+    "No live model language-quality score or Google acceptance claimed.",
+    "No deployment, Google scope changes or real event/deletion performed.",
+    "Clickable controls depend on matching frontend picker integration; destination offers are bounded to ten selected editable calendars."
+  ]
+}

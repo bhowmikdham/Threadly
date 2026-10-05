@@ -1,6 +1,6 @@
 # Calendar spoken requests and interrupted-turn recovery — working checkpoint
 
-Status: integration verification in progress on `codex/calendar-spoken-time`.
+Status: in review; local verification complete on `codex/calendar-spoken-time`.
 Original base `8a9e72cc049013d5f4d8dc1ac596d2e3ed173fe5`; now integrates merged
 shared-context PR #89 at `41eeaa8c7639d3a0bb60552cfac613322362d816`. Draft review only. No new deployment,
 Google consent, or real event/invitation work is part of this follow-up.
@@ -18,7 +18,7 @@ Google consent, or real event/invitation work is part of this follow-up.
 - A completed tool-limit failure retains an issued pending ID unless the service
   receives a terminal response; older clients discarded its exact retry body.
 
-## Frontend integration contract (implemented, tests in progress)
+## Frontend integration contract (implemented and verified)
 
 1. A bounded Calendar preparation exhaustion now returns HTTP 200, `kind=message`,
    `error_code=calendar_event_not_prepared`, conversation ID and incremented version.
@@ -76,11 +76,10 @@ not used as release authority. This follow-up remains draft-only.
 
 Initial focused language/creation/read/follow-up/recovery pass: 196 passed, no skips,
 disposable PostgreSQL, fake model/provider. The old-base full run was deliberately
-interrupted after #89 merged; it is not counted as a complete pass. A fresh combined
-run and the final status-supersession regressions are in progress. No live model-quality or live Google success is claimed for this follow-up.
+interrupted after #89 merged; it is not counted as a complete pass. The final combined run and status-supersession regressions passed; see the final verification below. No live model-quality or live Google success is claimed for this follow-up.
 A separate human-created canonical-order event was reported verified; it is untouched.
 
-## Clickable Calendar choice contract — implemented, final verification in progress
+## Clickable Calendar choice contract — implemented and verified
 
 A Calendar creation clarification/owned conversation GET adds nullable
 `calendar_choices: {choices: [{choice_id: UUID, label: string, access: "editable"}], expires_at: ISO8601}`.
@@ -126,6 +125,24 @@ into a new chat instruction, select automatically, or reinterpret an ordinal its
 
 Focused combined 1.7.2 regression before the final quoted-selection guard: 222 passed,
 zero skipped, 67.81 seconds. Earlier combined 1.7.1 full suite: 1,754 passed, zero
-skipped, 554.58 seconds. That full result precedes the picker; the final full 1.7.2 run
-is underway and will replace the current verification headline. No model/provider
+skipped, 554.58 seconds. That full result precedes the picker. The final 1.7.2 full run passed **1,774 tests,
+zero failed/skipped**, in 550.98 seconds (two existing dependency deprecation warnings). No model/provider
 live quality result is implied by these synthetic tests.
+
+
+## Final verification and handoff
+
+- Runtime commit: `2c9f5de7d79d3011af4056149d70106f5cfd2cbf` on
+  `codex/calendar-spoken-time`; integration base `41eeaa8c7639d3a0bb60552cfac613322362d816`.
+- Final full backend: 1,774 passed, 0 failed, 0 skipped, isolated PostgreSQL 16.
+- Ruff `app tests tools` (no-cache), current MVP asset check, planning validator,
+  backend handoff/card validators and `git diff --check` passed.
+- [Versioned replay/evidence](../../evaluation/calendar-event-language/README.md)
+  records current prompt/tool hashes and the exact focused case IDs.
+- No migration/configuration change, deployment, scope change or real provider write.
+  No live model-quality evaluation was run; fake-model results do not claim that gate.
+- Matching clickable frontend: draft [PR #93](https://github.com/bhowmikdham/Threadly/pull/93)
+  at `7cdd8df3240e222f0594635dfac63f26640cb469`; its extension CI was verified successful.
+  The earlier recovery UI PR #91 was independently merged by its owner.
+- Next gate: review the backend draft and paired picker integration before release.
+  Existing queued actions keep their original payload/version/approval.
