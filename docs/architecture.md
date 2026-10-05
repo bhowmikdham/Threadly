@@ -1,6 +1,7 @@
 # Architecture — what runs where
 
-Conversation release 1.6.0 adds the [shared email context design](shared-mail-context.md):
+Conversation release 1.7.0 combines direct Calendar creation with the
+[shared email context design](shared-mail-context.md):
 provider-thread reads, a separate reply target, up to five evidence threads,
 bounded retained source handles and per-dependency freshness checks. Summaries,
 replies and drafts consume the same reference-only plan. This local implementation
@@ -671,3 +672,16 @@ to prevent extending the session through the legacy access-token refresh path.
 Revocation remains server-owned through the existing account/session generations;
 no migration or model change is needed. Transient connection failures retain the
 local session for retry; a confirmed current-session 401 clears it.
+
+
+### Direct Calendar creation and approval mode
+
+Conversation release 1.5.0 adds a source-bound single-event tool without an email
+requirement. Semantic interpretation produces event fields; backend code validates
+user origin, resolves date/time, binds a writable selected calendar, and freezes a
+candidate. The model cannot choose the approval mode. A separate authenticated UI
+endpoint saves Ask or Always for Calendar creation in that chat. Always is bound to
+the user session and does not authorize email, changes to existing events or deletion.
+Both modes use the existing exact-payload approval/job/attempt state machine and
+read-before-retry recovery. Revocation shares the dispatch account lock. A failed
+preflight that exhausts its retry policy becomes visibly stopped rather than Queued.

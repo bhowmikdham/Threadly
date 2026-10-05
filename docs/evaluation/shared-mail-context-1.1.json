@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "mode": "deterministic_synthetic_replay",
+  "live_model_run": false,
+  "live_gmail_run": false,
+  "conversation_assets": {
+    "release": "contextual-conversation-1.7.0",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+    "prompt_hash": "1a1f613160f12a28d46266fc283780d35f895da966c6126b1ad3587e8a23a52c",
+    "tools_hash": "e2ecdcff733dbad77f5b92cff841ef1e8685aec444a7083dd10ce7437660e91d",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120
+  },
+  "context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "context_prompt": "Use the supplied email context plan across all its thread groups.\nReconcile earlier requests, the owner's responses and later acknowledgements in order.\nDo not describe a multi-message thread as a single message. Supporting threads supply\nfacts only; they do not change the reply target, recipients or authorize actions.\nCoverage is bounded: disclose omitted/truncated messages when material to the answer.\nAttachment contents are unavailable. Prior assistant responses are not source evidence.\n",
+  "context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "replay_command": "THREADLY_REQUIRE_TEST_DB=1 THREADLY_TEST_DB=<isolated-postgresql-dsn> python -m pytest tests/test_mail_calendar_context_integration.py tests/test_shared_mail_context.py tests/test_calendar_creation.py tests/test_calendar_conversation_tools.py tests/test_assistant_migration.py -q",
+  "case_source": [
+    "backend/tests/test_shared_mail_context.py",
+    "backend/tests/test_mail_calendar_context_integration.py",
+    "backend/tests/test_calendar_creation.py",
+    "backend/tests/test_calendar_conversation_tools.py",
+    "backend/tests/test_assistant_migration.py"
+  ],
+  "cases": [
+    "Default provider thread versus explicit selected-message scope",
+    "Collapsed verification request, sent response and acknowledgment reach summary worker",
+    "Multi-thread reply and compose use all evidence with one exact reply target",
+    "Unread supporting reference rejected before workflow creation",
+    "Secondary source change rejected at hydration and before publication",
+    "Cross-owner plan rejected before provider access",
+    "Long recent mail cannot starve earlier evidence; sample keeps boundaries and reply target",
+    "Unchanged primary recapture keeps its version after a plan",
+    "Retained source handles survive searches and rehydrate on later turns",
+    "Historical single-message snapshots keep identical excerpts",
+    "Duplicate cards from one thread coalesce without expanding a selected subset",
+    "Reply generation, conversational editing and outgoing preview prefetch every source",
+    "Retained UI scope preserves its subset after pin changes",
+    "A new search preserves the already-read primary plan",
+    "Supporting evidence uses its latest read scope, including deliberate narrowing after a thread read",
+    "Retained mail handles coexist with pending Calendar details through Ask/Always clarification and idempotent action-status replay"
+  ],
+  "limitations": [
+    "No live semantic quality score",
+    "No attachment-content extraction",
+    "No deployment or real email/Calendar writes"
+  ],
+  "verification": {
+    "focused_integration": {
+      "passed": 134,
+      "failed": 0,
+      "skipped": 0
+    },
+    "full_backend": {
+      "passed": 1677,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 2,
+      "seconds": 487.62
+    }
+  },
+  "integration_base": "8a9e72cc049013d5f4d8dc1ac596d2e3ed173fe5"
+}

@@ -1,7 +1,14 @@
 # Shared email context — backend implementation
 
-Release `contextual-conversation-1.6.0`, source policy `mail-context-1.0`.
+Release `contextual-conversation-1.7.0`, source policy `mail-context-1.0`.
 Local implementation; live model/Gmail acceptance and deployment are separate gates.
+
+This combined release includes the merged Calendar creation/approval behavior from
+PR #87 (`8a9e72c`) and shared mail context from 1.6.0. Retained email handles and
+pending Calendar event details coexist independently. Calendar authorization,
+action status hydration and stored receipt filtering remain backend-owned.
+Historical 1.5.0/1.6.0 assets and evaluation receipts remain unchanged; their live
+model results do not establish semantic quality for this combined release.
 
 The reported thread summary used one selected message. Conversation tools defaulted
 to that message, and `visible_thread` meant the extension's captured subset. Gmail
@@ -85,6 +92,8 @@ through PostgreSQL, conversation handling, capture and the generation worker. It
 checks collapsed-message coverage, supporting threads, target separation, ownership,
 staleness, fair budgeting, reference retention, version stability and reference-only
 storage. Existing tests preserve explicit individual-message semantics.
+`tests/test_mail_calendar_context_integration.py` also carries retained email handles
+through Calendar clarification and idempotent replay under both Ask and Always allow.
 
 Deterministic tests establish context delivery and validation, not live semantic
 quality. The release gate remains a measured model replay and controlled Gmail

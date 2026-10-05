@@ -1,8 +1,8 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.2.4`. Feature switch:
-`CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and migration
-`c23026e9a039`. Release `1.1.6` makes an explicit sender address an exact From
+Implementation release: `contextual-conversation-1.7.0`. Feature switch:
+`CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and current
+backend migrations through `c061026e9041`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
 unfiltered Inbox search with that page limit. These requests discard an older
 search's cards and cursor while preserving any independently pinned source. Its
@@ -326,6 +326,13 @@ user must review the complete revised subject, body and recipients before any se
 Release 1.6.0 adds [shared email context](shared-mail-context.md): provider-thread
 reads by default, up to five evidence threads per workflow and eight stable source
 handles across searches. Each later use re-reads Gmail; history is not source evidence.
+
+Release 1.7.0 combines that context layer with 1.5.0 direct Calendar creation and
+chat approval controls. Both source handles and pending event details reach the
+model; action authority, stored receipt filtering and replayed action status remain
+backend-owned. Versioned combined assets and deterministic replay cases are linked
+from the [integration checkpoint](backend-execution/checkpoints/shared-mail-context.md).
+Earlier live model receipts remain evidence only for their own pinned releases.
 
 Known limits: 12 exchanges, one active task, one search result set and eight retained
 source handles are in working context; arbitrary long-running autonomous planning

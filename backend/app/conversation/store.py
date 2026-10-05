@@ -224,6 +224,7 @@ async def complete(session, owner, request, lease, state, response):
             "agenda",
             "calendar_availability",
             "calendar_tools",
+            "calendar_action",
             "task",
             "artifacts",
             "proposal",
@@ -248,6 +249,7 @@ async def complete(session, owner, request, lease, state, response):
                 ),
                 "task_id": saved.get("task_id"),
                 "proposal_id": saved.get("proposal_id"),
+                "calendar_action_id": saved.get("calendar_action_id"),
                 "request_id": request.request_id,
                 "context_references": saved.get("context_references", []),
                 "error_code": saved.get("error_code"),
@@ -269,6 +271,8 @@ async def complete(session, owner, request, lease, state, response):
     # same request context with this turn ID without retaining old provider facts.
     if state.get("calendar_read_request", {}).get("last_request_id") != request.request_id:
         state.pop("calendar_read_request", None)
+    if state.get("calendar_event_request", {}).get("last_request_id") != request.request_id:
+        state.pop("calendar_event_request", None)
     compact(state, preserve_receipt_id=request.request_id)
     row.state_enc = encode(state)
     row.version += 1
@@ -314,6 +318,7 @@ async def checkpoint(session, owner, request, lease, state, response):
             "agenda",
             "calendar_availability",
             "calendar_tools",
+            "calendar_action",
             "task",
             "artifacts",
             "proposal",

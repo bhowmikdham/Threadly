@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.conversation import engine, store
 from app.conversation.runtime import Runtime, proposal_text
 from app.db.engine import get_session_factory
-from app.db.models import Conversation
+from app.db.models import Conversation, User
 
 
 async def turn(owner, request, *, factory=None, model=None):
@@ -53,6 +53,10 @@ async def hydrate_response(owner, saved, factory):
 
     result = dict(saved)
     async with factory() as session:
+        if saved.get("calendar_action_id"):
+            from app.calendar.event_creation import response
+
+            result.update(await response(session, owner, saved["calendar_action_id"]))
         if saved.get("task_id"):
             result["task"] = await task_view(
                 session, await tasks.owned_task(session, owner, saved["task_id"])
@@ -109,6 +113,7 @@ async def get(owner, identifier, factory=None):
 async def remove(owner, identifier, factory=None):
     factory = factory or get_session_factory()
     async with factory.begin() as session:
+        await session.get(User, owner, with_for_update=True)
         row = await session.scalar(
             select(Conversation)
             .where(Conversation.id == identifier, Conversation.user_id == owner)

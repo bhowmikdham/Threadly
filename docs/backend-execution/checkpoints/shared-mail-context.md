@@ -25,7 +25,8 @@ The original dirty `codex/backend-execution-handoff` checkout was preserved.
 - Runtime architecture/API/data-model docs and versioned release/replay assets.
 
 Design: [shared mail context](../../shared-mail-context.md).
-Replay manifest: [context cases](../../evaluation/shared-mail-context-1.0.json).
+Original replay manifest: [context cases](../../evaluation/shared-mail-context-1.0.json).
+Combined release: [integration cases](../../evaluation/shared-mail-context-1.1.json).
 
 ## Actual verification
 
@@ -55,17 +56,37 @@ reference snapshots retain their historical excerpt/hash behavior.
 
 ## Release and integration limits
 
-The distinct context release is `contextual-conversation-1.6.0`; context policy and
-prompt hashes are saved with each plan. Historical release files remain unchanged.
-The concurrently developed Calendar change uses 1.5.0. This branch does **not**
-include that unmerged change. Integration must reconcile overlapping conversation
-runtime/schema/prompt files, preserve both tool sets, regenerate the combined
-release assets, and rerun affected checks before merge. No auto-merge is authorized.
+The original 1.6.0 commit `bd4e688` was published as draft PR #89. Its exact-head
+GitHub CI passed **1,635 tests**, zero failures/skips, plus all offline checks.
+Calendar PR #87 subsequently merged at `8a9e72cc049013d5f4d8dc1ac596d2e3ed173fe5`.
+That base is now integrated into this isolated branch without rewriting history.
+The combined release is `contextual-conversation-1.7.0`; historical 1.5.0/1.6.0
+assets and receipts remain unchanged. Both tool sets, retained email handles,
+pending Calendar event context, approval settings, receipt filtering and action
+status hydration are preserved. The evaluator now names new assets from the
+current release rather than overwriting a historical filename.
 
-Live Bedrock quality evaluation, controlled Gmail/browser acceptance, publishing,
-deployment and real sends/bookings were **not performed**. Deterministic tests
+Integration checks use a new disposable PostgreSQL 16 container,
+`threadly-shared-context-integration`, localhost 55441, database
+`threadly_context_integration`, with `THREADLY_REQUIRE_TEST_DB=1`.
+Focused integration checks: **134 passed**, zero failures/skips. These include
+shared context, Calendar creation/permissions, Calendar reads/replays and migrations.
+The new cross-feature regression verifies retained email handles survive a Calendar
+title clarification and idempotent response replay under both Ask and Always allow.
+Full merged backend suite: **1,677 passed**, zero failures/skips, in 487.62 seconds.
+Two existing FastAPI/Starlette deprecation warnings remain. Ruff, whitespace,
+playbook/handoff validators and generated card consistency checks also passed.
+There is no additional migration beyond Calendar's existing `c061026e9041`.
+The separate 1.5.1 follow-up about time-before-title booking wording, clarification
+guards and pending-field preservation is not part of this integration. When that
+follow-up is integrated, reconcile its prompt/schema/runtime changes with this
+1.7.0 release, pin fresh combined assets and rerun affected checks. No auto-merge
+or rollout is authorized.
+
+Live Bedrock quality evaluation, controlled Gmail/browser acceptance,
+deployment and real sends/bookings were **not performed** for shared context. Deterministic tests
 establish source delivery and backend boundaries, not semantic model accuracy.
 Attachment contents, unlimited history, semantic relevance ranking and autonomous
 whole-mailbox discovery remain outside this slice. Existing search tools only use
-bounded user-supplied terms. Next gate: integrate/review, evaluate synthetic model
+bounded user-supplied terms. Next gate: review the combined release, evaluate synthetic model
 cases and controlled Gmail thread behavior, then separately authorize rollout.

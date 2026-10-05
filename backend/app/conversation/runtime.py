@@ -683,6 +683,7 @@ class Runtime:
             "recent_dialogue": model_history(self.state["history"]),
             "previous_calendar_request": calendar_context.model_context(self.state),
             "remembered_email_sources": mail_context.model_context(self.state),
+            "pending_calendar_event": self.state.get("calendar_event_request"),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -709,6 +710,10 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        if name == "prepare_calendar_event":
+            from app.calendar.event_creation import prepare
+
+            return await prepare(self, args)
         if name == "retry_calendar_read":
             return await calendar_context.retry(self)
         if name in calendar_context.WINDOW_TOOLS:

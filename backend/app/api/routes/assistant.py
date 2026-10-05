@@ -46,7 +46,7 @@ from app.schemas.assistant import (
 from app.schemas.command_plan import CommandPlanRequest, ConfirmCommandPlan
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
-from app.schemas.conversation import ConversationTurn
+from app.schemas.conversation import CalendarApprovalSetting, ConversationTurn
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.inbox_chat import InboxChatRequest, InboxPageRequest
@@ -94,6 +94,22 @@ async def delete_conversation(conversation_id: str, user_id: CurrentUser):
     from app.conversation import service
 
     return await service.remove(user_id, conversation_id)
+
+
+@router.get("/conversations/{conversation_id}/calendar-approval")
+async def get_calendar_approval(conversation_id: str, user_id: CurrentUser):
+    from app.calendar import permissions
+
+    return await permissions.get(user_id, conversation_id)
+
+
+@router.put("/conversations/{conversation_id}/calendar-approval")
+async def set_calendar_approval(
+    conversation_id: str, body: CalendarApprovalSetting, user_id: CurrentUser
+):
+    from app.calendar import permissions
+
+    return await permissions.set_mode(user_id, conversation_id, body)
 
 
 @router.post("/inbox-chat")
