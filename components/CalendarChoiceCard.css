@@ -1,0 +1,40 @@
+.calendar-choice-card {
+  margin: 12px 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--border);
+}
+.calendar-choice-card p {
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+.calendar-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.calendar-choice-buttons button {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+}
+.calendar-choice-buttons button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.calendar-choice-buttons button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.calendar-choice-card small {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}

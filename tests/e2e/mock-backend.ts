@@ -36,6 +36,7 @@ export type Call = {
 }
 // Switches a test can flip to exercise failure paths.
 export type MockControl = {
+  failCalendarChoice?: boolean
   strandedConversation?: {
     id: string
     requestId: string
@@ -212,6 +213,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     { mode: string; version: number }
   >()
   const directEvents = new Map<string, any>()
+  const pendingEvents = new Map<string, any>()
   async function handle(req: IncomingMessage, res: ServerResponse) {
     let raw = ""
     for await (const chunk of req) raw += chunk
@@ -242,7 +244,17 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     }
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
-      if (
+      if (body.instruction === "could you create Meeting at 4 pm") {
+        pendingEvents.set(body.conversation_id, {
+          version: body.expected_version + 1
+        })
+        p = "/fixture/calendar-date"
+      } else if (
+        body.instruction === "tomorrow" &&
+        pendingEvents.has(body.conversation_id)
+      )
+        p = "/fixture/calendar-choices"
+      else if (
         [
           "Create Focus at 2pm tomorrow",
           "book 2 pm tmrw for doctors appointment"
@@ -312,7 +324,107 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
     const stranded = control.strandedConversation
-    if (stranded && p === `/assistant/conversations/${stranded.id}`) {
+    if (p === "/fixture/calendar-date") {
+      data = {
+        kind: "clarification",
+        text: "What day should I use for Meeting at 4 pm?"
+      }
+    } else if (p === "/fixture/calendar-choices") {
+      data = {
+        kind: "clarification",
+        text: "Which calendar should I create this Meeting on?",
+        calendar_choices: {
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+          choices: [
+            {
+              choice_id: "00000000-0000-4000-8000-000000000101",
+              label: "Personal calendar",
+              access: "editable"
+            },
+            {
+              choice_id: "00000000-0000-4000-8000-000000000102",
+              label: "Family and shared plans with a very long calendar name",
+              access: "editable"
+            }
+          ]
+        }
+      }
+      pendingEvents.set(originalTurn.conversation_id, {
+        version: originalTurn.expected_version + 1,
+        calendar_choices: data.calendar_choices
+      })
+    } else if (p.endsWith("/calendar-choice")) {
+      const cid = p.split("/")[3]
+      const candidate = pendingEvents.get(cid)
+      verify(
+        "selection version retains title/date/time candidate",
+        body.expected_version,
+        candidate.version
+      )
+      verify(
+        "selection sends only structured fields",
+        Object.keys(body).sort(),
+        ["choice_id", "expected_version", "request_id"]
+      )
+      const choice = candidate.calendar_choices.choices.find(
+        (item: any) => item.choice_id === body.choice_id
+      )
+      if (control.failCalendarChoice) {
+        res.statusCode = 503
+        data = {
+          error: {
+            code: "service_unavailable",
+            message: "The response was interrupted. Retry safely."
+          }
+        }
+      } else {
+        const id = `direct-${directEvents.size + 1}`
+        const action = {
+          action_id: id,
+          state: "proposed",
+          version: 1,
+          payload_hash: "event-hash",
+          blockers: [],
+          approval_available: true,
+          authorization: "separate_exact_event_approval",
+          preview: {
+            calendar_id: "fixture-owned-calendar",
+            calendar_name: choice.label,
+            send_updates: "none",
+            event: {
+              summary: "Meeting",
+              description: "",
+              location: "",
+              attendees: [],
+              start: {
+                dateTime: "2026-10-06T05:00:00Z",
+                timeZone: "Australia/Melbourne"
+              },
+              end: {
+                dateTime: "2026-10-06T05:30:00Z",
+                timeZone: "Australia/Melbourne"
+              }
+            }
+          }
+        }
+        directEvents.set(id, action)
+        data = {
+          conversation_id: cid,
+          version: body.expected_version + 1,
+          kind: "calendar_event",
+          text: "Review this event before creating it.",
+          calendar_action_id: id,
+          calendar_action: action
+        }
+      }
+    } else if (
+      req.method === "GET" &&
+      /^\/assistant\/conversations\/[^/]+$/.test(p) &&
+      pendingEvents.has(p.split("/")[3])
+    ) {
+      const cid = p.split("/")[3]
+      data = { conversation_id: cid, history: [], ...pendingEvents.get(cid) }
+    } else if (stranded && p === `/assistant/conversations/${stranded.id}`) {
       data = {
         conversation_id: stranded.id,
         version: stranded.version,

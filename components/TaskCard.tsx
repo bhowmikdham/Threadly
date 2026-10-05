@@ -4,6 +4,7 @@ import { addresses } from "../lib/api"
 import { needsCalendarSetup } from "../lib/scheduling-readiness"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
+import { CalendarChoiceCard } from "./CalendarChoiceCard"
 import { CalendarEventCard } from "./CalendarEventCard"
 import { Icon } from "./Icon"
 import { InboxCards } from "./InboxCards"
@@ -113,6 +114,15 @@ export function TaskCard({
           <CalendarEventCard
             id={entry.calendarActionId}
             initial={entry.calendarAction}
+          />
+        )}
+        {entry.calendarChoices && (
+          <CalendarChoiceCard
+            value={entry.calendarChoices}
+            enabled={Boolean(controller.canChooseCalendar?.(entry))}
+            choose={(choiceId) =>
+              void controller.chooseCalendar(entry, choiceId)
+            }
           />
         )}
         {entry.inbox && <InboxCards entry={entry} controller={controller} />}
