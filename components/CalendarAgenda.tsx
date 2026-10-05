@@ -72,11 +72,7 @@ export function CalendarAgenda({
   return (
     <section className="calendar-agenda" aria-label="Upcoming Calendar events">
       <h4>See upcoming events</h4>
-      <p className="muted">
-        Optional: event titles need a separate read permission. Checking
-        free/busy availability above does not require it. This never books a
-        meeting.
-      </p>
+      <p className="muted">Event details from your selected calendars.</p>
       {!canRead ? (
         <button
           disabled={busy}
@@ -90,7 +86,7 @@ export function CalendarAgenda({
               setReconnect(false)
             })
           }>
-          {busy ? "Connecting…" : "Connect event read access"}
+          {busy ? "Connecting…" : "Allow event details"}
         </button>
       ) : preferencesState !== "ready" ? (
         <p className="muted">
@@ -129,7 +125,7 @@ export function CalendarAgenda({
               <p>
                 {agenda.coverage === "complete"
                   ? `Events in ${agenda.timezone}`
-                  : `Results may be incomplete (${agenda.coverage} coverage).`}
+                  : `Some events may be missing.`}
               </p>
               {agenda.calendars.map((calendar) => (
                 <div key={calendar.calendar_id}>

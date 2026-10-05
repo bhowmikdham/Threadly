@@ -39,6 +39,8 @@ export type MockControl = {
   failDisconnect?: boolean
   failLogout: boolean
   calendarConnected: boolean
+  calendarSelection?: string[]
+  calendarPreferencesStale?: boolean
 }
 export type MockBackend = {
   server: Server
@@ -210,7 +212,9 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     })
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
-      if (
+      if (body.instruction === "am i free on the tuesday")
+        p = "/fixture/calendar-answer"
+      else if (
         body.instruction === "hey" ||
         (/^(show|find)\b.*emails?\b/i.test(body.instruction) &&
           !/next page/.test(body.instruction))
@@ -266,7 +270,13 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Content-Type", "application/json")
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
-    if (p === "/auth/google/disconnect") {
+    if (p === "/fixture/calendar-answer") {
+      data = {
+        kind: "message",
+        text: "I couldn't confirm your full availability on Tuesday, 6 October 2026. Holidays in India couldn't be checked. Review calendars to fix this; they may contain additional busy time.",
+        error_code: "calendar_coverage_incomplete"
+      }
+    } else if (p === "/auth/google/disconnect") {
       if (control.failDisconnect) {
         res.statusCode = 503
         data = {
@@ -575,12 +585,31 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       }
       lastAction = data
     } else if (p === "/assistant/actions/action-1") data = lastAction
-    else if (p === "/calendar/preferences")
+    else if (p === "/calendar/freebusy")
       data = {
-        version: 1,
-        preferences: {
+        coverage: control.calendarSelection?.includes("holiday")
+          ? "unknown"
+          : "complete",
+        checked_at: new Date().toISOString(),
+        calendars: (control.calendarSelection || ["primary"]).map(
+          (calendar_id) => ({
+            calendar_id,
+            status: calendar_id === "holiday" ? "unknown" : "known"
+          })
+        )
+      }
+    else if (p === "/calendar/preferences") {
+      if (req.method === "PUT") {
+        control.calendarSelection = body.preferences.calendar_ids
+        control.calendarPreferencesStale = false
+      }
+      data = {
+        version: req.method === "PUT" ? body.expected_version + 1 : 1,
+        account_version: 2,
+        needs_review: control.calendarPreferencesStale || false,
+        preferences: body?.preferences || {
           timezone: "Australia/Melbourne",
-          calendar_ids: ["primary"],
+          calendar_ids: control.calendarSelection || ["primary"],
           working_periods: [
             { weekday: 0, start_minute: 540, end_minute: 1020 }
           ],
@@ -590,7 +619,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
           buffer_after_minutes: 0
         }
       }
-    else if (p === "/calendar/calendars")
+    } else if (p === "/calendar/calendars")
       data = {
         calendars: [
           {
@@ -598,6 +627,12 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
             summary: "Personal calendar",
             can_read_busy: true,
             event_write_acl: true
+          },
+          {
+            id: "holiday",
+            summary: "Holidays in India",
+            can_read_busy: true,
+            event_write_acl: false
           }
         ]
       }

@@ -1,6 +1,11 @@
 import type { Capability } from "./types"
 
-export type PreferencesState = "loading" | "missing" | "ready" | "unavailable"
+export type PreferencesState =
+  | "loading"
+  | "missing"
+  | "ready"
+  | "unavailable"
+  | "stale"
 
 export function calendarReadReady(capabilities: Capability[]): boolean {
   return ["calendar_read", "calendar_list"].every(
@@ -37,6 +42,14 @@ export function schedulingReadiness(
       detail: "Checking your saved scheduling preferences.",
       action: null
     }
+  if (preferences === "stale")
+    return {
+      state: "preferences" as const,
+      label: "Review your calendars",
+      detail:
+        "Your connection changed. Review and save your calendar settings.",
+      action: "Review calendars"
+    }
   if (preferences === "unavailable")
     return {
       state: "unavailable" as const,
@@ -65,9 +78,18 @@ const SETUP_ERRORS = new Set([
   "calendar_access_denied",
   "calendar_preferences_missing",
   "calendar_preferences_required",
-  "calendar_not_selectable"
+  "calendar_not_selectable",
+  "calendar_preferences_stale",
+  "calendar_context_changed",
+  "calendar_coverage_incomplete"
 ])
 
 export function needsCalendarSetup(code?: string | null): boolean {
   return Boolean(code && SETUP_ERRORS.has(code))
+}
+
+export function preferencesStatus(
+  value: { needs_review?: boolean } | null
+): PreferencesState {
+  return !value ? "missing" : value.needs_review ? "stale" : "ready"
 }

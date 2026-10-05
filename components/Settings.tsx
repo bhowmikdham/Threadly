@@ -47,10 +47,12 @@ export function Settings({
     }
   }
   useEffect(() => {
-    void bridge<any>({ type: "STATUS" }).then((status) => {
-      setOrigin(status.origin)
-      setRedirect(status.redirectUri)
-    })
+    void bridge<any>({ type: "STATUS" })
+      .then((status) => {
+        setOrigin(status.origin)
+        setRedirect(status.redirectUri)
+      })
+      .catch((cause) => setMessage(errorText(cause)))
   }, [])
   return (
     <section className="settings">
@@ -60,9 +62,29 @@ export function Settings({
       </div>
       {user && (
         <>
-          {publishedBackendBuild && (
+          {connector ? (
+            <ConnectorDetails
+              key={connector}
+              id={connector}
+              user={user}
+              capabilities={capabilities}
+              preferencesState={preferencesState}
+              onAuth={onAuth}
+              onPreferences={onPreferences}
+              onBack={() => setConnector(null)}
+            />
+          ) : (
             <section className="settings-section">
-              <h3>Threadly server</h3>
+              <h3>Connections</h3>
+              <ConnectorList
+                capabilities={capabilities}
+                onSelect={setConnector}
+              />
+            </section>
+          )}
+          {publishedBackendBuild && !connector && (
+            <details className="connection-disclosure">
+              <summary>Troubleshooting</summary>
               <p className="muted">
                 Reconnect if browser access to the Threadly server was removed.
               </p>
@@ -78,31 +100,11 @@ export function Settings({
                 }}>
                 Reconnect server
               </button>
-            </section>
-          )}
-          {connector ? (
-            <ConnectorDetails
-              key={connector}
-              id={connector}
-              user={user}
-              capabilities={capabilities}
-              preferencesState={preferencesState}
-              onAuth={onAuth}
-              onPreferences={onPreferences}
-              onBack={() => setConnector(null)}
-            />
-          ) : (
-            <section className="settings-section">
-              <h3>Connectors</h3>
-              <ConnectorList
-                capabilities={capabilities}
-                onSelect={setConnector}
-              />
-            </section>
+            </details>
           )}
         </>
       )}
-      {!publishedBackendBuild && (
+      {!publishedBackendBuild && !connector && (
         <section className="settings-section">
           <h3>Backend server</h3>
           <label>

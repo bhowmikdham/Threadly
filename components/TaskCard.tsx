@@ -318,12 +318,8 @@ export function TaskCard({
         )}
         {calendarSetupNeeded && controller.openCalendarSetup && (
           <div className="calendar-recovery">
-            <p>
-              Connect Calendar and review your scheduling preferences, then try
-              this request again.
-            </p>
             <button onClick={controller.openCalendarSetup}>
-              Open Calendar setup
+              Review calendars
             </button>
           </div>
         )}

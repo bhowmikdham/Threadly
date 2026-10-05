@@ -966,7 +966,13 @@ describe("backend-owned conversation", () => {
         ? {
             conversation_id: "c",
             version: 2,
-            history: [{ user: "hi", assistant: "Hello" }]
+            history: [
+              {
+                user: "hi",
+                assistant: "Hello",
+                error_code: "calendar_preferences_stale"
+              }
+            ]
           }
         : respond(m)
     )
@@ -975,6 +981,9 @@ describe("backend-owned conversation", () => {
       await Promise.resolve()
     })
     expect(result.current.entries[0].message).toBe("Hello")
+    expect(result.current.entries[0].errorCode).toBe(
+      "calendar_preferences_stale"
+    )
     await act(async () => {
       await result.current.submit("How are you?")
     })
@@ -1157,4 +1166,20 @@ describe("backend-owned conversation", () => {
     expect(result.current.busy).toBe(false)
     expect(result.current.error).toContain("Storage unavailable")
   })
+})
+
+it("keeps Calendar recovery codes from completed responses", async () => {
+  mock((m) =>
+    respond(m, {
+      text: "Review your calendars.",
+      error_code: "calendar_coverage_incomplete"
+    })
+  )
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("am i free on the tuesday")
+  })
+  expect(result.current.entries[0].errorCode).toBe(
+    "calendar_coverage_incomplete"
+  )
 })

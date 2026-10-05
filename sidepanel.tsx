@@ -13,6 +13,7 @@ import { requestBackendAccess } from "./lib/backend-access"
 import { gmailUrlShowsEmail } from "./lib/gmail-context"
 import {
   calendarReadReady,
+  preferencesStatus,
   schedulingReadiness,
   type PreferencesState
 } from "./lib/scheduling-readiness"
@@ -51,8 +52,9 @@ export default function SidePanel() {
         }
         setPreferencesState("loading")
         try {
-          await api("/calendar/preferences")
-          if (epoch === authEpoch.current) setPreferencesState("ready")
+          const preferences = await api("/calendar/preferences")
+          if (epoch === authEpoch.current)
+            setPreferencesState(preferencesStatus(preferences))
         } catch (e) {
           if (epoch === authEpoch.current)
             setPreferencesState(
@@ -168,7 +170,7 @@ export default function SidePanel() {
               onAuth={refresh}
               onClose={() => setSettings(false)}
               onPreferences={(value) =>
-                setPreferencesState(value ? "ready" : "missing")
+                setPreferencesState(preferencesStatus(value))
               }
             />
           )}

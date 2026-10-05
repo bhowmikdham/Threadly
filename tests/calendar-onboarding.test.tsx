@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { CalendarAgenda } from "../components/CalendarAgenda"
 import { CalendarSetup } from "../components/CalendarSetup"
 import { TaskCard } from "../components/TaskCard"
 import {
@@ -47,6 +48,14 @@ describe("Calendar onboarding", () => {
       async (message: any) => {
         calls.push(message)
         if (message.type === "LOGIN") return { ok: true, data: {} } as any
+        if (message.path === "/calendar/freebusy")
+          return {
+            ok: true,
+            data: {
+              coverage: "complete",
+              calendars: [{ calendar_id: "primary", status: "known" }]
+            }
+          } as any
         if (message.path === "/calendar/calendars")
           return {
             ok: true,
@@ -102,10 +111,8 @@ describe("Calendar onboarding", () => {
     fireEvent.change(screen.getByLabelText("Timezone"), {
       target: { value: "Australia/Melbourne" }
     })
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save scheduling preferences" })
-    )
-    await screen.findByText(/Scheduling preferences saved/)
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+    await screen.findByText(/Calendar settings saved/)
     const saved = calls.find(
       (call) => call.path === "/calendar/preferences" && call.method === "PUT"
     )
@@ -167,25 +174,22 @@ describe("Calendar onboarding", () => {
     function Example() {
       const [caps, setCaps] = useState(base)
       return (
-        <CalendarSetup
+        <CalendarAgenda
           capabilities={caps}
           preferencesState="ready"
           onAuth={async () => setCaps([...base, ready("calendar_events_read")])}
-          onPreferences={vi.fn()}
         />
       )
     }
     render(<Example />)
-    fireEvent.click(
-      screen.getByRole("button", { name: "Connect event read access" })
-    )
+    fireEvent.click(screen.getByRole("button", { name: "Allow event details" }))
     await screen.findByRole("button", { name: "View events" })
     expect(calls.find((call) => call.type === "LOGIN").capabilities).toEqual([
       "calendar_events_read"
     ])
     fireEvent.click(screen.getByRole("button", { name: "View events" }))
     await screen.findByText("Planning")
-    expect(screen.getByText(/partial coverage/)).toBeTruthy()
+    expect(screen.getByText(/Some events may be missing/)).toBeTruthy()
     expect(
       screen.getByText(/Team: Events could not be read right now/)
     ).toBeTruthy()
@@ -224,22 +228,16 @@ describe("Calendar onboarding", () => {
       />
     )
     const view = render(element(1))
-    fireEvent.click(
-      screen.getByRole("button", { name: "Load calendars and preferences" })
-    )
     await screen.findByLabelText("Personal")
     fireEvent.click(screen.getByLabelText("Personal"))
     expect(
       (screen.getByLabelText("Personal") as HTMLInputElement).checked
     ).toBe(true)
     view.rerender(element(2))
+    await screen.findByLabelText("Personal")
     expect(
-      screen.getByRole("button", { name: "Load calendars and preferences" })
-    ).toBeTruthy()
-    expect(screen.queryByLabelText("Personal")).toBeNull()
-    await waitFor(() =>
-      expect(screen.getByText("See upcoming events")).toBeTruthy()
-    )
+      (screen.getByLabelText("Personal") as HTMLInputElement).checked
+    ).toBe(false)
   })
 
   it("opens Calendar setup from a scheduling failure without submitting a write", () => {
@@ -255,7 +253,7 @@ describe("Calendar onboarding", () => {
         controller={{ openCalendarSetup }}
       />
     )
-    fireEvent.click(screen.getByRole("button", { name: "Open Calendar setup" }))
+    fireEvent.click(screen.getByRole("button", { name: "Review calendars" }))
     expect(openCalendarSetup).toHaveBeenCalledTimes(1)
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
