@@ -1,5 +1,15 @@
 # Data model — PostgreSQL
 
+Shared email context adds no tables or migration. `context_snapshots.payload`
+also supports internal `storage=gmail-context-plan-1.0`: primary thread/version
+metadata, up to five owner-bound source references, explicit reply-message ID,
+policy and prompt hash. `source_hash` binds deterministic materialized excerpts;
+original mail bodies remain transient. The relational thread anchor identifies
+the primary source, not every supporting source. Encrypted conversation state adds
+bounded `context_order`, monotonic `next_context_reference`, reference-only
+`context-N` entries and per-turn `context_references`.
+See [shared context](shared-mail-context.md).
+
 > Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
 
 > Current correction: [on-demand Gmail](on-demand-gmail.md) supersedes the mailbox-sync,

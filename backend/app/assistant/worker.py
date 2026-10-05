@@ -62,6 +62,7 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
     source_reference = claim.snapshot if source_data.is_reference(claim.snapshot) else None
     if source_reference:
         try:
+            await source_data.prefetch(claim.user_id, [claim.snapshot])
             source = await source_data.fetch(claim.user_id, claim.snapshot["thread_id"])
             claim = replace(claim, snapshot=source_data.materialize(claim.snapshot, source))
         except ApiError as exc:
@@ -259,11 +260,8 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
     if payload is not None and source_reference:
         # Re-read outside the publication transaction. A model call may outlive a
         # changed/deleted email or revoked Google connection; cached source is insufficient.
-        from app.mail import live
-
         try:
-            current_source = await live.thread(claim.user_id, source_reference["thread_id"])
-            source_data.materialize(source_reference, current_source)
+            await source_data.recheck(claim.user_id, source_reference)
         except ApiError as exc:
             payload = None
             error, retryable = exc.code, exc.status == 503
@@ -295,8 +293,10 @@ async def serve(once: bool = False):
             pulse("assistant")
             try:
                 import time
+
                 if time.monotonic() - last_purge > 3600:
                     from app.conversation.store import purge
+
                     async with get_session_factory().begin() as session:
                         await purge(session)
                     last_purge = time.monotonic()

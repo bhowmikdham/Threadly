@@ -140,18 +140,33 @@ async def bind_input(session, user, options, context) -> dict | None:
 
 
 def make_prompt(instruction: str, snapshot: dict | None, envelope: dict, mode: str) -> str:
+    from app.assistant.context_plan import PROMPT as CONTEXT_PROMPT
+    from app.assistant.context_plan import generation_context
+
+    plan = generation_context(snapshot)
     messages = [
         {
             "number": i,
             "body": m["body"],
             "sent_at": m["sent_at"],
             "reply_target": mode == "reply" and m["message_id"] == envelope["reply_message_id"],
+            **(
+                {
+                    "thread": m["thread"],
+                    "subject": m["subject"],
+                    "from": m["from_addr"],
+                    "is_from_user": m["is_from_user"],
+                }
+                if plan
+                else {}
+            ),
         }
         for i, m in enumerate((snapshot or {}).get("messages", []), 1)
     ]
     # Envelope addresses (especially Bcc) and provider identifiers never enter this prompt.
     return (
         (REPLY_PROMPT if mode == "reply" else PROMPT)
+        + (CONTEXT_PROMPT if plan else "")
         + "\nDRAFT_REQUEST_JSON:\n"
         + json.dumps(
             {
@@ -160,12 +175,15 @@ def make_prompt(instruction: str, snapshot: dict | None, envelope: dict, mode: s
                 "recipients_selected": bool(envelope.get("to")),
                 "reply_subject": envelope["reply"]["subject"] if mode == "reply" else None,
                 "messages": messages,
+                **({"context_plan": plan} if plan else {}),
             }
         )
     )
 
 
 def make_artifact(text: str, claim, mode: str) -> dict:
+    from app.assistant.context_plan import coverage_assumptions
+
     schema = GeneratedReplyDraft if mode == "reply" else GeneratedDraft
     draft = schema.model_validate(json_object(text, max_chars=30000))
     messages = (claim.snapshot or {}).get("messages", [])
@@ -209,6 +227,7 @@ def make_artifact(text: str, claim, mode: str) -> dict:
         "assumptions": [
             "Reviewable text only; not approved, sent, inserted, or saved in Gmail.",
             "Based on the user request and saved excerpts; no live availability or attachments.",
+            *coverage_assumptions(claim.snapshot),
         ],
         "evidence": evidence,
         "content": {

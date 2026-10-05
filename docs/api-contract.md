@@ -1,5 +1,15 @@
 # API contract — v0 DRAFT
 
+Conversation release 1.6.0 extends internal `read_email.scope` and
+`prepare_workflow.source_scope` with `thread` (new default), alongside explicit
+`selected_message` and `visible_thread`. `prepare_workflow.context_references`
+accepts up to four distinct already-read supporting handles, separate from the
+primary reference/reply target. Existing HTTP request shapes remain unchanged.
+Responses/history add stable `context_references` handles. Context-plan reads
+materialize schema 1.2 with message/thread groups and per-source coverage, after
+owner/account/fingerprint checks. Clients cannot upload an authoritative plan.
+See [shared context](shared-mail-context.md) for bounds and compatibility.
+
 > Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
 
 > Current inbox chat: [conversational search and result cards](inbox-chat.md).

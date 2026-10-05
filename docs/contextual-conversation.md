@@ -323,8 +323,13 @@ user must review the complete revised subject, body and recipients before any se
   [v6 receipt](evaluation/contextual-conversation-live-v6.json). A fixture/model
   replay is not a live Gmail test or proof of general reasoning accuracy.
 
-Known limits: only 12 exchanges, one active task and one search result set are in working
-context; arbitrary long-running autonomous planning is not implemented. Only existing
+Release 1.6.0 adds [shared email context](shared-mail-context.md): provider-thread
+reads by default, up to five evidence threads per workflow and eight stable source
+handles across searches. Each later use re-reads Gmail; history is not source evidence.
+
+Known limits: 12 exchanges, one active task, one search result set and eight retained
+source handles are in working context; arbitrary long-running autonomous planning
+is not implemented. Only existing
 workflow combinations are supported. Bounded read failures/ambiguous identity still require
 clarification. Browser navigation does not automatically replace a pin. Semantic factual
 correctness still needs human assessment beyond exact-quote validation. No assumption is

@@ -1,5 +1,11 @@
 # Architecture — what runs where
 
+Conversation release 1.6.0 adds the [shared email context design](shared-mail-context.md):
+provider-thread reads, a separate reply target, up to five evidence threads,
+bounded retained source handles and per-dependency freshness checks. Summaries,
+replies and drafts consume the same reference-only plan. This local implementation
+requires live evaluation and rollout before installed behavior changes.
+
 > Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
 
 > Current inbox chat: [conversational search and result cards](inbox-chat.md).

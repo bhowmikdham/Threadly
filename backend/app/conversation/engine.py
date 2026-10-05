@@ -445,6 +445,9 @@ async def run(context, runtime, model=None):
 def _merge_prepare_workflows(requests):
     """Collapse provider-split terminal calls without granting new authority."""
     workflows = [PrepareWorkflow.model_validate(call["input"]) for call in requests]
+    supporting = {tuple(workflow.context_references) for workflow in workflows}
+    if len(supporting) != 1:
+        raise ValueError("A compound workflow must keep one supporting evidence plan")
     scopes = {workflow.source_scope for workflow in workflows}
     if len(scopes) != 1:
         raise ValueError("A compound workflow must keep one source scope")
@@ -480,6 +483,7 @@ def _merge_prepare_workflows(requests):
         reference=next(iter(references), None),
         compound=True,
         source_scope=scopes.pop(),
+        context_references=list(supporting.pop()),
         to_refs=roles["to"],
         cc_refs=roles["cc"],
         bcc_refs=roles["bcc"],

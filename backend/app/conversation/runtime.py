@@ -19,7 +19,7 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
-from app.conversation import calendar_context
+from app.conversation import calendar_context, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.schemas.assistant import AssistantRequest, DraftOptions
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
@@ -532,6 +532,9 @@ class Runtime:
             else datetime.now(UTC)
         )
         self.evidence, self.loaded, self.read_scopes = {}, {}, {}
+        self.source_selections = {}
+        self.last_read_scopes = {}
+        self.turn_source_references = []
         self.search_page = None
         self.fresh_search_scope = fresh_search_scope(request.instruction)
         self.fresh_search_done = False
@@ -576,11 +579,7 @@ class Runtime:
     def _reset_previous_search(self):
         # A new explicit mailbox request supersedes old search references. The
         # independently pinned source, if any, remains available to the user.
-        self.state["refs"] = {
-            key: value for key, value in self.state["refs"].items() if key == "selected"
-        }
-        self.state["result_order"] = []
-        self.state.pop("search", None)
+        mail_context.reset_search(self.state)
 
     def authoritative_instruction(self):
         """Build workflow input exclusively from bounded user-authored turns.
@@ -625,14 +624,11 @@ class Runtime:
                         raise ApiError(404, "context_not_found", "Select an accessible email.")
                     ui_map = context.payload.get("ui_map")
                     selected = (ui_map or {}).get("selected_message_ids", [])
-                    if ui_map is None or len(selected) == 1:
-                        self.state["refs"]["selected"] = {
-                            "message_id": selected[0] if selected else None,
-                            "context_id": context.id,
-                            "thread_id": context.payload["thread_id"],
-                        }
-                    else:
-                        self.state["refs"].pop("selected", None)
+                    self.state["refs"]["selected"] = {
+                        "message_id": selected[0] if len(selected) == 1 else None,
+                        "context_id": context.id,
+                        "thread_id": context.payload["thread_id"],
+                    }
             else:
                 self.state["refs"].pop("selected", None)
         if "active_task_id" in self.request.model_fields_set:
@@ -686,6 +682,7 @@ class Runtime:
             # instructions or remembered facts to the next model decision.
             "recent_dialogue": model_history(self.state["history"]),
             "previous_calendar_request": calendar_context.model_context(self.state),
+            "remembered_email_sources": mail_context.model_context(self.state),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -696,9 +693,9 @@ class Runtime:
             "user_recipient_refs": self.recipients,
             "selected_reference": "selected" if "selected" in self.state["refs"] else None,
             "selected_source_scopes": (
-                ["selected_message", "visible_thread"]
+                ["selected_message", "visible_thread", "thread"]
                 if self.state["refs"].get("selected", {}).get("message_id")
-                else ["visible_thread"]
+                else ["visible_thread", "thread"]
                 if "selected" in self.state["refs"]
                 else []
             ),
@@ -824,11 +821,16 @@ class Runtime:
         if args is not None and self.fresh_search_scope:
             self.fresh_search_done = True
         if args is not None:
-            self.evidence = {k: v for k, v in self.evidence.items() if k == "selected"}
-            self.loaded = {k: v for k, v in self.loaded.items() if k == "selected"}
-            self.read_scopes = {k: v for k, v in self.read_scopes.items() if k == "selected"}
-            self.state["refs"] = {k: v for k, v in self.state["refs"].items() if k == "selected"}
-            self.state["result_order"] = []
+            mail_context.reset_search(self.state)
+            for mapping in (self.evidence, self.loaded, self.read_scopes, self.last_read_scopes):
+                for key in list(mapping):
+                    if key not in self.state["refs"]:
+                        mapping.pop(key)
+            self.source_selections = {
+                key: value
+                for key, value in self.source_selections.items()
+                if key[0] in self.state["refs"]
+            }
         observations = []
         retained_results = []
         for row in page["results"]:
@@ -885,7 +887,7 @@ class Runtime:
         ref = self.state["refs"].get(reference)
         if not ref:
             raise ValueError("Unknown source reference")
-        if scope == "visible_thread" and (reference != "selected" or not ref.get("context_id")):
+        if scope == "visible_thread" and not ref.get("context_id"):
             raise ValueError("Visible thread requires an owned pinned capture")
         source = await source_data.fetch(self.owner, ref["thread_id"])
         captured_messages = None
@@ -902,7 +904,9 @@ class Runtime:
                 payload = source_data.context_data(context)
                 message_id = ref.get("message_id")
                 available = {m["message_id"] for m in payload["messages"]}
-                if scope == "visible_thread":
+                if scope == "thread":
+                    mids = {m["gmail_msg_id"] for m in source["messages"]}
+                elif scope == "visible_thread":
                     mids = available
                     captured_messages = payload["messages"]
                 elif message_id:
@@ -918,7 +922,19 @@ class Runtime:
                 else:
                     raise ApiError(404, "ui_reference_not_found", "Select one accessible email.")
         else:
-            mids = {ref["message_id"]}
+            mids = (
+                {m["gmail_msg_id"] for m in source["messages"]}
+                if scope == "thread"
+                else {ref["message_id"]}
+            )
+        if scope == "thread":
+            from app.assistant.context_plan import MAX_MESSAGES, sample
+
+            messages_in_scope = [m for m in source["messages"] if m["gmail_msg_id"] in mids]
+            mids = {
+                m["gmail_msg_id"]
+                for m in sample(messages_in_scope, MAX_MESSAGES, ref.get("message_id"))
+            }
         messages = [m for m in source["messages"] if m["gmail_msg_id"] in mids]
         if not messages or not mids.issubset({m["gmail_msg_id"] for m in messages}):
             raise ApiError(404, "gmail_source_missing", "That email is no longer available.")
@@ -947,13 +963,33 @@ class Runtime:
         )
         self.loaded[reference] = source
         self.read_scopes.setdefault(reference, set()).add(scope)
+        self.last_read_scopes[reference] = scope
+        self.source_selections[(reference, scope)] = {
+            "thread_id": ref["thread_id"],
+            "scope": scope,
+            "message_ids": None if scope == "thread" else [m["gmail_msg_id"] for m in messages],
+        }
+        remembered = mail_context.retain(self.state, reference, scope)
+        if remembered not in self.turn_source_references:
+            self.turn_source_references.append(remembered)
         return {
             "reference": reference,
+            "remembered_reference": remembered,
+            "scope": scope,
             "messages": output,
             "untrusted_source": True,
             "coverage": (
-                "captured thread messages" if scope == "visible_thread" else "selected message only"
+                "provider thread messages"
+                if scope == "thread"
+                else "captured thread messages"
+                if scope == "visible_thread"
+                else "selected message only"
             ),
+            "total_thread_messages": len(source["messages"]),
+            "included_messages": len(output),
+            "omitted_messages": len(source["messages"]) - len(output),
+            "truncated_messages": sum(m["truncated"] for m in output),
+            "attachments": "not_read",
             "fetched_at": datetime.now(UTC).isoformat(),
         }
 
@@ -978,6 +1014,12 @@ class Runtime:
             ):
                 raise ValueError("Use only current searched email references")
 
+        from copy import deepcopy
+
+        memory_before = deepcopy(self.state)
+        selections_before = self.source_selections.copy()
+        last_scopes_before = self.last_read_scopes.copy()
+        turn_refs_before = self.turn_source_references.copy()
         sentinel = object()
         prior = {
             reference: (
@@ -1016,6 +1058,11 @@ class Runtime:
                 )
                 results.append({"reference": reference, "messages": messages})
         except Exception:
+            self.state.clear()
+            self.state.update(memory_before)
+            self.source_selections = selections_before
+            self.last_read_scopes = last_scopes_before
+            self.turn_source_references = turn_refs_before
             for reference, values in prior.items():
                 for mapping, value in zip(
                     (self.evidence, self.loaded, self.read_scopes), values, strict=True
@@ -1033,14 +1080,30 @@ class Runtime:
             "fetched_at": datetime.now(UTC).isoformat(),
         }
 
-    async def capture(self, reference, *, scope="selected_message"):
+    async def capture(self, reference, *, scope="selected_message", supporting=()):
         if reference is None:
             return None, None
         if reference not in self.loaded:
             raise ValueError("Read this email before preparing work")
-        ref = self.state["refs"][reference]
+        ref = self.state["refs"].get(reference)
+        if ref is None:
+            raise ValueError("This source handle expired; select or search for it again")
+        if scope == "thread" or supporting:
+            from app.assistant import context_plan
+
+            selections = [self.source_selections[(reference, scope)]]
+            for key in supporting:
+                supporting_scope = self.last_read_scopes.get(key)
+                if supporting_scope is None:
+                    raise ValueError("Read every supporting source before preparing work")
+                selections.append(self.source_selections[(key, supporting_scope)])
+            async with self.factory.begin() as session:
+                context = await context_plan.capture(
+                    session, self.owner, selections, ref.get("message_id")
+                )
+            return context.id, ref.get("message_id")
         if scope == "visible_thread":
-            if reference != "selected" or not ref.get("context_id"):
+            if not ref.get("context_id"):
                 raise ValueError("Visible thread requires an owned pinned capture")
             return ref["context_id"], None
         message_id = ref.get("message_id")
@@ -1064,9 +1127,9 @@ class Runtime:
             args, set(self.loaded), set(self.recipients), self.recipient_roles
         )
         scope = args.source_scope
-        if scope == "visible_thread" and args.reference != "selected":
-            raise ValueError("Visible thread requires an owned pinned reference")
         ref = self.state["refs"].get(args.reference, {})
+        if scope == "visible_thread" and not ref.get("context_id"):
+            raise ValueError("Visible thread requires an owned pinned reference")
         if scope == "selected_message" and not ref.get("message_id"):
             if ref.get("context_id") and "visible_thread" in self.read_scopes.get(
                 args.reference, set()
@@ -1074,10 +1137,15 @@ class Runtime:
                 scope = "visible_thread"
         if args.reference and scope not in self.read_scopes.get(args.reference, set()):
             raise ValueError("Read the requested source scope before preparing work")
-        context_id, mid = await self.capture(args.reference, scope=scope)
+        if any(key not in self.loaded for key in args.context_references):
+            raise ValueError("Read every supporting source before preparing work")
+        context_id, mid = await self.capture(
+            args.reference, scope=scope, supporting=args.context_references
+        )
         provenance = self.conversation_provenance(instruction)
         if args.reference:
             provenance["source_scope"] = scope
+            provenance["context_references"] = args.context_references
         draft = DraftOptions(reply_message_id=mid) if args.intent == "reply" and mid else None
         roles = {role: getattr(args, role + "_refs") for role in ("to", "cc", "bcc")}
         if any(roles.values()):
@@ -1215,6 +1283,19 @@ class Runtime:
         envelope = self.artifact.draft_envelope
         if not envelope:
             raise ValueError("No draft envelope")
+        context_id = self.artifact.payload.get("context_snapshot_id")
+        if context_id:
+            async with self.factory() as session:
+                context = await session.scalar(
+                    select(ContextSnapshot).where(
+                        ContextSnapshot.id == context_id,
+                        ContextSnapshot.user_id == self.owner,
+                    )
+                )
+                if context is None:
+                    raise ApiError(404, "context_not_found", "Select the evidence again.")
+                reference = context.payload
+            await source_data.prefetch(self.owner, [reference])
         # Fetch original source for freshness without changing the pinned UI selection.
         reply = envelope.get("reply")
         if reply:
@@ -1238,6 +1319,7 @@ class Runtime:
                 author="conversation_model",
                 author_provenance=self.conversation_provenance(self.authoritative_instruction()),
             )
+            await session.refresh(task)
             view = await task_view(session, task)
             result = await draft_review.artifact_view(session, task, artifact)
             await self.checkpoint(
@@ -1260,4 +1342,14 @@ class Runtime:
         if self.lease is not None:
             from app.conversation.store import checkpoint
 
-            await checkpoint(session, self.owner, self.request, self.lease, self.state, response)
+            await checkpoint(
+                session,
+                self.owner,
+                self.request,
+                self.lease,
+                self.state,
+                {
+                    **response,
+                    "context_references": self.turn_source_references,
+                },
+            )
