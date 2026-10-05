@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for a tested Threadly extension download every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+RandomizedDelaySec=10
+Unit=threadly-extension-download.service
+
+[Install]
+WantedBy=timers.target
