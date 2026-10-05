@@ -1,0 +1,33 @@
+name: website-ci
+
+on:
+  pull_request:
+    paths: ["website/**", "website-src/**", "infra/caddy/Caddyfile.threadly-au", ".github/workflows/website-ci.yml"]
+  push:
+    branches: [main, "codex/assistant-intent-routing"]
+    paths: ["website/**", "website-src/**", "infra/caddy/Caddyfile.threadly-au", ".github/workflows/website-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  download-cache:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website-src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: website-src/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: python tests/check-download-headers.py

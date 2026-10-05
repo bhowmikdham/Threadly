@@ -16,3 +16,17 @@ Privacy, service information, and support pages describe invited early access.
 Public support contact and wider Google signup remain pending; do not claim full
 public verification from this hosting rollout. The deploy script rejects unresolved
 `__LAUNCH_` markers if a future page introduces them.
+
+`npx playwright install chromium && npm test` verifies the real install page in
+isolated Chromium against local fixture ZIPs, including an already-cached old
+download, same-version rebuilds, rollback, invalid/unavailable/timed-out metadata,
+and JavaScript-disabled downloads. `python3 tests/check-download-headers.py` runs
+the actual public Caddy handlers in an ephemeral local `caddy:2.11.4` container.
+These checks run in `website-ci`; they do not deploy anything.
+
+The install button uses the public metadata's SHA-256 as a download query string.
+The ZIP endpoint remains mutable and sends `Cache-Control: no-store`. The query
+bypasses previously cached bare URLs; it does not pin a server-side historical
+artifact. Keep the ZIP's no-store policy and the metadata validation together.
+After deploying these assets and the Caddy configuration, refresh the install
+page before checking the download. Existing unpacked installations are unchanged.

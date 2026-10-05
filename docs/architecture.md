@@ -614,9 +614,15 @@ The homepage install section and installation guide read
 `/downloads/threadly-extension.json` to show the extension version beside their
 download buttons. The extension updater derives this public version/checksum from
 the ZIP installed on the website host and restores it on rollback. Caddy serves
-only that exact metadata path with `Cache-Control: no-store`; the site's CSP permits
-same-origin reads. Missing or invalid metadata hides the label without blocking
-downloads. No backend API, authentication or database access is involved.
+the exact metadata and mutable ZIP paths with `Cache-Control: no-store`; the site's
+CSP permits same-origin reads. The install button includes the metadata SHA-256 in
+its query string, bypassing old copies already cached at the bare ZIP URL. This
+also distinguishes rebuilds with the same version and rollbacks. The query is a
+cache identity, not an immutable archive or a server-side checksum constraint.
+Missing or invalid metadata hides the label and retains a separate fallback URL,
+including when JavaScript is unavailable. The pages and version script revalidate
+with `Cache-Control: no-cache`. No backend API, authentication or database access
+is involved.
 
 
 ### Semantic Calendar interpretation (1.4.0)
