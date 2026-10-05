@@ -239,15 +239,15 @@ export async function speak(text: string, onLevel: (level: number) => void) {
   if (!text) return
   const session = { cancelled: false, stop: () => {} }
   active = session
+  console.info("[voice] requesting ElevenLabs for", text.length, "characters")
   let ctx: AudioContext | undefined
   let frame = 0
   try {
-    // Goes through the background worker like every other request, so the
-    // session token never leaves it. The backend returns base64 MP3 in JSON.
     const reply = await api<{ audio: string }>("/assistant/voice/speak", {
       text
     })
     if (session.cancelled) return
+    console.info("[voice] ElevenLabs audio received, base64 length:", reply.audio.length)
     const bytes = Uint8Array.from(atob(reply.audio), (c) => c.charCodeAt(0))
     ctx = new AudioContext()
     await ctx.resume()
@@ -261,7 +261,6 @@ export async function speak(text: string, onLevel: (level: number) => void) {
     source.connect(analyser)
     analyser.connect(ctx.destination)
 
-    // The orb follows the real loudness of the voice.
     const samples = new Uint8Array(analyser.fftSize)
     const tick = () => {
       analyser.getByteTimeDomainData(samples)
@@ -281,7 +280,8 @@ export async function speak(text: string, onLevel: (level: number) => void) {
       source.start()
       frame = requestAnimationFrame(tick)
     })
-  } catch {
+  } catch (e) {
+    console.warn("[voice] ElevenLabs failed, falling back to browser voice:", e)
     if (!session.cancelled) await speakWithBrowser(text, onLevel)
   } finally {
     cancelAnimationFrame(frame)
