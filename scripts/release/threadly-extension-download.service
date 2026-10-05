@@ -1,0 +1,25 @@
+[Unit]
+Description=Verify and refresh the Threadly website extension download
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/srv/threadly-data
+
+[Service]
+Type=oneshot
+User=threadly-release
+Group=threadly-release
+ExecStart=/usr/bin/python3 /usr/local/lib/threadly-extension-release/download_release.py update
+TimeoutStartSec=240
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/threadly-data/public-downloads /srv/threadly-data/extension-releases
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

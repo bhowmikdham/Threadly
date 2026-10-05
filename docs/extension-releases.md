@@ -7,6 +7,19 @@ but no Chrome Web Store or Edge Add-ons publisher account or listing is configur
 The current website download is an unpacked developer ZIP. Hosting a new ZIP on
 AWS does **not** update installed unpacked extensions.
 
+## Automatic website ZIP
+
+Frontend CI now packages the tested public-origin build and publishes a download
+feed on successful pushes to `frontend`. The website updater checks this feed
+every two minutes after its one-time installation. Pull requests and other
+branches cannot publish through this job. Backend and website-only deployments
+do not rebuild the extension. See the [setup and rollback guide](extension-download-automation.md).
+
+Every package records the exact source commit and workflow run, even when the
+extension version has not changed. Continue increasing the manifest/package
+version for user-visible releases and store updates. Existing unpacked installs
+still need new files and a browser reload.
+
 ## First store release
 
 1. The owner registers a publisher account, accepts the store agreement and handles

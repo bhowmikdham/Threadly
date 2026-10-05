@@ -186,6 +186,12 @@ See [inbox chat behavior and checks](docs/inbox-chat.md) for the new discovery A
 
 ## threadly.au release
 
+After changes merge into `frontend`, the frontend checks build and publish the
+public website package. Once the server updater is installed, it checks every
+two minutes and replaces the existing download only after verifying the release.
+See [automatic website downloads](docs/extension-download-automation.md) for
+installation, checks, rollback and the distinction from installed browser updates.
+
 The store submission workflow pins `https://api.threadly.au` so a store build
 cannot accidentally ship the localhost default. The website currently distributes
 an early-access unpacked build; this does not establish store approval or public

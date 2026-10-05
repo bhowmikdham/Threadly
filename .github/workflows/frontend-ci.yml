@@ -8,7 +8,8 @@ permissions:
   contents: read
 concurrency:
   group: frontend-${{ github.ref }}
-  cancel-in-progress: true
+  # Never interrupt publication halfway through replacing the release feed.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/frontend' }}
 jobs:
   extension:
     runs-on: ubuntu-latest
@@ -22,18 +23,50 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
       - run: npm run build
         env:
-          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.example.test
+          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.threadly.au
       - run: npx playwright test tests/e2e/public-origin.spec.ts
         env:
-          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.example.test
-      - run: npm run build
+          PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN: https://api.threadly.au
+      - name: Package the tested public build
+        run: >-
+          python3 scripts/release/download_release.py package
+          --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
+          --run-attempt "$GITHUB_RUN_ATTEMPT"
       - uses: actions/upload-artifact@v4
         with:
           name: threadly-chrome-extension
           path: build/chrome-mv3-prod
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: threadly-website-release
+          path: build/website-release/
+          if-no-files-found: error
+          retention-days: 30
+
+  website-download:
+    needs: extension
+    if: github.event_name == 'push' && github.ref == 'refs/heads/frontend'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: threadly-website-download
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: threadly-website-release
+          path: build/website-release
+      - name: Publish verified package and update the server feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release/publish.sh
