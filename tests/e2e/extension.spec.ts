@@ -511,6 +511,7 @@ test("connected connectors open capability details and the update page is bundle
     .getByRole("button", { name: "Conversation menu", exact: true })
     .click()
   await page.getByRole("button", { name: "Manage Google Calendar" }).click()
+  await page.getByText("What Threadly can do", { exact: true }).click()
   await expect(
     page.getByRole("list", { name: "Skills", exact: true })
   ).toBeVisible()
@@ -558,9 +559,11 @@ test("Calendar recovery is clear, compact and usable at 320px", async () => {
   await expect(
     page.getByLabel("Holidays in India", { exact: true })
   ).toBeChecked()
+  await page.getByText("What Threadly can do", { exact: true }).click()
   await expect(
     page.getByRole("list", { name: "Skills" }).locator("li")
   ).toHaveCount(4)
+  await page.getByText("What Threadly can do", { exact: true }).click()
   await expect(page.getByText("Threadly server", { exact: true })).toHaveCount(
     0
   )

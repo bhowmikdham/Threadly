@@ -50,17 +50,21 @@ it("makes both connected and disconnected rows manageable", () => {
   )
   expect(select.mock.calls).toEqual([["gmail"], ["calendar"]])
 })
-it("shows compact skills and puts Calendar preferences directly on the page", () => {
+it("explains feature availability in text and keeps Calendar preferences on the page", () => {
   render(<ConnectorDetails {...props} id="calendar" />)
+  fireEvent.click(screen.getByText("What Threadly can do"))
   const skills = screen.getByRole("list", { name: "Skills" })
   expect(within(skills).getAllByRole("listitem")).toHaveLength(4)
-  expect(screen.queryByText("Available")).toBeNull()
-  expect(screen.getByText("Find availability").closest("li")!.title).toBe(
-    "Available"
-  )
-  expect(screen.getByText("Review agenda").closest("li")!.title).toBe(
-    "Permission needed"
-  )
+  expect(
+    within(screen.getByText("Find availability").closest("li")!).getByText(
+      "Available"
+    )
+  ).toBeTruthy()
+  expect(
+    within(screen.getByText("Review agenda").closest("li")!).getByText(
+      "Permission needed"
+    )
+  ).toBeTruthy()
   expect(screen.queryByRole("tablist")).toBeNull()
   expect(screen.getByText("Calendar preferences")).toBeTruthy()
   fireEvent.click(screen.getByText("Account & permissions"))
@@ -72,6 +76,74 @@ it("shows compact skills and puts Calendar preferences directly on the page", ()
     channel: "threadly",
     type: "LOGIN",
     capabilities: ["calendar_events_read"]
+  })
+})
+it("keeps reconnect visible, disables repeated requests, and reports errors without changing scopes", async () => {
+  let finish!: (value: any) => void
+  vi.mocked(chrome.runtime.sendMessage).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }) as any
+  )
+  render(<ConnectorDetails {...props} id="gmail" />)
+  const reconnect = screen.getByRole("button", {
+    name: "Reconnect Gmail"
+  }) as HTMLButtonElement
+  expect(reconnect.closest("details")).toBeNull()
+  fireEvent.click(reconnect)
+  expect(reconnect.disabled).toBe(true)
+  expect(screen.getByRole("status").textContent).toBe("Updating connection…")
+  expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+    channel: "threadly",
+    type: "LOGIN",
+    capabilities: ["gmail_read"]
+  })
+  finish({ ok: false, error: { message: "Connection cancelled. Try again." } })
+  await screen.findByText("Connection cancelled. Try again.")
+  expect(reconnect.disabled).toBe(false)
+  expect(auth).not.toHaveBeenCalled()
+})
+it("keeps Gmail sending and Calendar event creation consent explicit", async () => {
+  const { rerender } = render(
+    <ConnectorDetails
+      {...props}
+      id="calendar"
+      capabilities={[
+        ...caps,
+        {
+          id: "calendar_write",
+          ready: false,
+          enabled: true,
+          status: "scope_missing"
+        }
+      ]}
+    />
+  )
+  fireEvent.click(screen.getByRole("button", { name: "Enable event creation" }))
+  await waitFor(() => expect(auth).toHaveBeenCalledOnce())
+  expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+    channel: "threadly",
+    type: "LOGIN",
+    capabilities: ["calendar_write"]
+  })
+  rerender(
+    <ConnectorDetails
+      {...props}
+      id="gmail"
+      capabilities={caps.map((c) =>
+        c.id === "gmail_send" ? { ...c, enabled: true } : c
+      )}
+    />
+  )
+  fireEvent.click(screen.getByText("Account & permissions"))
+  fireEvent.click(
+    screen.getByRole("button", { name: "Allow sending after review" })
+  )
+  await waitFor(() => expect(auth).toHaveBeenCalledTimes(2))
+  expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+    channel: "threadly",
+    type: "LOGIN",
+    capabilities: ["gmail_send"]
   })
 })
 it("requires shared-account confirmation and preserves visible errors on disconnect failure", async () => {
