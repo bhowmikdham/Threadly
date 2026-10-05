@@ -24,7 +24,9 @@ _cache = ContextVar("gmail_request_sources", default=None)
 
 
 def is_reference(payload):
-    return isinstance(payload, dict) and payload.get("storage") == STORAGE
+    from app.assistant.context_plan import STORAGE as PLAN_STORAGE
+
+    return isinstance(payload, dict) and payload.get("storage") in {STORAGE, PLAN_STORAGE}
 
 
 @asynccontextmanager
@@ -54,6 +56,14 @@ def source_for(owner, thread_id):
 
 
 def materialize(ref, source):
+    from app.assistant import context_plan
+
+    if ref.get("storage") == context_plan.STORAGE:
+        sources = {
+            r["thread_id"]: source_for(ref["owner_id"], r["thread_id"]) for r in ref["sources"]
+        }
+        sources[ref["thread_id"]] = source
+        return context_plan.materialize(ref, sources)
     if ref["owner_id"] != source["owner"] or ref["account_version"] != source["account_version"]:
         raise ApiError(409, "google_connection_changed", "Select the source again.")
     if ref["fingerprint"] != source["fingerprint"]:
@@ -139,8 +149,29 @@ async def prefetch(owner, references):
         if is_reference(ref):
             if ref["owner_id"] != owner:
                 raise ApiError(404, "context_not_found", "Unknown context.")
-            source = await fetch(owner, ref["thread_id"])
+            for item in ref.get("sources", [ref]):
+                if item["owner_id"] != owner:
+                    raise ApiError(404, "context_not_found", "Unknown context.")
+                await fetch(owner, item["thread_id"])
+            source = source_for(owner, ref["thread_id"])
             materialize(ref, source)
+
+
+async def recheck(owner, ref):
+    """Independently re-read every dependency before publishing generated work."""
+    from app.assistant import context_plan
+
+    if ref.get("owner_id") != owner:
+        raise ApiError(404, "context_not_found", "Unknown context.")
+    sources = {}
+    for item in ref.get("sources", [ref]):
+        if item["owner_id"] != owner:
+            raise ApiError(404, "context_not_found", "Unknown context.")
+        sources[item["thread_id"]] = await live.thread(owner, item["thread_id"])
+    if ref.get("storage") == context_plan.STORAGE:
+        context_plan.materialize(ref, sources)
+    else:
+        materialize(ref, sources[ref["thread_id"]])
 
 
 async def capture(session, owner, thread_id, ui_map=None, *, message_id=None):
@@ -215,6 +246,15 @@ async def capture(session, owner, thread_id, ui_map=None, *, message_id=None):
 
 
 async def validate(session, owner, data):
+    for ref in data.get("context_plan", {}).get("source_references", []):
+        source = source_for(owner, ref["thread_id"])
+        if (
+            ref["owner_id"] != owner
+            or source["owner"] != owner
+            or source["fingerprint"] != ref["fingerprint"]
+            or source["account_version"] != ref["account_version"]
+        ):
+            raise ApiError(409, "source_changed", "Capture the evidence sources again.")
     source = source_for(owner, data["thread_id"])
     if (
         source["owner"] != owner

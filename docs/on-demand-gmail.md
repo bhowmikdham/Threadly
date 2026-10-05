@@ -1,5 +1,10 @@
 # On-demand Gmail architecture
 
+Conversation release 1.6.0 also supports reference-only plans across up to five
+threads, 50 messages and 24,000 body characters. Legacy capture budgets below are
+unchanged. All plan sources are re-fetched and validated; no source-body persistence
+is added. See [shared context](shared-mail-context.md).
+
 > Current conversation layer: [context, lifecycle and limits](contextual-conversation.md).
 
 This corrects the mailbox-replication design. The default is `GMAIL_SOURCE_MODE=on_demand`.

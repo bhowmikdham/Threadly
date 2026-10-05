@@ -152,6 +152,21 @@ async def calendar_result(session, claim, query_id):
 async def checkpoint(
     factory, claim, ordinal, operation, dependencies, payload=None, provenance=None
 ):
+    if payload is not None and claim.snapshot.get("context_plan"):
+        from app.assistant import context_plan, source_data
+
+        await source_data.recheck(
+            claim.user_id,
+            {
+                "storage": context_plan.STORAGE,
+                "policy": context_plan.POLICY,
+                "prompt_hash": claim.snapshot["context_plan"]["prompt_hash"],
+                "owner_id": claim.user_id,
+                "thread_id": claim.snapshot["thread_id"],
+                "sources": claim.snapshot["context_plan"]["source_references"],
+                "reply_message_id": claim.snapshot["context_plan"].get("reply_message_id"),
+            },
+        )
     async with factory.begin() as session:
         await current(session, claim)  # Account/preferences/source precede the task lock.
         # Every dependent publication/replay checks the original Calendar receipt.

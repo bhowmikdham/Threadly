@@ -69,6 +69,8 @@ def make_prompt(snapshot: dict) -> str:
 
 
 def make_artifact(text: str, context_id: str, snapshot: dict) -> dict:
+    from app.assistant.context_plan import coverage_assumptions
+
     if len(text) > 16000:
         raise ValueError("summary output too large")
     summary = GeneratedSummary.model_validate(
@@ -94,6 +96,7 @@ def make_artifact(text: str, context_id: str, snapshot: dict) -> dict:
             ),
             f"{snapshot['omitted_messages']} source messages omitted; "
             f"{snapshot['truncated_messages']} included messages truncated.",
+            *coverage_assumptions(snapshot),
         ],
         "evidence": [
             {

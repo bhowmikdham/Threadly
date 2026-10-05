@@ -75,14 +75,29 @@ def unwrap_release(release: dict) -> dict:
 
 
 def make_prompt(snapshot: dict, instruction: str, *, policy=None) -> str:
+    from app.assistant.context_plan import PROMPT as CONTEXT_PROMPT
+    from app.assistant.context_plan import generation_context
+
+    plan = generation_context(snapshot)
     policy = policy or summary_policy
     # IDs, recipients and provider metadata remain outside model authority.
     messages = [
-        {"number": i, "from": m["from_addr"], "sent_at": m["sent_at"], "body": m["body"]}
+        {
+            "number": i,
+            "from": m["from_addr"],
+            "sent_at": m["sent_at"],
+            "body": m["body"],
+            **(
+                {"thread": m["thread"], "subject": m["subject"], "is_from_user": m["is_from_user"]}
+                if plan
+                else {}
+            ),
+        }
         for i, m in enumerate(snapshot["messages"], 1)
     ]
     return (
         policy.PROMPT
+        + (CONTEXT_PROMPT + "\nCONTEXT_PLAN_JSON:\n" + json.dumps(plan) if plan else "")
         + "\nUSER_SUMMARY_REQUEST_JSON:\n"
         + json.dumps(instruction)
         + "\nSOURCE_JSON:\n"

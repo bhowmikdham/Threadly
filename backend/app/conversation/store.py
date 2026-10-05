@@ -251,6 +251,7 @@ async def complete(session, owner, request, lease, state, response):
                 "proposal_id": saved.get("proposal_id"),
                 "calendar_action_id": saved.get("calendar_action_id"),
                 "request_id": request.request_id,
+                "context_references": saved.get("context_references", []),
                 "error_code": saved.get("error_code"),
             }
         ]
