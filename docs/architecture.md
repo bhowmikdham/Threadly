@@ -603,6 +603,14 @@ Google Fonts requests are separate from extension authentication. Launch details
 [the deployment runbook](../infra/deploy/ec2/APP-DEPLOYMENT.md#threadlyau-public-launch-mode).
 This source configuration is not evidence of a completed public rollout.
 
+The homepage install section and installation guide read
+`/downloads/threadly-extension.json` to show the extension version beside their
+download buttons. The extension updater derives this public version/checksum from
+the ZIP installed on the website host and restores it on rollback. Caddy serves
+only that exact metadata path with `Cache-Control: no-store`; the site's CSP permits
+same-origin reads. Missing or invalid metadata hides the label without blocking
+downloads. No backend API, authentication or database access is involved.
+
 
 ### Semantic Calendar interpretation (1.4.0)
 
