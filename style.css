@@ -2224,10 +2224,14 @@ summary:focus-visible {
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .voice-overlay.docked {
-  height: 168px;
-  justify-content: flex-start;
-  padding-top: 12px;
-  background: linear-gradient(var(--bg) 70%, transparent);
+  height: 184px;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px 24px 20px;
+  /* Solid, with a clear rule underneath that separates the orb from the chat. */
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 6px 16px -10px #00000040;
   pointer-events: none;
   animation: none;
 }
@@ -2235,13 +2239,13 @@ summary:focus-visible {
   pointer-events: auto;
 }
 .docked .voice-orb {
-  width: 96px;
+  width: 100px;
 }
 .docked .voice-status {
-  margin-top: 2px;
+  margin-top: 0;
 }
 .threadly.voice-docked .conversation {
-  padding-top: 110px;
+  padding-top: 130px;
 }
 @keyframes voice-in {
   from {
