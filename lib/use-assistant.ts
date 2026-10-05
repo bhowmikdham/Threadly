@@ -76,6 +76,7 @@ const validSelectionReference = (value: any): value is SelectionReference =>
       value.selectedIds.includes(value.targetId)))
 
 type ConversationHistoryItem = {
+  error_code?: string
   user: string
   assistant: string
   kind?: string
@@ -256,7 +257,8 @@ export function useAssistant(user: User) {
         const restoredEntries: Entry[] = history.map((h, i) => ({
           id: h.request_id || `restored-${i}`,
           instruction: h.user,
-          message: h.assistant
+          message: h.assistant,
+          errorCode: h.error_code
         }))
         const pending = saved.pendingTurn
           ? pendingTurn(saved.pendingTurn.id, saved.pendingTurn.body)
@@ -787,7 +789,7 @@ export function useAssistant(user: User) {
       artifacts: turn.artifacts,
       conversationVersion: turn.version,
       error: undefined,
-      errorCode: undefined
+      errorCode: turn.error_code
     })
     try {
       await saveConversation(null)

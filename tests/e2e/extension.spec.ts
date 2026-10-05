@@ -464,7 +464,7 @@ test("connected connectors open capability details and the update page is bundle
     .click()
   await page.getByRole("button", { name: "Manage Google Calendar" }).click()
   await expect(
-    page.getByRole("heading", { name: "Skills", exact: true })
+    page.getByRole("list", { name: "Skills", exact: true })
   ).toBeVisible()
   await expect(
     page.getByText("Find availability", { exact: true })
@@ -495,6 +495,69 @@ test("connected connectors open capability details and the update page is bundle
   await update.close()
 })
 
+test("Calendar recovery is clear, compact and usable at 320px", async () => {
+  control.calendarSelection = ["primary", "holiday"]
+  await page.reload()
+  await page.setViewportSize({ width: 380, height: 820 })
+  await page.getByLabel("Your request").fill("am i free on the tuesday")
+  await page.getByLabel("Your request").press("Enter")
+  await page
+    .getByRole("button", { name: "Review calendars", exact: true })
+    .click()
+  await expect(
+    page.getByText("Some calendars couldn't be checked")
+  ).toBeVisible()
+  await expect(
+    page.getByLabel("Holidays in India", { exact: true })
+  ).toBeChecked()
+  await expect(
+    page.getByRole("list", { name: "Skills" }).locator("li")
+  ).toHaveCount(3)
+  await expect(page.getByText("Threadly server", { exact: true })).toHaveCount(
+    0
+  )
+  await page.screenshot({
+    path: path.join("test-results", "calendar-connection-light.png")
+  })
+  await page.setViewportSize({ width: 320, height: 740 })
+  expect(
+    await page
+      .locator(".settings")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth)
+  ).toBe(true)
+  await page.screenshot({
+    path: path.join("test-results", "calendar-connection-narrow.png")
+  })
+  await page.getByLabel("Holidays in India", { exact: true }).uncheck()
+  await page.getByRole("button", { name: "Save changes" }).click()
+  await expect(page.getByText("All selected calendars checked")).toBeVisible()
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click()
+  control.calendarPreferencesStale = true
+  await page.reload()
+  await page
+    .getByRole("button", { name: "Review calendars", exact: true })
+    .last()
+    .click()
+  await expect(page.locator(".calendar-notice")).toBeVisible()
+  await page.getByRole("button", { name: "Save changes" }).click()
+  await expect(page.getByText("All selected calendars checked")).toBeVisible()
+  // The real theme toggle is covered in the suite; set the same saved preference
+  // here so both versions of this screen get a screenshot without extra menu state.
+  await page.evaluate(() => chrome.storage.local.set({ darkMode: true }))
+  await page.reload()
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Manage Google Calendar" }).click()
+  await expect(page.getByText("All selected calendars checked")).toBeVisible()
+  await page.setViewportSize({ width: 380, height: 820 })
+  await page.screenshot({
+    path: path.join("test-results", "calendar-connection-dark.png")
+  })
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click()
+  await page.evaluate(() => chrome.storage.local.set({ darkMode: false }))
+})
+
 test("settings use real capability and versioned preference contracts; history survives panel reload", async () => {
   await page.reload()
   await page.setViewportSize({ width: 360, height: 900 })
@@ -521,13 +584,8 @@ test("settings use real capability and versioned preference contracts; history s
   await page.getByRole("button", { name: "Account menu" }).click()
   await page.getByRole("button", { name: "Settings", exact: true }).click()
   await page.getByRole("button", { name: "Manage Google Calendar" }).click()
-  await page.getByRole("tab", { name: "Manage connection" }).click()
-  await page
-    .getByRole("button", { name: "Load calendars and preferences" })
-    .click()
-  await page
-    .getByRole("heading", { name: "See upcoming events" })
-    .scrollIntoViewIfNeeded()
+  await expect(page.getByText("All selected calendars checked")).toBeVisible()
+  await page.locator(".working-hours > summary").click()
   expect(
     await page
       .locator(".threadly")
@@ -536,10 +594,9 @@ test("settings use real capability and versioned preference contracts; history s
   await expect(page.getByLabel("Timezone", { exact: true })).toHaveValue(
     "Australia/Melbourne"
   )
-  await page
-    .getByRole("button", { name: "Save scheduling preferences" })
-    .click()
-  await expect(page.getByText(/Scheduling preferences saved/)).toBeVisible()
+  await page.getByLabel("Timezone", { exact: true }).fill("UTC")
+  await page.getByRole("button", { name: "Save changes" }).click()
+  await expect(page.getByText(/Calendar settings saved/)).toBeVisible()
   expect(
     calls.find((c) => c.path === "/calendar/preferences" && c.body)?.body
       .expected_version

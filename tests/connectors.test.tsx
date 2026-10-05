@@ -50,32 +50,20 @@ it("makes both connected and disconnected rows manageable", () => {
   )
   expect(select.mock.calls).toEqual([["gmail"], ["calendar"]])
 })
-it("shows scope and backend limits, with keyboard-accessible management tabs", () => {
+it("shows compact skills and puts Calendar preferences directly on the page", () => {
   render(<ConnectorDetails {...props} id="calendar" />)
-  expect(
-    within(screen.getByText("Find free times").closest("li")!).getByText(
-      "Available"
-    )
-  ).toBeTruthy()
-  expect(
-    within(screen.getByText("Search events").closest("li")!).getByText(
-      "Permission needed"
-    )
-  ).toBeTruthy()
-  expect(
-    within(
-      screen.getByText("Create an approved event").closest("li")!
-    ).getByText("Not available")
-  ).toBeTruthy()
-  fireEvent.keyDown(screen.getByRole("tab", { name: "Capabilities" }), {
-    key: "ArrowRight"
-  })
-  expect(
-    screen
-      .getByRole("tab", { name: "Manage connection" })
-      .getAttribute("aria-selected")
-  ).toBe("true")
+  const skills = screen.getByRole("list", { name: "Skills" })
+  expect(within(skills).getAllByRole("listitem")).toHaveLength(3)
+  expect(screen.queryByText("Available")).toBeNull()
+  expect(screen.getByText("Find availability").closest("li")!.title).toBe(
+    "Available"
+  )
+  expect(screen.getByText("Review agenda").closest("li")!.title).toBe(
+    "Permission needed"
+  )
+  expect(screen.queryByRole("tablist")).toBeNull()
   expect(screen.getByText("Calendar preferences")).toBeTruthy()
+  fireEvent.click(screen.getByText("Account & permissions"))
   expect(
     screen.queryByRole("button", { name: "Allow booking after review" })
   ).toBeNull()
@@ -89,7 +77,7 @@ it("shows scope and backend limits, with keyboard-accessible management tabs", (
 it("requires shared-account confirmation and preserves visible errors on disconnect failure", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
   render(<ConnectorDetails {...props} id="gmail" />)
-  fireEvent.click(screen.getByRole("tab", { name: "Manage connection" }))
+  fireEvent.click(screen.getByText("Account & permissions"))
   const disconnect = screen.getByRole("button", {
     name: "Disconnect Google account"
   })

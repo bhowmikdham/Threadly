@@ -67,64 +67,21 @@ export function ConnectorList({
 }
 
 type Feature = { name: string; requires: string[]; preferences?: boolean }
-const mail = ["gmail_read"],
-  calendar = ["calendar_read", "calendar_list"],
-  events = [...calendar, "calendar_events_read"]
-const catalog: Record<
-  ConnectorId,
-  {
-    description: string
-    skills: Feature[]
-    tools: Feature[]
-    sources: Feature[]
-  }
-> = {
-  gmail: {
-    description:
-      "Find messages, understand a thread and prepare a reply beside your inbox.",
-    skills: ["Search your mail", "Summarise a thread", "Draft a reply"].map(
-      (name) => ({ name, requires: mail })
-    ),
-    tools: [
-      { name: "Search emails", requires: mail },
-      { name: "Read email threads", requires: mail },
-      { name: "Send an approved email", requires: ["gmail_send"] }
-    ],
-    sources: ["Emails", "Email threads"].map((name) => ({
-      name,
-      requires: mail
-    }))
-  },
-  calendar: {
-    description:
-      "Check your schedule and find times that fit your selected calendars and working hours.",
-    skills: [
-      { name: "Find availability", requires: calendar, preferences: true },
-      { name: "Review your agenda", requires: events, preferences: true },
-      {
-        name: "Prepare a meeting proposal",
-        requires: calendar,
-        preferences: true
-      }
-    ],
-    tools: [
-      { name: "List calendars", requires: ["calendar_list"] },
-      { name: "Check busy times", requires: calendar, preferences: true },
-      { name: "Find free times", requires: calendar, preferences: true },
-      { name: "Search events", requires: events, preferences: true },
-      {
-        name: "Read a day or week of events",
-        requires: events,
-        preferences: true
-      },
-      { name: "Create an approved event", requires: ["calendar_write"] }
-    ],
-    sources: [
-      { name: "Calendars", requires: ["calendar_list"] },
-      { name: "Busy times", requires: calendar },
-      { name: "Events", requires: events }
-    ]
-  }
+const calendar = ["calendar_read", "calendar_list"]
+const skills: Record<ConnectorId, Feature[]> = {
+  gmail: ["Search mail", "Summarise threads", "Draft replies"].map((name) => ({
+    name,
+    requires: ["gmail_read"]
+  })),
+  calendar: [
+    { name: "Find availability", requires: calendar, preferences: true },
+    {
+      name: "Review agenda",
+      requires: [...calendar, "calendar_events_read"],
+      preferences: true
+    },
+    { name: "Plan meetings", requires: calendar, preferences: true }
+  ]
 }
 export function featureStatus(
   feature: Feature,
@@ -139,14 +96,13 @@ export function featureStatus(
       (c) =>
         !c ||
         c.enabled === false ||
-        c.status === "disabled" ||
-        c.status === "not_implemented"
+        ["disabled", "not_implemented"].includes(c.status)
     )
   )
     return "Not available"
   if (!required.every((c) => c?.ready)) return "Permission needed"
   if (feature.preferences && preferences !== "ready")
-    return "Finish calendar setup"
+    return "Review calendar settings"
   return "Available"
 }
 export function ConnectorDetails({
@@ -166,11 +122,10 @@ export function ConnectorDetails({
   onPreferences: (value: any | null) => void
   onBack: () => void
 }) {
-  const [tab, setTab] = useState<"capabilities" | "manage">("capabilities")
-  const [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("")
-  const info = catalog[id],
-    ready = connectorReady(id, capabilities)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState("")
+  const [revision, setRevision] = useState(0)
+  const ready = connectorReady(id, capabilities)
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
     setMessage("")
@@ -186,39 +141,22 @@ export function ConnectorDetails({
     run(async () => {
       await bridge({ type: "LOGIN", capabilities: [capability] })
       await onAuth()
+      setRevision((value) => value + 1)
       setMessage("Connection refreshed.")
     })
-  const group = (title: string, features: Feature[]) => (
-    <section className="connector-section">
-      <h3>{title}</h3>
-      <ul className="capability-chips">
-        {features.map((feature) => {
-          const status = featureStatus(feature, capabilities, preferencesState)
-          return (
-            <li
-              key={feature.name}
-              className={status === "Available" ? "available" : "unavailable"}>
-              <span>{feature.name}</span>
-              <small>{status}</small>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
-  )
   return (
     <section
       className="connector-detail"
       aria-label={`${connectorNames[id]} connector`}>
       <button className="connector-back" onClick={onBack}>
-        ‹ All connectors
+        ‹ Connections
       </button>
       <div className="connector-detail-heading">
         <span className="connector-icon">
           {id === "gmail" ? (
-            <GmailIcon size={27} />
+            <GmailIcon size={24} />
           ) : (
-            <GoogleCalendarIcon size={27} />
+            <GoogleCalendarIcon size={24} />
           )}
         </span>
         <div>
@@ -226,170 +164,123 @@ export function ConnectorDetails({
           <p className="muted">{user.email}</p>
         </div>
       </div>
-      <p>{info.description}</p>
       <p className={`connector-status${ready ? " is-on" : ""}`}>
         {ready ? "Connected" : "Not connected"}
       </p>
-      <div
-        className="connector-tabs"
-        role="tablist"
-        aria-label="Connector details">
-        {(["capabilities", "manage"] as const).map((value) => (
+      <ul className="capability-chips" aria-label="Skills">
+        {skills[id].map((feature) => {
+          const status = featureStatus(feature, capabilities, preferencesState)
+          return (
+            <li
+              key={feature.name}
+              className={status === "Available" ? "available" : "unavailable"}
+              title={status}>
+              <span>{feature.name}</span>
+              {status !== "Available" && (
+                <span className="skill-status" aria-label={status}>
+                  ·
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      {id === "calendar" ? (
+        <CalendarSetup
+          key={revision}
+          capabilities={capabilities}
+          preferencesState={preferencesState}
+          onAuth={onAuth}
+          onPreferences={onPreferences}
+        />
+      ) : (
+        <p className="connector-description">
+          Find messages, understand a thread, and prepare a reply.
+        </p>
+      )}
+      <details className="connection-disclosure">
+        <summary>Account & permissions</summary>
+        <p className="muted">
+          Access granted to Threadly by this Google account.
+        </p>
+        <div className="connection-actions">
           <button
-            key={value}
-            role="tab"
-            id={`connector-tab-${value}`}
-            aria-controls={`connector-panel-${value}`}
-            aria-selected={tab === value}
-            tabIndex={tab === value ? 0 : -1}
-            onClick={() => setTab(value)}
-            onKeyDown={(event) => {
-              if (
-                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
-              )
-                return
-              event.preventDefault()
-              const next =
-                event.key === "Home"
-                  ? "capabilities"
-                  : event.key === "End"
-                    ? "manage"
-                    : value === "manage"
-                      ? "capabilities"
-                      : "manage"
-              setTab(next)
-              document.getElementById(`connector-tab-${next}`)?.focus()
-            }}>
-            {value === "capabilities" ? "Capabilities" : "Manage connection"}
+            disabled={busy}
+            onClick={() =>
+              void reconnect(id === "gmail" ? "gmail_read" : "calendar_read")
+            }>
+            {ready ? "Reconnect" : "Connect"} {connectorNames[id]}
           </button>
-        ))}
-      </div>
-      <div
-        role="tabpanel"
-        id={`connector-panel-${tab}`}
-        aria-labelledby={`connector-tab-${tab}`}>
-        {tab === "capabilities" ? (
-          <>
-            {group("Skills", info.skills)}
-            {group("Tools", info.tools)}
-            {group("Data sources", info.sources)}
-            {id === "calendar" && (
-              <p className="muted">
-                Event editing, deletion, RSVP, shared free-time searches and
-                room booking are not available yet.
-              </p>
-            )}
-            <section className="connector-section">
-              <h3>Privacy and control</h3>
-              <p>
-                Threadly uses the Google access you grant to answer your
-                requests. Sending mail and creating events require a separate
-                permission and your review.
-              </p>
-              <p className="muted">
-                Status reflects stored permissions, not a live Google connection
-                test.
-              </p>
-              <a
-                href="https://threadly.au/privacy/"
-                target="_blank"
-                rel="noreferrer">
-                Read the privacy information
-              </a>
-            </section>
-          </>
-        ) : (
-          <>
-            <section className="connector-section">
-              <h3>Connection</h3>
-              <div className="button-row">
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void reconnect(
-                      id === "gmail" ? "gmail_read" : "calendar_read"
-                    )
-                  }>
-                  {ready ? "Reconnect" : "Connect"} {connectorNames[id]}
-                </button>
-                <button disabled={busy} onClick={() => void run(onAuth)}>
-                  Refresh status
-                </button>
-              </div>
-              {id === "calendar" &&
-                !capabilities.some(
-                  (c) => c.id === "calendar_events_read" && c.ready
-                ) && (
-                  <button
-                    disabled={busy}
-                    onClick={() => void reconnect("calendar_events_read")}>
-                    Allow event details
-                  </button>
-                )}
-              {capabilities
-                .filter(
-                  (c) =>
-                    c.id ===
-                      (id === "gmail" ? "gmail_send" : "calendar_write") &&
-                    c.enabled &&
-                    !c.ready
-                )
-                .map((c) => (
-                  <button
-                    key={c.id}
-                    disabled={busy}
-                    onClick={() => void reconnect(c.id)}>
-                    {id === "gmail"
-                      ? "Allow sending after review"
-                      : "Allow booking after review"}
-                  </button>
-                ))}
-            </section>
-            {id === "calendar" && (
-              <CalendarSetup
-                capabilities={capabilities}
-                preferencesState={preferencesState}
-                onAuth={onAuth}
-                onPreferences={onPreferences}
-              />
-            )}
-            <section className="connector-section">
-              <h3>Google account access</h3>
-              <p>
-                Gmail and Calendar share this Google account. Disconnecting
-                stops both connectors in Threadly and signs you out.
-              </p>
+          {id === "calendar" &&
+            !capabilities.some(
+              (c) => c.id === "calendar_events_read" && c.ready
+            ) && (
               <button
-                className="connector-disconnect"
                 disabled={busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Disconnect your Google account from Threadly? This stops both Gmail and Calendar access and signs you out."
-                    )
-                  )
-                    void run(async () => {
-                      await bridge({ type: "DISCONNECT_GOOGLE" })
-                      await onAuth()
-                    })
-                }}>
-                Disconnect Google account
+                onClick={() => void reconnect("calendar_events_read")}>
+                Allow event details
               </button>
-              <p className="muted">
-                To remove Google's permission grant too, use{" "}
-                <a
-                  href="https://myaccount.google.com/connections"
-                  target="_blank"
-                  rel="noreferrer">
-                  Google account connections
-                </a>
-                .
-              </p>
-            </section>
-          </>
-        )}
-        {message && <p role="status">{message}</p>}
-      </div>
+            )}
+          {capabilities
+            .filter(
+              (c) =>
+                c.id === (id === "gmail" ? "gmail_send" : "calendar_write") &&
+                c.enabled &&
+                !c.ready
+            )
+            .map((c) => (
+              <button
+                key={c.id}
+                disabled={busy}
+                onClick={() => void reconnect(c.id)}>
+                {id === "gmail"
+                  ? "Allow sending after review"
+                  : "Allow booking after review"}
+              </button>
+            ))}
+        </div>
+        <p className="muted">
+          Sending mail and booking meetings require your review.
+        </p>
+        <p className="muted">
+          Disconnecting signs you out of Threadly and disconnects both Gmail and
+          Calendar.
+        </p>
+        <button
+          className="connector-disconnect"
+          disabled={busy}
+          onClick={() => {
+            if (
+              window.confirm(
+                "Disconnect your Google account from Threadly? This stops both Gmail and Calendar access and signs you out."
+              )
+            )
+              void run(async () => {
+                await bridge({ type: "DISCONNECT_GOOGLE" })
+                await onAuth()
+              })
+          }}>
+          Disconnect Google account
+        </button>
+        <p className="muted">
+          <a
+            href="https://myaccount.google.com/connections"
+            target="_blank"
+            rel="noreferrer">
+            Manage access at Google ↗
+          </a>
+        </p>
+      </details>
+      <p className="connection-privacy">
+        <a href="https://threadly.au/privacy/" target="_blank" rel="noreferrer">
+          Privacy
+        </a>
+      </p>
+      {message && (
+        <p role="status" className="setup-message">
+          {message}
+        </p>
+      )}
     </section>
   )
 }

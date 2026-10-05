@@ -1,6 +1,6 @@
 # Extension distribution and updates
 
-## Current state (0.2.0)
+## Current state (0.2.1)
 
 The public API is `https://api.threadly.au`. A store-ready build can be prepared,
 but no Chrome Web Store or Edge Add-ons publisher account or listing is configured.
@@ -71,3 +71,29 @@ References: [Chrome distribution](https://developer.chrome.com/docs/extensions/h
   deliberately skipped in the localhost suite and executed against its own build.
 - Screens inspected at narrow panel width and full update-page width. No real
   mail send, event creation, Google revocation or store submission was performed.
+
+## Calendar connection refresh — local preview, 5 October 2026
+
+Branch `codex/calendar-settings-refresh-ui` replaces the capability/manage tabs with
+one focused connection page: three compact skill pills, automatically loaded calendar
+choices, live free/busy diagnostics, expandable working hours, agenda and account controls.
+Server troubleshooting is outside connector details. Failed or disappeared selections
+remain visible and removable; no calendar is silently excluded. A save rechecks the
+explicit selection. A concurrent settings edit requires reloading instead of overwriting.
+
+The client understands `needs_review` after reconnect, preserves returned recovery codes,
+and offers “Review calendars” from incomplete day answers and settings errors. Reopening
+history retains that action when the paired backend includes the history error code.
+Pair with backend branch `codex/calendar-read-recovery`, commit `58b07c3`.
+
+Verification: TypeScript passed; 122 unit tests passed; 14 built-extension browser tests
+passed. The final visual refinement was rechecked with the Calendar browser case at 320px,
+380px and in dark mode. The separate pinned-HTTPS browser test passed. Production build
+and packaging passed. Screenshots use synthetic account/calendar data. The ZIP is a local
+0.2.0 preview, not a new store release; no version notice or publication is claimed.
+Live Google and backend deployment were not performed. A website ZIP does not update an
+installed unpacked extension; load the reviewed package explicitly when releasing it.
+
+Version 0.2.1 packages the Calendar refresh after explicit deployment authorization.
+The installed developer bundle and website download are updated separately from the
+backend; existing store publication remains unconfigured.

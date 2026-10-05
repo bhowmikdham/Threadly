@@ -34,6 +34,7 @@ it("re-grants the pinned server after browser permission is removed", async () =
     />
   )
 
+  fireEvent.click(screen.getByText("Troubleshooting"))
   fireEvent.click(screen.getByRole("button", { name: "Reconnect server" }))
   await waitFor(() => expect(onAuth).toHaveBeenCalledOnce())
   expect(chrome.permissions.request).toHaveBeenCalledWith({
