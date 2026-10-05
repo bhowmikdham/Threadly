@@ -2212,6 +2212,41 @@ summary:focus-visible {
 .voice-transcript span {
   color: var(--muted);
 }
+/* Docked: once Threadly starts speaking, the overlay shrinks to the top of the
+   panel and the orb glides up with it. The real chat shows underneath (the
+   reply and any cards exactly as when typing) and stays after the speech. */
+.voice-overlay {
+  inset: 0 0 auto 0;
+  height: 100%;
+  transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.voice-orb {
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.voice-overlay.docked {
+  height: 184px;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px 24px 20px;
+  /* Solid, with a clear rule underneath that separates the orb from the chat. */
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 6px 16px -10px #00000040;
+  pointer-events: none;
+  animation: none;
+}
+.voice-overlay.docked .voice-close {
+  pointer-events: auto;
+}
+.docked .voice-orb {
+  width: 100px;
+}
+.docked .voice-status {
+  margin-top: 0;
+}
+.threadly.voice-docked .conversation {
+  padding-top: 130px;
+}
 @keyframes voice-in {
   from {
     opacity: 0;
@@ -2219,57 +2254,14 @@ summary:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .voice-overlay {
+  .voice-overlay,
+  .voice-orb {
     animation: none;
+    transition: none;
   }
 }
 
-/* Quiet connection settings, sized for the extension panel. */
-.settings {
-  --bg: #fff;
-  --surface: #fff;
-  --soft: #f5f5f5;
-  --border: #e5e5e5;
-  --text: #202020;
-  --muted: #6b6b6b;
-  --hover: #f0f0f0;
-  --accent: #242424;
-  background: var(--bg);
-  color: var(--text);
-  padding: 18px 20px 28px;
-}
-.dark .settings {
-  --bg: #212121;
-  --surface: #212121;
-  --soft: #2b2b2b;
-  --border: #3a3a3a;
-  --text: #ececec;
-  --muted: #aaa;
-  --hover: #303030;
-  --accent: #ececec;
-}
-.settings > .card-heading {
-  margin-bottom: 12px;
-}
-.settings > .card-heading h2 {
-  font-size: 16px;
-  font-weight: 600;
-}
-.settings > .card-heading button,
-.connector-back,
-.quiet-button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-}
-.settings button,
-.connection-disclosure > summary {
-  min-height: 40px;
-}
-.settings :focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
-}
+/* Connector catalogue and account controls. */
 .connector-row {
   display: flex;
   align-items: center;
@@ -2292,260 +2284,87 @@ summary:focus-visible {
 }
 .connector-detail-heading {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  margin: 16px 0 8px;
+  margin: 20px 0 10px;
 }
-.connector-detail-heading > div {
-  min-width: 0;
-}
-.connector-detail-heading h2 {
-  font-size: 20px;
-  letter-spacing: -0.5px;
-  font-weight: 600;
-  margin: 0 0 4px;
+.connector-detail-heading h2,
+.connector-detail-heading p {
+  margin: 3px 0;
 }
 .connector-detail-heading p {
-  margin: 0;
   overflow-wrap: anywhere;
 }
 .connector-detail-heading .connector-icon {
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: 0;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
 }
 .connector-back {
+  border: 0;
+  background: transparent;
   padding-left: 0;
-  font-size: 12px;
+  color: var(--muted);
 }
-.connector-detail > .connector-status {
-  margin: 2px 0 16px 52px;
+.connector-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 20px 0;
 }
-.connector-status.is-on::before {
-  box-shadow: none;
+.connector-tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  padding: 12px 6px;
+}
+.connector-tabs button[aria-selected="true"] {
+  background: var(--soft);
+  box-shadow: inset 0 -2px var(--accent, #8d7ea1);
+}
+.connector-section {
+  margin: 24px 0;
+}
+.connector-section h3 {
+  margin-bottom: 12px;
+}
+.connector-section p {
+  font-size: 13px;
+}
+.connector-section a {
+  color: inherit;
+  text-underline-offset: 3px;
 }
 .capability-chips {
+  padding: 0;
+  margin: 0;
+  list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 0;
-  margin: 0 0 24px;
-  list-style: none;
+  gap: 8px;
 }
 .capability-chips li {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 10px;
+  border-radius: 14px;
+  padding: 8px 11px;
   max-width: 100%;
-  font-size: 11px;
-  line-height: 1.4;
-  background: var(--soft);
 }
-.capability-chips .unavailable {
-  color: var(--muted);
-  background: transparent;
-}
-.skill-status {
-  font-weight: 700;
-}
-.connector-description {
-  font-size: 13px;
-  color: var(--muted);
-}
-.connection-disclosure {
-  border-top: 1px solid var(--border);
-  padding: 4px 0;
-}
-.connection-disclosure > summary {
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 12px 0;
-}
-.connection-disclosure > summary > span {
+.capability-chips small {
   display: block;
+  font-size: 10px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 400;
-  margin: 4px 0 0 15px;
-  overflow-wrap: anywhere;
+  margin-top: 3px;
 }
-.connection-disclosure p {
-  font-size: 12px;
-}
-.connection-actions {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
-  justify-items: start;
+.capability-chips .available small {
+  color: var(--success, #278965);
 }
 .connector-disconnect {
   color: var(--danger, #b74c4c);
 }
-.connection-privacy {
-  margin-top: 20px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.connector-detail a {
-  color: inherit;
-  text-underline-offset: 3px;
-}
-.calendar-setup {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-}
-.calendar-preferences {
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.calendar-preferences fieldset {
-  padding: 0;
-  margin: 0;
-  border: 0;
-}
-.calendar-preferences legend {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 0;
-  margin-bottom: 8px;
-}
-.calendar-preferences fieldset > .muted {
-  font-size: 12px;
-  line-height: 1.5;
-  margin: 0 0 12px;
-}
-.calendar-choices {
-  margin-bottom: 16px;
-}
-.calendar-choice {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  margin: 0;
-  padding: 10px 0;
-  font-size: 13px;
-  cursor: pointer;
-}
-.calendar-choice > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.calendar-choice small {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.5;
-}
-.calendar-choice input {
-  height: 16px;
-  margin: 0;
-  accent-color: var(--text);
-}
-.calendar-health {
-  margin: 0 0 18px;
-  font-size: 12px;
-}
-.calendar-health small {
-  font-size: 11px;
-  margin-top: 5px;
-  line-height: 1.5;
-}
-.calendar-notice {
-  padding: 12px;
-  background: var(--soft);
-  border-radius: 10px;
-  font-size: 12px;
-  line-height: 1.6;
-  margin: 0 0 18px;
-}
-.calendar-save-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 12px 0 18px;
-}
-.calendar-save-row > .muted {
-  flex: 1;
-}
-.calendar-save-row button {
-  font-size: 12px;
-  border-radius: 999px;
-  padding: 10px 16px;
-}
-.calendar-preferences .working-day {
-  display: flex;
+.connector-detail .button-row {
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-}
-.working-day > label {
-  min-width: 90px;
-  flex: 1;
-}
-.working-times {
-  width: 190px;
-  max-width: 100%;
-  padding: 0;
-}
-.working-times label {
-  font-size: 10px;
-}
-.calendar-preferences .working-times input {
-  padding: 8px 4px;
-}
-.calendar-agenda {
-  padding: 4px 0 12px;
-  margin: 0;
-  border: 0;
-}
-.calendar-agenda h4 {
-  display: none;
-}
-.agenda-results {
-  border: 0;
-  padding: 0;
-  background: transparent;
-}
-.setup-message {
-  color: var(--muted);
-  font-size: 12px;
-}
-.calendar-recovery {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  margin-top: 10px;
-}
-.calendar-recovery button {
-  align-self: flex-start;
-  border-radius: 999px;
-  font-size: 12px;
-}
-@media (max-width: 360px) {
-  .settings {
-    padding: 14px 16px 24px;
-  }
-  .connector-detail-heading h2 {
-    font-size: 18px;
-  }
-  .capability-chips {
-    gap: 5px;
-  }
-  .capability-chips li {
-    font-size: 10.5px;
-    padding: 5px 8px;
-  }
+  margin-bottom: 12px;
 }
 
 .update-page {
