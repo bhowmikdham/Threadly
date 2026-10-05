@@ -75,7 +75,7 @@ class MoreMail(StrictModel):
 
 class ReadEmail(StrictModel):
     reference: str = Field(min_length=1, max_length=40)
-    scope: Literal["selected_message", "visible_thread"] = "selected_message"
+    scope: Literal["selected_message", "visible_thread", "thread"] = "thread"
 
 
 class ReadSearchResults(StrictModel):
@@ -115,10 +115,23 @@ class PrepareWorkflow(StrictModel):
     intent: Literal["summarise", "reply", "compose", "plan_schedule", "other"]
     reference: str | None = Field(default=None, max_length=40)
     compound: bool = False
-    source_scope: Literal["selected_message", "visible_thread"] = "selected_message"
+    source_scope: Literal["selected_message", "visible_thread", "thread"] = "thread"
+    context_references: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(
+        default_factory=list, max_length=4
+    )
     to_refs: list[str] = Field(default_factory=list, max_length=20)
     cc_refs: list[str] = Field(default_factory=list, max_length=20)
     bcc_refs: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def distinct_context(self):
+        if len(set(self.context_references)) != len(self.context_references):
+            raise ValueError("Use distinct supporting references")
+        if self.reference in self.context_references or (
+            self.context_references and not self.reference
+        ):
+            raise ValueError("Keep the primary reference separate from supporting context")
+        return self
 
 
 class AnswerQuestion(StrictModel):
@@ -167,6 +180,7 @@ TOOLS = {
             "Read a selected source or a returned mail reference before answering "
             "about it or preparing a workflow. A selected_message read returns one "
             "selected or searched email; visible_thread reads the owned pinned capture. "
+            "The default thread scope reads the provider thread, including collapsed messages. "
             "Only backend-issued references are valid."
         ),
     ),
@@ -217,9 +231,12 @@ TOOLS = {
             "Simple free-slot reads use find_free_times without a proposal. "
             "For a simple whole-day availability question use check_day_availability. "
             "Use find_free_times for 'Find me three free slots tomorrow for a meeting'. "
-            "The default selected_message source_scope binds one email; "
+            "The default thread source_scope includes the provider conversation history. "
+            "selected_message deliberately binds one email; "
             "visible_thread is only for an explicitly requested workflow over the "
-            "owned pinned capture and requires a matching read. Use compound=true "
+            "owned pinned capture and requires a matching read. Add up to four already-read "
+            "context_references as supporting evidence; these cannot change the reply target. "
+            "Use compound=true "
             "for multiple dependent operations. Never "
             "sends mail or books events. Terminal for this turn; execution status "
             "arrives later."

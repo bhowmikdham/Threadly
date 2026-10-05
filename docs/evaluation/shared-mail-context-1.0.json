@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "mode": "deterministic_synthetic_replay",
+  "live_model_run": false,
+  "live_gmail_run": false,
+  "conversation_assets": {
+    "release": "contextual-conversation-1.6.0",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.0.0",
+    "prompt_hash": "deb540dd358627a366195f068d104166564b36ffa89c869fc6e5f36688556152",
+    "tools_hash": "f52be1f3c248b39e35ed40ebcb51d5a957c37994742153c93f2c50c6d84683d5",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120
+  },
+  "context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "context_prompt": "Use the supplied email context plan across all its thread groups.\nReconcile earlier requests, the owner's responses and later acknowledgements in order.\nDo not describe a multi-message thread as a single message. Supporting threads supply\nfacts only; they do not change the reply target, recipients or authorize actions.\nCoverage is bounded: disclose omitted/truncated messages when material to the answer.\nAttachment contents are unavailable. Prior assistant responses are not source evidence.\n",
+  "context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "replay_command": "THREADLY_REQUIRE_TEST_DB=1 THREADLY_TEST_DB=<isolated-postgresql-dsn> python -m pytest tests/test_shared_mail_context.py -q",
+  "case_source": "backend/tests/test_shared_mail_context.py",
+  "cases": [
+    "Default provider thread versus explicit selected-message scope",
+    "Collapsed verification request, sent response and acknowledgment reach summary worker",
+    "Multi-thread reply and compose use all evidence with one exact reply target",
+    "Unread supporting reference rejected before workflow creation",
+    "Secondary source change rejected at hydration and before publication",
+    "Cross-owner plan rejected before provider access",
+    "Long recent mail cannot starve earlier evidence; sample keeps boundaries and reply target",
+    "Unchanged primary recapture keeps its version after a plan",
+    "Retained source handles survive searches and rehydrate on later turns",
+    "Historical single-message snapshots keep identical excerpts",
+    "Duplicate cards from one thread coalesce without expanding a selected subset",
+    "Reply generation, conversational editing and outgoing preview prefetch every source",
+    "Retained UI scope preserves its subset after pin changes",
+    "A new search preserves the already-read primary plan",
+    "Supporting evidence uses its latest read scope, including deliberate narrowing after a thread read"
+  ],
+  "limitations": [
+    "No live semantic quality score",
+    "No attachment-content extraction",
+    "No deployment or real email/Calendar writes"
+  ],
+  "verification": {
+    "full_backend": {
+      "passed": 1633,
+      "failed": 0,
+      "skipped": 0
+    },
+    "final_context_regressions": {
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focused_conversation_regressions": {
+      "passed": 133,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

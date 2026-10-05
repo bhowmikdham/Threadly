@@ -35,6 +35,7 @@ async def turn(owner, request, *, factory=None, model=None):
             response = await engine.run(context, runtime, model)
         if runtime.search_page is not None:
             response["search"] = runtime.search_page
+        response.setdefault("context_references", runtime.turn_source_references)
         response["latency_ms"] = round((time.monotonic() - started) * 1000)
         async with factory.begin() as session:
             return await store.complete(session, owner, request, lease, state, response)

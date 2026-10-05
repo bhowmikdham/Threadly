@@ -1,7 +1,8 @@
 # Calendar spoken requests and interrupted-turn recovery — working checkpoint
 
-Status: implementation in progress on `codex/calendar-spoken-time`, based on deployed
-`8a9e72cc049013d5f4d8dc1ac596d2e3ed173fe5`. Draft review only. No new deployment,
+Status: integration verification in progress on `codex/calendar-spoken-time`.
+Original base `8a9e72cc049013d5f4d8dc1ac596d2e3ed173fe5`; now integrates merged
+shared-context PR #89 at `41eeaa8c7639d3a0bb60552cfac613322362d816`. Draft review only. No new deployment,
 Google consent, or real event/invitation work is part of this follow-up.
 
 ## Reproductions and causes
@@ -55,11 +56,12 @@ It does not invent an end time, widen to a whole day or claim incomplete coverag
 
 ## Version/integration notes
 
-Prompt/tool snapshot is `contextual-conversation-1.5.1`; direct creation policy is
-`direct-calendar-event-1.0.1`. Shared-mail-context draft #89 owns its combined 1.7.0
-release; merge integration must retain both historical assets and create fresh
-combined assets/evidence. Keep diffs surgical in engine, prompt, Calendar context,
-schemas/API docs; no edits to that agent's checkout.
+The original follow-up snapshot `contextual-conversation-1.5.1` is retained. The
+current combined release is `contextual-conversation-1.7.1`, preserving shared mail
+context 1.7.0 plus this Calendar follow-up. Direct creation policy is
+`direct-calendar-event-1.0.1`; timed reads are `calendar-conversation-reads-2.1.0`.
+Historical 1.5.0, 1.5.1, 1.6.0 and 1.7.0 assets remain unchanged. Combined replay and
+fresh verification are required; no edits were made to another chat's checkout.
 
 ## Prior release authorization (historical only)
 
@@ -72,7 +74,8 @@ not used as release authority. This follow-up remains draft-only.
 
 ## Verification
 
-Initial language/creation regression pass: 80 passed, no skips, disposable PostgreSQL,
-fake model/provider. Additional paraphrase, exact-time read and recovery cases are in
-progress. No live model-quality or live Google success is claimed for this follow-up.
+Initial focused language/creation/read/follow-up/recovery pass: 196 passed, no skips,
+disposable PostgreSQL, fake model/provider. The old-base full run was deliberately
+interrupted after #89 merged; it is not counted as a complete pass. A fresh combined
+run and the final status-supersession regressions are in progress. No live model-quality or live Google success is claimed for this follow-up.
 A separate human-created canonical-order event was reported verified; it is untouched.

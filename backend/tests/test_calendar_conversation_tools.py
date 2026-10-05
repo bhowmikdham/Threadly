@@ -381,6 +381,8 @@ def test_search_service_rechecks_owner_and_preferences_after_google(db_sessionma
     [
         ("calendar-agent-tools/replay-v4.json", "contextual-conversation-1.5.0"),
         ("calendar-event-language/replay-v1.json", "contextual-conversation-1.5.1"),
+        ("calendar-agent-tools/replay-mail-context-v2.json", "contextual-conversation-1.7.0"),
+        ("calendar-event-language/replay-v2.json", "contextual-conversation-1.7.1"),
     ],
 )
 async def test_versioned_tool_replay_cases(read_provider, monkeypatch, fixture_path, release):
@@ -524,7 +526,7 @@ def test_committed_release_matches_current_prompt_and_tools():
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
     saved = json.loads(
-        (root.parent / "calendar-event-language/contextual-conversation-1.5.1.json").read_text()
+        (root.parent / "calendar-event-language/contextual-conversation-1.7.1.json").read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())

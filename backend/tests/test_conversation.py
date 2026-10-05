@@ -915,15 +915,21 @@ async def test_source_compose_keeps_provenance_and_rejects_source_recipient(
             r,
             factory=db_sessionmaker,
             model=Model(
-                tool("read_email", reference="selected"),
-                tool("prepare_workflow", intent="compose"),
+                tool("read_email", reference="selected", scope="selected_message"),
+                tool("prepare_workflow", source_scope="selected_message", intent="compose"),
                 tool(
                     "prepare_workflow",
+                    source_scope="selected_message",
                     intent="compose",
                     reference="selected",
                     to_refs=["recipient-1"],
                 ),
-                tool("prepare_workflow", intent="compose", reference="selected"),
+                tool(
+                    "prepare_workflow",
+                    source_scope="selected_message",
+                    intent="compose",
+                    reference="selected",
+                ),
             ),
         )
 
@@ -1173,9 +1179,10 @@ async def test_search_read_then_summary_uses_reference_capture(two_message_threa
     r = request().model_copy(update={"instruction": instruction})
     model = Model(
         tool("search_mail", query="agenda"),
-        tool("read_email", reference="mail-1"),
+        tool("read_email", reference="mail-1", scope="selected_message"),
         tool(
             "prepare_workflow",
+            source_scope="selected_message",
             intent="summarise",
             reference="mail-1",
         ),
@@ -1234,8 +1241,13 @@ async def test_selected_email_summary_uses_typed_single_message_workflow(
         update={"instruction": instruction}
     )
     model = Model(
-        tool("read_email", reference="selected"),
-        tool("prepare_workflow", intent="summarise", reference="selected"),
+        tool("read_email", reference="selected", scope="selected_message"),
+        tool(
+            "prepare_workflow",
+            source_scope="selected_message",
+            intent="summarise",
+            reference="selected",
+        ),
     )
     async with source_data.source_scope():
         result = await service.turn(1, r, factory=db_sessionmaker, model=model)
@@ -1440,8 +1452,14 @@ async def test_selected_compose_cannot_expand_read_to_other_visible_email(
         update={"instruction": "Compose an email to alex@example.test about this selected email"}
     )
     model = Model(
-        tool("read_email", reference="selected"),
-        tool("prepare_workflow", intent="compose", reference="selected", to_refs=["recipient-1"]),
+        tool("read_email", reference="selected", scope="selected_message"),
+        tool(
+            "prepare_workflow",
+            source_scope="selected_message",
+            intent="compose",
+            reference="selected",
+            to_refs=["recipient-1"],
+        ),
     )
     async with source_data.source_scope():
         result = await service.turn(1, r, factory=db_sessionmaker, model=model)
