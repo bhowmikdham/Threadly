@@ -546,6 +546,7 @@ button.tp-icon:hover{background:var(--g-hover);color:var(--g-ink)}
 .install-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:40px;align-items:center}
 @media (max-width:820px){.install-grid{grid-template-columns:1fr;gap:32px}}
 .browsers{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.extension-version{font-size:13px;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .browsers span{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--rule);color:var(--ink-3)}
 .install-mark{opacity:.07;line-height:0}
 .install-mark svg{width:180px;height:180px;color:var(--ink)}
