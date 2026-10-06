@@ -415,7 +415,11 @@ read scopes only through authenticated reconnect, and requires actual list + fre
 grants. Transactions close before network calls; short final account/preferences
 locks fence publication. Saved evidence has explicit per-calendar unknown coverage,
 version checks and expiry. This service makes no calendar write; B14b1 adds the
-explicit assistant read handler described below.
+explicit assistant read handler described below. The shared provider adapter
+rounds only its outgoing freeBusy window outward to whole UTC seconds, validates
+Google's exact echoed window, then clips intervals back to the original request.
+This handles provider timestamp precision without weakening coverage validation
+or changing saved request dates, evidence bounds or event preflight semantics.
 [Calendar lifecycle, diagram and B13 handoff](calendar-reads.md).
 
 ### Deterministic Calendar slots (B13)

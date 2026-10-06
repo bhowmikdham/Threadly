@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -164,6 +164,13 @@ def normalize(body, ids, start, end):
 
 
 async def freebusy(token, ids, start, end, *, transport=None):
+    # Google echoes milliseconds, while current-time anchors include microseconds.
+    # Whole-second bounds cover the full request without depending on rounding.
+    start, end = start.astimezone(UTC), end.astimezone(UTC)
+    query_start = start.replace(microsecond=0)
+    query_end = end.replace(microsecond=0)
+    if end.microsecond:
+        query_end += timedelta(seconds=1)
     try:
         async with asyncio.timeout(15):
             body = await _request(
@@ -172,8 +179,8 @@ async def freebusy(token, ids, start, end, *, transport=None):
                 token,
                 transport=transport,
                 json={
-                    "timeMin": start.isoformat(),
-                    "timeMax": end.isoformat(),
+                    "timeMin": query_start.isoformat(),
+                    "timeMax": query_end.isoformat(),
                     "timeZone": "UTC",
                     "calendarExpansionMax": 10,
                     "items": [{"id": cid} for cid in ids],
@@ -181,7 +188,17 @@ async def freebusy(token, ids, start, end, *, transport=None):
             )
     except TimeoutError:
         raise ApiError(503, "calendar_unavailable", "Google Calendar is unavailable.") from None
-    return normalize(body, ids, start, end)
+    # Validate the exact transmitted window; never accept a shifted/narrower echo.
+    result = normalize(body, ids, query_start, query_end)
+    for calendar in result:
+        calendar.busy = [
+            interval.model_copy(update={
+                "start": max(interval.start, start), "end": min(interval.end, end),
+            })
+            for interval in calendar.busy
+            if interval.start < end and interval.end > start
+        ]
+    return result
 
 
 def _agenda_event(row, fallback_zone=None):
