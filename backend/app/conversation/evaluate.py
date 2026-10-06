@@ -2,12 +2,14 @@
 
 import argparse
 import asyncio
+import calendar
 import json
 import re
 import sys
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from app.assistant import inbox_chat
 from app.assistant.summary import digest
@@ -23,6 +25,7 @@ from app.conversation.runtime import (
     validate_agenda_request,
     validate_workflow_bindings,
 )
+from app.mail.presentation import received_display
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
@@ -44,6 +47,14 @@ INBOX_MESSAGES = {
     "mail-2": "From: Casey <casey@example.test>. Subject: Project update. The draft is ready.",
 }
 CASES = [
+    {
+        "id": "latest_single_inbox_local_time",
+        "turns": ["could you check for the latest mail that I got in my inbox"],
+        "mail_listing": True,
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "forbid": ["prepare_workflow", "more_mail"],
+    },
     {
         "id": "calendar_today_agenda",
         "turns": ["What meetings are on my calendar today?"],
@@ -342,7 +353,9 @@ class FixtureRuntime:
         sources = {"mail-1": "GYG promotion: 20% off your next purchase.", "mail-2": RECEIPT}
         if self.case.get("fresh_sender") and self.search_page is not None:
             sources = {"mail-1": SENDER_MESSAGE}
-        elif self.case.get("fresh_inbox_limit") and self.search_page is not None:
+        elif (
+            self.case.get("fresh_inbox_limit") or self.case.get("mail_listing")
+        ) and self.search_page is not None:
             sources = INBOX_MESSAGES
         if self.case.get("merchant_rank_search"):
             sources = {
@@ -386,7 +399,7 @@ class FixtureRuntime:
                     "flight": None,
                 }
             ]
-        if self.case.get("fresh_inbox_limit"):
+        if self.case.get("fresh_inbox_limit") or self.case.get("mail_listing"):
             return [
                 {
                     "message_id": f"fixture-inbox-{number}",
@@ -561,7 +574,7 @@ class FixtureRuntime:
                     args.sender_email,
                     args.folder,
                     args.date_phrase,
-                    args.limit,
+                    1 if args.selection == "latest_message" else args.limit,
                 )
                 if self.case.get("fresh_sender"):
                     sender_email = self.case["fresh_sender"]
@@ -586,7 +599,10 @@ class FixtureRuntime:
                     datetime(2026, 9, 23, 12, tzinfo=UTC),
                     "Australia/Melbourne",
                 )
-                if not self.fresh_search_scope and "gyg" not in query.casefold():
+                if (
+                    not (self.fresh_search_scope or self.case.get("mail_listing"))
+                    and "gyg" not in query.casefold()
+                ):
                     raise ValueError("Only user's GYG literal is available")
                 self.search_query = query.casefold()
                 filters = InboxFilters(
@@ -597,6 +613,7 @@ class FixtureRuntime:
                     received_from=start,
                     received_before=end,
                     limit=limit,
+                    timezone="Australia/Melbourne",
                 ).model_dump(mode="json")
                 self.fresh_search_attempted = True
                 self.search_page_index = 0
@@ -613,6 +630,12 @@ class FixtureRuntime:
                 filters = self.search_page["filters"]
                 self.search_page_index += 1
             rows = self._search_rows()
+            if self.case.get("mail_listing"):
+                rows = rows[: filters["limit"]]
+            rows = [
+                {**row, **received_display(row["received_at"], "Australia/Melbourne")}
+                for row in rows
+            ]
             self.result_order.extend(row["reference"] for row in rows)
             previous_rows = (
                 self.search_page["results"] if name == "more_mail" and self.search_page else []
@@ -770,6 +793,57 @@ def _contradicts_fixture_mail_count(text, expected):
     return False
 
 
+def _mail_display_failures(text, row, timezone="Australia/Melbourne"):
+    """Grade optional arrival dates/clocks against the fixture's actual instant."""
+    local = datetime.fromisoformat(row["received_at"]).astimezone(ZoneInfo(timezone))
+    normalized = re.sub(r"\b([ap])\.m\.", r"\1m", text, flags=re.I)
+    offset_pattern = r"\b(?:UTC|GMT)\s*([+-])(\d{1,2})(?::?(\d{2}))?\b"
+    clocks_text = re.sub(offset_pattern, "", normalized)
+    clocks = list(
+        re.finditer(
+            r"\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}):(\d{2})\b",
+            clocks_text,
+            re.I,
+        )
+    )
+    failures = []
+    for match in clocks:
+        if match[3]:
+            hour = int(match[1]) % 12 + (12 if match[3].upper() == "PM" else 0)
+            minute = int(match[2] or 0)
+        else:
+            hour, minute = int(match[4]), int(match[5])
+        if (hour, minute) != (local.hour, local.minute):
+            failures.append("mail_time_mismatch")
+    if clocks and not (local.tzname() in text or timezone in text):
+        failures.append("mail_time_missing_zone")
+    if any(zone != local.tzname() for zone in re.findall(r"\b(?:AEST|AEDT)\b", text)):
+        failures.append("mail_timezone_mismatch")
+    for sign, hours, minutes in re.findall(offset_pattern, text):
+        offset = (int(hours) * 60 + int(minutes or 0)) * (-1 if sign == "-" else 1)
+        if offset != local.utcoffset().total_seconds() / 60:
+            failures.append("mail_timezone_mismatch")
+    dates = re.findall(r"\b(20\d{2})-(\d{2})-(\d{2})\b", text)
+    months = {name.casefold(): index for index, name in enumerate(calendar.month_name) if name}
+    months.update(
+        {name.casefold(): index for index, name in enumerate(calendar.month_abbr) if name}
+    )
+    month_pattern = "|".join(months)
+    for match in re.finditer(
+        rf"\b(\d{{1,2}})\s+({month_pattern})(?:\s+(20\d{{2}}))?\b|"
+        rf"\b({month_pattern})\s+(\d{{1,2}})(?:,?\s+(20\d{{2}}))?\b",
+        text,
+        re.I,
+    ):
+        if match[1]:
+            dates.append((match[3] or str(local.year), months[match[2].casefold()], match[1]))
+        else:
+            dates.append((match[6] or str(local.year), months[match[4].casefold()], match[5]))
+    if any(tuple(map(int, parts)) != (local.year, local.month, local.day) for parts in dates):
+        failures.append("mail_date_mismatch")
+    return list(dict.fromkeys(failures))
+
+
 def grade(case, response, calls, search_page=None):
     """Return deterministic failures for a synthetic behavioral replay."""
 
@@ -790,7 +864,25 @@ def grade(case, response, calls, search_page=None):
 
     case_id = case["id"]
     workflow = _workflow_input(calls)
-    if case_id == "sender_after_unrelated_search":
+    if case_id == "latest_single_inbox_local_time":
+        searches = _tool_inputs(calls, "search_mail")
+        if len(searches) != 1 or any(
+            searches[0].get(key, "") != value
+            for key, value in {
+                "query": "",
+                "sender_email": "",
+                "date_phrase": "",
+                "folder": "INBOX",
+                "selection": "latest_message",
+            }.items()
+        ):
+            failures.append("wrong_single_inbox_search")
+        if not search_page or len(search_page["results"]) != 1:
+            failures.append("single_inbox_card_count_mismatch")
+        if _contradicts_fixture_mail_count(text, 1):
+            failures.append("inbox_answer_count_mismatch")
+        failures.extend(_mail_display_failures(text, {"received_at": "2026-09-23T10:00:00Z"}))
+    elif case_id == "sender_after_unrelated_search":
         searches = _tool_inputs(calls, "search_mail")
         if (
             len(searches) != 1

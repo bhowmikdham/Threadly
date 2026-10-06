@@ -29,13 +29,18 @@ Unknown fields are rejected. The response has `release` and one of:
 
 `filters` contains `schema_version: 1.0`, literal `query` (which may be empty),
 `sender_email` (an exact address or empty), `folder` (`all_mail`, `INBOX`, `SENT`),
-UTC `received_from` / `received_before`, `limit` (1–5; the interpreter uses 5)
+UTC `received_from` / `received_before`, validated IANA `timezone` (legacy default UTC),
+`limit` (1–5; the legacy interpreter uses 5)
 and `cursor: null`. The address is a separate constraint, not part of the quoted
 search phrase. Only a user-written “from” or “sent by” address can set it.
 Each result contains `message_id`, `thread_id`, `subject`, `sender`, `received_at`,
 plain `snippet` (up to 220 characters), nullable `flight`. IDs are owned live Gmail
 references. Selecting a card calls the existing owned `/threads/{id}` endpoint;
 the frontend checks that the chosen message is still in that thread before capture.
+Results also contain `received_at_local` (ISO with offset), `received_timezone`,
+`received_at_display` (local date/time, abbreviation, IANA zone and UTC offset), and
+`timestamp_source: gmail.internalDate`. `received_at` remains the original provider
+instant. Conversation message reads expose these same additive display fields.
 
 `POST /assistant/inbox-search-page`
 
@@ -47,6 +52,8 @@ Returns the next search page. Reuse the exact returned filters. Existing cursor
 signing binds user, Google account version, query/sender/date/folder scope and
 release/page size. The filter schema accepts `limit` from 1 to 5, but pagination
 must preserve the first page's limit; changing it invalidates the cursor.
+Timezone is also bound into the signed filter scope. Pre-update cursors must restart
+their search because the new timezone field changes that scope.
 Changing filters or using another account rejects the cursor before a provider read.
 Both a Show more button and the chat phrase “show more” reuse this endpoint.
 
@@ -85,6 +92,10 @@ use the caller timezone, including daylight-saving boundaries. Maximum window is
 366 days. Unsupported date language asks a question in chat; the next request must
 include the desired search term/date together. Individual provider pages are sorted
 by received time; this is not a complete-mailbox ordering guarantee.
+Provider epoch query bounds include a one-second margin; the backend still enforces
+the exact inclusive start and exclusive end against Gmail `internalDate`. This keeps
+messages at the start boundary and in the final fractional second. `coverage.ordering`
+is `received_at_desc_within_returned_page`, and coverage remains explicitly incomplete.
 
 ## Presentation and limits
 
@@ -94,6 +105,21 @@ The parser preserves the route quote; it does not invent airports, dates, times,
 gates, flight status or a current aircraft location. Unsupported itinerary formats
 remain ordinary email cards. The short SVG animation is decorative and respects
 reduced motion. HTML from email is never rendered by these cards.
+
+Mail presentation policy `mail-presentation-1.0` cleans only transient snippets:
+bounded nested HTML entities, invisible preheader padding, bare tracking links,
+Markdown link destinations/emphasis and common footer lines. Meaningful word/emoji
+joiners remain intact. Source bodies, exact evidence quotes, message/thread IDs,
+selection/capture and Gmail data are unchanged. A snippet is not an exact-source quote.
+
+Conversation release `contextual-conversation-1.8.3` adds typed `search_mail.selection`:
+`latest_message` returns one card, and default `recent_matches` keeps the existing
+1–5 `limit`. The existing explicit numbered-Inbox guard takes priority over a
+contradictory model selection. Its prompt distinguishes a singular newest email from plural lists and
+from searches requiring candidate comparison. It tells the model to use the backend's
+local display timestamp and keep a simple listing answer concise. Interpretation is
+semantic; no new matching phrase or sender-specific routing rule is added. The legacy
+`/assistant/inbox-chat` interpreter retains its historical five-result behavior.
 
 Search/greeting turns are ephemeral conversation state. Generated artifacts and
 reviewed tasks retain their existing durable history. Arbitrary “the second one”

@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.mail import search as mail_search
+from app.mail.presentation import received_display, snippet
 from app.model_client.client import get_model_client
 from app.model_client.providers import ProviderError
 from app.model_client.structured import json_object
@@ -195,6 +196,7 @@ async def interpret(request, model=None, now=None):
                 folder=value.folder,
                 received_from=start,
                 received_before=end,
+                timezone=request.timezone,
             )
         except ValueError:
             return {
@@ -247,12 +249,15 @@ async def search(owner, filters, cursor=None):
     # The provider's plain phrase search can match To, Cc or message text. A
     # sender constraint is a separate, validated field and is enforced again
     # against the parsed From header below.
+    # Gmail's epoch operators have second precision. Widen by one second, then
+    # enforce the exact inclusive start/exclusive end locally so neither the
+    # start instant nor subsecond arrivals in the last second are lost.
     query = (
         (f'"{filters.query}" ' if filters.query else "")
         + (f"from:{filters.sender_email} " if filters.sender_email else "")
         + (
-            f"-in:spam -in:trash after:{int(filters.received_from.timestamp())} "
-            f"before:{int(filters.received_before.timestamp())}"
+            f"-in:spam -in:trash after:{int(filters.received_from.timestamp()) - 1} "
+            f"before:{int(filters.received_before.timestamp()) + 1}"
         )
     )
     if filters.folder != "all_mail":
@@ -299,7 +304,8 @@ async def search(owner, filters, cursor=None):
                     "subject": m["subject"],
                     "sender": m["from_addr"],
                     "received_at": m["received_at"],
-                    "snippet": " ".join(m["body_clean"].split())[:220],
+                    **received_display(m["received_at"], filters.timezone),
+                    "snippet": snippet(m["body_clean"]),
                     "flight": flight_preview(m["body_clean"][:12000]),
                 }
             )
@@ -307,7 +313,7 @@ async def search(owner, filters, cursor=None):
                 break
         if not next_cursor:
             break
-    rows.sort(key=lambda m: m["received_at"], reverse=True)
+    rows.sort(key=lambda m: datetime.fromisoformat(m["received_at"]), reverse=True)
     return {
         "filters": filters.model_dump(mode="json"),
         "results": rows,
@@ -318,6 +324,8 @@ async def search(owner, filters, cursor=None):
             "provider_pages_read": pages_read,
             "provider_candidates_read": candidates_read,
             "source": "live_gmail",
+            "ordering": "received_at_desc_within_returned_page",
+            "timestamp_source": "gmail.internalDate",
             "persisted": False,
         },
     }

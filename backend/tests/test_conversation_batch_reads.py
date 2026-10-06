@@ -23,7 +23,7 @@ def runtime():
         },
         "result_order": ["mail-1", "mail-2"],
     }
-    request = SimpleNamespace(instruction="Find my latest order")
+    request = SimpleNamespace(instruction="Find my latest order", timezone="Australia/Melbourne")
     return Runtime(7, request, state, factory=None)
 
 

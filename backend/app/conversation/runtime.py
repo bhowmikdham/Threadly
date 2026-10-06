@@ -21,6 +21,7 @@ from app.capabilities.service import build_capabilities
 from app.config import get_settings
 from app.conversation import calendar_context, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
+from app.mail.presentation import received_display
 from app.schemas.assistant import AssistantRequest, DraftOptions
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
 from app.schemas.continuation import TaskInputRequest
@@ -783,7 +784,7 @@ class Runtime:
                 args.sender_email,
                 args.folder,
                 args.date_phrase,
-                args.limit,
+                1 if args.selection == "latest_message" else args.limit,
             )
             if self.fresh_search_scope:
                 if self.fresh_search_scope["kind"] == "recent_inbox":
@@ -830,6 +831,7 @@ class Runtime:
                 received_from=start,
                 received_before=end,
                 limit=limit,
+                timezone=self.request.timezone,
             )
         else:
             if self.fresh_search_scope and not self.fresh_search_done:
@@ -975,6 +977,7 @@ class Runtime:
                 "sender": m["from_addr"],
                 "sent_at": m["sent_at"],
                 "received_at": m["received_at"],
+                **received_display(m["received_at"], self.request.timezone),
                 "reply_to": m["reply_metadata"].get("headers", {}).get("reply-to", []),
                 "body": captured_bodies.get(m["gmail_msg_id"], m["body_clean"][:budget]),
                 "truncated": len(m["body_clean"])
