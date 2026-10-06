@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ["infra/bedrock/**", ".github/workflows/bedrock-prototypes.yml"]
   push:
-    branches: [main, "codex/assistant-intent-routing"]
+    branches: [main, "release/website"]
     paths: ["infra/bedrock/**", ".github/workflows/bedrock-prototypes.yml"]
 
 permissions:
