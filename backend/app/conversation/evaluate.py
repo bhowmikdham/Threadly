@@ -9,12 +9,13 @@ import sys
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from app.assistant import inbox_chat
 from app.assistant.summary import digest
 from app.config import get_settings
-from app.conversation import engine
+from app.conversation import email_draft, engine
 from app.conversation.prompt import assets
 from app.conversation.runtime import (
     authoritative_user_instruction,
@@ -300,7 +301,7 @@ CASES = [
         ],
         "turns": ["nothing specific , just a basic email"],
         "kinds": ["task"],
-        "required": ["prepare_workflow"],
+        "required": ["prepare_email_draft", "prepare_workflow"],
         "forbid": ["search_mail", "read_email", "answer_question"],
     },
     {
@@ -340,9 +341,51 @@ CASES = [
     },
 ]
 
+CASES += [
+    {
+        "id": f"email_draft_missing_{number}",
+        "turns": [instruction],
+        "kinds": ["clarification"],
+        "required": ["prepare_email_draft"],
+        "forbid": ["prepare_workflow", "search_mail", "read_email"],
+        "words": ["Who’s it for", "what would you like to say"],
+    }
+    for number, instruction in enumerate(
+        [
+            "could you help me draft an email",
+            "could you help me draft an email?",
+            "could draft an email",
+            "Please compose a message for me",
+        ],
+        1,
+    )
+]
+CASES += [
+    {
+        "id": "email_draft_partial_and_repeat",
+        "turns": [
+            "Help me draft an email",
+            "Alex",
+            "could you help me draft an email?",
+            "Ask about the presentation requirements",
+        ],
+        "kinds": ["clarification", "message"],
+        "required": ["prepare_email_draft"],
+        "forbid": ["prepare_workflow", "search_mail", "read_email"],
+    },
+    {
+        "id": "email_draft_named_recipient",
+        "turns": ["Draft an email to Alex asking about the presentation requirements"],
+        "kinds": ["message"],
+        "required": ["prepare_email_draft"],
+        "forbid": ["prepare_workflow", "search_mail", "read_email"],
+        "words": ["Subject:", "Alex", "presentation"],
+    },
+]
+
 
 class FixtureRuntime:
-    def __init__(self, case, turn=""):
+    def __init__(self, case, turn="", *, draft_state=None):
         self.case, self.evidence, self.calls, self.read_scopes = case, {}, [], {}
         self.turn = turn
         self.mail_anchor = datetime.fromisoformat(case.get("now", "2026-09-23T12:00:00Z"))
@@ -350,7 +393,12 @@ class FixtureRuntime:
         self.search_page_index = -1
         self.search_query = None
         self.result_order = list(case.get("order", []))
-        history = case.get("history", [])
+        self.draft_state = (
+            draft_state
+            if draft_state is not None
+            else {"history": deepcopy(case.get("history", []))}
+        )
+        history = self.draft_state["history"]
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
         self.user_text = user_text
         self.instruction = authoritative_user_instruction(turn, history)
@@ -565,6 +613,24 @@ class FixtureRuntime:
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
+        if name == "prepare_email_draft":
+            # Run the production field/state validator; only task reservation is
+            # replaced with the fixture workflow, which cannot touch Gmail or DB.
+            runtime = SimpleNamespace(
+                request=SimpleNamespace(instruction=self.turn),
+                state=self.draft_state,
+                loaded=self.evidence,
+                authoritative_instruction=lambda: self.instruction,
+            )
+
+            async def workflow(arguments):
+                self.instruction = runtime.goal_instruction
+                self.recipient_refs = runtime.recipients
+                self.recipient_roles = runtime.recipient_roles
+                return await self.call("prepare_workflow", arguments)
+
+            runtime.workflow = workflow
+            return await email_draft.prepare(runtime, args)
         if name == "find_free_times":
             from app.calendar import conversation_tools as calendar_tools
 
@@ -1356,8 +1422,9 @@ async def evaluate(trials, *, case_delay_seconds=0):
                 await asyncio.sleep(case_delay_seconds)
             print(f"REPLAY {trial + 1} {case['id']}", file=sys.stderr, flush=True)
             history = deepcopy(case.get("history", []))
+            draft_state = {"history": history}
             for turn in case["turns"]:
-                runtime = FixtureRuntime(case, turn)
+                runtime = FixtureRuntime(case, turn, draft_state=draft_state)
                 context = {
                     "user_turn": turn,
                     "current_user_goal": (
@@ -1367,6 +1434,7 @@ async def evaluate(trials, *, case_delay_seconds=0):
                     "selected_reference": "selected" if case.get("selected") else None,
                     "displayed_result_order": runtime.result_order,
                     "active_work": None,
+                    "pending_email_draft": email_draft.model_context(draft_state),
                     "user_recipient_refs": runtime.recipient_refs,
                     "capabilities": {
                         "gmail_read": True,
@@ -1384,6 +1452,7 @@ async def evaluate(trials, *, case_delay_seconds=0):
                         {
                             "user": turn,
                             "assistant": response.get("text", ""),
+                            "kind": response.get("kind"),
                             "source": (
                                 "calendar_agenda"
                                 if any(call["name"] == "read_calendar" for call in runtime.calls)

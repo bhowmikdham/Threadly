@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from app.assistant.drafting import GeneratedDraft
 from app.mail.presentation import has_visible_text
 from app.schemas.assistant import DraftOptions, StrictModel
 from app.schemas.calendar_event import CalendarIntent, EventFieldChange
@@ -173,6 +174,13 @@ class PrepareWorkflow(StrictModel):
         return self
 
 
+class PrepareEmailDraft(StrictModel):
+    recipient: str = Field(default="", max_length=500)
+    purpose: str = Field(default="", max_length=4000)
+    continue_previous: bool = False
+    draft: GeneratedDraft | None = None
+
+
 class AnswerQuestion(StrictModel):
     answer: ClarificationAnswer
 
@@ -183,6 +191,20 @@ class ReviseDraft(StrictModel):
 
 
 TOOLS = {
+    "prepare_email_draft": (
+        PrepareEmailDraft,
+        "Prepare a standalone email draft from USER text. Copy recipient (a name is enough) "
+        "and purpose/message facts as exact USER wording; leave genuinely missing fields empty. "
+        "The backend asks only for missing fields. No subject or exact email address is required. "
+        "Use continue_previous=true to answer the pending_email_draft question, repeat an "
+        "unfinished request, or revise its text; supply only newly stated fields. A new goal "
+        "uses false and must not inherit the old recipient/purpose. When recipient and purpose "
+        "are known, supply draft with a generated subject, plain-text body, unresolved_fields "
+        "and sources=[]; keep unknown facts as visible placeholders. Literal user-addressed "
+        "requests use the existing reviewable workflow. Otherwise returns text only, never "
+        "an actionable envelope, Gmail draft, send, insertion, approval or completed action. "
+        "Source-based replies/drafts and compound work use prepare_workflow instead. Terminal.",
+    ),
     "prepare_calendar_event": (
         PrepareCalendarEvent,
         "Prepare ONE event directly from a USER creation request, without needing email. "
@@ -277,7 +299,9 @@ TOOLS = {
         PrepareWorkflow,
         (
             "Prepare a summary, draft, plan or scheduling proposal using existing "
-            "workflows. Use intent=plan_schedule for email-based or compound scheduling. "
+            "workflows. Standalone composition first uses prepare_email_draft to collect its "
+            "recipient and purpose. Use intent=plan_schedule for email-based or compound "
+            "scheduling. "
             "Standalone events use prepare_calendar_event. "
             "Simple free-slot reads use find_free_times without a proposal. "
             "For a simple whole-day availability question use check_day_availability. "

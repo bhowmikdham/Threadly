@@ -401,3 +401,20 @@ correctness still needs human assessment beyond exact-quote validation. No assum
 made about Superhuman's private implementation.
 
 AWS documents the client-side tool-result loop used here in [Converse tool use](https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use-client-side.html).
+# Email drafting clarification release 1.8.6
+
+`prepare_email_draft` collects the recipient and purpose conversationally before
+creating a task. “Could you help me draft an email?” returns “Who’s it for, and
+what would you like to say?” A recipient-only or purpose-only turn asks only
+for the other field. Repeated requests retain the pending details, a new goal
+starts fresh, and text revisions retain the supplied facts. A name is sufficient
+for text generation and the model supplies a subject. Old planner diagnostics
+are not user-facing clarification copy.
+
+The coordinator binds fields to user wording and persists them in encrypted,
+bounded conversation state. Named-recipient text drafts remain chat text;
+explicit role-bound mailboxes use the existing durable artifact and approval
+workflow. Sending, inserting, and saving in Gmail remain distinct real actions.
+Prompt/tool assets are pinned at `contextual-conversation-1.8.6`, preserving
+Calendar 1.8.4, Primary Inbox 1.8.5, and the Haiku classification additions.
+See [evaluation evidence](evaluation/email-drafting/README.md).

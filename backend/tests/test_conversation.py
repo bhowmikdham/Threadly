@@ -995,7 +995,13 @@ async def test_prepare_workflow_submits_existing_job_and_retry_only_once(
     r = request().model_copy(
         update={"instruction": "Write an email to alex@example.test thanking them for the update"}
     )
-    model = Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]))
+    model = Model(
+        tool(
+            "prepare_email_draft",
+            recipient="alex@example.test",
+            purpose="thanking them for the update",
+        )
+    )
     async with source_data.source_scope():
         first = await service.turn(1, r, factory=db_sessionmaker, model=model)
         second = await service.turn(1, r, factory=db_sessionmaker, model=Model())
@@ -1053,7 +1059,13 @@ async def test_hassan_compose_followup_keeps_goal_and_confirmed_recipient_withou
         }
     )
     async with source_data.source_scope():
-        model = Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]))
+        model = Model(
+            tool(
+                "prepare_email_draft",
+                recipient="Hassan",
+                purpose="asking for clarification on the upcoming final semester presentation",
+            )
+        )
         prepared = await service.turn(1, final, factory=db_sessionmaker, model=model)
 
     assert prepared["kind"] == "task"
@@ -1116,9 +1128,7 @@ async def test_independent_compose_does_not_reuse_old_conversation_address(
                 "instruction": "Create an email to Hassan about the final semester presentation",
             }
         )
-        asking = Model(
-            tool("respond", kind="clarification", text="What is Hassan's email address?")
-        )
+        asking = Model(tool("prepare_email_draft", purpose="about the final semester presentation"))
         await service.turn(1, compose, factory=db_sessionmaker, model=asking)
         assert asking.contexts[0]["user_recipient_refs"] == {}
 
@@ -1129,7 +1139,9 @@ async def test_independent_compose_does_not_reuse_old_conversation_address(
                 "instruction": "hassan@example.test",
             }
         )
-        model = Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"]))
+        model = Model(
+            tool("prepare_email_draft", continue_previous=True, recipient="hassan@example.test")
+        )
         prepared = await service.turn(1, address, factory=db_sessionmaker, model=model)
     assert model.contexts[0]["user_recipient_refs"] == {"recipient-1": "hassan@example.test"}
     assert prepared["task"]["draft_input"]["to"] == ["hassan@example.test"]
@@ -1141,9 +1153,9 @@ async def test_workflow_records_user_turn_and_model_release(configured, db_sessi
     )
     model = Model(
         tool(
-            "prepare_workflow",
-            intent="compose",
-            to_refs=["recipient-1"],
+            "prepare_email_draft",
+            recipient="alex@example.test",
+            purpose="thank them for the update",
         )
     )
     async with source_data.source_scope():
@@ -1537,9 +1549,9 @@ async def test_crash_after_task_creation_recovers_checkpoint(
                 factory=db_sessionmaker,
                 model=Model(
                     tool(
-                        "prepare_workflow",
-                        intent="compose",
-                        to_refs=["recipient-1"],
+                        "prepare_email_draft",
+                        recipient="alex@example.test",
+                        purpose="thanking them",
                     )
                 ),
             )
@@ -1622,7 +1634,9 @@ async def test_failure_after_proposal_reservation_resumes_saved_plan(
         1,
         replacement,
         factory=db_sessionmaker,
-        model=Model(tool("prepare_workflow", intent="compose", to_refs=["recipient-1"])),
+        model=Model(
+            tool("prepare_email_draft", recipient="alex@example.test", purpose="thanking them")
+        ),
     )
     restored = await service.get(1, r.conversation_id, db_sessionmaker)
     assert restored["active_task_id"] == replacement_result["task_id"]
@@ -1645,11 +1659,9 @@ async def test_recipient_roles_are_reference_bound(configured, db_sessionmaker):
             factory=db_sessionmaker,
             model=Model(
                 tool(
-                    "prepare_workflow",
-                    intent="compose",
-                    to_refs=["recipient-1"],
-                    cc_refs=["recipient-2"],
-                    bcc_refs=["recipient-3"],
+                    "prepare_email_draft",
+                    recipient="alex@example.test",
+                    purpose="thanks",
                 )
             ),
         )
