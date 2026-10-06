@@ -1,5 +1,17 @@
 # Conversational panel — implementation and acceptance
 
+Email drafting clarification (backend conversation 1.8.6) arrives as an ordinary
+chat question, with no task status, preparation promise or retry button. Follow-up
+details use the same conversation/version. Named-recipient drafts render as text
+with a generated subject and body; they carry no send or approval control. Existing
+address-bound draft artifacts retain their review and action gates. Unsupported
+historical tasks use neutral UI copy instead of rendering planner rationale.
+
+The drafting companion was checked with typechecking, 222 unit tests, 29 release
+helper tests, and all 36 browser checks, including the separately configured
+public-origin packaging test. That test uses an empty profile and rejects the
+sign-in permission request; it does not authenticate to the public backend.
+
 Extension PR #50 is the client of backend PR #49, whose model/prompt release is
 `contextual-conversation-1.1.1`. The earlier 23 September adapter and
 [inbox-chat](inbox-chat.md) releases are historical baselines, not the

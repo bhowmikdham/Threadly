@@ -231,10 +231,8 @@ export function TaskCard({
         )}
         {t?.state === "unsupported" && !p && (
           <p>
-            {t.route?.decision?.rationale ||
-              "This request is not supported by the current workflow."}{" "}
-            Describe what you’d like to achieve, including any timing or people
-            involved.
+            I can’t complete that request as written. What would you like to do
+            next?
           </p>
         )}
         {t?.state === "needs_clarification" && (
