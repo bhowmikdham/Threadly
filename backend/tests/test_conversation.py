@@ -1714,14 +1714,10 @@ async def test_calendar_followup_context_persists_is_owned_and_clears_on_new_top
 
     monkeypatch.setattr(day_availability, "answer", answer)
     original = request().model_copy(update={"instruction": "am i free tmrw?"})
-    first_model = Model(
-        tool(
-            "check_day_availability",
-            subject="self",
-            date={"kind": "relative", "offset_days": 1},
-            date_source="tmrw",
-        )
-    )
+    first_model = Model(tool(
+        "check_day_availability", subject="self",
+        date={"kind": "relative", "offset_days": 1}, date_source="tmrw",
+    ))
     first = await service.turn(1, original, factory=db_sessionmaker, model=first_model)
     assert first["error_code"] == "calendar_coverage_incomplete"
     async with db_sessionmaker() as session:
@@ -1731,13 +1727,9 @@ async def test_calendar_followup_context_persists_is_owned_and_clears_on_new_top
         assert state[KEY]["arguments"]["date"]["start"] == "2026-10-06"
         assert "PRIVATE-CALENDAR-ANSWER" not in json.dumps(state[KEY])
         assert b"am i free" not in row.state_enc
-    followup = original.model_copy(
-        update={
-            "instruction": "check now",
-            "request_id": str(uuid4()),
-            "expected_version": 1,
-        }
-    )
+    followup = original.model_copy(update={
+        "instruction": "check now", "request_id": str(uuid4()), "expected_version": 1,
+    })
     with pytest.raises(ApiError) as exc:
         await service.turn(2, followup, factory=db_sessionmaker, model=Model())
     assert exc.value.code == "conversation_not_found"
@@ -1750,29 +1742,19 @@ async def test_calendar_followup_context_persists_is_owned_and_clears_on_new_top
     assert reads[1][2].date.start == "2026-10-06"
     replay = await service.turn(1, followup, factory=db_sessionmaker, model=Model())
     assert replay["version"] == second["version"] and len(reads) == 2
-    other = followup.model_copy(
-        update={
-            "instruction": "hello",
-            "request_id": str(uuid4()),
-            "expected_version": 2,
-        }
-    )
+    other = followup.model_copy(update={
+        "instruction": "hello", "request_id": str(uuid4()), "expected_version": 2,
+    })
     await service.turn(
-        1,
-        other,
-        factory=db_sessionmaker,
+        1, other, factory=db_sessionmaker,
         model=Model(tool("respond", kind="message", text="Hello.")),
     )
     async with db_sessionmaker() as session:
         state = store.decode(await session.get(Conversation, original.conversation_id))
         assert KEY not in state
-    no_context = other.model_copy(
-        update={
-            "instruction": "check now",
-            "request_id": str(uuid4()),
-            "expected_version": 3,
-        }
-    )
+    no_context = other.model_copy(update={
+        "instruction": "check now", "request_id": str(uuid4()), "expected_version": 3,
+    })
     result = await service.turn(
         1, no_context, factory=db_sessionmaker, model=Model(tool("retry_calendar_read"))
     )
