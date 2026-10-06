@@ -311,15 +311,15 @@ export async function speak(text: string, onLevel: (level: number) => void) {
 // Voice mode: a spoken back-and-forth with Threadly. The orb listens, thinks
 // and answers aloud, then listens again, until the user closes it. Requests
 // and replies also land in the chat, where drafts and approvals are handled.
+export type VoiceReply = string | { text: string; showChat?: boolean }
+
 export function VoiceOrb({
   respond,
   onClose
 }: {
   // `showChat` lifts the orb to the top so a list of choices (for example the
   // top five emails) is visible in the chat below it.
-  respond: (
-    said: string
-  ) => Promise<string | { text: string; showChat?: boolean }>
+  respond: (said: string) => Promise<VoiceReply>
   onClose: (error?: string) => void
 }) {
   const level = useRef(0)

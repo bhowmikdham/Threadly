@@ -1,3 +1,5 @@
+import type { CalendarAvailability } from "./calendar-availability"
+
 export interface User {
   id: number
   email: string
@@ -119,6 +121,7 @@ export interface CalendarChoices {
   expires_at: string
 }
 export interface Entry {
+  calendarAvailability?: CalendarAvailability
   conversationId?: string
   calendarChoices?: CalendarChoices
   calendarAction?: CalendarAction

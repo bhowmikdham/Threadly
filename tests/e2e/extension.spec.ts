@@ -112,6 +112,79 @@ test.afterAll(async () => {
   await new Promise<void>((r) => server?.close(() => r()))
   if (profile) await rm(profile, { recursive: true, force: true })
 })
+test("availability cards accompany concise replies, recheck only latest, and fit narrow themes", async () => {
+  await page.getByLabel("Your request").fill("am I free at 5pm tomorrow")
+  await page.getByLabel("Your request").press("Enter")
+  const cards = page.getByRole("region", { name: "Calendar availability" })
+  const first = cards.first()
+  await expect(
+    first.getByRole("heading", { name: "Busy", exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByText("No, you're busy tomorrow at 5 pm.", { exact: false })
+  ).toBeVisible()
+  await expect(
+    first.getByText("Australia/Melbourne · Selected calendars")
+  ).toBeVisible()
+  await expect(first.getByText(/17:00|5:00 pm|5:00 PM/).first()).toBeVisible()
+  await page.setViewportSize({ width: 343, height: 840 })
+  await first.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: "test-results/availability-busy-light.png" })
+  await first.getByRole("button", { name: "Check again" }).focus()
+  await page.keyboard.press("Enter")
+  await expect(
+    cards.last().getByRole("heading", { name: "Free", exact: true })
+  ).toBeVisible()
+  await expect(
+    first.getByRole("button", { name: "Check again" })
+  ).toBeDisabled()
+  await page.getByLabel("Your request").fill("am I free at 6pm tomorrow")
+  await page.getByLabel("Your request").press("Enter")
+  const last = cards.last()
+  await expect(
+    last.getByRole("heading", { name: "Availability uncertain" })
+  ).toBeVisible()
+  await expect(
+    last.getByText(/Some selected calendars couldn't be checked/)
+  ).toBeVisible()
+  await page.setViewportSize({ width: 320, height: 840 })
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await last.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: "test-results/availability-partial-dark.png" })
+  const box = await last.boundingBox()
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(320)
+  expect(await last.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true
+  )
+  expect(
+    calls
+      .filter((c) => c.path === "/assistant/conversation-turns")
+      .map((c) => c.body.instruction)
+  ).toEqual([
+    "am I free at 5pm tomorrow",
+    "Check that availability again",
+    "am I free at 6pm tomorrow"
+  ])
+  expect(
+    calls.some((c) => /approve|calendar-actions|events/.test(c.path))
+  ).toBe(false)
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await page.getByRole("button", { name: "Switch to light appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await page.setViewportSize({ width: 420, height: 900 })
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  calls.length = 0
+})
+
 test("Calendar approval menu and exact event card in the built extension", async () => {
   await expect(
     page.getByRole("button", { name: "Calendar approval: Ask for approval" })
@@ -743,9 +816,9 @@ test("voice mode is a spoken back-and-forth that also lands in the chat", async 
   await page.screenshot({
     path: path.join("test-results", "voice-speaking.png")
   })
-  expect(await page.evaluate(() => (window as any).spoken)).toEqual([
-    "Hey! What can I help you with?"
-  ])
+  await expect
+    .poll(() => page.evaluate(() => (window as any).spoken))
+    .toEqual(["Sure, I can do that.", "Hey! What can I help you with?"])
   await expect(dialog).not.toHaveClass(/\bdocked\b/)
   await expect(dialog.getByRole("status")).toHaveText("Listening…")
   await page.getByRole("button", { name: "Close voice conversation" }).click()

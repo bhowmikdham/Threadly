@@ -6,6 +6,7 @@ import { needsCalendarSetup } from "../lib/scheduling-readiness"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
 import { AssistantText } from "./AssistantText"
+import { CalendarAvailabilityCard } from "./CalendarAvailabilityCard"
 import { CalendarChoiceCard } from "./CalendarChoiceCard"
 import { CalendarEventCard } from "./CalendarEventCard"
 import { Icon } from "./Icon"
@@ -134,6 +135,13 @@ export function TaskCard({
           <button onClick={() => controller.retry(entry)}>
             Retry response
           </button>
+        )}
+        {entry.calendarAvailability && (
+          <CalendarAvailabilityCard
+            value={entry.calendarAvailability}
+            enabled={Boolean(controller.canRecheckAvailability?.(entry))}
+            onRecheck={() => void controller.recheckAvailability(entry)}
+          />
         )}
         {entry.calendarActionId && (
           <CalendarEventCard
