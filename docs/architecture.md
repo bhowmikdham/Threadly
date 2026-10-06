@@ -7,7 +7,9 @@ four-field/evidence validation → fresh Gmail and
 session checks → transient badge response. It preserves BERT category/priority/action
 labels and adds independent binary reply. It makes no external writes, restores no
 mailbox import/cache, and changes no existing assistant Flow registry. Disabled by
-default; Claude Haiku 4.5 is the selected classification model. Nova Micro is retired.
+default in fresh configuration; the public backend enabled Claude Haiku 4.5 on
+7 October 2026. See the [deployment record](classification/ROLLOUT-2026-10-07.md).
+Nova Micro is retired.
 Classification Flows use a numbered managed CHAT prompt, a numbered Flow version
 and an alias verified before/after invocation. The backend checks the prompt,
 model, graph and role; it does not accept a console-edited replacement release.

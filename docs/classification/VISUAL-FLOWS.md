@@ -1,7 +1,9 @@
 # Visual classification Flow
 
-7 October 2026. Backend branch: `codex/llm-classification-service`, based on
-`release/backend`. The frontend badge API and trained BERT labels are unchanged.
+7 October 2026. The service is merged into `release/backend` and enabled on the
+public API. See the [deployment record](ROLLOUT-2026-10-07.md) for current runtime
+status. The provisioning history below preserves the earlier stages. The frontend
+badge API and trained BERT labels are unchanged.
 
 ## Selected model
 
@@ -98,8 +100,9 @@ the release. A DRAFT version, test alias, foreign account, unknown model or grap
 cannot activate. Retired Nova targets are rejected. A changed alias/prompt/role is
 rejected; no Converse fallback runs.
 
-Provisioning does not change EC2, deploy this feature branch, attach caller policies
-or enable classification. Model selection is complete; deployment acceptance remains.
+Provisioning alone does not change EC2, deploy application code, attach caller
+policies or enable classification. The separate [backend rollout](ROLLOUT-2026-10-07.md)
+completed those steps using the retained Haiku target.
 
 To run the 12 synthetic cases through the selected Haiku Flow, from `backend/`:
 

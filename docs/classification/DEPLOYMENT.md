@@ -6,11 +6,23 @@ belong to that team. No extension or website implementation is part of this roll
 
 ## Release and configuration
 
-Merge into `release/backend` and deploy the immutable merged commit only after
-its backend CI passes. Backend CI includes classification fixtures, Flow pinning,
+Merge into `release/backend` and deploy an immutable commit whose complete source
+tree passed backend CI. If using a pre-merge CI result, verify exact Git tree
+identity with the merged commit; otherwise wait for the merged commit's CI.
+Record the tested and deployed SHAs and the release-branch CI result.
+Backend CI includes classification fixtures, Flow pinning,
 provisioning and the rendered Haiku role template. Follow the existing
 [EC2 deployment runbook](../../infra/deploy/ec2/APP-DEPLOYMENT.md), preserving the
 host's current deployment mode. No classification migration is required.
+
+For the current public host, Caddy mounts the website from a separate release.
+Use a backend-only rollout: build/preflight the new API image, drain existing
+backend services, take the protected database snapshot, check migrations, then
+recreate only `api`, `assistant-worker` and `action-worker` with `--no-deps` using
+the existing public HTTPS/launch Compose overlays. Verify the Caddy container and
+its website/download mounts remain unchanged. Running the full public-launch
+helper would also replace website/proxy assets and is outside this service's scope.
+The [initial rollout record](ROLLOUT-2026-10-07.md) includes the actual outcome.
 
 The existing private release receipt contains `haiku.target.json` and
 `haiku.caller-policy.json`. Attach the latter as the separate named inline policy

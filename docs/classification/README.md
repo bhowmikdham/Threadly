@@ -1,11 +1,13 @@
 # Email classification badge API
 
-Implementation handoff, 7 October 2026. Feature branch: `codex/llm-classification-service`,
-based on `release/backend` at `5298835`. Tested with fake Gmail/model responses and
-real isolated PostgreSQL. The [visual Flow record](VISUAL-FLOWS.md) tracks subsequent
-cloud provisioning/evaluation. **Claude Haiku 4.5 is selected**; application
-deployment and activation remain pending. The Nova Micro Flow is retired.
-The website team consumes this contract; backend changes target `release/backend`.
+**Live backend handoff, 7 October 2026.** Claude Haiku 4.5 classification is deployed
+and enabled at `https://api.threadly.au` from `release/backend` commit `7b2c277`.
+[PR #105](https://github.com/bhowmikdham/Threadly/pull/105) contains the service.
+Five authorized live Gmail threads passed the response-contract checks; the live
+concurrency check admitted two calls and rejected two with 429/Retry-After.
+See the [deployment evidence and limitations](ROLLOUT-2026-10-07.md).
+The Nova Micro Flow is retired. The frontend team owns calling this service,
+request scheduling and badge rendering; no frontend implementation was deployed.
 
 ## Release baseline and scope
 
@@ -195,8 +197,10 @@ Use `--predictions /path/to/predictions.json` to replay a JSON object mapping ev
 case ID to its raw parsed model decision. With model access configured, explicit
 `--live` invokes only these synthetic cases and reports per-field/joint correctness,
 invalid outputs and predictions. Save the report's predictions member for replay.
-Set production thresholds and evaluate broader held-out data before enabling;
-mock/fixture passes do not establish model quality.
+The initial enabled release passed the bounded integration checks in the
+[rollout record](ROLLOUT-2026-10-07.md). Production accuracy thresholds and a broader
+held-out, human-labelled dataset remain quality work; neither this smoke test nor
+mock/fixture passes establish production accuracy.
 
 ## Frontend artifacts
 
