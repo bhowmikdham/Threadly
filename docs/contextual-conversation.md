@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.8.4`. Feature switch:
+Implementation release: `contextual-conversation-1.8.5`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and current
 backend migrations through `c061026e9041`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
@@ -12,6 +12,28 @@ pins the prompt, tool and case hashes. An [earlier replay](evaluation/contextual
 passed 38/40 because the evaluator treated a safe review recommendation as an
 invalid answer type for “do that”; its external-action check found no send claim.
 The accepted type was corrected and the entire suite rerun.
+
+
+Release `1.8.5` makes unqualified Inbox and explicit Primary requests use Gmail's
+`in:inbox category:primary` query. Explicit all-category requests retain `in:inbox`.
+The backend does not approximate Primary with `CATEGORY_PERSONAL`: Gmail can return
+Updates-labelled or uncategorised messages in Primary. The additive filter travels
+with cards and signed pagination. Non-Inbox folder semantics remain unchanged.
+
+For singular latest-message searches without a requested date restriction, a separate
+bounded `today_check` uses the same folder/category/query/sender and the recipient's
+local midnight through the turn's fixed reference instant. It reports `no_messages`
+only after the provider query is exhausted with zero valid results; present, incomplete
+and unavailable checks remain distinct. A ten-second timeout preserves an already-read
+latest result with unknown today status; ownership/authentication failures still stop
+the turn. It never narrows the latest search to today, replaces its cursor or persists
+source bodies. Search remains bounded to the displayed window (one year by default).
+
+The model receives current local date/time and each mail's deterministic local-day
+relation. It must state verified no arrivals today alongside an older latest message,
+and cannot infer absence from the older message or incomplete latest page. Absolute
+Gmail timestamps remain intact. Empty/invisible citations are rejected without
+rewriting meaningful quotes. See [Primary Inbox verification](evaluation/primary-inbox/README.md).
 
 Release `1.2.2` combines those exact-sender and fresh-Inbox constraints with
 `1.2.1` Calendar agenda support. The replay retains Calendar period checks,

@@ -2,10 +2,11 @@
 
 import html
 import re
+import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-POLICY = "mail-presentation-1.0"
+POLICY = "mail-presentation-1.1"
 _INVISIBLE = re.compile(r"[\u00ad\u200b\u200e\u200f\u202a-\u202e\u2060-\u2069\ufeff]")
 _JOINERS = re.compile(r"[\u200c\u200d]+")
 _URL = re.compile(r"https?://[^\s<>]+", re.I)
@@ -15,6 +16,17 @@ _FOOTER = re.compile(
     r"privacy policy\b|you (?:are receiving|received) this (?:email|message) because\b)",
     re.I,
 )
+
+
+def has_visible_text(value):
+    """Validate visibility without altering an exact evidence quote or dropping URLs."""
+    text = value
+    for _ in range(3):
+        decoded = html.unescape(text)
+        if decoded == text:
+            break
+        text = decoded
+    return any(not c.isspace() and unicodedata.category(c) not in {"Cf", "Cc"} for c in text)
 
 
 def snippet(value, limit=220):
@@ -54,7 +66,18 @@ def snippet(value, limit=220):
     return text[:limit].rstrip()
 
 
-def received_display(received_at, timezone):
+def clock_context(reference_at, timezone):
+    """Keep the model's date reference in the same zone as displayed mail."""
+    local = reference_at.astimezone(ZoneInfo(timezone))
+    return {
+        "now": reference_at.isoformat(),
+        "now_local": local.isoformat(),
+        "current_date_local": local.date().isoformat(),
+        "timezone": timezone,
+    }
+
+
+def received_display(received_at, timezone, *, reference_at=None):
     """Render the provider instant in the request zone, including its DST offset."""
     if not received_at:
         return {}
@@ -62,7 +85,7 @@ def received_display(received_at, timezone):
     if received.tzinfo is None:
         return {}
     local = received.astimezone(ZoneInfo(timezone))
-    return {
+    values = {
         "received_at_local": local.isoformat(),
         "received_timezone": timezone,
         "received_at_display": (
@@ -70,3 +93,11 @@ def received_display(received_at, timezone):
         ),
         "timestamp_source": "gmail.internalDate",
     }
+    if reference_at is not None:
+        current = reference_at.astimezone(ZoneInfo(timezone))
+        days = (current.date() - local.date()).days
+        values.update(
+            received_day_relation={0: "today", 1: "yesterday"}.get(days, "absolute"),
+            received_display_reference_at=reference_at.isoformat(),
+        )
+    return values

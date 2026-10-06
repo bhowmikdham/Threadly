@@ -240,7 +240,7 @@ async def test_versioned_synthetic_replay_delivers_one_card_with_local_time():
 
     result = await engine.run({"user_turn": case["turns"][0], "timezone": ZONE}, runtime, Model())
     assert evaluate.grade(case, result, runtime.calls, runtime.search_page) == []
-    assert result["release"] == "contextual-conversation-1.8.4"
+    assert result["release"] == "contextual-conversation-1.8.5"
     assert len(runtime.search_page["results"]) == 1
     assert runtime.search_page["results"][0]["reference"] == "mail-1"
 
@@ -257,6 +257,7 @@ def test_latest_replay_rejects_five_item_default_and_unzoned_utc_answer():
         "wrong_single_inbox_search",
         "single_inbox_card_count_mismatch",
         "inbox_answer_count_mismatch",
+        "inbox_category_scope_mismatch",
         "mail_time_mismatch",
         "mail_time_missing_zone",
     }

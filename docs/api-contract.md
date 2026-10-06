@@ -821,7 +821,7 @@ resubmitted. Completed artifacts remain readable.
 ## Conversational inbox discovery (on demand)
 
 `POST /assistant/inbox-chat` accepts `{instruction, timezone}` under the session JWT.
-The current interpreter release is `inbox-chat-1.1.0`. It returns `release` and one of
+The current interpreter release is `inbox-chat-1.2.0`. It returns `release` and one of
 `kind: message` with `text`, `kind: continue`, or `kind: search` with `search`.
 For “Find emails from person@example.com”, `search.filters` has an empty `query` and
 `sender_email: "person@example.com"`. The sender must be an exact address explicitly
@@ -846,6 +846,17 @@ cases for `inbox-chat-1.1.0`; the [v1 receipt](evaluation/inbox-chat-live-v1.jso
 belongs to release `1.0.0`.
 
 ## Contextual conversation API (feature-gated)
+
+Conversation release `1.8.5` adds `search_mail.inbox_category` (`primary` by
+ default for Inbox; explicit `all` includes every Inbox category). Public search filters
+ default to `all` for old clients. Primary uses Gmail `in:inbox category:primary`;
+ category is signed with pagination and must not be inferred from Personal labels.
+ For latest-message requests without explicit date wording, optional `search.today_check`
+ and the tool observation report `no_messages`, `has_messages`, or `unknown` with
+ exact local-day bounds, timezone and query/sender/folder/category. Only exhausted,
+ empty provider results prove no arrivals today. Latest cards and their cursor retain
+ their original wider date window. Provider errors/timeouts yield unknown; authorization
+ and account-generation errors still stop. See [verification](evaluation/primary-inbox/README.md).
 
 `POST /assistant/conversation-turns`: `{conversation_id, request_id, expected_version,
 instruction, timezone, context_snapshot_id?, active_task_id?}`. IDs are client UUIDs;
