@@ -23,6 +23,7 @@ class ConfigurationTests(unittest.TestCase):
                 "SECRET_KEY=untouched\nBEDROCK_MODEL_ID=unchanged\n"
                 "GOOGLE_CLIENT_SECRET=old\nexport GOOGLE_CLIENT_ID=old\n"
                 "EMAIL_WRITES_ENABLED=true\nWRITE_PILOT_USER_IDS=1\n"
+                "CALENDAR_PUBLIC_ROLLOUT_ENABLED=true\n"
             )
             path.write_text(original)
             path.chmod(0o600)
@@ -37,6 +38,7 @@ class ConfigurationTests(unittest.TestCase):
             self.assertIn("GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK=true", result)
             self.assertIn("EMAIL_WRITES_ENABLED=false", result)
             self.assertIn("CALENDAR_WRITES_ENABLED=false", result)
+            self.assertIn("CALENDAR_PUBLIC_ROLLOUT_ENABLED=false", result)
             self.assertIn("WRITE_PILOT_USER_IDS=\n", result)
 
     def test_bad_input_and_unsafe_permissions_do_not_change_file(self):

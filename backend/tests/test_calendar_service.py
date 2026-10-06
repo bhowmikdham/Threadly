@@ -320,6 +320,7 @@ def test_calendar_incremental_consent_only_on_authenticated_reconnect(
             google_client_secret="fixture",
             google_allow_loopback_test_callback=False,
             write_pilot_user_ids_values=set(),
+            calendar_write_eligible=lambda _user_id: False,
             google_redirect_uri_allowlist_values={"https://ext.chromiumapp.org/"},
         ),
     )

@@ -742,12 +742,25 @@ auxiliary generation adapters and separately approved booking. Configuration dis
 is not proof that remote providers passed acceptance. Existing routes remain compatible;
 new clients should use background sync jobs instead of inline `/sync`.
 
-Write capabilities are installed but disabled by default. Reconnect accepts explicit
-`gmail_send` and `calendar_write` only for enrolled pilot users. Real execution requires
-both the corresponding environment flag and local user allowlist membership; scope and
-exact approval checks still apply. The historical always-disabled write-capability
-statements above are superseded by this explicit pilot behavior. No frontend origin,
-public port, domain or automatic send is enabled by this change.
+Write capabilities are installed but disabled by default. The default rollout permits
+`gmail_send` and `calendar_write` only for enrolled `WRITE_PILOT_USER_IDS` users.
+`CALENDAR_PUBLIC_ROLLOUT_ENABLED=true`, after separate rollout authorization, makes
+Calendar consent and creation eligibility available to current and future signed-in
+users without enrolling them for Gmail sending. It defaults to false and does not
+change the stored Google grants. Calendar execution still requires
+`CALENDAR_WRITES_ENABLED`, a verified connection, actual write scope, editable Calendar
+access and the existing exact approval / chat-scoped authorization checks. Reconnect
+requests containing Gmail sending still require Gmail pilot membership, even when
+Calendar is public. API capabilities, OAuth initiation, job selection, dispatch and
+owner-scoped operational status use the same Calendar policy. Neither flag approves an
+event or changes the default Ask mode. Public web hosting and Google OAuth publication
+do not set this application rollout control.
+
+For an eligible account without the Google write grant, `calendar_write` is enabled
+with status `scope_missing` (or `scope_unknown`); the existing extension offers
+**Enable event creation** and requests consent explicitly. Excluded accounts remain
+disabled, and already-ready accounts do not need another consent button. The historical
+always-disabled write-capability statements above are superseded by these controls.
 
 
 ### Frontend selected-message factual questions (2026-09-23)

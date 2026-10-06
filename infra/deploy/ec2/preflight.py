@@ -63,9 +63,18 @@ def main():
     registry.load_manifest()
     auxiliary.load_manifest()
     if settings.email_writes_enabled or settings.calendar_writes_enabled:
-        if not settings.write_pilot_user_ids_values:
+        if settings.email_writes_enabled and not settings.write_pilot_user_ids_values:
             raise SystemExit(
-                "Writes require an explicit WRITE_PILOT_USER_IDS allowlist."
+                "Email writes require an explicit WRITE_PILOT_USER_IDS allowlist."
+            )
+        if (
+            settings.calendar_writes_enabled
+            and not settings.calendar_public_rollout_enabled
+            and not settings.write_pilot_user_ids_values
+        ):
+            raise SystemExit(
+                "Calendar writes require WRITE_PILOT_USER_IDS or the separately "
+                "authorized CALENDAR_PUBLIC_ROLLOUT_ENABLED control."
             )
         if (
             settings.email_writes_enabled and not settings.email_reconciliation_enabled
@@ -76,9 +85,13 @@ def main():
             raise SystemExit(
                 "Enable the matching read reconciliation control before pilot writes."
             )
-        print(
-            "Pilot-only writes configured; each action requires exact authorization."
-        )
+        if settings.calendar_writes_enabled and settings.calendar_public_rollout_enabled:
+            print(
+                "Public Calendar eligibility configured; Google consent and exact action "
+                "authorization remain required. Gmail eligibility is unchanged."
+            )
+        else:
+            print("Pilot-only writes configured; each action requires exact authorization.")
     else:
         print(
             "External writes disabled; previews and reviewed workflows remain available."

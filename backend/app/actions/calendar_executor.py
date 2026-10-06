@@ -19,7 +19,7 @@ def enabled(owner, transport=None):
     settings = get_settings()
     return settings.calendar_writes_enabled and (
         isinstance(transport, httpx.MockTransport)
-        or str(owner) in settings.write_pilot_user_ids_values
+        or settings.calendar_write_eligible(owner)
     )
 
 

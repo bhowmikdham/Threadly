@@ -279,3 +279,60 @@ async def test_api_pilot_gate_and_foreign_approval(
     # Approval queues work but does not itself call Google.
     async with db_sessionmaker() as session:
         assert await session.scalar(select(func.count()).select_from(ActionAttempt)) == 0
+
+
+@pytest.mark.parametrize(
+    "revoke", [None, "calendar_public_rollout_enabled", "calendar_writes_enabled"]
+)
+async def test_public_calendar_worker_requires_exact_approval_and_rechecks_rollout(
+    db_sessionmaker, setup, db_client, auth_headers, monkeypatch, revoke
+):
+    from app.actions import gmail_sender
+    from app.db.models import ActionJob
+
+    action = await proposed(db_sessionmaker, db_client, auth_headers)
+    settings = get_settings()
+    monkeypatch.setattr(settings, "write_pilot_user_ids", "")
+    monkeypatch.setattr(settings, "calendar_writes_enabled", True)
+    monkeypatch.setattr(settings, "calendar_public_rollout_enabled", True)
+    monkeypatch.setattr(settings, "calendar_reconciliation_enabled", True)
+    monkeypatch.setattr(settings, "email_writes_enabled", True)
+    assert not gmail_sender.enabled(user_id=1)
+    assert await calendar_worker.claim_one(db_sessionmaker) is None
+    url = "/assistant/calendar-actions/" + action["action_id"] + "/approve"
+    request = {"request_id": "public-approval", "expected_version": action["version"],
+               "payload_hash": action["payload_hash"]}
+    wrong = {**request, "payload_hash": "0" * 64}
+    assert db_client.post(url, headers=auth_headers(1), json=wrong).status_code == 409
+    assert db_client.post(url, headers=auth_headers(2), json=request).status_code == 404
+    result = db_client.post(url, headers=auth_headers(1), json=request)
+    assert result.status_code == 202, result.text
+    assert await email_worker.claim_one(db_sessionmaker) is None
+    google = Google()
+
+    # Exercise production eligibility checks; passing MockTransport directly is
+    # the older tests' explicit pilot bypass. This wrapper makes no real calls.
+    class FixtureTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            return await google.transport.handle_async_request(request)
+
+    async def acl(*args, **kwargs):
+        if revoke:
+            monkeypatch.setattr(settings, revoke, False)
+        return await allow_acl(*args, **kwargs)
+
+    monkeypatch.setattr(executor.client, "list_calendars", acl)
+    assert await calendar_worker.run_once(
+        db_sessionmaker, transport=FixtureTransport(), token_loader=token
+    )
+    async with db_sessionmaker() as session:
+        row = await session.get(AssistantAction, action["action_id"])
+        attempts = await session.scalar(select(func.count()).select_from(ActionAttempt))
+        if revoke:
+            assert row.state == "approved"
+            assert (await session.get(ActionJob, row.id)).state == "queued"
+            assert attempts == 0 and not google.calls
+        else:
+            assert row.state == "succeeded", row.error_code
+            assert attempts == 1
+            assert [call.method for call in google.calls] == ["POST"]

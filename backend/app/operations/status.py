@@ -39,7 +39,7 @@ async def snapshot(session, owner):
             "email_writes": settings.email_writes_enabled
             and str(owner) in settings.write_pilot_user_ids_values,
             "calendar_writes": settings.calendar_writes_enabled
-            and str(owner) in settings.write_pilot_user_ids_values,
+            and settings.calendar_write_eligible(owner),
             "email_reconciliation": settings.email_reconciliation_enabled,
             "calendar_reconciliation": settings.calendar_reconciliation_enabled,
             "background_sync": settings.gmail_source_mode != "on_demand"

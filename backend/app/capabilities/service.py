@@ -47,6 +47,7 @@ def build_capabilities(user: User) -> dict[str, Any]:
 
     settings = get_settings()
     pilot = str(user.id) in settings.write_pilot_user_ids_values
+    calendar_eligible = settings.calendar_write_eligible(user.id)
     expiry = user.access_token_expires_at
     if expiry is not None and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=UTC)
@@ -113,7 +114,7 @@ def build_capabilities(user: User) -> dict[str, Any]:
             _capability(
                 "calendar_write",
                 implemented=True,
-                enabled=settings.calendar_writes_enabled and pilot,
+                enabled=settings.calendar_writes_enabled and calendar_eligible,
                 connected=verified_connection,
                 scopes=scopes,
                 required_scopes=CALENDAR_WRITE_SCOPES,
@@ -123,7 +124,8 @@ def build_capabilities(user: User) -> dict[str, Any]:
             "available": True,
             "method": "POST /auth/google/reconnect",
             "requestable_capabilities": ["gmail_read", "calendar_read", "calendar_events_read"]
-            + (["gmail_send", "calendar_write"] if pilot else []),
+            + (["gmail_send"] if pilot else [])
+            + (["calendar_write"] if calendar_eligible else []),
             "state_pkce_required": True,
         },
     }

@@ -39,6 +39,7 @@ def update_env(path, client_id, secret):
         "GOOGLE_ALLOW_LOOPBACK_TEST_CALLBACK": "true",
         "EMAIL_WRITES_ENABLED": "false",
         "CALENDAR_WRITES_ENABLED": "false",
+        "CALENDAR_PUBLIC_ROLLOUT_ENABLED": "false",
         "WRITE_PILOT_USER_IDS": "",
     }
     pattern = r"^\s*(?:export\s+)?(" + "|".join(updates) + r")\s*="

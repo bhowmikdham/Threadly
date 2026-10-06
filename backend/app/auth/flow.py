@@ -65,7 +65,9 @@ async def begin(
         raise ApiError(401, "reauth_required", "Sign in with Google again.")
     validate_redirect(redirect_uri)
     settings = get_settings()
-    if (gmail_send or calendar_write) and str(user_id) not in settings.write_pilot_user_ids_values:
+    if (
+        gmail_send and str(user_id) not in settings.write_pilot_user_ids_values
+    ) or (calendar_write and not settings.calendar_write_eligible(user_id)):
         raise ApiError(
             409, "write_pilot_unavailable", "Write access is limited to configured test accounts."
         )
