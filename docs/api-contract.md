@@ -1379,3 +1379,27 @@ remain. The payload is live evidence, not an event preview or permission to crea
 Clients should show it alongside the answer, mark expired evidence as historical, and
 never infer event titles or another person's availability. Older responses without these
 fields remain valid text responses. These card details are not persisted in history.
+# Conversational email drafting clarification (1.8.6)
+
+Standalone composition uses the backend model tool `prepare_email_draft` before
+reserving a durable workflow. It accepts exact user-sourced `recipient` and
+`purpose`, `continue_previous`, and optional generated `draft` text. Missing fields
+return a normal `kind=clarification` conversation response without a task or
+preparation acknowledgment. The backend asks only for the recipient, purpose, or
+both; no subject or exact mailbox is required just to write text.
+
+The bounded encrypted conversation state retains the goal and current recipient
+authority across answers and repeated requests. A new goal resets those fields;
+a superseded task pointer resent by an older client cannot reactivate the old
+draft. Changing the recipient cannot retain the old To address. Previously bound
+Cc/Bcc remain unless that role changes. Mail observations cannot supply these
+user-only fields.
+
+A named recipient produces `kind=message` with a generated subject and body.
+This text has no actionable envelope, artifact approval, insertion, Gmail-save,
+or send authority. Literal user-role-bound addresses enter the existing durable
+draft worker with a validated compose route (`email-draft-preflight-1.0.0`), avoiding
+redundant intent classification. Existing recipient validation, draft review,
+exact-payload approval, disabled-intent controls and Gmail send gates still apply.
+Source-based replies/drafts and compound workflows keep their existing contracts.
+No database migration or external email operation is introduced.

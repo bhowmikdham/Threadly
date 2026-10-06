@@ -636,8 +636,12 @@ class Runtime:
                 self.state["refs"].pop("selected", None)
         if "active_task_id" in self.request.model_fields_set:
             if self.request.active_task_id:
-                self.state["active_task_id"] = self.request.active_task_id
-                self.state.pop("proposal_id", None)
+                # Older clients resend the last task card during a new compose
+                # clarification. It must not revive the superseded draft.
+                superseded = (self.state.get(email_draft.KEY) or {}).get("superseded_task_id")
+                if self.request.active_task_id != superseded:
+                    self.state["active_task_id"] = self.request.active_task_id
+                    self.state.pop("proposal_id", None)
             else:
                 self.state.pop("active_task_id", None)
         async with self.factory() as session:

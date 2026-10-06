@@ -6,7 +6,7 @@ can produce an actionable artifact; conversation text never grants send authorit
 
 import re
 
-from app.schemas.assistant import RouteDecision, RouteParameters
+from app.schemas.assistant import DraftOptions, RouteDecision, RouteParameters
 from app.schemas.conversation import PrepareWorkflow
 
 KEY = "email_draft_goal"
@@ -74,7 +74,6 @@ def _quoted(value, instruction):
 async def prepare(runtime, args):
     from app.conversation.runtime import (
         _revokes_compose_request,
-        user_recipient_references,
         user_recipient_roles,
     )
 
@@ -115,7 +114,49 @@ async def prepare(runtime, args):
             )
         if supplied:
             values[field] = supplied
-    goal = {**values, "instruction": instruction, "status": "clarification"}
+    recipient_instruction = (
+        previous.get("recipient_instruction", previous["instruction"])
+        if args.continue_previous and previous
+        else instruction
+    )
+    if (
+        args.continue_previous
+        and args.recipient.strip()
+        and (args.recipient.strip() != previous["recipient"])
+    ):
+        # An updated name cannot silently inherit the previous person's address.
+        # Keep recipient authority with the USER turn that supplied that recipient.
+        recipient_instruction = latest
+    goal = {
+        **values,
+        "instruction": instruction,
+        "recipient_instruction": recipient_instruction,
+        "status": "clarification",
+        "superseded_task_id": (
+            previous.get("superseded_task_id")
+            if args.continue_previous and previous
+            else runtime.state.get("active_task_id")
+        ),
+    }
+    # A literal address is bound only by the existing user-role resolver. A copied
+    # name or an incidental address in message content cannot become an envelope.
+    roles = user_recipient_roles(recipient_instruction, runtime.state["history"], latest)
+    if recipient_instruction.strip() == values["recipient"]:
+        try:
+            # A literal mailbox provided as the whole answer is a recipient;
+            # a name, quoted header, or address mentioned in other text is not.
+            address = DraftOptions(to=[values["recipient"]]).to[0]
+        except ValueError:
+            pass
+        else:
+            roles = {"to": {address}, "cc": set(), "bcc": set()}
+    if args.continue_previous and previous.get("recipient_roles"):
+        # Replacing To does not silently drop a previously supplied Cc/Bcc.
+        # A newly stated role replaces that role; only user-bound values persist.
+        for role in ("cc", "bcc"):
+            if not re.search(rf"\b{role}\b", recipient_instruction, re.I):
+                roles[role] = set(previous["recipient_roles"][role])
+    goal["recipient_roles"] = {role: sorted(addresses) for role, addresses in roles.items()}
     missing = [field for field, value in values.items() if not value]
     if not args.continue_previous:
         runtime.state.pop("active_task_id", None)
@@ -132,10 +173,10 @@ async def prepare(runtime, args):
         )
         return {"kind": "clarification", "text": question}
 
-    # A literal address is bound only by the existing user-role resolver. A copied
-    # name or an incidental address in message content cannot become an envelope.
-    recipients = user_recipient_references(instruction, runtime.state["history"], latest)
-    roles = user_recipient_roles(instruction, runtime.state["history"], latest)
+    addresses = list(
+        dict.fromkeys(address for values in roles.values() for address in sorted(values))
+    )
+    recipients = {f"recipient-{index + 1}": address for index, address in enumerate(addresses)}
     if roles["to"]:
         runtime.goal_instruction = instruction
         runtime.recipients = recipients

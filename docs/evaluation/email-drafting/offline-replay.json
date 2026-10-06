@@ -1,0 +1,104 @@
+{
+  "release": "contextual-conversation-1.8.6",
+  "prompt_hash": "bfd11acb185bfadab3c9cc667c0960241bd2f8496259544db7da32826d66afd8",
+  "tools_hash": "d1953fdeaa8fb5df47ef95f676d2def9df64a83d71b334a87a288145c299d1b3",
+  "checked_at": "2026-10-06T23:36:23.558098+00:00",
+  "evaluation": "offline scripted tool replay through production compose state validation",
+  "real_model": false,
+  "live_gmail": false,
+  "external_actions": false,
+  "passed": 9,
+  "total": 9,
+  "cases": [
+    {
+      "case": "email_draft_missing_1",
+      "turn": 1,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_missing_2",
+      "turn": 1,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_missing_3",
+      "turn": 1,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_missing_4",
+      "turn": 1,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_partial_and_repeat",
+      "turn": 1,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_partial_and_repeat",
+      "turn": 2,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_partial_and_repeat",
+      "turn": 3,
+      "kind": "clarification",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_partial_and_repeat",
+      "turn": 4,
+      "kind": "message",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "case": "email_draft_named_recipient",
+      "turn": 1,
+      "kind": "message",
+      "tools": [
+        "prepare_email_draft"
+      ],
+      "passed": true,
+      "failures": []
+    }
+  ]
+}
