@@ -26,11 +26,19 @@ THREADLY_TEST_DB=postgresql+asyncpg://USER@HOST/TEST_DB THREADLY_REQUIRE_TEST_DB
 python -m ruff check app tests tools
 ```
 
-The final complete backend suite passed **1917 tests, zero failures or skips**.
+The initial complete backend suite passed **1917 tests, zero failures or skips**.
 Ruff passed. Tests use scripted model decisions and fake Google adapters through
 the real application/database paths. This verifies repair handling, not the live
 model's probability of generating the corrected call. No live Bedrock evaluation,
 Google write, deployment or merge was performed.
+
+The later release-branch integration preserves the Haiku classification source
+from `82225a5` without modification. Its complete backend suite passed **2014
+tests, zero failures or skips**, with Ruff and versioned MVP assets passing.
+The recorded classification predictions replay without a live model call;
+the existing seed-evaluation quality limitation remains. See
+`classification-integration.json` for the integration receipt. This merges
+upstream source into the draft review branch only, not into a release branch.
 
 Coverage includes literal title/date/time/duration/location/description/calendar
 and attendee mismatches, normalized clock conflict, invalid schema privacy,

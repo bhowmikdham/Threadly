@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-10-06T23:14:49.297468+00:00",
+  "release": "contextual-conversation-1.8.4",
+  "current_release_backend": "82225a52056ea043416e4b9a39e713bd9601b2ce",
+  "integration_commit": "4909330c9c8133de0a59c0f7ec4d877a091a24c0",
+  "original_calendar_commit": "d07e682ca4f4181060caa11fe7d531ecf2edb3b5",
+  "classification_runtime_source_unchanged": true,
+  "complete_backend_suite": {
+    "tests": 2014,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ruff": "passed",
+  "versioned_mvp_assets": "matched",
+  "classification_saved_predictions_replayed": true,
+  "classification_live_model_evaluated": false,
+  "real_google_writes": false,
+  "production_deployed": false
+}
