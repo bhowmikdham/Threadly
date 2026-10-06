@@ -46,7 +46,12 @@ from app.schemas.assistant import (
 from app.schemas.command_plan import CommandPlanRequest, ConfirmCommandPlan
 from app.schemas.compound import CompoundRequest
 from app.schemas.continuation import TaskInputRequest
-from app.schemas.conversation import CalendarApprovalSetting, ConversationTurn
+from app.schemas.conversation import (
+    CalendarApprovalSetting,
+    ConversationTurn,
+    RecoverConversation,
+    SelectCalendarChoice,
+)
 from app.schemas.coordinator import CoordinatorRequest
 from app.schemas.draft_review import EditDraftRequest, ReviewDraftRequest
 from app.schemas.inbox_chat import InboxChatRequest, InboxPageRequest
@@ -94,6 +99,24 @@ async def delete_conversation(conversation_id: str, user_id: CurrentUser):
     from app.conversation import service
 
     return await service.remove(user_id, conversation_id)
+
+
+@router.post("/conversations/{conversation_id}/recover")
+async def recover_conversation(
+    conversation_id: str, body: RecoverConversation, user_id: CurrentUser
+):
+    from app.conversation.recovery import recover
+
+    return await recover(user_id, conversation_id, body)
+
+
+@router.post("/conversations/{conversation_id}/calendar-choice")
+async def select_calendar_choice(
+    conversation_id: str, body: SelectCalendarChoice, user_id: CurrentUser
+):
+    from app.conversation.service import choose_calendar
+
+    return await choose_calendar(user_id, conversation_id, body)
 
 
 @router.get("/conversations/{conversation_id}/calendar-approval")

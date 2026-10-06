@@ -88,8 +88,12 @@ def setup(db_sessionmaker, monkeypatch):
         return httpx.Response(
             200,
             json={
-                "timeMin": query["timeMin"],
-                "timeMax": query["timeMax"],
+                "timeMin": datetime.fromisoformat(query["timeMin"]).isoformat(
+                    timespec="milliseconds"
+                ),
+                "timeMax": datetime.fromisoformat(query["timeMax"]).isoformat(
+                    timespec="milliseconds"
+                ),
                 "calendars": {
                     item["id"]: {"errors": [{"reason": "secret-provider-detail"}]}
                     if state.unknown
@@ -437,3 +441,27 @@ def test_stale_preferences_are_reviewable_and_rebind_only_on_save(
     assert resaved.json()["version"] == 2
     body = {**window(), "expected_preferences_version": 2}
     assert db_client.post("/calendar/freebusy", headers=headers, json=body).status_code == 201
+
+
+def test_fractional_window_persists_exact_evidence_after_provider_rounding(
+    db_client, auth_headers, setup,
+):
+    headers = auth_headers(1)
+    saved_preferences = db_client.put("/calendar/preferences", headers=headers, json=save_body())
+    assert saved_preferences.status_code == 200
+    start = datetime.now(UTC).replace(microsecond=937225) + timedelta(minutes=1)
+    end = start + timedelta(hours=1)
+    body = {"expected_preferences_version": 1, "start": start.isoformat(), "end": end.isoformat()}
+    response = db_client.post("/calendar/freebusy", headers=headers, json=body)
+    assert response.status_code == 201, response.text
+    evidence = response.json()
+    assert datetime.fromisoformat(evidence["start"]) == start
+    assert datetime.fromisoformat(evidence["end"]) == end
+    assert evidence["coverage"] == "complete"
+    assert evidence["calendars"][0]["status"] == "known"
+    sent = json.loads(setup.calls[-1].content)
+    assert datetime.fromisoformat(sent["timeMin"]) == start.replace(microsecond=0)
+    expected_end = end.replace(microsecond=0) + timedelta(seconds=1)
+    assert datetime.fromisoformat(sent["timeMax"]) == expected_end
+    saved = db_client.get("/calendar/freebusy/" + evidence["id"], headers=headers)
+    assert saved.status_code == 200 and saved.json() == evidence

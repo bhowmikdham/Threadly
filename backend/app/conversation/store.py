@@ -271,7 +271,11 @@ async def complete(session, owner, request, lease, state, response):
     # same request context with this turn ID without retaining old provider facts.
     if state.get("calendar_read_request", {}).get("last_request_id") != request.request_id:
         state.pop("calendar_read_request", None)
-    if state.get("calendar_event_request", {}).get("last_request_id") != request.request_id:
+    # Unfinished event intent survives read-only detours. Explicit transitions,
+    # expiry and account fences invalidate it; a read cannot silently cancel it.
+    from app.calendar import event_choices
+
+    if not event_choices.pending(state):
         state.pop("calendar_event_request", None)
     compact(state, preserve_receipt_id=request.request_id)
     row.state_enc = encode(state)

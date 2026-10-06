@@ -21,6 +21,7 @@ from app.schemas.calendar import CalendarCoverage, CalendarEventsOut, FreeBusyOu
 from app.schemas.calendar_tools import (
     CALENDAR_READ_TOOLS,
     CalendarWindow,
+    CheckTimeAvailability,
     FindFreeTimes,
 )
 from tests.conftest import needs_pg
@@ -375,14 +376,19 @@ def test_search_service_rechecks_owner_and_preferences_after_google(db_sessionma
     assert calls[:2] == [("fixture-1", "calendar-a", "Team"), ("fixture-2", "calendar-b", "Team")]
 
 
-async def test_versioned_tool_replay_cases(read_provider, monkeypatch):
-    fixture = json.loads(
-        (
-            Path(__file__).parents[2]
-            / "docs/evaluation/calendar-agent-tools/replay-mail-context-v2.json"
-        ).read_text()
-    )
-    assert fixture["release"] == engine.RELEASE
+@pytest.mark.parametrize(
+    "fixture_path,release",
+    [
+        ("calendar-agent-tools/replay-v4.json", "contextual-conversation-1.5.0"),
+        ("calendar-event-language/replay-v1.json", "contextual-conversation-1.5.1"),
+        ("calendar-agent-tools/replay-mail-context-v2.json", "contextual-conversation-1.7.0"),
+        ("calendar-event-language/replay-v2.json", "contextual-conversation-1.7.1"),
+        ("calendar-event-language/replay-v3.json", "contextual-conversation-1.7.2"),
+    ],
+)
+async def test_versioned_tool_replay_cases(read_provider, monkeypatch, fixture_path, release):
+    fixture = json.loads((Path(__file__).parents[2] / "docs/evaluation" / fixture_path).read_text())
+    assert fixture["release"] == release
     for case in fixture["cases"]:
         args = CALENDAR_READ_TOOLS[case["tool"]][0].model_validate(case["arguments"])
         result = await tools.execute(42, case["tool"], args, case["user"], anchor=ANCHOR)
@@ -520,7 +526,9 @@ def test_committed_release_matches_current_prompt_and_tools():
     from app.schemas.conversation import tool_config
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
-    saved = json.loads((root / "contextual-conversation-1.7.0.json").read_text())
+    saved = json.loads(
+        (root.parent / "calendar-event-language/contextual-conversation-1.8.0.json").read_text()
+    )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())
     assert old["release"] == "contextual-conversation-1.2.5"
@@ -710,3 +718,77 @@ async def test_other_person_scope_does_not_query_owners_calendar(read_provider):
     )
     assert result["kind"] == "message"
     assert read_provider.calls == []
+
+
+@pytest.mark.parametrize("partial", [False, True])
+async def test_single_start_availability_never_claims_unchecked_time_is_free(
+    read_provider, partial
+):
+    read_provider.unknown = partial
+    args = CheckTimeAvailability(date_phrase="Thursday", at_time="14:00", at_time_source="2 p.m.")
+    result = await tools.execute(
+        42, "check_time_availability", args, "Am I free Thursday at 2 p.m.?", anchor=ANCHOR
+    )
+    assert result["calendar_tools"]["start"] == "2026-10-01T04:00:00+00:00"
+    assert result["calendar_tools"]["end"] == "2026-10-01T04:30:00+00:00"
+    assert "saved default 30-minute" in result["text"]
+    assert ("cannot confirm free time" in result["text"]) is partial
+    assert ("No busy time is recorded" in result["text"]) is not partial
+    assert all(call[0] in {"preferences", "freebusy"} for call in read_provider.calls)
+
+
+@pytest.mark.parametrize(
+    "instruction,fields",
+    [
+        ("Am I free Thursday at 2 pm?", {"at_time": "02:00"}),
+        ("Am I free Thursday at 2?", {"at_time": "2", "at_time_source": "2"}),
+        ("Am I free Thursday at 2 pm for 45 minutes?", {}),
+        ("Am I free Thursday at 2 pm or 4 pm?", {}),
+        ("Am I free Thursday at 2 pm in America/New_York?", {}),
+        ("Check Thursday at 2 pm and book it", {}),
+        (
+            "Am I free 2026-10-04 at 02:30?",
+            {"date_phrase": "2026-10-04", "at_time": "02:30", "at_time_source": "02:30"},
+        ),
+        ("Am I free this week at 2 pm?", {"date_phrase": "this week"}),
+    ],
+)
+async def test_single_start_preserves_constraints_before_provider_read(
+    read_provider, instruction, fields
+):
+    args = CheckTimeAvailability(
+        **{"date_phrase": "Thursday", "at_time": "14:00", "at_time_source": "2 pm", **fields}
+    )
+    result = await tools.execute(42, "check_time_availability", args, instruction, anchor=ANCHOR)
+    assert result["kind"] == "clarification"
+    assert not any(call[0] == "freebusy" for call in read_provider.calls)
+
+
+async def test_single_start_other_person_never_reads_self(read_provider):
+    args = CheckTimeAvailability(
+        subject="other", date_phrase="Thursday", at_time="14:00", at_time_source="2 pm"
+    )
+    result = await tools.execute(
+        42, "check_time_availability", args, "Is Alex free Thursday at 2 pm?", anchor=ANCHOR
+    )
+    assert "that person" in result["text"]
+    assert read_provider.calls == []
+
+
+async def test_single_start_busy_overlap_and_explicit_duration(read_provider):
+    args = CheckTimeAvailability(
+        date_phrase="Thursday",
+        at_time="10:30",
+        at_time_source="10:30 am",
+        duration_phrase="45 minutes",
+    )
+    result = await tools.execute(
+        42,
+        "check_time_availability",
+        args,
+        "Am I free Thursday at 10:30 am for 45 minutes?",
+        anchor=ANCHOR,
+    )
+    assert "Busy:" in result["text"] and "requested 45-minute" in result["text"]
+    assert "No busy time" not in result["text"]
+    assert result["calendar_tools"]["end"] == "2026-10-01T01:15:00+00:00"

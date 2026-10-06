@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from app.api.errors import ApiError
 from app.assistant.summary import digest
+from app.calendar import conversation_guard
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -127,6 +128,8 @@ async def run(context, runtime, model=None):
                     # requested operation before reserving a proposal.
                     calls += len(requests)
                     try:
+                        if conversation_guard.requires_preparation(runtime):
+                            raise conversation_guard.CalendarPreparationRequired
                         arguments = _merge_prepare_workflows(requests)
                         key = digest({"tool": "prepare_workflow", "input": arguments.model_dump()})
                         if key in seen:
@@ -135,6 +138,23 @@ async def run(context, runtime, model=None):
                         outcome = await runtime.call("prepare_workflow", arguments)
                         trace.append({"tool": "prepare_workflow", "status": "ok"})
                         return {**outcome, "release": RELEASE, "trace": trace}
+                    except conversation_guard.CalendarPreparationRequired:
+                        trace.append(
+                            {
+                                "tool": "prepare_workflow",
+                                "status": "invalid",
+                                "reason": "calendar_preparation_required",
+                            }
+                        )
+                        results = [
+                            _tool_error(
+                                call["toolUseId"],
+                                "calendar_preparation_required",
+                                "Use prepare_calendar_event for this Calendar request. "
+                                "Preserve the supplied title, date and time.",
+                            )
+                            for call in requests
+                        ]
                     except (ValidationError, ValueError):
                         trace.append({"tool": "prepare_workflow", "status": "invalid"})
                         message = (
@@ -166,6 +186,17 @@ async def run(context, runtime, model=None):
                             raise ValueError("Unknown tool")
                         if name in TERMINAL and len(requests) != 1:
                             raise ValueError("Use a terminal tool alone after observations")
+                        if name in (
+                            set(CALENDAR_READ_TOOLS)
+                            | {
+                                "prepare_workflow",
+                                "answer_question",
+                                "read_calendar",
+                                "check_day_availability",
+                                "retry_calendar_read",
+                            }
+                        ) and conversation_guard.requires_preparation(runtime):
+                            raise conversation_guard.CalendarPreparationRequired
                         arguments = TOOLS[name][0].model_validate(values)
                         key = digest({"tool": name, "input": arguments.model_dump(mode="json")})
                         if name != "respond" and key in seen:
@@ -178,7 +209,9 @@ async def run(context, runtime, model=None):
                         if name != "respond":
                             seen.add(key)
                         if name == "respond":
-                            outcome = validate_response(arguments, runtime)
+                            outcome = await conversation_guard.respond(runtime, arguments)
+                            if outcome is None:
+                                outcome = validate_response(arguments, runtime)
                         else:
                             outcome = await runtime.call(name, arguments)
                         trace.append({"tool": name, "status": outcome.get("error_code", "ok")})
@@ -253,6 +286,27 @@ async def run(context, runtime, model=None):
                                     "A source-free clarification should ask only for "
                                     "missing information. Remove the order ranking, or "
                                     "read and cite the source before answering."
+                                ),
+                            }
+                        }
+                        status = "error"
+                    except conversation_guard.CalendarPreparationRequired:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_preparation_required",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_preparation_required",
+                                "message": (
+                                    "Use prepare_calendar_event for this Calendar request. "
+                                    "Preserve the supplied title, date and time; ask only for "
+                                    "missing fields through that tool. Use continue_previous=true "
+                                    "for a pending event answer. A prose reply cannot establish "
+                                    "that an event was queued or created."
                                 ),
                             }
                         }
@@ -392,6 +446,9 @@ async def run(context, runtime, model=None):
         raise ApiError(
             503, "conversation_unavailable", "I couldn’t finish that response. Retry this message."
         ) from None
+    calendar_failure = conversation_guard.exhausted(runtime)
+    if calendar_failure:
+        return {**calendar_failure, "release": RELEASE, "trace": trace}
     # A search can reach the finite tool or transcript budget after returning
     # useful cards. Preserve those bounded results instead of turning a
     # recoverable discovery request into an HTTP error. Never infer a fact from

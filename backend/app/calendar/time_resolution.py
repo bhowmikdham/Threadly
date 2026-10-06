@@ -8,11 +8,11 @@ from app.calendar.availability import fits_working
 
 
 def parse_clock(value, meridiem=None):
-    match = re.fullmatch(r"(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?", value.strip().lower())
+    match = re.fullmatch(r"(\d{1,2})(?::([0-5]\d))?\s*([ap]\.?\s*m\.?)?", value.strip().lower())
     if not match:
         raise ValueError("Use a clock time such as 4, 4 pm or 16:00.")
     hour, minute = int(match[1]), int(match[2] or 0)
-    suffix = match[3].upper() if match[3] else None
+    suffix = re.sub(r"[.\s]", "", match[3]).upper() if match[3] else None
     if suffix and meridiem and suffix != meridiem:
         raise ValueError("Clock time and meridiem conflict.")
     suffix = suffix or meridiem
