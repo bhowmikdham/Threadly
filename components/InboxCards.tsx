@@ -75,9 +75,15 @@ export function InboxCards({
   const timezone = displayTimezone(page.filters.timezone)
   const from = mailDateBound(page.filters.received_from, timezone)
   const before = mailDateBound(page.filters.received_before, timezone)
+  const inboxScope =
+    page.filters.inbox_category === "primary"
+      ? "Primary Inbox"
+      : page.filters.inbox_category === "all"
+        ? "All Inbox categories"
+        : "Inbox"
   const folder =
     page.filters.folder === "INBOX"
-      ? "Inbox"
+      ? inboxScope
       : page.filters.folder === "SENT"
         ? "Sent"
         : ["all_mail", "all_synced"].includes(page.filters.folder)
