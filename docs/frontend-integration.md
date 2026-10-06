@@ -80,6 +80,11 @@ sequenceDiagram
   email/assistant HTML, images and link destinations are never executed.
   A Sources excerpt is omitted only when its explicit reference and text are
   already represented by a card; distinct evidence remains available.
+- The voice consumer accepts both legacy text and `{text, showChat}` replies.
+  Only `text` reaches speech; the structured flag controls whether selectable
+  results remain visible. This completes the callback contract introduced by
+  frontend change `18c9f12` (maintained base `db11122`) without adding speech
+  acknowledgements or changing resource cleanup.
 - Threadly access and renewal credentials use `chrome.storage.local` restricted
   to `TRUSTED_CONTEXTS` before any storage migration or request handling. They
   survive extension reloads and browser restarts; content scripts cannot read

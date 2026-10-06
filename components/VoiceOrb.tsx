@@ -298,18 +298,20 @@ export async function speak(text: string, onLevel: (level: number) => void) {
 // Voice mode: a spoken back-and-forth with Threadly. The orb listens, thinks
 // and answers aloud, then listens again, until the user closes it. Requests
 // and replies also land in the chat, where drafts and approvals are handled.
+export type VoiceReply = string | { text: string; showChat: boolean }
+
 export function VoiceOrb({
   respond,
   onClose
 }: {
-  respond: (said: string) => Promise<string>
+  respond: (said: string) => Promise<VoiceReply>
   onClose: (error?: string) => void
 }) {
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
-    // Once Threadly speaks, the orb glides to the top so the chat, showing the
-    // reply as it would for a typed request, stays readable below it.
+    // Structured replies reveal selectable cards when requested. Legacy text
+    // replies retain their original behavior of docking after speech.
     [docked, setDocked] = useState(false)
   const overlay = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<Phase>("listening")
@@ -372,7 +374,7 @@ export function VoiceOrb({
       try {
         r.stop()
       } catch {}
-      let answer: string
+      let answer: VoiceReply
       try {
         answer = await respond(said)
       } catch {
@@ -380,8 +382,11 @@ export function VoiceOrb({
       }
       if (stopped || closed.current) return
       move("speaking")
-      setDocked(true)
-      await speak(answer, (value) => (voice.level = value))
+      setDocked(typeof answer === "string" ? true : answer.showChat)
+      await speak(
+        typeof answer === "string" ? answer : answer.text,
+        (value) => (voice.level = value)
+      )
       if (!stopped && !closed.current) listen()
     }
     r.onresult = (e: any) => {
