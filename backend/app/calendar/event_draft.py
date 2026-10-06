@@ -31,6 +31,26 @@ class IncompleteEventTitle(ValueError):
         super().__init__("Preserve the complete user-supplied event title")
 
 
+class FieldRepairRequired(ValueError):
+    """Safe model feedback; never retain rejected values or source text in a trace."""
+
+    def __init__(self, field, *, interpretation=False):
+        self.field = field if field in FIELDS else "event"
+        self.code = (
+            "calendar_field_interpretation_mismatch"
+            if interpretation
+            else "calendar_field_source_mismatch"
+        )
+        super().__init__(self.code)
+
+
+def literal_field(value, text, field):
+    try:
+        return literal(value, text)
+    except RequestClarification:
+        raise FieldRepairRequired(field) from None
+
+
 def evidence(arguments):
     values = [arguments.get(SOURCE_FIELDS.get(field, field)) for field in FIELDS]
     return "\n".join(
@@ -134,9 +154,11 @@ def merge(runtime, args, pending):
         field = change.field
         if field in supplied:
             raise ValueError("Use either a field change or a legacy value for each field")
-        literal(change.source, latest)
+        literal_field(change.source, latest, field)
         if change.operation in {"clear", "remove"}:
-            literal(change.source, re.sub(r'"[^"\n]*"|“[^”\n]*”|`[^`\n]*`', " ", latest))
+            literal_field(
+                change.source, re.sub(r'"[^"\n]*"|“[^”\n]*”|`[^`\n]*`', " ", latest), field
+            )
             if not re.search(r"\b(?:clear|remove|delete|drop|without|no)\b", change.source, re.I):
                 raise RequestClarification("Please explicitly say which event field to clear.")
             names = {
@@ -159,7 +181,7 @@ def merge(runtime, args, pending):
         if change.operation == "remove":
             previous = old.get("attendees", [])
             for address in change.value:
-                literal(address, change.source)
+                literal_field(address, change.source, field)
                 if address not in previous:
                     raise RequestClarification("That guest is not in the pending event.")
             supplied[field] = [v for v in previous if v not in change.value]
@@ -178,7 +200,7 @@ def merge(runtime, args, pending):
                 supplied[SOURCE_FIELDS[field]] = change.source
             if field not in SOURCE_FIELDS:
                 for entry in value if isinstance(value, list) else [value]:
-                    literal(entry, change.source)
+                    literal_field(entry, change.source, field)
         changes[field] = {
             "operation": change.operation,
             "source": change.source,

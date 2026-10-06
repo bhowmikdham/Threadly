@@ -1351,3 +1351,20 @@ cannot replay an event card through the preparation tool. Proposed direct events
 explain when they use the saved default duration; this explanation is tied to the
 immutable candidate's source metadata. Request/approval envelopes and execution
 authority are unchanged.
+
+### Single-time Calendar availability presentation (conversation 1.8.4)
+
+A `check_time_availability` response keeps `kind: message` and concise `text`.
+Its optional `calendar_tools` payload now additionally contains:
+
+- `availability`: `free`, `busy`, or `unknown`; partial checks may report known busy
+  intervals but never confirm free time.
+- `scope: selected_calendars`, `complete`, and existing `coverage`.
+- `duration_source`: `saved_default` or `requested`, plus existing `duration_minutes`.
+- `busy_periods`: at most ten clipped `{start,end}` ISO intervals and `busy_period_count`.
+
+Existing `date`, `start`, `end`, `timezone`, `checked_at`, `expires_at`, and `evidence_id`
+remain. The payload is live evidence, not an event preview or permission to create one.
+Clients should show it alongside the answer, mark expired evidence as historical, and
+never infer event titles or another person's availability. Older responses without these
+fields remain valid text responses. These card details are not persisted in history.

@@ -197,10 +197,14 @@ async def test_untrusted_or_mismatched_change_does_not_supersede(
     await ready(db_sessionmaker)
     request = turn("Create Focus at 2pm tmrw and invite guest@example.test")
     first = await run(db_sessionmaker, request, {**ARGS, "attendees": ["guest@example.test"]})
-    result = await run(
-        db_sessionmaker,
+    result = await service.turn(
+        1,
         turn(text, conversation_id=request.conversation_id, expected_version=first["version"]),
-        {"continue_previous": True, "changes": changes},
+        factory=db_sessionmaker,
+        model=Model(
+            tool("prepare_calendar_event", continue_previous=True, changes=changes),
+            tool("respond", kind="clarification", text="Which field would you like to change?"),
+        ),
     )
     assert result["kind"] == "clarification", result
     async with db_sessionmaker() as db:
@@ -270,13 +274,18 @@ async def test_quoted_or_reported_removal_cannot_authorize_change(
     await ready(db_sessionmaker)
     request = turn("Create Focus at 2pm tmrw in Room B")
     first = await run(db_sessionmaker, request, {**ARGS, "location": "Room B"})
-    result = await run(
-        db_sessionmaker,
+    result = await service.turn(
+        1,
         turn(text, conversation_id=request.conversation_id, expected_version=first["version"]),
-        {
-            "continue_previous": True,
-            "changes": [{"field": "location", "operation": "clear", "source": "clear location"}],
-        },
+        factory=db_sessionmaker,
+        model=Model(
+            tool(
+                "prepare_calendar_event",
+                continue_previous=True,
+                changes=[{"field": "location", "operation": "clear", "source": "clear location"}],
+            ),
+            tool("respond", kind="clarification", text="Which field would you like to change?"),
+        ),
     )
     assert result["kind"] == "clarification"
     async with db_sessionmaker() as db:

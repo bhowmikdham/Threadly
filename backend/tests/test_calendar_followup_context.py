@@ -60,8 +60,8 @@ def provider(monkeypatch):
             policy_version="calendar-read-1.0.0",
             start=body.start,
             end=body.end,
-            checked_at=ANCHOR,
-            expires_at=ANCHOR + timedelta(minutes=5),
+            checked_at=state.get("checked_at", ANCHOR),
+            expires_at=state.get("checked_at", ANCHOR) + timedelta(minutes=5),
             coverage=state["coverage"],
             calendars=[
                 CalendarCoverage(
@@ -274,7 +274,7 @@ async def test_single_start_retry_keeps_time_and_date_across_midnight(provider):
     args = CheckTimeAvailability(**DATE, at_time="14:00", at_time_source="2 pm")
     await runtime(state, "am i free at 2 pm tmrw?").call("check_time_availability", args)
     first = provider["calls"][-1][1]
-    provider["coverage"] = "complete"
+    provider.update(coverage="complete", checked_at=datetime(2026, 10, 5, 15, tzinfo=UTC))
     result = await runtime(state, "check now", anchor=datetime(2026, 10, 5, 15, tzinfo=UTC)).call(
         "retry_calendar_read", RetryCalendarRead()
     )

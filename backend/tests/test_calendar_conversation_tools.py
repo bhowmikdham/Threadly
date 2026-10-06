@@ -393,7 +393,12 @@ async def test_versioned_tool_replay_cases(read_provider, monkeypatch, fixture_p
         args = CALENDAR_READ_TOOLS[case["tool"]][0].model_validate(case["arguments"])
         result = await tools.execute(42, case["tool"], args, case["user"], anchor=ANCHOR)
         assert result["kind"] == case["kind"], case["id"]
-        assert case["text"] in result["text"], case["id"]
+        if case["tool"] == "check_time_availability" and case["text"] == "Busy:":
+            # Historical prose is retained; current presentation leads with the answer.
+            assert result["text"].startswith("No, you're busy"), case["id"]
+            assert result["calendar_tools"]["availability"] == "busy"
+        else:
+            assert case["text"] in result["text"], case["id"]
 
 
 @needs_pg
@@ -527,7 +532,7 @@ def test_committed_release_matches_current_prompt_and_tools():
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
     saved = json.loads(
-        (root.parent / "inbox-presentation/contextual-conversation-1.8.3.json").read_text()
+        (root.parent / "calendar-field-repair/contextual-conversation-1.8.4.json").read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())
@@ -731,9 +736,9 @@ async def test_single_start_availability_never_claims_unchecked_time_is_free(
     )
     assert result["calendar_tools"]["start"] == "2026-10-01T04:00:00+00:00"
     assert result["calendar_tools"]["end"] == "2026-10-01T04:30:00+00:00"
-    assert "saved default 30-minute" in result["text"]
-    assert ("cannot confirm free time" in result["text"]) is partial
-    assert ("No busy time is recorded" in result["text"]) is not partial
+    assert "default 30-minute" in result["text"]
+    assert ("can't confirm whether you're free" in result["text"]) is partial
+    assert result["text"].startswith("Yes, you're free") is not partial
     assert all(call[0] in {"preferences", "freebusy"} for call in read_provider.calls)
 
 
@@ -789,6 +794,6 @@ async def test_single_start_busy_overlap_and_explicit_duration(read_provider):
         "Am I free Thursday at 10:30 am for 45 minutes?",
         anchor=ANCHOR,
     )
-    assert "Busy:" in result["text"] and "requested 45-minute" in result["text"]
+    assert result["text"].startswith("No, you're busy") and "requested 45-minute" in result["text"]
     assert "No busy time" not in result["text"]
     assert result["calendar_tools"]["end"] == "2026-10-01T01:15:00+00:00"

@@ -1,0 +1,37 @@
+{
+  "release": "contextual-conversation-1.8.4",
+  "checked_at": "2026-10-06T13:28:22.433510+00:00",
+  "base_commit": "221d633a6942e18128a9914d8e84116f8459847b",
+  "evaluation_mode": "scripted model decisions; synthetic Google adapters; isolated PostgreSQL",
+  "assets": {
+    "release": "contextual-conversation-1.8.4",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+    "prompt_hash": "473baa5c67036d219acb40ed794fdb3e9fee1bb2c7bd7ce6169ca2c6be65b648",
+    "tools_hash": "2a3e0a055acc3fb0e5667004e2de80314b40070bbc18e90effacf2da7f7b6225",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120
+  },
+  "sha256": {
+    "backend/tests/test_calendar_field_repair.py": "d45a9e17e82a61571aa6f53f27ba486628eeb07ab6aa990b0433c94309face5c",
+    "backend/tests/test_calendar_availability_presentation.py": "0163c0c9d4558804ff2543be453065fd2aeadecefc492ad55094bdc2e68d6a27",
+    "backend/app/calendar/event_draft.py": "ea8eb5582efa00d80b484df7d3e931d75251b119142b7e1960fc82b1920e0210",
+    "backend/app/calendar/event_creation.py": "b34499f13d3159300cd15246590dd8ef382f6fe7dfab514c26f15788461a8e20",
+    "backend/app/calendar/conversation_tools.py": "ffd50e80813d6614a0e636fec8c59f3b61c948098bcae827c361347d4a04d590",
+    "backend/app/conversation/engine.py": "77a1c1b9bddad945ad75a1247ef693e8ad8e79051d4cd96cbf99f3d178ef394d",
+    "backend/app/conversation/prompt.py": "942cb19c178d4fbead1dadc16d96d0d728758751af9b9514cf9e81cb18299ce0"
+  },
+  "snapshot_sha256": "431fea6e9ff9cbff7c14f40f9c235ebe405acd32e333189979c75a66150f9347",
+  "complete_backend_suite": {
+    "tests": 1917,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": "ruff app/tests/tools passed",
+  "live_model_evaluated": false,
+  "real_google_writes": false,
+  "production_deployed": false
+}
