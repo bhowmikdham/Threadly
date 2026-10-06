@@ -89,6 +89,22 @@ revalidate source fingerprints on independent reads before execution. Kill switc
 per-user pilot gates and exact-payload approval remain unchanged. Nothing here grants
 send or Calendar write permissions.
 
+## Primary Inbox and today status
+
+Conversation `1.8.5` defaults unqualified Inbox to Gmail `category:primary`, combined
+with `in:inbox`. `search_mail.inbox_category=all` explicitly includes all Inbox categories.
+Public `InboxFilters.inbox_category` defaults to `all` for existing API clients; `primary`
+is valid only with `folder=INBOX`. Both values bind signed cursors. Old cursors require a
+fresh search after the version change. Legacy replicated mode cannot reproduce Gmail's
+Primary view and remains unavailable for this conversation search.
+
+A latest-message request without a date restriction also receives a separate `today_check`.
+Its status is `no_messages`, `has_messages` or `unknown`, with exact local-day bounds,
+timezone and the same folder/category/query/sender. Only exhausted empty provider results
+prove absence; page limits, filtered hits, failures and timeouts never become zero-mail
+claims. This read uses at most five bounded provider pages and ten seconds; latest-mail
+pagination/selection is independent. It does not change Gmail labels or settings.
+
 ## Deployment and rollback
 
 `deploy-app.sh` stops all older workers, including an existing sync worker. It starts only

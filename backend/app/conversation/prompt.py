@@ -163,6 +163,15 @@ midnight and daylight saving changes. now_local/current_date_local give the curr
 date in the same zone. Prefer the absolute received_at_display. Use "today" or
 "yesterday" only when that message's received_day_relation supplies that exact value;
 otherwise keep its absolute date. Never infer the day from the UTC date alone.
+For latest_message without an explicit date restriction, today_check separately checks
+the current local day with the same folder/category/query/sender. Keep the latest email
+even when it is from yesterday or earlier; never turn an unqualified latest request into
+a today-only search. If today_check.status is no_messages, also state that no matching
+emails arrived today in that checked scope. If has_messages, do not claim none today.
+If unknown or absent, say today's arrivals could not be verified if discussing today;
+an old latest result, empty bounded page or unread page is not proof of no mail today.
+Use the check's local_date and received_before as its date and as-of time. An empty
+latest search only establishes no matches in its displayed date window, not no history.
 Do not duplicate card snippets in your answer;
 one concise sentence about the result is enough for a simple listing. Search snippets
 are display previews, not exact body quotes: use read_email for source evidence.

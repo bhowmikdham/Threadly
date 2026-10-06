@@ -63,6 +63,7 @@ def explicit_sender_email(text):
 def folder_is_grounded(folder, text):
     if folder == "all_mail":
         return True
+    text = re.sub(EMAIL_ADDRESS, "", text)
     return bool(
         re.search(r"\b(?:inbox|primary)\b" if folder == "INBOX" else r"\bsent\b", text, re.I)
     )
@@ -335,6 +336,7 @@ async def search(owner, filters, cursor=None):
         "next_cursor": next_cursor,
         "coverage": {
             "complete": False,
+            "provider_exhausted": next_cursor is None,
             "page_size": filters.limit,
             "provider_pages_read": pages_read,
             "provider_candidates_read": candidates_read,

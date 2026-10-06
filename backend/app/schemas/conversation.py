@@ -216,6 +216,8 @@ TOOLS = {
             "INBOX defaults to inbox_category='primary' (Gmail Primary Inbox). "
             "Use inbox_category='all' only for an explicit request for all Inbox categories, "
             "including Promotions/Social. The category is ignored outside INBOX. "
+            "latest_message without date_phrase also checks today's arrivals in the same "
+            "scope; use today_check to state verified no arrivals today, or uncertainty. "
             "Default coverage is the past year. No mailbox import."
         ),
     ),

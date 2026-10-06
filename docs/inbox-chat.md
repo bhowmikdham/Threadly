@@ -1,4 +1,4 @@
-# Conversational inbox discovery — inbox-chat-1.1.0
+# Conversational inbox discovery — inbox-chat-1.2.0
 
 The extension accepts “Show me all the GYG emails” in the normal composer. A request
 such as “Find emails from person@example.com” searches that exact From address.
@@ -30,8 +30,9 @@ Unknown fields are rejected. The response has `release` and one of:
 `filters` contains `schema_version: 1.0`, literal `query` (which may be empty),
 `sender_email` (an exact address or empty), `folder` (`all_mail`, `INBOX`, `SENT`),
 UTC `received_from` / `received_before`, validated IANA `timezone` (legacy default UTC),
-`limit` (1–5; the legacy interpreter uses 5)
-and `cursor: null`. The address is a separate constraint, not part of the quoted
+`limit` (1–5; the legacy interpreter uses 5), `inbox_category` (`primary` or `all`)
+and `cursor: null`. Primary is valid only with INBOX. The interpreter defaults Inbox
+to Primary; old API filter payloads omit the field and retain all-category semantics. The address is a separate constraint, not part of the quoted
 search phrase. Only a user-written “from” or “sent by” address can set it.
 Each result contains `message_id`, `thread_id`, `subject`, `sender`, `received_at`,
 plain `snippet` (up to 220 characters), nullable `flight`. IDs are owned live Gmail

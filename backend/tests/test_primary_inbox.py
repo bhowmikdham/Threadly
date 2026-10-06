@@ -180,6 +180,7 @@ async def test_runtime_defaults_primary_and_preserves_explicit_category_across_p
     await subject.search(None)
     assert [(f.inbox_category, f.limit, cursor) for f, cursor in seen] == [
         (category, 1, None),
+        (category, 1, None),  # Independent local-day check; original cursor is retained.
         (category, 1, "next"),
     ]
 

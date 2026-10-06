@@ -21,6 +21,7 @@ from app.capabilities.service import build_capabilities
 from app.config import get_settings
 from app.conversation import calendar_context, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
+from app.mail.inbox_status import check_today
 from app.mail.presentation import clock_context, received_display
 from app.schemas.assistant import AssistantRequest, DraftOptions
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
@@ -809,7 +810,11 @@ class Runtime:
                         date_phrase = ""
                     folder = (
                         "INBOX"
-                        if inbox_chat.folder_is_grounded("INBOX", self.request.instruction)
+                        if re.search(
+                            r"\binbox\b",
+                            re.sub(inbox_chat.EMAIL_ADDRESS, "", self.request.instruction),
+                            re.I,
+                        )
                         else "all_mail"
                     )
             user_text = "\n".join(
@@ -845,6 +850,10 @@ class Runtime:
             filters = InboxFilters.model_validate_json(json.dumps(previous["filters"]))
             cursor = previous["next_cursor"]
         page = await inbox_chat.search(self.owner, filters, cursor)
+        if args is not None and args.selection == "latest_message" and not date_phrase:
+            page["today_check"] = await check_today(self.owner, filters, self.mail_anchor)
+        elif args is None and self.search_page and "today_check" in self.search_page:
+            page["today_check"] = self.search_page["today_check"]
         if args is not None and self.fresh_search_scope:
             self.fresh_search_done = True
         if args is not None:
@@ -913,6 +922,7 @@ class Runtime:
             "coverage": page["coverage"],
             "date_window": page["filters"],
             "displayed_result_order": self.state["result_order"],
+            **({"today_check": page["today_check"]} if "today_check" in page else {}),
         }
 
     async def read(self, reference, scope="selected_message"):
