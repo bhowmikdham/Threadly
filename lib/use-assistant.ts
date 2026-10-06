@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { api, errorText, requestId } from "./api"
+import { calendarAvailability } from "./calendar-availability"
 import { activeGmail, capture } from "./context"
 import type {
   Artifact,
@@ -844,6 +845,7 @@ export function useAssistant(user: User) {
       calendarChoices: turn.calendar_choices,
       error: undefined,
       errorCode: turn.error_code,
+      calendarAvailability: calendarAvailability(turn.calendar_tools),
       calendarAction: turn.calendar_action,
       calendarActionId: turn.calendar_action_id
     })
@@ -980,6 +982,19 @@ export function useAssistant(user: User) {
       submitting.current = false
       setBusy(false)
     }
+  }
+  const canRecheckAvailability = (entry: Entry) =>
+    Boolean(entry.calendarAvailability) &&
+    !busy &&
+    !restoring &&
+    !restoreFailed &&
+    !contextBlocked &&
+    !unresolvedTurn() &&
+    entry.conversationId === conversation.current.id &&
+    entry.conversationVersion === conversation.current.version
+  const recheckAvailability = async (entry: Entry) => {
+    if (!canRecheckAvailability(entry)) return
+    await submit("Check that availability again")
   }
   const canChooseCalendar = (entry: Entry) =>
     !busy &&
@@ -1378,6 +1393,8 @@ export function useAssistant(user: User) {
     retry,
     chooseCalendar,
     canChooseCalendar,
+    recheckAvailability,
+    canRecheckAvailability,
     canRetry: (entry: Entry) => retryTurn.current?.id === entry.id,
     deleteChat,
     confirm,

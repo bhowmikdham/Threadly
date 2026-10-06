@@ -244,7 +244,15 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     }
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
-      if (body.instruction === "could you create Meeting at 4 pm") {
+      if (
+        [
+          "am I free at 5pm tomorrow",
+          "am I free at 6pm tomorrow",
+          "Check that availability again"
+        ].includes(body.instruction)
+      )
+        p = "/fixture/calendar-availability"
+      else if (body.instruction === "could you create Meeting at 4 pm") {
         pendingEvents.set(body.conversation_id, {
           version: body.expected_version + 1
         })
@@ -324,7 +332,35 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
     const stranded = control.strandedConversation
-    if (p === "/fixture/calendar-date") {
+    if (p === "/fixture/calendar-availability") {
+      const partial = body.instruction === "am I free at 6pm tomorrow"
+      const free = body.instruction === "Check that availability again"
+      const start = partial ? "2026-10-07T07:00:00Z" : "2026-10-07T06:00:00Z"
+      const end = partial ? "2026-10-07T07:30:00Z" : "2026-10-07T06:30:00Z"
+      data = {
+        kind: "message",
+        text: partial
+          ? "I can't confirm whether you're free tomorrow at 6 pm. Some selected calendars couldn't be checked."
+          : `${free ? "Yes, you're free" : "No, you're busy"} tomorrow at 5 pm. I checked your saved default 30-minute slot on your selected calendars.`,
+        ...(partial ? { error_code: "calendar_coverage_incomplete" } : {}),
+        calendar_tools: {
+          operation: "check_time_availability",
+          scope: "selected_calendars",
+          availability: partial ? "unknown" : free ? "free" : "busy",
+          date: "2026-10-07",
+          start,
+          end,
+          timezone: "Australia/Melbourne",
+          duration_minutes: 30,
+          duration_source: "saved_default",
+          complete: !partial,
+          coverage: partial ? "unknown" : "complete",
+          checked_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 300_000).toISOString(),
+          busy_periods: !partial && !free ? [{ start, end }] : []
+        }
+      }
+    } else if (p === "/fixture/calendar-date") {
       data = {
         kind: "clarification",
         text: "What day should I use for Meeting at 4 pm?"
