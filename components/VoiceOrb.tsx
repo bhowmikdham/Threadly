@@ -280,8 +280,12 @@ export async function speak(text: string, onLevel: (level: number) => void) {
       source.start()
       frame = requestAnimationFrame(tick)
     })
-  } catch (e) {
-    console.warn("[voice] ElevenLabs failed, falling back to browser voice:", e)
+  } catch (e: any) {
+    console.warn("[voice] failed", {
+      status: e?.status,
+      code: e?.code,
+      message: e?.message
+    })
     if (!session.cancelled) await speakWithBrowser(text, onLevel)
   } finally {
     cancelAnimationFrame(frame)
