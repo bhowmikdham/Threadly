@@ -19,7 +19,7 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
-from app.conversation import calendar_context, mail_context
+from app.conversation import calendar_context, email_draft, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.mail.presentation import received_display
 from app.schemas.assistant import AssistantRequest, DraftOptions
@@ -114,7 +114,7 @@ def _recipient_question(value):
             value,
             re.I,
         )
-    )
+    ) or bool(re.search(r"\bwho(?:['’]s| is) it for\b", value, re.I))
 
 
 def _user_recipient_entries(user_text, history=(), latest_turn=""):
@@ -687,6 +687,7 @@ class Runtime:
             "previous_calendar_request": calendar_context.model_context(self.state),
             "remembered_email_sources": mail_context.model_context(self.state),
             "pending_calendar_event": event_choices.model_context(self.state),
+            "pending_email_draft": email_draft.model_context(self.state),
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -713,6 +714,8 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        if name == "prepare_email_draft":
+            return await email_draft.prepare(self, args)
         if name == "list_calendars":
             from app.calendar import event_choices
 
@@ -1153,6 +1156,13 @@ class Runtime:
         validate_workflow_bindings(
             args, set(self.loaded), set(self.recipients), self.recipient_roles
         )
+        if (
+            args.intent == "compose"
+            and not args.reference
+            and not args.compound
+            and not getattr(self, "email_draft_prepared", False)
+        ):
+            raise email_draft.EmailDraftRequired
         scope = args.source_scope
         ref = self.state["refs"].get(args.reference, {})
         if scope == "visible_thread" and not ref.get("context_id"):
@@ -1258,6 +1268,11 @@ class Runtime:
             task = await tasks.submit(
                 session, self.owner, request, workflow=workflow, provenance=provenance
             )
+            if getattr(self, "email_draft_prepared", False) and task.route is None:
+                task.route = email_draft.ready_route()
+                tasks.add_event(
+                    session, task, "task.routed", {"intent": "compose", "route_status": "ready"}
+                )
             view = await task_view(session, task)
             self.state["active_task_id"] = task.id
             self.state.pop("proposal_id", None)

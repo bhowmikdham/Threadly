@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
+from app.conversation import email_draft
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -22,6 +23,7 @@ TERMINAL = set(CALENDAR_READ_TOOLS) | {
     "respond",
     "prepare_calendar_event",
     "prepare_workflow",
+    "prepare_email_draft",
     "answer_question",
     "revise_draft",
     "read_calendar",
@@ -211,6 +213,12 @@ async def run(context, runtime, model=None):
                         if name == "respond":
                             outcome = await conversation_guard.respond(runtime, arguments)
                             if outcome is None:
+                                if (
+                                    arguments.kind != "clarification"
+                                    and hasattr(runtime, "request")
+                                    and email_draft.requires_preparation(runtime)
+                                ):
+                                    raise email_draft.EmailDraftRequired
                                 outcome = validate_response(arguments, runtime)
                         else:
                             outcome = await runtime.call(name, arguments)
@@ -397,6 +405,22 @@ async def run(context, runtime, model=None):
                                     "for a pending event answer. A prose reply cannot establish "
                                     "that an event was queued or created."
                                 ),
+                            }
+                        }
+                        status = "error"
+                    except email_draft.EmailDraftRequired:
+                        trace.append(
+                            {"tool": name, "status": "invalid", "reason": "email_draft_required"}
+                        )
+                        result = {
+                            "json": {
+                                "error": "email_draft_required",
+                                "message": "Use prepare_email_draft for standalone composition. "
+                                "Copy recipient and purpose from USER text, retaining pending "
+                                "fields on follow-ups. Leave missing fields empty; do not ask "
+                                "for a subject or exact address just to compose. When both "
+                                "are known, supply the generated subject/body in draft. "
+                                "Never show this diagnostic to the user.",
                             }
                         }
                         status = "error"
