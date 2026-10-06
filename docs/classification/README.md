@@ -200,6 +200,7 @@ mock/fixture passes do not establish model quality.
 
 ## Frontend artifacts
 
+- [Backend deployment, activation and rollback](DEPLOYMENT.md).
 - [Request schema](request.schema.json) and [response schema](response.schema.json),
   exported from runtime models; semantic state checks also execute in Python.
 - [Synthetic frontend fixtures](frontend-fixtures.json) for classified, needs-review

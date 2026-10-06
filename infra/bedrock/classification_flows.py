@@ -192,7 +192,7 @@ def run(args, aws=None):
             provision.write_json(args.output / (key + ".target.json"), target.model_dump())
             provision.write_json(args.output / (key + ".caller-policy.json"), caller_policy(target))
             provision.write_json(args.output / "manifest.json", manifest)
-            print(f"Published and verified {key}: {target.flow_arn} version {target.version}", flush=True)
+            print(f"Published {key}: {target.flow_arn} version {target.version}", flush=True)
         manifest["status"] = "published_selected_model_not_enabled"
     except Exception:
         manifest["status"] = "incomplete"

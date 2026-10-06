@@ -23,6 +23,10 @@ async def readyz() -> dict:
         from app.workflows.auxiliary import load_manifest as auxiliary_manifest
 
         auxiliary_manifest()
+        if get_settings().classification_enabled:
+            from app.classification.service import release
+
+            release()
         checks["workflow_configuration"] = True
     except ApiError:
         pass

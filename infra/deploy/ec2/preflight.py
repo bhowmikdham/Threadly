@@ -2,9 +2,10 @@
 
 import re
 
-from app.config import get_settings
 from cryptography.fernet import Fernet
 from sqlalchemy.engine import make_url
+
+from app.config import get_settings
 
 BEDROCK_PROFILE = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
 SUPPORTED_BEDROCK_REGIONS = {"ap-southeast-2", "ap-southeast-4"}
@@ -55,13 +56,28 @@ def main():
         or settings.mailbox_background_sync_enabled
     ):
         raise SystemExit(
-            "Staging requires GMAIL_SOURCE_MODE=on_demand and MAILBOX_BACKGROUND_SYNC_ENABLED=false."
+            "Staging requires GMAIL_SOURCE_MODE=on_demand "
+            "and MAILBOX_BACKGROUND_SYNC_ENABLED=false."
         )
     print("Gmail on-demand reads configured; mailbox replication disabled.")
     from app.workflows import auxiliary, registry
 
     registry.load_manifest()
     auxiliary.load_manifest()
+    if settings.classification_enabled:
+        from app.api.errors import ApiError
+        from app.classification.service import release
+
+        if settings.classification_transport != "bedrock_flow":
+            raise SystemExit("Deployed classification requires the selected Haiku visual Flow.")
+        try:
+            release()
+        except ApiError:
+            raise SystemExit(
+                "Classification requires a valid pinned Haiku Flow "
+                "and mail-processing acknowledgement."
+            ) from None
+        print("Classification configuration passed; live Flow/Gmail checks remain required.")
     if settings.email_writes_enabled or settings.calendar_writes_enabled:
         if settings.email_writes_enabled and not settings.write_pilot_user_ids_values:
             raise SystemExit(

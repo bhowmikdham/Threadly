@@ -10,7 +10,8 @@ import pytest
 
 INFRA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INFRA))
-SPEC = importlib.util.spec_from_file_location("classification_provision", INFRA / "classification_flows.py")
+SPEC = importlib.util.spec_from_file_location(
+    "classification_provision", INFRA / "classification_flows.py")
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
 
