@@ -29,14 +29,23 @@ These use synthetic responses through the built extension and mock backend.
 - `npm run test:e2e -- --grep 'availability|Calendar approval|clickable calendars'`:
   5 passed, including keyboard recheck, latest-only refresh, narrow light/dark
   rendering, and no event/approval API calls from availability.
-- Full `npm test`: 192 passed, 8 failed. All failures are in
+- Full `npm test` after the approved test correction: **200 passed**.
+- Full development browser suite: **35 passed**, with its public-origin case
+  intentionally deferred to a separate public-origin build; that check passed
+  **1/1**. Both development and public-origin builds passed.
+- Release-tool checks: **29 passed**.
+- Initially, full `npm test` returned 192 passed and 8 failed, all in
   `voice-orb.test.tsx` (6) and `voice-audio-lifecycle.test.tsx` (2).
 - Replaying those two voice files on unchanged base
   `dd62cf4642c3d69f574138398e52c58c3b2d4ad5` reproduces the same 8 failures
   (11 passed). The new voice acknowledgment/docking behavior differs from its
-  existing tests. This PR does not change voice runtime behavior.
+  existing tests. The follow-up test-only commit explicitly expects acknowledgment
+  followed by the answer and docking only for choice replies. Restart tests verify
+  cancellation and cleanup, then deliver the old acknowledgment completion and
+  old response after reopening and assert no additional speech or stale callbacks.
+  The browser voice test also verifies both phrases in order. This PR does not
+  change voice runtime behavior.
 
 The base also imports a missing `VoiceReply` type from `VoiceOrb`; this change
 exports its existing inline type to restore typechecking without changing the
-component's runtime contract. Frontend CI remains blocked by the inherited
-voice test failures. No production deployment or real Calendar write was run.
+component's runtime contract. No production deployment or real Calendar write was run.
