@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ["website/**", "website-src/**", "infra/caddy/Caddyfile.threadly-au", ".github/workflows/website-ci.yml"]
   push:
-    branches: [main, "codex/assistant-intent-routing"]
+    branches: [main, "release/website"]
     paths: ["website/**", "website-src/**", "infra/caddy/Caddyfile.threadly-au", ".github/workflows/website-ci.yml"]
 
 permissions:
