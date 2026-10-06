@@ -51,7 +51,7 @@ async def set_mode(owner, conversation_id, request, *, factory=None):
             count = await session.scalar(
                 select(func.count())
                 .select_from(Conversation)
-                .where(Conversation.user_id == owner, Conversation.expires_at > datetime.now(UTC))
+                .where(*store.retained_scope(owner, user.google_account_version, datetime.now(UTC)))
             )
             if count >= get_settings().conversation_max_rows_per_user:
                 raise ApiError(429, "conversation_history_limit", "Delete an old chat first.")
