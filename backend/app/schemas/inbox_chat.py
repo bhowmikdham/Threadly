@@ -35,7 +35,10 @@ class InboxFilters(MailSearchRequest):
     sender_email: str = Field(default="", max_length=254)
     folder: Literal["all_mail", "INBOX", "SENT"] = "all_mail"
     limit: int = Field(default=5, ge=1, le=5)
+    timezone: str = Field(default="UTC", max_length=80)
     cursor: None = None
+
+    timezone_exists = field_validator("timezone")(InboxChatRequest.timezone_exists.__func__)
 
     @field_validator("sender_email")
     @classmethod
