@@ -48,6 +48,8 @@ Calendar `1.8.4` and classification PR105/106 remain in the integration base.
 
 Local integrated backend verification: **2,085 tests passed, zero skips**, against
 isolated PostgreSQL16 (257.63s). Ruff and diff checks passed. The full run included
-classification and Calendar code; final dependency reconciliation changes only the
+classification and Calendar code. Four subsequent scripted engine regressions also
+passed, confirming verified no-mail-today and unknown-day responses survive the real
+response validator while keeping latest cards. Final dependency reconciliation changes only the
 Calendar integration evidence documents. Hosted CI and exact heads are tracked in
 the draft PR. No live Bedrock replay or new production verification was performed.

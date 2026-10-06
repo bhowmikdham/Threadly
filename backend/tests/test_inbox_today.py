@@ -288,3 +288,71 @@ async def test_every_latest_listing_replay_rejects_default_five_result_selection
     )
     assert "wrong_single_inbox_search" in failures
     assert "single_inbox_card_count_mismatch" in failures
+
+
+@pytest.mark.parametrize(
+    "suffix,text",
+    [
+        (
+            "none",
+            "No emails received today in Primary. "
+            "The latest email I found arrived yesterday at 10:09 PM AEDT.",
+        ),
+        ("present", "The latest email I found arrived today at 12:09 AM AEDT."),
+        (
+            "failed",
+            "I could not verify today’s arrivals. "
+            "The latest email I found arrived yesterday at 10:09 PM AEDT.",
+        ),
+        (
+            "empty_history",
+            "No emails received today in Primary. "
+            "No matching email was found in the searched date window.",
+        ),
+    ],
+)
+async def test_scripted_engine_accepts_verified_today_fact_alongside_latest(suffix, text):
+    from app.conversation import engine, evaluate
+
+    case = next(c for c in evaluate.CASES if c["id"] == f"latest_primary_today_{suffix}")
+    runtime = evaluate.FixtureRuntime(case, case["turns"][0])
+
+    class Model:
+        calls = 0
+
+        async def decide(self, prompt, messages, config):
+            self.calls += 1
+            if self.calls == 1:
+                name = "search_mail"
+                values = {"query": "", "folder": "INBOX", "selection": "latest_message"}
+            elif self.calls == 2:
+                observed = messages[-1]["content"][0]["toolResult"]["content"][0]["json"]
+                assert observed["today_check"]["status"] == case["today_status"]
+                assert observed["today_check"]["inbox_category"] == "primary"
+                if suffix == "empty_history":
+                    name, values = "respond", {"kind": "message", "text": text}
+                else:
+                    assert len(observed["results"]) == 1
+                    assert observed["results"][0]["received_at"] == case["received_at"]
+                    name, values = "read_email", {"reference": "mail-1"}
+            else:
+                assert self.calls == 3
+                name, values = (
+                    "respond",
+                    {
+                        "kind": "message",
+                        "text": text,
+                        "evidence": [{"reference": "mail-1", "quote": "Room B is booked."}],
+                    },
+                )
+            return {
+                "role": "assistant",
+                "content": [
+                    {"toolUse": {"toolUseId": str(self.calls), "name": name, "input": values}}
+                ],
+            }
+
+    result = await engine.run({"user_turn": case["turns"][0], "timezone": ZONE}, runtime, Model())
+    assert result["text"] == text
+    assert all(t["status"] == "ok" for t in result["trace"])
+    assert evaluate.grade(case, result, runtime.calls, runtime.search_page) == []
