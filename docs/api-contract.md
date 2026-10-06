@@ -873,6 +873,21 @@ response is execution approval. Ordinary follow-up text uses another turn with t
 version. A retry must reuse identical request ID and the complete input, including whether
 optional source/task fields were omitted or explicitly null. Busy/stale versions return 409.
 
+In `contextual-conversation-1.8.3`, `search_mail` additionally accepts
+`selection: latest_message | recent_matches` (default `recent_matches`). A singular
+newest-email request uses `latest_message`, which resolves `limit` to one in the
+backend. Plural searches retain `limit` 1–5. `filters.timezone` is the validated
+request IANA zone and is preserved and cursor-bound when paging. Each search result
+and conversation read adds `received_at_local`, `received_timezone`,
+`received_at_display` and `timestamp_source: gmail.internalDate`; authoritative
+`received_at` is unchanged. Display snippets are cleaned separately from source bodies
+and evidence. Coverage explicitly reports page-local received-time ordering and remains
+incomplete; the default date scope is still a rolling year. Historical cursors from
+before the additive timezone field must restart their search. No migration is needed.
+The [versioned prompt/tools](evaluation/inbox-presentation/contextual-conversation-1.8.3.json)
+and [verification checkpoint](backend-execution/checkpoints/latest-inbox-presentation.md)
+record the release and test limits.
+
 In `contextual-conversation-1.2.3`, the model's `search_mail` tool accepts
 `{query, sender_email?, date_phrase?, folder?, limit?}`; `sender_email` defaults to empty
 and `limit` defaults to 5, with 1–5 allowed. An explicit new “from

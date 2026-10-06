@@ -96,6 +96,7 @@ class SearchMail(StrictModel):
     date_phrase: str = Field(default="", max_length=100)
     folder: Literal["all_mail", "INBOX", "SENT"] = "all_mail"
     limit: int = Field(default=5, ge=1, le=5)
+    selection: Literal["recent_matches", "latest_message"] = "recent_matches"
 
 
 class MoreMail(StrictModel):
@@ -199,7 +200,11 @@ TOOLS = {
             "the exact address and leave query empty unless the user also gave "
             "independent search words. For 'latest 2 emails in my inbox', use "
             "query='', folder='INBOX', limit=2; start a new search rather than "
-            "reading earlier results. Default coverage is the past year. No mailbox import."
+            "reading earlier results. For a single newest email, set selection='latest_message'; "
+            "the backend uses one card unless an explicit user count takes priority. "
+            "Use recent_matches for plural "
+            "listings or searches whose candidates need reading (such as latest confirmed order). "
+            "Default coverage is the past year. No mailbox import."
         ),
     ),
     "more_mail": (

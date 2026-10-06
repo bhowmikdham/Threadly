@@ -112,6 +112,7 @@ async def test_equivalent_search_defaults_do_not_issue_two_provider_searches():
                 "date_phrase": "",
                 "folder": "all_mail",
                 "limit": 5,
+                "selection": "recent_matches",
             },
         )
     ]

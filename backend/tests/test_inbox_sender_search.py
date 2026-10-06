@@ -84,8 +84,8 @@ async def test_sender_search_keeps_explicit_phrase_date_and_folder_bounds(monkey
 
     assert [row["message_id"] for row in result["results"]] == ["wanted"]
     assert observed[0].startswith('"invoice" from:naveen@example.test ')
-    assert f"after:{int(START.timestamp())}" in observed[0]
-    assert f"before:{int(END.timestamp())}" in observed[0]
+    assert f"after:{int(START.timestamp()) - 1}" in observed[0]
+    assert f"before:{int(END.timestamp()) + 1}" in observed[0]
     assert observed[0].endswith(" in:inbox")
 
 

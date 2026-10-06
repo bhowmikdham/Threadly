@@ -95,7 +95,8 @@ async def test_exact_sender_search_overrides_old_merchant_query(monkeypatch):
     assert subject.state["refs"]["mail-1"]["message_id"] == "sender-hit"
 
 
-async def test_inbox_wide_latest_two_ignores_old_query_and_limits_cards(monkeypatch):
+@pytest.mark.parametrize("selection", ["recent_matches", "latest_message"])
+async def test_inbox_wide_latest_two_ignores_old_query_and_limits_cards(monkeypatch, selection):
     observed = []
 
     async def search(_owner, filters, cursor):
@@ -121,7 +122,9 @@ async def test_inbox_wide_latest_two_ignores_old_query_and_limits_cards(monkeypa
 
     with pytest.raises(ValueError, match="Start a new search"):
         await subject.search(None)
-    result = await subject.search(SearchMail(query="GYG", folder="all_mail", limit=5))
+    result = await subject.search(
+        SearchMail(query="GYG", folder="all_mail", limit=5, selection=selection)
+    )
 
     filters, cursor = observed[0]
     assert cursor is None
