@@ -178,6 +178,8 @@ const labels: Record<Phase, string> = {
 }
 // How long a pause ends what the user is saying.
 const PAUSE_MS = 1200
+// Said as soon as the user finishes speaking, while the answer is worked out.
+const ACKNOWLEDGE = "Sure, I can do that."
 
 // Threadly's voice. The server voice (ElevenLabs, called by the backend so the
 // key never reaches the extension) is tried first; the browser voice is the
@@ -224,6 +226,9 @@ function speakWithBrowser(text: string, onLevel: (level: number) => void) {
 }
 
 let active: { cancelled: boolean; stop: () => void } | null = null
+// Short fixed phrases (like the acknowledgement) are fetched once, so repeats
+// are instant and don't use up more of the voice quota.
+const phraseAudio = new Map<string, string>()
 
 export function stopSpeaking() {
   if (active) {
@@ -243,12 +248,20 @@ export async function speak(text: string, onLevel: (level: number) => void) {
   let ctx: AudioContext | undefined
   let frame = 0
   try {
-    const reply = await api<{ audio: string }>("/voice/speak", {
-      text
-    })
+    let audio64 = phraseAudio.get(text)
+    if (!audio64) {
+      const reply = await api<{ audio: string }>("/voice/speak", {
+        text
+      })
+      audio64 = reply.audio
+      if (text.length <= 60) phraseAudio.set(text, audio64)
+    }
     if (session.cancelled) return
-    console.info("[voice] ElevenLabs audio received, base64 length:", reply.audio.length)
-    const bytes = Uint8Array.from(atob(reply.audio), (c) => c.charCodeAt(0))
+    console.info(
+      "[voice] ElevenLabs audio received, base64 length:",
+      audio64.length
+    )
+    const bytes = Uint8Array.from(atob(audio64), (c) => c.charCodeAt(0))
     ctx = new AudioContext()
     await ctx.resume()
     const buffer = await ctx.decodeAudioData(bytes.buffer)
@@ -302,14 +315,17 @@ export function VoiceOrb({
   respond,
   onClose
 }: {
-  respond: (said: string) => Promise<string>
+  // `showChat` lifts the orb to the top so a list of choices (for example the
+  // top five emails) is visible in the chat below it.
+  respond: (
+    said: string
+  ) => Promise<string | { text: string; showChat?: boolean }>
   onClose: (error?: string) => void
 }) {
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
-    // Once Threadly speaks, the orb glides to the top so the chat, showing the
-    // reply as it would for a typed request, stays readable below it.
+    // The orb stays centred, and only lifts for replies that offer choices.
     [docked, setDocked] = useState(false)
   const overlay = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<Phase>("listening")
@@ -325,7 +341,7 @@ export function VoiceOrb({
     stop.current()
     onClose(error)
   }
-  // Leave room for the docked orb above the conversation.
+  // Leave room for the lifted orb above the conversation.
   useEffect(() => {
     const root = overlay.current?.closest(".threadly")
     if (!docked || !root) return
@@ -363,19 +379,34 @@ export function VoiceOrb({
       } catch {}
     }
     const reply = async (said: string) => {
-      move("thinking")
       try {
         r.stop()
       } catch {}
-      let answer: string
-      try {
-        answer = await respond(said)
-      } catch {
+      // Acknowledge straight away, so there is no silence while the answer is
+      // worked out. The request is sent at the same time.
+      move("speaking")
+      let ready = false
+      const work = respond(said)
+        .then(
+          (result) => result,
+          () => null
+        )
+        .finally(() => (ready = true))
+      await speak(ACKNOWLEDGE, (value) => (voice.level = value))
+      if (closed.current) return
+      if (!ready) move("thinking")
+      const result = await work
+      let answer: string,
+        showChat = false
+      if (result === null) {
         answer = "Sorry, something went wrong. Try again."
+      } else {
+        answer = typeof result === "string" ? result : result.text
+        showChat = typeof result === "string" ? false : !!result.showChat
       }
       if (closed.current) return
+      setDocked(showChat)
       move("speaking")
-      setDocked(true)
       await speak(answer, (value) => (voice.level = value))
       if (!closed.current) listen()
     }

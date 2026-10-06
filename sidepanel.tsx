@@ -19,7 +19,7 @@ import {
   schedulingReadiness,
   type PreferencesState
 } from "./lib/scheduling-readiness"
-import { spokenReply } from "./lib/spoken-reply"
+import { hasChoices, spokenReply } from "./lib/spoken-reply"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -391,7 +391,7 @@ function Assistant({
         .slice(before)
         .find((e) => e.instruction === said)
       const reply = spokenReply(entry)
-      if (reply) return reply
+      if (reply) return { text: reply, showChat: hasChoices(entry) }
     }
     return "That's taking a while. I'll keep working on it in the chat."
   }

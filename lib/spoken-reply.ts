@@ -53,3 +53,12 @@ export function spokenReply(entry: Entry | undefined): string | null {
   if (entry.notice) return brief(entry.notice)
   return task?.state === "succeeded" ? "Done. It's in the chat." : null
 }
+
+/**
+ * True when the reply is a list the user chooses from, such as the top five
+ * emails from a search. Voice mode then lifts the orb out of the way so the
+ * cards show in the chat, exactly as they would for a typed request.
+ */
+export function hasChoices(entry: Entry | undefined): boolean {
+  return (entry?.inbox?.results.length ?? 0) > 1
+}
