@@ -203,6 +203,13 @@ registry. Generated revisions are unreviewed and supersede old approval. A conve
   retention of generated content**. Model tool transcripts/raw email bodies are not stored.
 - Hourly assistant-worker maintenance deletes expired conversation rows. Expired data is
   inaccessible immediately. Backend account-version changes invalidate conversation access.
+  Retained-chat and retained-turn admission budgets count only unexpired conversations
+  from the current Google account version (including pending/failed turns and chats
+  created by Calendar approval settings). Inaccessible older versions remain stored
+  until their existing expiry, but cannot block starting a new chat. Limits remain
+  50 chats and 250 turn versions by default; active-response admission remains
+  account-wide across connection versions. Reconnecting does not restore old history
+  or carry forward a chat's Calendar approval permission.
   The delete endpoint removes chat state, not existing tasks, generated drafts or action audit
   records. Backups follow their existing lifecycle; deleting chat is not immediate backup erasure.
 - The extension stores the current conversation ID/version and any unfinished exact turn

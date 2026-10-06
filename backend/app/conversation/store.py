@@ -106,21 +106,20 @@ async def enforce_admission(session, owner, row, request, hashed, now):
     rows = await session.scalar(
         select(func.count())
         .select_from(Conversation)
-        .where(Conversation.user_id == owner, Conversation.expires_at > now)
+        .where(*retained_scope(owner, row.account_version, now))
     )
     if rows > settings.conversation_max_rows_per_user:
         raise ApiError(429, "conversation_history_limit", "Delete an old chat before starting one.")
     completed = await session.scalar(
         select(func.coalesce(func.sum(Conversation.version), 0))
         .select_from(Conversation)
-        .where(Conversation.user_id == owner, Conversation.expires_at > now)
+        .where(*retained_scope(owner, row.account_version, now))
     )
     pending = await session.scalar(
         select(func.count())
         .select_from(Conversation)
         .where(
-            Conversation.user_id == owner,
-            Conversation.expires_at > now,
+            *retained_scope(owner, row.account_version, now),
             Conversation.pending_request_id.is_not(None),
         )
     )
@@ -130,6 +129,17 @@ async def enforce_admission(session, owner, row, request, hashed, now):
             "conversation_turn_limit",
             "This account reached its retained conversation-turn limit. Delete old chats.",
         )
+
+
+def retained_scope(owner, account_version, now):
+    # Older connection generations are inaccessible through owned(). Keep their
+    # data until normal expiry without charging it to the usable chat budget.
+    # Active-response admission remains account-wide, including older leases.
+    return (
+        Conversation.user_id == owner,
+        Conversation.account_version == account_version,
+        Conversation.expires_at > now,
+    )
 
 
 async def owned(session, owner, identifier, *, lock=False):
