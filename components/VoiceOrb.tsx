@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
+import { api } from "../lib/api"
 import { Icon } from "./Icon"
 
 // The glowing purple and white orb, drawn with a single WebGL shader so the
@@ -178,8 +179,9 @@ const labels: Record<Phase, string> = {
 // How long a pause ends what the user is saying.
 const PAUSE_MS = 1200
 
-// Threadly's voice. Kept on its own so a server voice (for example ElevenLabs
-// behind the backend's /voice/speak) can replace the browser's later.
+// Threadly's voice. The server voice (ElevenLabs, called by the backend so the
+// key never reaches the extension) is tried first; the browser voice is the
+// fallback if the server is unreachable or over its limit.
 function pickVoice() {
   const voices = window.speechSynthesis?.getVoices() || []
   const lang = navigator.language.slice(0, 2)
@@ -190,7 +192,7 @@ function pickVoice() {
     null
   )
 }
-export function speak(text: string, onLevel: (level: number) => void) {
+function speakWithBrowser(text: string, onLevel: (level: number) => void) {
   return new Promise<void>((resolve) => {
     const synth = window.speechSynthesis
     if (!synth || !text) return resolve()
@@ -219,6 +221,78 @@ export function speak(text: string, onLevel: (level: number) => void) {
     u.onerror = done
     synth.speak(u)
   })
+}
+
+let active: { cancelled: boolean; stop: () => void } | null = null
+
+export function stopSpeaking() {
+  if (active) {
+    active.cancelled = true
+    active.stop()
+    active = null
+  }
+  window.speechSynthesis?.cancel()
+}
+
+export async function speak(text: string, onLevel: (level: number) => void) {
+  stopSpeaking()
+  if (!text) return
+  const session = { cancelled: false, stop: () => {} }
+  active = session
+  console.info("[voice] requesting ElevenLabs for", text.length, "characters")
+  let ctx: AudioContext | undefined
+  let frame = 0
+  try {
+    const reply = await api<{ audio: string }>("/voice/speak", {
+      text
+    })
+    if (session.cancelled) return
+    console.info("[voice] ElevenLabs audio received, base64 length:", reply.audio.length)
+    const bytes = Uint8Array.from(atob(reply.audio), (c) => c.charCodeAt(0))
+    ctx = new AudioContext()
+    await ctx.resume()
+    const buffer = await ctx.decodeAudioData(bytes.buffer)
+    if (session.cancelled) return
+
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 512
+    source.connect(analyser)
+    analyser.connect(ctx.destination)
+
+    const samples = new Uint8Array(analyser.fftSize)
+    const tick = () => {
+      analyser.getByteTimeDomainData(samples)
+      let sum = 0
+      for (const v of samples) sum += ((v - 128) / 128) ** 2
+      onLevel(Math.min(1, Math.sqrt(sum / samples.length) * 5))
+      frame = requestAnimationFrame(tick)
+    }
+    await new Promise<void>((resolve) => {
+      session.stop = () => {
+        try {
+          source.stop()
+        } catch {}
+        resolve()
+      }
+      source.onended = () => resolve()
+      source.start()
+      frame = requestAnimationFrame(tick)
+    })
+  } catch (e: any) {
+    console.warn("[voice] failed", {
+      status: e?.status,
+      code: e?.code,
+      message: e?.message
+    })
+    if (!session.cancelled) await speakWithBrowser(text, onLevel)
+  } finally {
+    cancelAnimationFrame(frame)
+    onLevel(0)
+    void ctx?.close()
+    if (active === session) active = null
+  }
 }
 
 // Voice mode: a spoken back-and-forth with Threadly. The orb listens, thinks
@@ -356,7 +430,7 @@ export function VoiceOrb({
       try {
         r.abort()
       } catch {}
-      window.speechSynthesis?.cancel()
+      stopSpeaking()
       stream?.getTracks().forEach((t) => t.stop())
       void audio?.close()
     }
