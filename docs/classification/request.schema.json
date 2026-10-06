@@ -1,0 +1,14 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "time_zone": {
+      "default": "UTC",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Time Zone",
+      "type": "string"
+    }
+  },
+  "title": "ClassificationRequest",
+  "type": "object"
+}

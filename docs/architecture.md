@@ -1,5 +1,18 @@
 # Architecture — what runs where
 
+[Email badge classification](classification/README.md) is a separate on-demand
+service: authenticated thread ID → bounded live Gmail context → dedicated configured
+published Bedrock classification Flow (or explicit Converse baseline) → strict
+four-field/evidence validation → fresh Gmail and
+session checks → transient badge response. It preserves BERT category/priority/action
+labels and adds independent binary reply. It makes no external writes, restores no
+mailbox import/cache, and changes no existing assistant Flow registry. Disabled by
+default; Claude Haiku 4.5 is the selected classification model. Nova Micro is retired.
+Classification Flows use a numbered managed CHAT prompt, a numbered Flow version
+and an alias verified before/after invocation. The backend checks the prompt,
+model, graph and role; it does not accept a console-edited replacement release.
+See [Flow provisioning and evaluation](classification/VISUAL-FLOWS.md).
+
 Conversation release 1.7.0 combines direct Calendar creation with the
 [shared email context design](shared-mail-context.md):
 provider-thread reads, a separate reply target, up to five evidence threads,

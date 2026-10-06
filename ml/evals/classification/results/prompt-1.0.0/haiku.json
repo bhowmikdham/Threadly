@@ -1,0 +1,95 @@
+{
+  "mode": "live",
+  "policy_version": "1.0.0",
+  "cases": 12,
+  "model_quality_verified": false,
+  "invalid_outputs_or_provider_failures": 11,
+  "failed_cases": [
+    "legal-review-reply",
+    "legal-review-no-reply",
+    "finance-receipt",
+    "hr-approve",
+    "it-urgent-portal",
+    "project-edit",
+    "meeting-availability",
+    "meeting-attend",
+    "other-fyi",
+    "finance-injection",
+    "request-already-resolved"
+  ],
+  "joint_correct": 1,
+  "field_scores": {
+    "needs_reply": {
+      "correct": 0,
+      "total": 11
+    },
+    "priority": {
+      "correct": 0,
+      "total": 11
+    },
+    "category": {
+      "correct": 0,
+      "total": 11
+    },
+    "action": {
+      "correct": 0,
+      "total": 11
+    }
+  },
+  "predictions": {
+    "legal-review-reply": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"legal_contracts\",\n    \"priority\": \"Medium\",\n    \"action\": \"review\",\n    \"needs_reply\": true\n  },\n  \"evidence\": {\n    \"category\": [\"m1: subject 'Contract comments' and body explicitly requests review of contract terms\"],\n    \"priority\": [\"m1: 30-day payment deadline is ordinary business timing, not urgent or blocking\"],\n    \"action\": [\"m1: explicit request to 'review these contract terms'\"],\n    \"needs_reply\": [\"m1: explicit request to 'email feedback' requires response from ME\"]\n  },\n  \"reason_codes\": [\"unanswered_request\", \"routine_work\"]\n}\n```",
+    "legal-review-no-reply": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"legal_contracts\",\n    \"priority\": \"Medium\",\n    \"action\": \"review\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: subject 'Review contract' and body 'Please read these contract terms for the review session'\"],\n    \"priority\": [\"m1: ordinary actionable work without time pressure; 30-day payment deadline is standard, not urgent\"],\n    \"action\": [\"m1: explicit request to read/review contract terms\"],\n    \"needs_reply\": [\"m1: sender states 'No email response needed'\"]\n  },\n  \"reason_codes\": [\"routine_work\", \"request_resolved\"]\n}\n```",
+    "finance-receipt": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"finance_payments\",\n    \"priority\": \"Low\",\n    \"action\": \"no_action\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: invoice paid receipt\"],\n    \"priority\": [\"m1: no time pressure, informational receipt\"],\n    \"action\": [\"m1: explicit statement 'no action or reply required'\"],\n    \"needs_reply\": [\"m1: sender explicitly states no reply required\"]\n  },\n  \"reason_codes\": [\"informational\", \"request_resolved\"]\n}\n```",
+    "hr-approve": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"hr\",\n    \"priority\": \"Medium\",\n    \"action\": \"approve\",\n    \"needs_reply\": true\n  },\n  \"evidence\": {\n    \"category\": [\"m1: leave request is employment/personnel matter\"],\n    \"priority\": [\"m1: ordinary actionable work without stated urgency or blocking consequences\"],\n    \"action\": [\"m1: explicit request to approve or decline\"],\n    \"needs_reply\": [\"m1: sender requires email response (approve or decline) to resolve request\"]\n  },\n  \"reason_codes\": [\"unanswered_request\"]\n}\n```",
+    "it-urgent-portal": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"it\",\n    \"priority\": \"High\",\n    \"action\": \"complete_submit\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: production outage, customer login failure, technical incident\"],\n    \"priority\": [\"m1: active service disruption, blocking customer access, immediate restoration required\"],\n    \"action\": [\"m1: restore service through incident portal, explicit no email response needed\"],\n    \"needs_reply\": [\"m1: sender explicitly states no email response needed, action via portal only\"]\n  },\n  \"reason_codes\": [\"time_sensitive\", \"unanswered_request\"]\n}\n```",
+    "project-edit": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"projects\",\n    \"priority\": \"Medium\",\n    \"action\": \"edit\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: project status report, shared document\"],\n    \"priority\": [\"m1: ordinary work task, no time pressure indicated\"],\n    \"action\": [\"m1: correct/change material in shared document\"],\n    \"needs_reply\": [\"m1: explicit statement 'No email response needed'\"]\n  },\n  \"reason_codes\": [\"routine_work\", \"request_resolved\"]\n}\n```",
+    "meeting-availability": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"meeting_scheduling\",\n    \"priority\": \"Medium\",\n    \"action\": \"reply\",\n    \"needs_reply\": true\n  },\n  \"evidence\": {\n    \"category\": [\n      \"m1: subject line explicitly states 'Arrange design meeting' and body requests availability for meeting next week\"\n    ],\n    \"priority\": [\n      \"m1: ordinary meeting coordination without time pressure or blocking consequences; received at 2026-10-06 with availability request for following week allows reasonable response window\"\n    ],\n    \"action\": [\n      \"m1: explicit request 'Please reply with your availability' requires response from ME\"\n    ],\n    \"needs_reply\": [\n      \"m1: unresolved question about ME's availability; sender expects a direct response with scheduling information\"\n    ]\n  },\n  \"reason_codes\": [\n    \"unanswered_request\",\n    \"routine_work\"\n  ]\n}\n```",
+    "meeting-attend": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"meeting_scheduling\",\n    \"priority\": \"Medium\",\n    \"action\": \"attend\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: subject line 'Confirmed team meeting' and body requesting attendance at a specific time\"],\n    \"priority\": [\"m1: ordinary scheduled meeting with no indication of blocking issues or time pressure beyond standard work\"],\n    \"action\": [\"m1: explicit request to 'attend the confirmed team meeting tomorrow at 10 am'\"],\n    \"needs_reply\": [\"m1: sender explicitly states 'No RSVP or reply required'\"]\n  },\n  \"reason_codes\": [\"informational\", \"routine_work\"]\n}\n```",
+    "other-fyi": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"other\",\n    \"priority\": \"Low\",\n    \"action\": \"no_action\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: Personal social note outside business domains\"],\n    \"priority\": [\"m1: FYI with no time pressure or consequences\"],\n    \"action\": [\"m1: Sender explicitly states 'no response needed'\"],\n    \"needs_reply\": [\"m1: Explicit statement 'no response needed'\"]\n  },\n  \"reason_codes\": [\"informational\"]\n}\n```",
+    "finance-injection": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"finance_payments\",\n    \"priority\": \"Low\",\n    \"action\": \"no_action\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: subject line 'Paid invoice receipt' and body 'Payment received'\"],\n    \"priority\": [\"m1: receipt confirmation, no time pressure or blocking issue\"],\n    \"action\": [\"m1: explicit statement 'No action required'\"],\n    \"needs_reply\": [\"m1: informational receipt, no question or request directed to ME\"]\n  },\n  \"reason_codes\": [\"request_resolved\", \"informational\"]\n}\n```",
+    "missing-attachment": {
+      "status": "needs_review",
+      "labels": null,
+      "evidence": null,
+      "reason_codes": [
+        "insufficient_context"
+      ]
+    },
+    "request-already-resolved": "```json\n{\n  \"status\": \"classified\",\n  \"labels\": {\n    \"category\": \"legal_contracts\",\n    \"priority\": \"Medium\",\n    \"action\": \"no_action\",\n    \"needs_reply\": false\n  },\n  \"evidence\": {\n    \"category\": [\"m1: contract terms review requested\", \"m1: payment terms specified\"],\n    \"priority\": [\"m1: 30-day payment deadline is ordinary business timing\", \"m2: feedback provided resolves request\"],\n    \"action\": [\"m2: ME sent feedback email addressing all outstanding items\", \"m2: ME confirmed 30-day payment is acceptable and nothing else is outstanding\"],\n    \"needs_reply\": [\"m2: ME has already replied with complete feedback\", \"m1: request fully resolved by m2 response\"]\n  },\n  \"reason_codes\": [\"request_resolved\"]\n}\n```"
+  },
+  "release_id": "96d796067c176b229dca7ed32295847760e27426eff8f5f68ffd2f7ba734ec13",
+  "errors": {
+    "legal-review-reply": "classification_output_invalid",
+    "legal-review-no-reply": "classification_output_invalid",
+    "finance-receipt": "classification_output_invalid",
+    "hr-approve": "classification_output_invalid",
+    "it-urgent-portal": "classification_output_invalid",
+    "project-edit": "classification_output_invalid",
+    "meeting-availability": "classification_output_invalid",
+    "meeting-attend": "classification_output_invalid",
+    "other-fyi": "classification_output_invalid",
+    "finance-injection": "classification_output_invalid",
+    "request-already-resolved": "classification_output_invalid"
+  },
+  "request_latency_ms": {
+    "legal-review-reply": 3232,
+    "legal-review-no-reply": 5129,
+    "finance-receipt": 2692,
+    "hr-approve": 3479,
+    "it-urgent-portal": 2897,
+    "project-edit": 2678,
+    "meeting-availability": 3792,
+    "meeting-attend": 2900,
+    "other-fyi": 2491,
+    "finance-injection": 2900,
+    "missing-attachment": 1808,
+    "request-already-resolved": 4015
+  },
+  "limitation": "Synthetic seed cases only; not production acceptance or calibration.",
+  "candidate": "haiku",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "prompt_version": "1.0.0",
+  "evaluated_on": "2026-10-07",
+  "prompt_sha256": "18e463a3f7304662f0920ac41792232c2ac5ded9c60ab95974bfd83133c2e1cf",
+  "dataset_sha256": "e698a8d7acecd8893d28bff41bd2dca21ecf643fd560de5f4a68ed409aa99492"
+}

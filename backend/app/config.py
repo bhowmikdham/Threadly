@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     bedrock_small_model_id: str = ""
     bedrock_read_timeout_s: int = Field(default=90, ge=1, le=300)
 
+    # Read-only badge service; its visual Flow pins the selected Haiku 4.5 release.
+    classification_enabled: bool = False
+    classification_model_id: str = ""
+    classification_transport: Literal["converse", "bedrock_flow"] = "converse"
+    classification_flow_manifest: str = ""
+    classification_max_concurrency: int = Field(default=2, ge=1, le=8)
+    classification_valid_seconds: int = Field(default=300, ge=30, le=900)
+
     # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
     conversation_enabled: bool = False
     conversation_max_active_per_user: int = Field(default=2, ge=1, le=8)

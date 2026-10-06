@@ -1,0 +1,348 @@
+{
+  "mode": "live",
+  "policy_version": "1.0.0",
+  "cases": 12,
+  "model_quality_verified": false,
+  "invalid_outputs_or_provider_failures": 0,
+  "failed_cases": [],
+  "joint_correct": 11,
+  "field_scores": {
+    "needs_reply": {
+      "correct": 11,
+      "total": 11
+    },
+    "priority": {
+      "correct": 10,
+      "total": 11
+    },
+    "category": {
+      "correct": 11,
+      "total": 11
+    },
+    "action": {
+      "correct": 11,
+      "total": 11
+    }
+  },
+  "predictions": {
+    "legal-review-reply": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": true,
+        "priority": "Medium",
+        "category": "legal_contracts",
+        "action": "review"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "routine_work",
+        "unanswered_request"
+      ]
+    },
+    "legal-review-no-reply": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Medium",
+        "category": "legal_contracts",
+        "action": "review"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "routine_work"
+      ]
+    },
+    "finance-receipt": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Low",
+        "category": "finance_payments",
+        "action": "no_action"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "informational"
+      ]
+    },
+    "hr-approve": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": true,
+        "priority": "Medium",
+        "category": "hr",
+        "action": "approve"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "unanswered_request"
+      ]
+    },
+    "it-urgent-portal": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "High",
+        "category": "it",
+        "action": "complete_submit"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "time_sensitive"
+      ]
+    },
+    "project-edit": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Medium",
+        "category": "projects",
+        "action": "edit"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "routine_work"
+      ]
+    },
+    "meeting-availability": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": true,
+        "priority": "Medium",
+        "category": "meeting_scheduling",
+        "action": "reply"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "unanswered_request"
+      ]
+    },
+    "meeting-attend": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Medium",
+        "category": "meeting_scheduling",
+        "action": "attend"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "routine_work"
+      ]
+    },
+    "other-fyi": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Low",
+        "category": "other",
+        "action": "no_action"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "informational"
+      ]
+    },
+    "finance-injection": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Low",
+        "category": "finance_payments",
+        "action": "no_action"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m1"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m1"
+        ]
+      },
+      "reason_codes": [
+        "informational",
+        "request_resolved"
+      ]
+    },
+    "missing-attachment": {
+      "status": "needs_review",
+      "labels": null,
+      "evidence": null,
+      "reason_codes": [
+        "insufficient_context"
+      ]
+    },
+    "request-already-resolved": {
+      "status": "classified",
+      "labels": {
+        "needs_reply": false,
+        "priority": "Medium",
+        "category": "legal_contracts",
+        "action": "no_action"
+      },
+      "evidence": {
+        "needs_reply": [
+          "m2"
+        ],
+        "priority": [
+          "m1"
+        ],
+        "category": [
+          "m1"
+        ],
+        "action": [
+          "m2"
+        ]
+      },
+      "reason_codes": [
+        "request_resolved"
+      ]
+    }
+  },
+  "release_id": "f18c748e134d0e0a2f225f8cfda69c2be6a9f9d8b265afc26a0db0b04310ab94",
+  "errors": {},
+  "request_latency_ms": {
+    "legal-review-reply": 2420,
+    "legal-review-no-reply": 1928,
+    "finance-receipt": 1969,
+    "hr-approve": 1751,
+    "it-urgent-portal": 1781,
+    "project-edit": 1871,
+    "meeting-availability": 1882,
+    "meeting-attend": 1820,
+    "other-fyi": 1719,
+    "finance-injection": 1948,
+    "missing-attachment": 1573,
+    "request-already-resolved": 1811
+  },
+  "limitation": "Synthetic seed cases only; not production acceptance or calibration.",
+  "candidate": "haiku",
+  "model": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "prompt_version": "1.0.1",
+  "evaluated_on": "2026-10-07",
+  "prompt_sha256": "be4b86d2c66c264b84b7d95224ee82b3146da6bc90d61d0aab7c58c5226d5591",
+  "dataset_sha256": "e698a8d7acecd8893d28bff41bd2dca21ecf643fd560de5f4a68ed409aa99492"
+}
