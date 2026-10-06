@@ -74,8 +74,9 @@ def verify_target(client, entry: FlowEntry) -> dict:
 
 
 class FlowInvoker:
-    def __init__(self, client_factory=None):
+    def __init__(self, client_factory=None, *, target_verifier=None):
         self.client_factory = client_factory or sdk_client
+        self.target_verifier = target_verifier or verify_target
 
     async def invoke(self, entry: FlowEntry, prompt: str) -> FlowResult:
         masked, _mapping = mask(prompt)
@@ -103,7 +104,7 @@ class FlowInvoker:
         try:
             check_time()
             control = self.client_factory("bedrock-agent", entry)
-            alias_before = verify_target(control, entry)
+            alias_before = self.target_verifier(control, entry)
             check_time()
             runtime = self.client_factory("bedrock-agent-runtime", entry)
             response = runtime.invoke_flow(
@@ -134,7 +135,9 @@ class FlowInvoker:
                     if (
                         output is not None
                         or value.get("nodeName") != "Output"
-                        or value.get("nodeType") != "FlowOutputNode"
+                        # Managed CHAT prompt Flows can omit nodeType in live
+                        # streams. The verified graph and exact nodeName bind it.
+                        or value.get("nodeType", "FlowOutputNode") != "FlowOutputNode"
                         or set(value.get("content", {})) != {"document"}
                     ):
                         raise FlowError("invalid_flow_output")

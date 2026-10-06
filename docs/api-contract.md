@@ -1,5 +1,24 @@
 # API contract — v0 DRAFT
 
+## Email badge classification (deployed; disabled by default in fresh configuration)
+
+`POST /threads/{gmail_thread_id}/classification`, with an access JWT and
+`{"time_zone":"Australia/Melbourne"}`, returns the current live-thread classification.
+Schema `email-classification-with-action.v1` has independent binary `needs_reply`,
+native BERT category/priority/action labels, evidence message IDs, fingerprint,
+release digest and display expiry. 200 states are classified, needs_review or skipped;
+the latter two have null labels. Non-2xx responses use the existing error envelope.
+The endpoint fetches mail itself, rechecks source/account/session after inference,
+and stores no results or mail. No mailbox import or migration is needed.
+See the [frontend contract, examples and error rules](classification/README.md).
+Existing `/threads` responses and filters are unchanged; the new endpoint does
+not populate the legacy `needs_reply` database column. The same contract works
+with the selected Claude Haiku 4.5 classification Flow; model configuration is
+backend-only. Nova Micro is retired. See [Flow setup and evidence](classification/VISUAL-FLOWS.md).
+The public backend enabled this service on 7 October 2026 after bounded live
+integration checks. See [deployment evidence and quality limits](classification/ROLLOUT-2026-10-07.md).
+Frontend request scheduling and badge rendering belong to the frontend team.
+
 Conversation release 1.7.0 preserves direct Calendar creation and extends internal
 `read_email.scope` and
 `prepare_workflow.source_scope` with `thread` (new default), alongside explicit

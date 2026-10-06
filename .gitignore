@@ -26,3 +26,6 @@ venv/
 
 # node (frontend/ has its own .gitignore too)
 node_modules/
+
+# Private, account-specific classification deployment receipts
+.classification-deployments/

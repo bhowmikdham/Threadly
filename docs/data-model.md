@@ -1,5 +1,11 @@
 # Data model — PostgreSQL
 
+On-demand [badge classification](classification/README.md) adds no tables or migration.
+It reads account/session state, holds mail and model output in request memory, then
+returns validated labels and source provenance. It does not write Message, Thread,
+ContextSnapshot, job or classification records, nor update `threads.needs_reply`.
+There is no persistent classification cache or saved user override in this slice.
+
 Shared email context adds no tables or migration. `context_snapshots.payload`
 also supports internal `storage=gmail-context-plan-1.0`: primary thread/version
 metadata, up to five owner-bound source references, explicit reply-message ID,

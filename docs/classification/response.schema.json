@@ -1,0 +1,224 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "needs_reply": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Needs Reply",
+          "type": "array"
+        },
+        "priority": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Priority",
+          "type": "array"
+        },
+        "category": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Category",
+          "type": "array"
+        },
+        "action": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Action",
+          "type": "array"
+        }
+      },
+      "required": [
+        "needs_reply",
+        "priority",
+        "category",
+        "action"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Labels": {
+      "additionalProperties": false,
+      "properties": {
+        "needs_reply": {
+          "title": "Needs Reply",
+          "type": "boolean"
+        },
+        "priority": {
+          "enum": [
+            "High",
+            "Low",
+            "Medium"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "finance_payments",
+            "hr",
+            "it",
+            "legal_contracts",
+            "meeting_scheduling",
+            "other",
+            "projects"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "approve",
+            "attend",
+            "complete_submit",
+            "edit",
+            "no_action",
+            "reply",
+            "review"
+          ],
+          "title": "Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "needs_reply",
+        "priority",
+        "category",
+        "action"
+      ],
+      "title": "Labels",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "email-classification-with-action.v1",
+      "default": "email-classification-with-action.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "thread_id": {
+      "title": "Thread Id",
+      "type": "string"
+    },
+    "source_message_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Message Ids",
+      "type": "array"
+    },
+    "source_fingerprint": {
+      "title": "Source Fingerprint",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "classified",
+        "needs_review",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "labels": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Labels"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Evidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "evaluated_at": {
+      "format": "date-time",
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "valid_until": {
+      "format": "date-time",
+      "title": "Valid Until",
+      "type": "string"
+    },
+    "time_zone": {
+      "title": "Time Zone",
+      "type": "string"
+    },
+    "release_id": {
+      "title": "Release Id",
+      "type": "string"
+    },
+    "source": {
+      "const": "live_gmail",
+      "default": "live_gmail",
+      "title": "Source",
+      "type": "string"
+    },
+    "coverage": {
+      "const": "cleaned_text_only",
+      "default": "cleaned_text_only",
+      "title": "Coverage",
+      "type": "string"
+    },
+    "persisted": {
+      "const": false,
+      "default": false,
+      "title": "Persisted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "thread_id",
+    "source_message_ids",
+    "source_fingerprint",
+    "status",
+    "labels",
+    "evidence",
+    "reason_codes",
+    "evaluated_at",
+    "valid_until",
+    "time_zone",
+    "release_id"
+  ],
+  "title": "ClassificationResponse",
+  "type": "object"
+}

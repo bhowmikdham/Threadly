@@ -1,0 +1,27 @@
+# Scoped project rules for the classification-only stack; not a general AWS audit.
+let roles = Resources.*[ Type == 'AWS::IAM::Role' ]
+let flows = Resources.*[ Type == 'AWS::Bedrock::Flow' ]
+
+rule classification_resources {
+    Resources.*.Type IN ['AWS::IAM::Role', 'AWS::Bedrock::Flow']
+}
+
+rule classification_role_permissions {
+    %roles.Properties.AssumeRolePolicyDocument.Statement.* {
+        Principal.Service == 'bedrock.amazonaws.com'
+        Action == 'sts:AssumeRole'
+        Condition.StringEquals.'aws:SourceAccount' exists
+        Condition.ArnLike.'aws:SourceArn' exists
+    }
+    %roles.Properties.Policies.*.PolicyDocument.Statement.* {
+        Effect == 'Allow'
+        Action.* IN ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream', 'bedrock:RenderPrompt']
+        Resource.* != '*'
+    }
+    %roles.Properties.ManagedPolicyArns !exists
+}
+
+rule classification_nodes {
+    %flows.Properties.Definition.Nodes.*.Type IN ['Input', 'Prompt', 'Output']
+    %flows.Properties.ExecutionRoleArn exists
+}

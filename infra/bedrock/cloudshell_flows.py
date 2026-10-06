@@ -346,7 +346,7 @@ def ensure_stack(aws, name, template, tags, sleep=time.sleep):
             0
         ]
         state = stack["StackStatus"]
-        if state == "CREATE_COMPLETE":
+        if state in ("CREATE_COMPLETE", "UPDATE_COMPLETE"):
             return {
                 item["OutputKey"]: item["OutputValue"]
                 for item in stack.get("Outputs", [])

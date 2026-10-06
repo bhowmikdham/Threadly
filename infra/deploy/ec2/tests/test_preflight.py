@@ -44,6 +44,7 @@ class PreflightTests(unittest.TestCase):
             "BEDROCK_REGION": "ap-southeast-2",
             "BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED": "false",
             "CONVERSATION_ENABLED": "false",
+            "CLASSIFICATION_ENABLED": "false",
             "GOOGLE_CLIENT_ID": "",
             "GOOGLE_CLIENT_SECRET": "",
             "GOOGLE_REDIRECT_URI": "",
@@ -72,6 +73,31 @@ class PreflightTests(unittest.TestCase):
         result = self.run_preflight(BEDROCK_REGION="us-east-1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ap-southeast-2 or ap-southeast-4", result.stderr)
+
+    def test_classification_requires_selected_flow_and_acknowledgement(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT / "backend"))
+        from tests.test_classification_flows import target
+
+        config = {
+            "CLASSIFICATION_ENABLED": "true",
+            "CLASSIFICATION_TRANSPORT": "bedrock_flow",
+            "CLASSIFICATION_FLOW_MANIFEST": target().model_dump_json(),
+            "BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED": "true",
+        }
+        result = self.run_preflight(**config)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Classification configuration passed", result.stdout)
+        for override in (
+            {"CLASSIFICATION_TRANSPORT": "converse"},
+            {"CLASSIFICATION_FLOW_MANIFEST": "{}"},
+            {"BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED": "false"},
+            {"CLASSIFICATION_FLOW_MANIFEST": config["CLASSIFICATION_FLOW_MANIFEST"].replace(
+                "au.anthropic.claude-haiku-4-5-20251001-v1:0", "amazon.nova-micro-v1:0")},
+        ):
+            with self.subTest(override=override):
+                self.assertNotEqual(self.run_preflight(**(config | override)).returncode, 0)
 
     def test_conversation_requires_profile_and_review_acknowledgement(self):
         self.assertNotEqual(
