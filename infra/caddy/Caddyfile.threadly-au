@@ -10,6 +10,8 @@ threadly.au {
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
         Content-Security-Policy "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
+    @releasePages path / /index.html /install/ /install/index.html /extension-version.js
+    header @releasePages Cache-Control "no-cache"
     handle /downloads/threadly-extension.json {
         root * /srv/downloads
         rewrite * /threadly-extension.json
@@ -20,6 +22,7 @@ threadly.au {
         root * /srv/downloads
         rewrite * /threadly-extension.zip
         header Content-Disposition "attachment; filename=threadly-extension.zip"
+        header Cache-Control "no-store"
         file_server
     }
     handle {
