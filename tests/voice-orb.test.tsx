@@ -50,6 +50,48 @@ const say = (text: string) =>
   )
 
 describe("voice conversation", () => {
+  it.each([true, false])(
+    "speaks structured reply text and honors showChat=%s",
+    async (showChat) => {
+      const { container } = render(
+        <VoiceOrb
+          respond={vi
+            .fn()
+            .mockResolvedValue({ text: "The email is in the chat.", showChat })}
+          onClose={vi.fn()}
+        />
+      )
+      say("Check my inbox")
+      await act(() => vi.advanceTimersByTimeAsync(1320))
+      expect(spoken).toEqual(["The email is in the chat."])
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/voice/speak",
+          body: { text: "The email is in the chat." }
+        })
+      )
+      expect(Boolean(container.querySelector(".voice-overlay.docked"))).toBe(
+        showChat
+      )
+      expect(screen.getByRole("status").textContent).toBe("Listening…")
+    }
+  )
+  it("returns the orb to its normal position when a later reply has no choices", async () => {
+    const respond = vi
+      .fn()
+      .mockResolvedValueOnce({ text: "Choose an email.", showChat: true })
+      .mockResolvedValueOnce({ text: "You're welcome.", showChat: false })
+    const { container } = render(
+      <VoiceOrb respond={respond} onClose={vi.fn()} />
+    )
+    say("Find my emails")
+    await act(() => vi.advanceTimersByTimeAsync(1320))
+    expect(container.querySelector(".voice-overlay.docked")).not.toBeNull()
+    say("Thanks")
+    await act(() => vi.advanceTimersByTimeAsync(1320))
+    expect(container.querySelector(".voice-overlay.docked")).toBeNull()
+    expect(spoken).toEqual(["Choose an email.", "You're welcome."])
+  })
   it("sends what was said after a pause, answers aloud, then listens again", async () => {
     const respond = vi.fn().mockResolvedValue("You have two new emails.")
     render(<VoiceOrb respond={respond} onClose={vi.fn()} />)

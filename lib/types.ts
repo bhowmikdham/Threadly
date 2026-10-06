@@ -61,11 +61,16 @@ export interface Artifact {
   scheduling_status?: any
 }
 export interface InboxResult {
+  reference?: string
   message_id: string
   thread_id: string
   subject: string
   sender: string
   received_at: string
+  received_at_local?: string
+  received_timezone?: string
+  received_at_display?: string
+  timestamp_source?: string
   snippet: string
   flight?: {
     origin: string
@@ -76,7 +81,13 @@ export interface InboxResult {
   } | null
 }
 export interface InboxPage {
-  filters: any
+  filters: {
+    received_from?: string | null
+    received_before?: string | null
+    folder?: string | null
+    timezone?: string
+    [key: string]: unknown
+  }
   results: InboxResult[]
   next_cursor: string | null
   coverage: { complete: boolean; page_size: number }

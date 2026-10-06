@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react"
 import { StrictMode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { VoiceOrb } from "../components/VoiceOrb"
+import { VoiceOrb, type VoiceReply } from "../components/VoiceOrb"
 
 const recognizers: FakeRecognition[] = []
 class FakeRecognition {
@@ -220,32 +220,38 @@ describe("VoiceOrb audio resource lifecycle", () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it("ignores the old reply and recognition callbacks after rapid restart", async () => {
-    const answer = deferred<string>()
-    const firstClose = vi.fn()
-    const first = render(
-      <VoiceOrb respond={() => answer.promise} onClose={firstClose} />
-    )
-    await flush()
-    const oldError = recognizers[0].onerror
-    const oldResult = recognizers[0].onresult
-    act(() => oldResult({ results: [[{ transcript: "Summarise this" }]] }))
-    await act(() => vi.advanceTimersByTimeAsync(1300))
-    first.unmount()
-    const respond = vi.fn()
-    const second = render(<VoiceOrb respond={respond} onClose={vi.fn()} />)
-    await flush()
-    act(() => {
-      oldError({ error: "not-allowed" })
-      oldResult({ results: [[{ transcript: "Late result" }]] })
-    })
-    await act(async () => answer.resolve("An old answer"))
-    await act(() => vi.advanceTimersByTimeAsync(1300))
-    expect(speak).not.toHaveBeenCalled()
-    expect(firstClose).not.toHaveBeenCalled()
-    expect(respond).not.toHaveBeenCalled()
-    expect(contexts[1].close).not.toHaveBeenCalled()
-    expect(recognizers[1].start).toHaveBeenCalledOnce()
-    second.unmount()
-  })
+  it.each<VoiceReply>([
+    "An old answer",
+    { text: "An old answer", showChat: true }
+  ])(
+    "ignores the old reply %j and recognition callbacks after rapid restart",
+    async (reply) => {
+      const answer = deferred<VoiceReply>()
+      const firstClose = vi.fn()
+      const first = render(
+        <VoiceOrb respond={() => answer.promise} onClose={firstClose} />
+      )
+      await flush()
+      const oldError = recognizers[0].onerror
+      const oldResult = recognizers[0].onresult
+      act(() => oldResult({ results: [[{ transcript: "Summarise this" }]] }))
+      await act(() => vi.advanceTimersByTimeAsync(1300))
+      first.unmount()
+      const respond = vi.fn()
+      const second = render(<VoiceOrb respond={respond} onClose={vi.fn()} />)
+      await flush()
+      act(() => {
+        oldError({ error: "not-allowed" })
+        oldResult({ results: [[{ transcript: "Late result" }]] })
+      })
+      await act(async () => answer.resolve(reply))
+      await act(() => vi.advanceTimersByTimeAsync(1300))
+      expect(speak).not.toHaveBeenCalled()
+      expect(firstClose).not.toHaveBeenCalled()
+      expect(respond).not.toHaveBeenCalled()
+      expect(contexts[1].close).not.toHaveBeenCalled()
+      expect(recognizers[1].start).toHaveBeenCalledOnce()
+      second.unmount()
+    }
+  )
 })
