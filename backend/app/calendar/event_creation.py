@@ -11,7 +11,7 @@ from app.actions import calendar_preview
 from app.actions import service as actions
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import event_choices, permissions, service
+from app.calendar import event_choices, event_draft, permissions, service
 from app.calendar.conversation_tools import RequestClarification, duration, literal, resolve_window
 from app.calendar.time_resolution import parse_clock, wall_instants
 from app.capabilities.service import build_capabilities
@@ -30,24 +30,54 @@ from app.schemas.calendar_tools import CalendarWindow
 POLICY = "direct-calendar-event-1.1.1"
 
 
+def user_directive(text):
+    # A model selects the operation semantically. Its quoted evidence must remain
+    # in the user's top-level directive, never a pasted email/label/instruction.
+    return re.split(r"\n|(?<!\d):(?!\d)", text.strip(), maxsplit=1)[0]
+
+
 def creation_target(text):
-    text = text.casefold().replace("craete", "create").replace("creat ", "create ")
-    if re.search(r"\b(?:don't|do not|never|cancel|delete|remove|reschedule|update)\b", text):
-        return False
-    # Only the leading request can confer authority. Pasted text after a newline
-    # or a prose colon is data. A 24-hour clock's colon is not a prose delimiter.
-    leading = re.split(r"\n|(?<!\d):(?!\d)", text.strip(), maxsplit=1)[0]
+    leading = user_directive(text).casefold()
+    leading = leading.replace("craete", "create").replace("creat ", "create ")
     leading = re.sub(r"\bat(?=\d)", "at ", leading)
-    match = re.match(
-        r"^\s*(?:(?:please|hey)[, ]+)?"
-        r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
-        r"(?:i(?:'d)?\s+(?:want|need|like)\s+(?:you\s+)?to\s+))?"
-        r"(?:help\s+me\s+(?:to\s+)?)?"
-        r"(?:create|add|book|schedule|reserve|put|block)\s+"
-        r"(?:(?:me|a|an|the|my|new|single|one-time)\s+)*(?P<object>.+)",
-        leading,
-    )
-    return match["object"] if match else None
+    match = re.search(r"\b(?:create|add|book|schedule|reserve|put|block)\s+", leading)
+    if not match:
+        return None
+    # Check the directive, not its title. A small request grammar accepts optional
+    # greetings/auxiliaries in any order; arbitrary reported speech is not authority.
+    prefix = leading[: match.start()]
+    request_words = {
+        "hi",
+        "hello",
+        "hey",
+        "alfred",
+        "threadly",
+        "please",
+        "kindly",
+        "can",
+        "could",
+        "would",
+        "will",
+        "you",
+        "i",
+        "i'd",
+        "want",
+        "need",
+        "like",
+        "to",
+        "help",
+        "helping",
+        "me",
+        "mind",
+        "for",
+        "thanks",
+        "thank",
+    }
+    if re.search(r'["“”`<>]', prefix) or any(
+        word not in request_words for word in re.findall(r"[\w']+", prefix)
+    ):
+        return None
+    return re.sub(r"^(?:(?:me|a|an|the|my|new|single|one-time)\s+)*", "", leading[match.end() :])
 
 
 def creation_request(text, title="", date_source="", time_source=""):
@@ -166,85 +196,63 @@ def resolve_times(args, text, preferences, anchor):
 
 
 async def prepare(runtime, args):
-    from app.schemas.conversation import PrepareCalendarEvent
-
-    # Only USER instructions can establish intent and event fields. Provider/email
-    # content, model history and the approval mode are never accepted as authority.
-    pending = runtime.state.get("calendar_event_request") if args.continue_previous else None
-    if pending and datetime.fromisoformat(pending["expires_at"]) <= datetime.now(UTC):
-        pending = None
+    pending = event_choices.pending(runtime.state) if args.continue_previous else None
     if args.continue_previous and not pending:
         raise RequestClarification("Please repeat the event details for this new request.")
-    text = runtime.request.instruction
-    anchor = runtime.calendar_anchor
-    previous_names = list(pending.get("previous_calendar_names", [])) if pending else []
-    if pending:
-        text = pending["user_text"] + "\n" + text
-        anchor = datetime.fromisoformat(pending["anchor"])
-        pending["last_request_id"] = runtime.request.request_id
-        if args.date_source:
-            try:
-                literal(args.date_source, runtime.request.instruction)
-            except ValueError:
-                pass
-            else:
-                anchor = runtime.calendar_anchor
-        old_name = pending["arguments"].get("calendar_name", "")
-        if args.calendar_name and old_name and args.calendar_name != old_name:
-            previous_names = (previous_names + [old_name])[-10:]
-        values = dict(pending["arguments"])
-        supplied = args.model_dump(exclude_unset=True)
-        if pending.get("selected_calendar") and args.calendar_name:
-            try:
-                literal(args.calendar_name, runtime.request.instruction)
-            except ValueError:
-                supplied.pop("calendar_name", None)
-        new_name = supplied.get("calendar_name")
-        if (
-            new_name
-            and new_name != old_name
-            and not event_choices.explicit_selection(new_name, runtime.request.instruction)
-        ):
-            return {
-                "kind": "clarification",
-                "text": "Choose a calendar from the list, or tell me its name.",
-                "calendar_choices": event_choices.public(runtime.state),
-            }
-        values.update(
-            {
-                k: v
-                for k, v in supplied.items()
-                if k != "continue_previous" and v not in (None, "", [])
-            }
-        )
-        args = PrepareCalendarEvent.model_validate(values)
+    # A typed interpretation is still only a proposal. Creation authority is the
+    # original top-level USER directive, independent of model/source text.
     origin_args = pending["arguments"] if pending else args.model_dump()
     origin = (pending or {}).get("creation_origin") or {
-        "text": pending["user_text"] if pending else text,
+        "text": pending["user_text"] if pending else runtime.request.instruction,
         "title": origin_args.get("title", ""),
         "date_source": origin_args.get("date_source", ""),
         "time_source": origin_args.get("time_source", ""),
     }
-    if not creation_target(text) or not creation_request(**origin):
+    authority_text = user_directive(origin["text"])
+    if origin.get("title"):
+        authority_text = authority_text.replace(origin["title"], " ")
+    if re.search(r"\b(?:don't|do not|never)\b", authority_text, re.I):
+        return {
+            "kind": "clarification",
+            "text": "Please confirm whether you want this event created.",
+        }
+    if not creation_request(**origin):
         raise RequestClarification("Tell me the event you want to create.")
+    if args.intent and args.intent.operation == "cancel":
+        if args.intent.source.strip() != user_directive(runtime.request.instruction).strip():
+            raise RequestClarification("Please confirm cancellation directly.")
+        if not re.fullmatch(
+            r"\s*(?:please\s+)?(?:cancel|stop|never mind|nevermind)"
+            r"(?:\s+(?:it|that|this|the|my|pending|event|request|booking))*[.! ]*",
+            args.intent.source,
+            re.I,
+        ):
+            raise RequestClarification("Please confirm cancellation of this pending event.")
+        await retire_candidate(runtime, pending, "cancelled")
+        runtime.state.pop("calendar_event_request", None)
+        return {
+            "kind": "message",
+            "text": "Cancelled this pending event request. No new event was created.",
+        }
     try:
-        source_fields(args, text, previous_names)
+        args, saved, changed = event_draft.merge(runtime, args, pending)
     except (RequestClarification, ValueError) as error:
         return {"kind": "clarification", "text": str(error)}
-    runtime.state["calendar_event_request"] = {
-        "arguments": args.model_dump(mode="json"),
-        "previous_calendar_names": previous_names,
-        "creation_origin": origin,
-        "user_text": text[-6000:],
-        "anchor": anchor.isoformat(),
-        "expires_at": (datetime.now(UTC) + timedelta(minutes=15)).isoformat(),
-        "last_request_id": runtime.request.request_id,
-        **(
-            {k: pending[k] for k in ("calendar_choices", "selected_calendar") if k in pending}
-            if pending
-            else {}
-        ),
-    }
+    saved["creation_origin"] = origin
+    if pending and pending.get("action_id"):
+        if not changed:
+            async with runtime.factory() as session:
+                return await response(session, runtime.owner, pending["action_id"])
+        await retire_candidate(runtime, pending, "superseded")
+        saved.pop("action_id", None)
+    elif not pending and event_choices.pending(runtime.state):
+        # A new user-authorized goal supersedes an older undispatched candidate.
+        await retire_candidate(
+            runtime, runtime.state["calendar_event_request"], "superseded", new_goal=True
+        )
+    runtime.state["calendar_event_request"] = saved
+    text = saved["user_text"]
+    anchor = datetime.fromisoformat(saved["anchor"])
     if not args.title:
         return {"kind": "clarification", "text": "What should I call the event?"}
     if not args.date:
@@ -284,6 +292,10 @@ async def prepare(runtime, args):
         start, end = resolve_times(args, text, preferences, anchor)
     except (RequestClarification, ValueError) as error:
         return {"kind": "clarification", "text": str(error)}
+    saved["arguments"]["date"] = {
+        "kind": "absolute",
+        "start": start.astimezone(ZoneInfo(preferences["timezone"])).date().isoformat(),
+    }
     key = str(
         uuid5(
             NAMESPACE_URL,
@@ -320,12 +332,46 @@ async def prepare(runtime, args):
             account_version,
         )
         result = await response(session, runtime.owner, action.id)
-        runtime.state.pop("calendar_event_request", None)
+        runtime.state["calendar_event_request"]["action_id"] = action.id
         runtime.state["last_calendar_action_id"] = action.id
         await store.checkpoint(
             session, runtime.owner, runtime.request, runtime.lease, runtime.state, result
         )
         return result
+
+
+async def retire_candidate(runtime, pending, target, *, new_goal=False):
+    if not pending or not pending.get("action_id"):
+        return
+    async with runtime.factory.begin() as session:
+        # Match Calendar dispatch's account -> task -> action lock order.
+        await session.get(User, runtime.owner, with_for_update=True)
+        chat = await store.owned(session, runtime.owner, runtime.request.conversation_id, lock=True)
+        if (
+            chat.lease_id != runtime.lease
+            or not chat.lease_until
+            or chat.lease_until <= datetime.now(UTC)
+        ):
+            raise ApiError(
+                409, "conversation_lease_lost", "Reload this conversation before continuing."
+            )
+        _, action = await actions.owned_action(
+            session, runtime.owner, pending["action_id"], lock=True
+        )
+        if action.state == target:
+            return
+        if action.state not in {"proposed", "approved"}:
+            if new_goal:
+                return
+            raise ApiError(
+                409,
+                "calendar_event_already_dispatched",
+                "This event has already been dispatched or stopped. Check its status; "
+                "I cannot edit it or create a replacement automatically.",
+            )
+        await actions.stop_before_dispatch(
+            session, runtime.owner, action.id, expected_version=action.version, state=target
+        )
 
 
 async def propose(

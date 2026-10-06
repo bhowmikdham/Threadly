@@ -607,3 +607,12 @@ in the encrypted, expiring conversation state; no event contents are cached. Pro
 IDs and internal authority metadata are excluded from model context/public choices.
 Choice references share the pending event's 15-minute expiry and current turn version;
 current ACL is rechecked at selection and again before eventual event dispatch.
+
+Conversation encrypted JSON's optional `calendar_event_request` version 2 contains
+`goal_id`, `revision`, typed `arguments`, `field_provenance` (request ID, operation,
+source), original creation authority, a pinned date anchor, fixed expiry, optional
+owned calendar choices/selection, and optional immutable `action_id`. Current field
+evidence replaces obsolete values; prior quoted/provider text is not reconstructed
+as authority. Legacy structured pending drafts remain readable. Unstructured old
+creation chats require clarification rather than guessing an old relative date.
+No relational schema change is introduced.

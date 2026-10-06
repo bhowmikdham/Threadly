@@ -16,7 +16,7 @@ def pending(state):
 
 def public(state):
     value = pending(state)
-    options = value.get("calendar_choices") if value else None
+    options = value.get("calendar_choices") if value and not value.get("action_id") else None
     if not options:
         return None
     return {
@@ -196,6 +196,8 @@ async def show(runtime):
 
 async def select(runtime, choice_id):
     value = pending(runtime.state)
+    if value and value.get("action_id"):
+        return unavailable()
     if not value:
         runtime.state.pop("calendar_event_request", None)
         return unavailable()

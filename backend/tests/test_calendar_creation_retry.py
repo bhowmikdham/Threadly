@@ -2,14 +2,14 @@
 
 # ruff: noqa: F811
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
 
 from app.api.errors import ApiError
-from app.calendar import conversation_guard, event_choices, event_creation
+from app.calendar import conversation_guard, event_choices, event_creation, event_draft
 from app.conversation import service, store
 from app.db.models import ActionJob, AssistantAction, Conversation
 from app.model_client.conversation import ConversationProviderError
@@ -17,16 +17,26 @@ from tests.test_calendar_creation import configured, ready, turn  # noqa: F401
 from tests.test_calendar_service import setup  # noqa: F401
 from tests.test_conversation import Model, tool
 
+# Keep the reported Melbourne midnight/date relationship, but place the synthetic
+# event in the future relative to PostgreSQL's real action-expiry clock.
+REPLAY_ANCHOR = (datetime.now(UTC) + timedelta(days=1)).replace(
+    hour=13, minute=53, second=0, microsecond=0
+)
+REPLAY_START = REPLAY_ANCHOR.astimezone(ZoneInfo("Australia/Melbourne")).replace(
+    hour=18, minute=0, second=0, microsecond=0
+)
+
 
 def freeze_reported_clock(monkeypatch):
     class Frozen(datetime):
         @classmethod
         def now(cls, tz=None):
-            value = cls(2026, 10, 5, 13, 53, tzinfo=UTC)
+            value = cls.fromtimestamp(REPLAY_ANCHOR.timestamp(), UTC)
             return value.astimezone(tz) if tz else value.replace(tzinfo=None)
 
     monkeypatch.setattr(store, "datetime", Frozen)
     monkeypatch.setattr(event_creation, "datetime", Frozen)
+    monkeypatch.setattr(event_draft, "datetime", Frozen)
     monkeypatch.setattr(event_choices, "datetime", Frozen)
     monkeypatch.setattr(conversation_guard, "datetime", Frozen)
 
@@ -98,7 +108,7 @@ async def test_ashu_title_followup_throttle_preserves_today_time_ask_and_exact_r
     start = datetime.fromisoformat(event["start"]["dateTime"]).astimezone(
         ZoneInfo("Australia/Melbourne")
     )
-    assert start == datetime(2026, 10, 6, 18, tzinfo=ZoneInfo("Australia/Melbourne"))
+    assert start == REPLAY_START
     replay = await service.turn(1, request, factory=db_sessionmaker, model=Model())
     assert replay["calendar_action"]["action_id"] == action["action_id"]
     async with db_sessionmaker() as db:
@@ -146,7 +156,7 @@ async def test_complete_ashu_title_does_not_require_an_attendee_or_prose_fallbac
     assert event["summary"] == "meeting with Ashu" and event["attendees"] == []
     assert datetime.fromisoformat(event["start"]["dateTime"]).astimezone(
         ZoneInfo("Australia/Melbourne")
-    ) == datetime(2026, 10, 6, 18, tzinfo=ZoneInfo("Australia/Melbourne"))
+    ) == REPLAY_START
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 1
         assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0

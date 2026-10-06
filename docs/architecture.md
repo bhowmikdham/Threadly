@@ -746,3 +746,21 @@ quoted/provider content to authorize creation. Calendar destination resolution
 rechecks pending expiry after provider reads and returns a typed unavailable
 result. The same-request provider retry preserves structured event details and
 the existing Ask setting; retry/backoff policy and live provider capacity are unchanged.
+
+### Event field memory and transitions (conversation 1.8.0)
+
+Calendar creation state now records a bounded goal ID/revision, structured current
+arguments and per-field user request/source provenance. Replacement and clearing
+operate on fields rather than appending old user text. Resolved dates are pinned
+to civil dates. Read-only detours preserve the draft; expiry, explicit cancellation,
+new creation goals and account fences bound its lifetime. Semantic tool intent is
+kept separate from the leading-user-directive authority check and immutable action
+approval. Content words in titles do not determine operation type.
+
+A completed preparation retains a reference to its action for correction/replay.
+It exposes no stale picker. Corrections take the existing account→task→action locks,
+stop only a pre-dispatch action, then create a separately reviewed candidate. An
+already dispatched/unknown action cannot be silently replaced. No provider calls
+run in these transactions. Historical prompt/tool snapshots remain immutable;
+1.8.0 is a new snapshot. Tests use scripted decisions and Google transports and do
+not establish live model language quality or a successful Google event write.

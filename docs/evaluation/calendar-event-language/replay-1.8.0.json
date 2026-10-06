@@ -1,0 +1,67 @@
+{
+  "release": "contextual-conversation-1.8.0",
+  "mode": "scripted model and mock Google with isolated PostgreSQL",
+  "live_model": false,
+  "live_provider": false,
+  "test_files": [
+    "backend/tests/test_calendar_context_contract.py",
+    "backend/tests/test_calendar_creation_retry.py",
+    "backend/tests/test_calendar_event_choices.py"
+  ],
+  "cases": [
+    {
+      "id": "polite_kelly",
+      "input": "Hi, could you create an event at 4pm tmrw for a meeting with kelly?",
+      "tool": "prepare_calendar_event",
+      "expected": "literal full title; no invented attendee"
+    },
+    {
+      "id": "title_operation_word",
+      "input": "Create an event called Cancel subscription tomorrow at 4pm",
+      "tool": "prepare_calendar_event",
+      "expected": "title is data, not cancellation"
+    },
+    {
+      "id": "read_detour",
+      "input": "Create Meeting at4pm \u2192 am I free tomorrow? \u2192 tomorrow",
+      "tool": "check_day_availability then prepare_calendar_event",
+      "expected": "preserve original create goal and 4pm"
+    },
+    {
+      "id": "replace_fields",
+      "input": "Use day after tomorrow at 5pm, title Update planning",
+      "tool": "prepare_calendar_event",
+      "expected": "replace only supplied fields; old approval superseded"
+    },
+    {
+      "id": "remove_guest",
+      "input": "remove guest guest@example.test",
+      "tool": "prepare_calendar_event",
+      "expected": "remove explicit existing guest; no email send"
+    },
+    {
+      "id": "clear_location",
+      "input": "clear location",
+      "tool": "prepare_calendar_event",
+      "expected": "clear explicitly; legacy empty fields keep old value"
+    },
+    {
+      "id": "quoted_removal",
+      "input": "Rename the title to \"clear location\"",
+      "tool": "prepare_calendar_event",
+      "expected": "cannot use quoted title as location-clear authority"
+    },
+    {
+      "id": "old_ashu",
+      "input": "meeting with Ashu (unstructured historical conversation)",
+      "tool": "respond clarification",
+      "expected": "do not infer date or title from assistant prose"
+    },
+    {
+      "id": "retry_429",
+      "input": "same title-followup request after mock 429",
+      "tool": "prepare_calendar_event",
+      "expected": "same request identity; one candidate"
+    }
+  ]
+}

@@ -49,7 +49,7 @@ def pending_event(runtime):
 
 
 def pending_reply(text, pending):
-    if not pending or len(text) > 500:
+    if not pending or pending.get("action_id") or len(text) > 500:
         return False
     if re.fullmatch(r"\s*(?:thanks|thank you|ok|okay|never mind|cancel)[.! ]*", text, re.I):
         return False
@@ -96,12 +96,22 @@ async def respond(runtime, answer):
     text = request.instruction
     state = getattr(runtime, "state", {})
     pending = pending_event(runtime)
+    if pending and re.fullmatch(r"\s*(?:cancel|never mind|nevermind)[.! ]*", text, re.I):
+        from app.calendar.event_creation import prepare
+        from app.schemas.conversation import PrepareCalendarEvent
+
+        return await prepare(
+            runtime,
+            PrepareCalendarEvent(
+                continue_previous=True, intent={"operation": "cancel", "source": text}
+            ),
+        )
     action_id = state.get("last_calendar_action_id")
     history = state.get("history", [])
     # A newer unfinished/failed event request supersedes the previous action.
     # Never answer its status with an older successful booking from this chat.
     if pending:
-        action_id = None
+        action_id = pending.get("action_id")
     else:
         for entry in reversed(history):
             if entry.get("calendar_action_id"):
@@ -154,6 +164,9 @@ def exhausted(runtime):
     if request and (
         creation_turn(request.instruction) or pending_reply(request.instruction, pending)
     ):
+        if pending and pending.get("action_id") and creation_turn(request.instruction):
+            runtime.state.pop("calendar_event_request", None)
+            pending = None
         if pending:
             pending["last_request_id"] = request.request_id
         return {

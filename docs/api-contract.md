@@ -1275,3 +1275,32 @@ request, including missing-title follow-ups after a provider-unavailable retry.
 If calendar choices expire during their ACL read, selection returns terminal
 `calendar_choice_unavailable` without creating an action; exact retries replay
 that result. Ask/Always and all existing request/account/version fences remain.
+
+### Calendar draft continuation contract (conversation 1.8.0)
+
+`prepare_calendar_event` retains the existing fields and `continue_previous` flag.
+Its optional `intent` is `{operation: create|resume|revise|cancel, source: string}`;
+source quotes the complete top-level user directive. It is an interpretation, never
+an approval or Google grant. New explicit creation supersedes an undispatched old
+candidate. Availability/email detours retain the unfinished goal for its original
+15-minute lifetime. Account ownership/version checks remain unchanged.
+
+Corrections use `continue_previous: true` and `changes`, an array with distinct
+fields. Each entry has `field`, `operation`, `source`, and optional `value`:
+
+- `replace`: a string value for title/location/description/calendar_name/duration,
+  a structured date for date, a normalized clock for time, or email list for attendees.
+  Date/time source quotes the original date/clock words in the latest user turn.
+- `clear`: no value; explicitly clears a field. Clearing required fields asks for them.
+- `remove`: only attendees, with explicit existing addresses to remove.
+
+Legacy empty values remain no-ops. Changes cannot derive authority from quoted email,
+calendar labels, another account, or model history. A correction supersedes the old
+undispatched immutable action and retires its approval/job before replacement. A
+claimed worker is fenced by that transition. Dispatched or unknown outcomes cannot
+be edited/replaced automatically. Repeating a resume without changes returns the
+same action; identical HTTP retries still use the existing exact request receipt.
+Changed existing details invalidate old calendar choice handles; filling a missing
+field preserves an explicitly chosen destination, rechecked against current ACLs
+and preference/account versions. Published response shapes and picker endpoints
+are unchanged. No migration, OAuth scope or production setting is required.
