@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
+from app.api.errors import ApiError
 from app.conversation import email_draft, engine, service, store
 from app.db.models import AssistantTask, Conversation
 from app.schemas.conversation import PrepareEmailDraft
@@ -203,6 +204,12 @@ async def test_corrected_literal_recipient_is_the_only_review_envelope(db_sessio
     assert result["task"]["draft_input"]["to"] == ["new@example.test"]
     assert result["task"]["draft_input"]["cc"] == ["observer@example.test"]
     assert result["task"]["route"]["decision"]["requested_action"] == "none"
+    async with db_sessionmaker() as session:
+        state = store.decode(await session.get(Conversation, turn.conversation_id))
+    assert email_draft.model_context(state) is None
+    with pytest.raises(ApiError) as error:
+        await prepare("Make it shorter", state, continue_previous=True)
+    assert error.value.code == "draft_artifact_required"
 
 
 async def test_read_email_cannot_be_promoted_to_a_user_only_draft():

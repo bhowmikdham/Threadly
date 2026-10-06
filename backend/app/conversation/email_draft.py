@@ -6,6 +6,7 @@ can produce an actionable artifact; conversation text never grants send authorit
 
 import re
 
+from app.api.errors import ApiError
 from app.schemas.assistant import DraftOptions, RouteDecision, RouteParameters
 from app.schemas.conversation import PrepareWorkflow
 
@@ -18,7 +19,9 @@ class EmailDraftRequired(ValueError):
 
 def model_context(state):
     value = state.get(KEY)
-    return dict(value) if value else None
+    # Address-bound drafts now belong to active_work and its immutable artifact
+    # revision flow. Do not invite the model to regenerate them from old turns.
+    return dict(value) if value and value.get("status") != "workflow" else None
 
 
 def ready_route():
@@ -87,6 +90,13 @@ async def prepare(runtime, args):
     if args.continue_previous:
         if not previous:
             raise ValueError("No pending email draft; use the current user goal")
+        if previous["status"] == "workflow":
+            raise ApiError(
+                422,
+                "draft_artifact_required",
+                "Use active_work and revise_draft for the existing saved draft. "
+                "A new email goal uses continue_previous=false.",
+            )
         if re.search(
             r"\b(?:new|another|different)\s+(?:email|e-mail|message|draft)\b", latest, re.I
         ):
