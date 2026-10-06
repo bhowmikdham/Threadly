@@ -27,7 +27,7 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.1.1"
+POLICY = "direct-calendar-event-1.1.2"
 
 
 def user_directive(text):
@@ -127,13 +127,31 @@ def source_fields(args, text, previous_calendar_names=()):
     if re.search(r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat)\b", text, re.I):
         raise RequestClarification("I can create one-time events. Which single date should I use?")
     complete_trailing_title(args, text)
-    for value in (args.title, args.location, args.description, args.calendar_name):
+    for field in ("title", "location", "description", "calendar_name", "duration_phrase"):
+        value = getattr(args, field)
         if value:
-            literal(value, text)
+            event_draft.literal_field(value, text, field)
     if args.date_source:
-        literal(args.date_source, text)
+        event_draft.literal_field(args.date_source, text, "date")
     for address in args.attendees:
-        literal(address, text)
+        event_draft.literal_field(address, text, "attendees")
+    if args.time_source:
+        event_draft.literal_field(
+            args.time_source, re.sub(r"\bat(?=\d)", "at ", text, flags=re.I), "time"
+        )
+        # Ambiguous user wording needs a question; a conflicting model value needs repair.
+        try:
+            source_clock = parse_clock(args.time_source)
+        except ValueError:
+            source_clock = []
+        if len(source_clock) != 1:
+            raise RequestClarification("What time should it start? Please include AM or PM.")
+        try:
+            interpreted_clock = parse_clock(args.time)
+        except ValueError:
+            interpreted_clock = []
+        if source_clock != interpreted_clock:
+            raise event_draft.FieldRepairRequired("time", interpretation=True)
     # Fail closed when an extracted candidate omits an explicit constraint. Only
     # literal user-authored fields are removed; provider content never enters here.
     remainder = text.casefold()
@@ -164,12 +182,6 @@ def source_fields(args, text, previous_calendar_names=()):
             "Please give one event's title, date, start time and any duration or guest email "
             "addresses. I couldn't preserve all the requested details."
         )
-    if args.time_source:
-        literal(args.time_source, re.sub(r"\bat(?=\d)", "at ", text, flags=re.I))
-        if len(parse_clock(args.time_source)) != 1 or parse_clock(args.time_source) != parse_clock(
-            args.time
-        ):
-            raise RequestClarification("What time should it start? Please include AM or PM.")
 
 
 def complete_trailing_title(args, text):
@@ -275,7 +287,11 @@ async def prepare(runtime, args):
         }
     try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
-    except (event_draft.IntentSourceMismatch, event_draft.IncompleteEventTitle):
+    except (
+        event_draft.IntentSourceMismatch,
+        event_draft.IncompleteEventTitle,
+        event_draft.FieldRepairRequired,
+    ):
         # This is a model protocol error, not information missing from the user.
         # Keep the exact-source fence and let the bounded engine repair the call.
         raise

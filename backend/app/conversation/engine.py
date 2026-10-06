@@ -260,6 +260,33 @@ async def run(context, runtime, model=None):
                             }
                         }
                         status = "error"
+                    except event_draft.FieldRepairRequired as exc:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": exc.code,
+                                "field": exc.field,
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": exc.code,
+                                "field": exc.field,
+                                "message": (
+                                    "Repair this event field in prepare_calendar_event. "
+                                    "Copy its source exactly from the current USER directive; "
+                                    "normalized clock values must match that source. "
+                                    "Keep the other grounded fields. For a new event, leave "
+                                    "unsupplied fields empty (including title) so the tool asks "
+                                    "only for missing information. Do not inherit an older "
+                                    "event's fields. For a retained event, preserve its saved "
+                                    "fields and send only user-supplied changes. Do not ask "
+                                    "the user to repair extraction or repeat supplied details."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except event_draft.IntentSourceMismatch:
                         trace.append(
                             {
@@ -463,24 +490,60 @@ async def run(context, runtime, model=None):
                             }
                         }
                         status = "error"
-                    except (ValidationError, ValueError):
-                        trace.append(
-                            {"tool": name if name in TOOLS else "unknown", "status": "invalid"}
-                        )
-                        message = (
-                            "The requested Calendar window is unsupported or combines "
-                            "periods. Ask the user to choose today, tomorrow, this week, "
-                            "or the next 7 days. Do not claim Calendar facts."
-                            if name in {"read_calendar", "check_day_availability"}
-                            else "Use declared schema and user-supplied search terms. "
-                            "Use valid references and exact quotes from read_email."
-                        )
-                        result = {
-                            "json": {
-                                "error": "invalid_tool_input",
-                                "message": message,
+                    except (ValidationError, ValueError) as exc:
+                        if name == "prepare_calendar_event":
+                            # Pydantic errors contain private input. Keep only allowlisted
+                            # field names; never serialize its error text or input values.
+                            fields = sorted(
+                                {
+                                    str(error["loc"][0])
+                                    for error in (
+                                        exc.errors() if isinstance(exc, ValidationError) else []
+                                    )
+                                    if error["loc"]
+                                    and error["loc"][0] in TOOLS[name][0].model_fields
+                                }
+                            )
+                            trace.append(
+                                {
+                                    "tool": name,
+                                    "status": "invalid",
+                                    "reason": "calendar_event_invalid_input",
+                                    "fields": fields,
+                                }
+                            )
+                            result = {
+                                "json": {
+                                    "error": "calendar_event_invalid_input",
+                                    "fields": fields,
+                                    "message": (
+                                        "Repair prepare_calendar_event using its declared schema. "
+                                        "Use create intent and continue_previous=false for a new "
+                                        "event; use changes only for a retained event revision. "
+                                        "Include exact user source wording with each date/time. "
+                                        "Preserve grounded fields, leave genuinely missing fields "
+                                        "empty, and do not repeat an identical rejected call."
+                                    ),
+                                }
                             }
-                        }
+                        else:
+                            trace.append(
+                                {"tool": name if name in TOOLS else "unknown", "status": "invalid"}
+                            )
+                            message = (
+                                "The requested Calendar window is unsupported or combines "
+                                "periods. Ask the user to choose today, tomorrow, this week, "
+                                "or the next 7 days. Do not claim Calendar facts."
+                                if name in {"read_calendar", "check_day_availability"}
+                                else "Use declared schema and user-supplied search terms. "
+                                "Use valid references and exact quotes from read_email."
+                            )
+                            result = {
+                                "json": {
+                                    "error": "invalid_tool_input",
+                                    "message": message,
+                                }
+                            }
                         status = "error"
                     except ApiError as exc:
                         trace.append({"tool": name, "status": exc.code})

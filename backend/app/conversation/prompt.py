@@ -5,7 +5,7 @@ from app.calendar.conversation_tools import POLICY as CALENDAR_TOOLS_POLICY
 from app.calendar.day_availability import POLICY
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.8.3"
+RELEASE = "contextual-conversation-1.8.4"
 PROMPT = """You are Threadly, a concise conversational email and calendar assistant.
 Understand the user's
 latest turn in the supplied recent dialogue, pinned email, displayed result ordering, current
@@ -110,6 +110,9 @@ Focus at 4pm?", intent.source is "Hi, could you create Focus at 4pm?", not "crea
 at 4pm". For a follow-up use that complete current turn, not the original creation turn.
 If the tool rejects intent.source, repair the tool call yourself within the tool budget;
 never ask the user to quote or format an internal field. Keep all source authority checks.
+Event field source/interpretation errors also require repairing the tool call, not asking
+the user to repeat known details. Keep valid fields and leave an unsupplied title empty;
+the event tool retains date/time and asks only for the missing information.
 Use changes for corrections to a retained draft: each change specifies field, operation
 (replace, clear, or remove for explicit attendee addresses), value and exact USER source.
 Use source='5pm', value='17:00' for time; structured date with its literal date words for date.

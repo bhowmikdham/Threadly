@@ -1,6 +1,6 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.7.0`. Feature switch:
+Implementation release: `contextual-conversation-1.8.4`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and current
 backend migrations through `c061026e9041`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,
@@ -75,6 +75,35 @@ The `1.1.3` replay passed **32/32** checks
 ([receipt](evaluation/contextual-conversation-live-v2.json)); the earlier `1.1.1`
 [receipt](evaluation/contextual-conversation-live-v1.json) is also available.
 Unit/integration and synthetic model results are not a general quality guarantee.
+
+## Calendar field repair and availability cards (1.8.4)
+
+Event source mismatches now return sanitized `calendar_field_source_mismatch` feedback
+with an allowlisted field name to the bounded model loop. A normalized clock that
+conflicts with a grounded clock source returns `calendar_field_interpretation_mismatch`.
+Invalid event schemas receive Calendar-specific feedback without logging Pydantic inputs.
+Repairs retain the exact-source and new-goal guards; only a fully validated candidate
+updates pending state or supersedes an approval. A missing title retains valid date/time
+and asks “What should I call the event?”; exhaustion returns `calendar_event_not_prepared`.
+Duration phrases must also come from the current user instruction before draft merging.
+
+Single-time availability answers lead with free, busy, or uncertainty. They retain
+selected-calendar scope and distinguish requested duration from the saved default.
+A later overlap says that the slot overlaps busy time rather than claiming the start
+instant is busy. Incomplete or expired evidence cannot produce a free confirmation.
+`calendar_tools` includes `availability`, `scope`, `complete`, `duration_source`, bounded
+`busy_periods`, and `busy_period_count` alongside its existing date/time/timezone and
+check/expiry timestamps. These live details support an availability card alongside the
+reply. They remain transient: conversation history/receipts do not persist provider
+observations, and a restored conversation must recheck rather than reconstruct a card
+from prose. Busy-only evidence never supplies event titles.
+
+The [verification receipt](evaluation/calendar-field-repair/receipt.json) and
+versioned prompt/tools snapshot are in `evaluation/calendar-field-repair/`.
+Replayable scripted-model tests cover extraction repair, missing-title continuation,
+budget exhaustion, fresh goals and stale approval isolation. Synthetic availability
+checks cover complete/partial/failing/stale sources and local-day boundaries; this is
+not a claim of live model or provider success.
 
 ## What changed
 

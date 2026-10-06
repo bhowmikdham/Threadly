@@ -10,7 +10,7 @@ from app.calendar.time_resolution import day_start, parse_clock, wall_instants
 from app.schemas.calendar import FreeBusyRequest, parse_instant
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "calendar-conversation-reads-2.1.0"
+POLICY = "calendar-conversation-reads-2.2.0"
 MAX_DISPLAY = 10
 WEEKDAY = r"(?:monday|tuesday|wednesday|thursday|thurday|friday|saturday|sunday)"
 DAY_PATTERN = rf"(?:(?:this|next) )?{WEEKDAY}(?: (?:this|next) week)?"
@@ -304,6 +304,70 @@ def render_events(result, *, overlaps=False, query=""):
     return "\n".join(lines)
 
 
+def single_availability(start, end, minutes, args, preferences, evidence, complete):
+    """Answer a bounded self check first; retain precise evidence for its UI card."""
+    zone = ZoneInfo(preferences.timezone)
+    local = start.astimezone(zone)
+    checked_day = evidence.checked_at.astimezone(zone).date()
+    days = (local.date() - checked_day).days
+    day = {0: "today", 1: "tomorrow"}.get(days, local.strftime("on %a %-d %b %Y"))
+    clock = local.strftime("%-I %p" if local.minute == 0 else "%-I:%M %p").lower()
+    when = f"{day} at {clock}"
+    periods = availability.merge(
+        (max(b.start, start), min(b.end, end))
+        for c in evidence.calendars
+        if c.status == "known"
+        for b in c.busy
+    )
+    busy_at_start = any(lo <= start < hi for lo, hi in periods)
+    if periods:
+        answer = (
+            f"No, you're busy {when}."
+            if busy_at_start
+            else f"No, that {minutes}-minute slot {when} overlaps busy time."
+        )
+    elif complete:
+        answer = f"Yes, you're free {when}."
+    else:
+        answer = f"I can't confirm whether you're free {when}."
+    source = "requested" if args.duration_phrase else "saved_default"
+    duration_label = "requested" if args.duration_phrase else "saved default"
+    if complete:
+        answer += (
+            f" I checked your {duration_label} {minutes}-minute slot on your selected calendars."
+        )
+    else:
+        answer += (
+            " I couldn't check every selected calendar; coverage is incomplete."
+            f" The check covers your {duration_label} {minutes}-minute slot."
+        )
+    return {
+        "kind": "message",
+        "text": answer,
+        **({"error_code": "calendar_coverage_incomplete"} if not complete else {}),
+        "calendar_tools": {
+            "operation": "check_time_availability",
+            "availability": "busy" if periods else "free" if complete else "unknown",
+            "scope": "selected_calendars",
+            "date": local.date().isoformat(),
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "timezone": preferences.timezone,
+            "duration_minutes": minutes,
+            "duration_source": source,
+            "busy_periods": [
+                {"start": lo.isoformat(), "end": hi.isoformat()} for lo, hi in periods[:MAX_DISPLAY]
+            ],
+            "busy_period_count": len(periods),
+            "coverage": evidence.coverage if not complete else "complete",
+            "complete": complete,
+            "evidence_id": evidence.id,
+            "checked_at": evidence.checked_at.isoformat(),
+            "expires_at": evidence.expires_at.isoformat(),
+        },
+    }
+
+
 async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=None):
     """Terminal, deterministic responses: provider prose never controls another tool call."""
     anchor = anchor or datetime.now(UTC)
@@ -408,14 +472,17 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             and bool(evidence.calendars)
             and all(c.status == "known" for c in evidence.calendars)
         )
+        if is_single:
+            if evidence.expires_at <= anchor:
+                raise ApiError(409, "calendar_evidence_expired", "Availability evidence expired")
+            return single_availability(
+                start, end, single_minutes, args, preferences, evidence, complete
+            )
         lines = [
             f"Your selected calendars only, {display(start, preferences.timezone)} "
             f"to {display(end, preferences.timezone)}. "
             "Other people's availability has not been checked."
         ]
-        if is_single:
-            duration_source = "requested" if args.duration_phrase else "saved default"
-            lines.append(f"Checking your {duration_source} {single_minutes}-minute duration.")
         if is_free:
             lines.append(
                 f"Using {minutes}-minute meetings and your saved working hours, "
@@ -458,22 +525,8 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
         return {
             "kind": "message",
             "text": "\n".join(lines),
-            **(
-                {"error_code": "calendar_coverage_incomplete"} if is_single and not complete else {}
-            ),
             "calendar_tools": {
                 "operation": name,
-                **(
-                    {
-                        "date": start.astimezone(ZoneInfo(preferences.timezone)).date().isoformat(),
-                        "start": start.isoformat(),
-                        "end": end.isoformat(),
-                        "timezone": preferences.timezone,
-                        "duration_minutes": single_minutes,
-                    }
-                    if is_single
-                    else {}
-                ),
                 "coverage": evidence.coverage,
                 "evidence_id": evidence.id,
                 "checked_at": evidence.checked_at.isoformat(),
@@ -490,6 +543,12 @@ async def execute(owner, name, args, instruction, *, anchor=None, date_anchor=No
             "I'll use your saved Calendar timezone.",
         }
     except ApiError as exc:
+        if exc.code == "calendar_evidence_expired":
+            return {
+                "kind": "message",
+                "error_code": exc.code,
+                "text": "That availability check expired. Please check again.",
+            }
         return {
             "kind": "message",
             "text": "I couldn't complete the Calendar read. "
