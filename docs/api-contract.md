@@ -639,6 +639,9 @@ expected_preferences_version and aware start/end, not arbitrary calendar IDs.
 Read-only incremental consent is opt-in on authenticated Google reconnect.
 Partial/omitted/invalid per-calendar results mean unknown; no slot/free/booking
 claim is made. Account/preference changes during network reads prevent publication.
+Evidence retains the exact requested instants, including fractional seconds.
+The provider transport may query less than one additional second at either edge;
+that padding is removed before reporting busy intervals. Echo validation remains exact.
 Full schemas, examples, limits, errors and live gate: [Calendar reads](calendar-reads.md).
 
 ## Deterministic Calendar slots (B13)

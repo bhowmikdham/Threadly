@@ -88,6 +88,17 @@ sorted and merged within each calendar. Empty busy intervals with **known** stat
 mean Google reported none; empty intervals with **unknown** status prove nothing.
 There is deliberately no `is_free`, slot or booking-success field.
 
+The shared Google freeBusy adapter sends a conservative whole-second UTC window:
+it floors the start and ceilings a fractional end. This covers every requested
+instant while avoiding Google's observed loss of sub-millisecond precision in
+response timestamps. The response must still match the **exact transmitted**
+window; shifted, shortened or enlarged echoes are rejected. Busy intervals are
+then clipped to the original exact request before returning or storing evidence.
+Padding of less than one second on either side cannot become reported busy time.
+Aligned boundaries, unknown coverage, source calendars and request hashes are
+unchanged. This applies to both availability reads and pre-execution busy checks.
+See [precision regression evidence](backend-execution/checkpoints/calendar-freebusy-precision.md).
+
 Provider errors, omitted calendars, malformed intervals and a calendar removed
 from the current list produce explicit unknown coverage. Other calendars can keep
 their valid intervals, but B13 must reject an overall availability claim while any

@@ -385,7 +385,10 @@ requires version +1 on every update. API updates serialize on user then preferen
 `calendar_evidence` has UUID ID, user_id FK to the owner's preference row, positive
 preference/account versions, policy version, checked_at/expires_at and minimal typed
 JSONB result. Owner/expiry indexes support reads and future retention. Evidence is
-immutable under UPDATE; the API exposes no deletion. Deleting the user/preferences
+immutable under UPDATE; the API exposes no deletion. Its `start`/`end` and busy
+intervals retain the original exact query window; provider transport precision
+padding is not stored as evidence coverage. No schema change is needed for this
+adapter correction. Deleting the user/preferences
 cascades owned evidence. A query never references another user's preference ID.
 Expiry invalidates reuse but does not delete rows. Downgrade refuses with either
 table populated; old tasks/releases/history are preserved. [Runtime](calendar-reads.md).
