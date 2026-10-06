@@ -33,7 +33,7 @@ class PreflightTests(unittest.TestCase):
 
     def run_preflight(self, **overrides):
         env = {
-            **os.environ,
+            **{k: v for k, v in os.environ.items() if k != "CALENDAR_PUBLIC_ROLLOUT_ENABLED"},
             "PYTHONPATH": str(ROOT / "backend"),
             "APP_ENV": "prod",
             "SECRET_KEY": "test-secret-never-print-this-value-123456789",
@@ -152,6 +152,33 @@ class PreflightTests(unittest.TestCase):
         ]:
             with self.subTest(override=override):
                 self.assertNotEqual(self.run_preflight(**override).returncode, 0)
+
+    def test_public_calendar_still_requires_reconciliation_and_keeps_email_pilot(self):
+        config = {
+            "CALENDAR_PUBLIC_ROLLOUT_ENABLED": "true",
+            "CALENDAR_WRITES_ENABLED": "true",
+            "CALENDAR_RECONCILIATION_ENABLED": "true",
+            "WRITE_PILOT_USER_IDS": "",
+            "EMAIL_WRITES_ENABLED": "false",
+        }
+        result = self.run_preflight(**config)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Public Calendar eligibility", result.stdout)
+        for override in (
+            {"CALENDAR_RECONCILIATION_ENABLED": "false"},
+            {"CALENDAR_PUBLIC_ROLLOUT_ENABLED": "false"},
+            {"EMAIL_WRITES_ENABLED": "true", "EMAIL_RECONCILIATION_ENABLED": "true"},
+        ):
+            with self.subTest(override=override):
+                self.assertNotEqual(self.run_preflight(**(config | override)).returncode, 0)
+
+    def test_public_flag_alone_does_not_enable_execution(self):
+        result = self.run_preflight(
+            CALENDAR_PUBLIC_ROLLOUT_ENABLED="true", CALENDAR_WRITES_ENABLED="false",
+            EMAIL_WRITES_ENABLED="false", WRITE_PILOT_USER_IDS="",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("External writes disabled", result.stdout)
 
 
 if __name__ == "__main__":

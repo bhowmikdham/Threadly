@@ -84,10 +84,22 @@ class Settings(BaseSettings):
     assistant_workflow_manifest: str = ""
     assistant_auxiliary_workflow_manifest: str = ""
 
-    # Separate exact-approval workers; real writes require explicit pilot membership.
+    # Exact-approval workers; Calendar can separately opt into public eligibility.
     calendar_writes_enabled: bool = False
     calendar_reconciliation_enabled: bool = False
+    # Calendar-only rollout; never expands Gmail-send eligibility or grants OAuth scopes.
+    calendar_public_rollout_enabled: bool = False
     write_pilot_user_ids: str = ""
+
+    def calendar_write_eligible(self, user_id: int | None) -> bool:
+        return (
+            type(user_id) is int
+            and user_id > 0
+            and (
+                self.calendar_public_rollout_enabled
+                or str(user_id) in self.write_pilot_user_ids_values
+            )
+        )
 
     @property
     def write_pilot_user_ids_values(self) -> set[str]:

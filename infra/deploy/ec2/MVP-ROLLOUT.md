@@ -77,13 +77,27 @@ No new Flow is necessary to start the API using its configured native Bedrock ad
 ## Controlled writes, after acceptance authorization
 
 A tester must be explicitly enrolled through `WRITE_PILOT_USER_IDS` (local positive
-user IDs). Grant the requested Gmail send / Calendar event scope through reconnect;
+user IDs) under the default pilot policy. A separately approved public Calendar rollout
+can instead set `CALENDAR_PUBLIC_ROLLOUT_ENABLED=true`; its default is false. This
+includes current and future signed-in accounts for Calendar only and leaves the Gmail
+pilot list and sending flag unchanged. Do not expand `WRITE_PILOT_USER_IDS` to make
+Calendar public. Apply the same reviewed setting and compatible code to the API and
+backend workers; a code deployment with the switch left false preserves the pilot.
+Grant the requested Gmail send / Calendar event scope through reconnect;
 requested scopes alone never count as granted. Set only the approved write flag and
 its matching reconciliation flag. Preflight refuses enabled writes with an empty
-allowlist or disabled recovery reads. Every action still requires exact payload/hash
-approval. Do not enroll all users, auto-approve artifacts or submit real messages/events
+allowlist under pilot policy, missing Gmail enrollment, or disabled recovery reads.
+Every action still requires its existing exact payload/hash authorization. The public
+Calendar switch does not select Always allow, grant scopes or bypass account/ACL checks.
+Do not expand access without the specific audience approval, auto-approve artifacts or submit real messages/events
 as a deployment smoke test. Disabling writes prevents new dispatch; it cannot undo an
 already dispatched provider request. Keep recovery reads available for unknown outcomes.
+
+For Calendar rollout rollback, set `CALENDAR_PUBLIC_ROLLOUT_ENABLED=false` consistently
+in the API and workers to restore the existing pilot. Set `CALENDAR_WRITES_ENABLED=false`
+to stop new dispatch for the pilot too. Existing scopes and past events are not revoked
+by either switch; already dispatched requests still require reconciliation. Inspect
+queued work before a later re-enable: existing exact approvals can remain queued.
 
 ## Failure and rollback
 

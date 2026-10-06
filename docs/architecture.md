@@ -685,3 +685,19 @@ the user session and does not authorize email, changes to existing events or del
 Both modes use the existing exact-payload approval/job/attempt state machine and
 read-before-retry recovery. Revocation shares the dispatch account lock. A failed
 preflight that exhausts its retry policy becomes visibly stopped rather than Queued.
+
+## Calendar public eligibility (2026-10-06)
+
+`CALENDAR_PUBLIC_ROLLOUT_ENABLED` is a separate, default-off Calendar eligibility
+control. When explicitly enabled, current and future authenticated accounts can request
+Calendar write consent and use event creation after the existing Google-grant, account,
+ACL and exact-action authorization checks. Otherwise the existing local pilot list
+applies. The API's capability/consent paths and Calendar action worker use the same
+policy; the worker rechecks it before dispatch. `CALENDAR_WRITES_ENABLED` remains the
+execution kill switch. Neither control selects a chat's Always allow mode or grants
+OAuth scopes. Gmail sending retains its existing pilot and execution controls.
+
+This requires compatible code and consistent configuration across API and workers;
+public website or OAuth publication alone does not activate application eligibility.
+Changing eligibility does not revoke past Google grants or undo dispatched events.
+Unknown write outcomes continue through the existing read-only reconciliation path.

@@ -25,15 +25,19 @@ from app.db.models import (
 
 
 async def claim_one(factory, *, transport=None):
-    if not get_settings().calendar_writes_enabled:
+    settings = get_settings()
+    if not settings.calendar_writes_enabled:
         return None
     async with factory.begin() as session:
         action = await worker.candidate(
             session,
             action_type="create_event",
             eligible_owners=None
-            if isinstance(transport, httpx.MockTransport)
-            else [int(v) for v in get_settings().write_pilot_user_ids_values],
+            if (
+                settings.calendar_public_rollout_enabled
+                or isinstance(transport, httpx.MockTransport)
+            )
+            else [int(v) for v in settings.write_pilot_user_ids_values],
         )
         if action is None or not executor.enabled(action.user_id, transport):
             return None
