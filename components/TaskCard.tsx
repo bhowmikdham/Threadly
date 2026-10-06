@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react"
 
 import { addresses } from "../lib/api"
+import { mailExcerpt, mailText } from "../lib/mail-display"
 import { needsCalendarSetup } from "../lib/scheduling-readiness"
 import type { Entry, Selection } from "../lib/types"
 import { ArtifactCard } from "./ArtifactCard"
+import { AssistantText } from "./AssistantText"
 import { CalendarChoiceCard } from "./CalendarChoiceCard"
 import { CalendarEventCard } from "./CalendarEventCard"
 import { Icon } from "./Icon"
-import { InboxCards } from "./InboxCards"
+import { InboxCards, VISIBLE_MAIL_BATCH } from "./InboxCards"
 
 const senderAddress = (from?: string | null) => {
   const candidate = from?.match(/<([^>]+)>/)?.[1] || from || ""
@@ -86,6 +88,29 @@ export function TaskCard({
       p?.result?.reason,
       t?.route?.decision?.reason
     ].some(needsCalendarSetup)
+  // The selectable card is already the source for these exact excerpts. Keep
+  // distinct body evidence and evidence without an explicitly matching ref.
+  // Only the first batch is guaranteed visible; retain later-page citations.
+  const visibleCards = Array.isArray(entry.inbox?.results)
+    ? entry.inbox.results.slice(0, VISIBLE_MAIL_BATCH)
+    : []
+  const evidence = entry.evidence?.filter((item) => {
+    const quote = mailText(item.quote).replace(/\s+/g, " ")
+    return (
+      !quote ||
+      !visibleCards.some(
+        (mail) =>
+          mail &&
+          (mail.reference === item.reference ||
+            mail.message_id === item.reference) &&
+          [
+            mailText(mail.sender),
+            mailText(mail.subject),
+            mailExcerpt(mail.snippet)
+          ].some((text) => text.includes(quote))
+      )
+    )
+  })
   return (
     <article className="exchange" data-entry-id={entry.id}>
       {entry.instruction && (
@@ -95,13 +120,13 @@ export function TaskCard({
         {entry.message &&
           !entry.calendarActionId &&
           (!p || p.state === "proposed" || p.state === "consumed") && (
-            <p className="chat-response">{entry.message}</p>
+            <AssistantText text={entry.message} />
           )}
-        {entry.evidence?.length > 0 && (
+        {evidence?.length > 0 && (
           <details className="work-details">
             <summary>Sources</summary>
-            {entry.evidence.map((e, i) => (
-              <blockquote key={i}>{e.quote}</blockquote>
+            {evidence.map((e, i) => (
+              <blockquote key={i}>{mailText(e.quote)}</blockquote>
             ))}
           </details>
         )}
@@ -311,7 +336,10 @@ export function TaskCard({
                       .writeText(
                         entry.message ||
                           entry.inbox.results
-                            .map((m) => `${m.subject}\n${m.snippet}`)
+                            .map(
+                              (m) =>
+                                `${mailText(m.subject)}\n${mailExcerpt(m.snippet)}`
+                            )
                             .join("\n\n")
                       )
                       .catch((e) => controller.setError(e.message))

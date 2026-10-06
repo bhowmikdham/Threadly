@@ -52,6 +52,8 @@ test.beforeAll(async () => {
   context = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
     headless: true,
+    timezoneId: "Australia/Melbourne",
+    locale: "en-AU",
     args: [
       `--disable-extensions-except=${extension}`,
       `--load-extension=${extension}`,
@@ -408,8 +410,39 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page.getByLabel("Your request").press("Enter")
   await expect(page.locator(".mail-glass-card")).toHaveCount(5)
   await expect(
+    page.locator(".chat-response strong", { hasText: "matching emails" })
+  ).toBeVisible()
+  await expect(
+    page.getByText("All mail · Times in Australia/Melbourne")
+  ).toBeVisible()
+  await expect(page.locator(".mail-card-date").first()).toHaveText(
+    /23 Sept 2026.*1:00 pm.*AEST/i
+  )
+  await expect(page.locator(".mail-card-date").first()).toHaveAttribute(
+    "datetime",
+    "2026-09-23T03:00:00Z"
+  )
+  await expect(page.locator(".mail-card-snippet").first()).toHaveText(
+    "Thanks for your order. Your receipt and pickup details are inside."
+  )
+  await expect(
+    page
+      .locator(".exchange")
+      .filter({ has: page.locator(".inbox-results") })
+      .getByText("Sources", { exact: true })
+  ).toHaveCount(0)
+  await expect(
     page.getByText("Showing 5 of 10 emails from this search.")
   ).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 900 })
+  await page.locator(".inbox-results").evaluate((element) => {
+    element.closest(".exchange")?.scrollIntoView({ block: "start" })
+  })
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "inbox-local-time-390.png")
+  })
+  await page.setViewportSize({ width: 420, height: 900 })
   const turnsBeforeReveal = calls.filter(
     (call) => call.path === "/assistant/conversation-turns"
   ).length
@@ -713,6 +746,7 @@ test("voice mode is a spoken back-and-forth that also lands in the chat", async 
   expect(await page.evaluate(() => (window as any).spoken)).toEqual([
     "Hey! What can I help you with?"
   ])
+  await expect(dialog).not.toHaveClass(/\bdocked\b/)
   await expect(dialog.getByRole("status")).toHaveText("Listening…")
   await page.getByRole("button", { name: "Close voice conversation" }).click()
   await expect(dialog).toHaveCount(0)

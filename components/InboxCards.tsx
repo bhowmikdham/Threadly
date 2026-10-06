@@ -1,9 +1,16 @@
 import { useState } from "react"
 
+import {
+  displayTimezone,
+  mailDateBound,
+  mailExcerpt,
+  mailText,
+  mailTimestamp
+} from "../lib/mail-display"
 import type { Entry, InboxResult } from "../lib/types"
 import { GmailIcon, Icon } from "./Icon"
 
-const VISIBLE_MAIL_BATCH = 5
+export const VISIBLE_MAIL_BATCH = 5
 
 export function FlightCard({
   flight
@@ -65,37 +72,42 @@ export function InboxCards({
         These email results could not be displayed. Please run the search again.
       </p>
     )
-  const dates = [page.filters.received_from, page.filters.received_before]
-    .filter((x) => typeof x === "string" && !Number.isNaN(Date.parse(x)))
-    .map((x) =>
-      new Date(x).toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
-      })
-    )
+  const timezone = displayTimezone(page.filters.timezone)
+  const from = mailDateBound(page.filters.received_from, timezone)
+  const before = mailDateBound(page.filters.received_before, timezone)
+  const folder =
+    page.filters.folder === "INBOX"
+      ? "Inbox"
+      : page.filters.folder === "SENT"
+        ? "Sent"
+        : ["all_mail", "all_synced"].includes(page.filters.folder)
+          ? "All mail"
+          : "Email results"
   return (
     <section className="inbox-results" aria-label="Email results">
       <p className="inbox-intro">
         {page.results.length
           ? page.results.length > visibleCount
             ? `Showing ${visibleCount} of ${page.results.length} emails from this search.`
-            : `Here ${page.results.length === 1 ? "is" : "are"} ${page.results.length} ${page.results.length === 1 ? "email" : "emails"} from this search.`
-          : "I didn’t find any matching emails in these dates."}
+            : `${page.results.length} ${page.results.length === 1 ? "email" : "emails"}`
+          : "No matching emails."}
       </p>
-      {dates.length > 0 && (
-        <p className="inbox-scope">
-          {dates.join(" – ")}
-          {page.filters.folder === "INBOX"
-            ? " · Inbox"
-            : page.filters.folder === "SENT"
-              ? " · Sent"
-              : ""}
-        </p>
-      )}
+      <p className="inbox-scope">
+        {folder} · Times in {timezone}
+        {(from || before) && (
+          <span className="inbox-date-window">
+            {[from && `From ${from}`, before && `before ${before}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        )}
+      </p>
       <div className="mail-card-list">
         {page.results.slice(0, visibleCount).map((mail, i) => {
           const selected = controller.selection?.targetId === mail.message_id
+          const subject =
+            mailText(mail.subject).replace(/\s+/g, " ") || "No subject"
+          const timestamp = mailTimestamp(mail.received_at, timezone)
           return (
             <article
               className={`mail-glass-card${selected ? " is-selected" : ""}`}
@@ -109,7 +121,7 @@ export function InboxCards({
                   controller.restoreFailed ||
                   controller.contextLocked
                 }
-                aria-label={`Use email: ${mail.subject || "No subject"}`}
+                aria-label={`Use email: ${subject}`}
                 aria-pressed={selected}
                 onClick={() => void controller.chooseEmail(mail)}>
                 <span className="mail-card-icon">
@@ -117,17 +129,25 @@ export function InboxCards({
                 </span>
                 <span className="mail-card-content">
                   <span className="mail-card-meta">
-                    <span>{mail.sender || "Email"}</span>
-                    <time dateTime={mail.received_at}>
-                      {new Date(mail.received_at).toLocaleDateString(
-                        undefined,
-                        { month: "short", day: "numeric" }
-                      )}
-                    </time>
+                    <span>
+                      {mailText(mail.sender).replace(/\s+/g, " ") || "Email"}
+                    </span>
                   </span>
-                  <strong>{mail.subject || "No subject"}</strong>
+                  <strong>{subject}</strong>
+                  {timestamp ? (
+                    <time
+                      className="mail-card-date"
+                      dateTime={mail.received_at}
+                      title={`Received ${timestamp} · ${timezone}\nOriginal timestamp: ${mail.received_at}`}>
+                      {timestamp}
+                    </time>
+                  ) : (
+                    <span className="mail-card-date">
+                      Received time unavailable
+                    </span>
+                  )}
                   <span className="mail-card-snippet">
-                    {mail.snippet || "Open this email to read it."}
+                    {mailExcerpt(mail.snippet) || "Open this email to read it."}
                   </span>
                 </span>
               </button>
@@ -142,7 +162,7 @@ export function InboxCards({
                 <button
                   className="icon-button"
                   title="Open in Gmail"
-                  aria-label={`Open in Gmail: ${mail.subject}`}
+                  aria-label={`Open in Gmail: ${subject}`}
                   onClick={() =>
                     void chrome.tabs.create({
                       url: `https://mail.google.com/mail/?authuser=${encodeURIComponent(controller.email)}#all/${encodeURIComponent(mail.thread_id)}`

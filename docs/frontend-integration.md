@@ -65,6 +65,26 @@ sequenceDiagram
 
 ## State, privacy and failure handling
 
+- Mail cards preserve the provider `received_at` instant in their `time`
+  element and original-timestamp tooltip. Display uses validated
+  `search.filters.timezone` from the request; older pages fall back to the
+  browser's IANA timezone. The scope names the timezone, each card includes the
+  local date/time and DST-aware zone abbreviation, and an offset-free or invalid
+  timestamp displays as unavailable. Date-only search bounds stay literal days;
+  timestamp bounds retain their local time, and the exclusive upper bound is
+  explicitly labelled “before”.
+- Compact mail previews decode nested entities, collapse hidden padding and
+  omit tracking/footer clutter without changing the result object passed to
+  source selection. These previews are not source bodies. Assistant prose uses
+  a text-only Markdown subset (paragraphs, lists, emphasis and inline code);
+  email/assistant HTML, images and link destinations are never executed.
+  A Sources excerpt is omitted only when its explicit reference and text are
+  already represented by a card; distinct evidence remains available.
+- The voice consumer accepts both legacy text and `{text, showChat}` replies.
+  Only `text` reaches speech; the structured flag controls whether selectable
+  results remain visible. This completes the callback contract introduced by
+  frontend change `18c9f12` (maintained base `db11122`) without adding speech
+  acknowledgements or changing resource cleanup.
 - Threadly access and renewal credentials use `chrome.storage.local` restricted
   to `TRUSTED_CONTEXTS` before any storage migration or request handling. They
   survive extension reloads and browser restarts; content scripts cannot read
