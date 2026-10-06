@@ -25,7 +25,7 @@ from app.conversation.runtime import (
     validate_agenda_request,
     validate_workflow_bindings,
 )
-from app.mail.presentation import received_display
+from app.mail.presentation import clock_context, received_display
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
@@ -47,10 +47,62 @@ INBOX_MESSAGES = {
     "mail-2": "From: Casey <casey@example.test>. Subject: Project update. The draft is ready.",
 }
 CASES = [
+    *[
+        {
+            "id": f"latest_primary_today_{name}",
+            "turns": ["Check my inbox and tell me the latest email and whether any arrived today"],
+            "mail_listing": True,
+            "expected_inbox_category": "primary",
+            "now": "2026-10-06T13:20:00Z",
+            "received_at": received,
+            "empty_latest": empty,
+            "today_status": status,
+            "kinds": ["message"],
+            "required": ["search_mail"],
+            "forbid": ["prepare_workflow", "more_mail"],
+        }
+        for name, status, received, empty in [
+            ("none", "no_messages", "2026-10-06T11:09:00Z", False),
+            ("present", "has_messages", "2026-10-06T13:09:00Z", False),
+            ("incomplete", "unknown", "2026-10-06T11:09:00Z", False),
+            ("failed", "unknown", "2026-10-06T11:09:00Z", False),
+            ("empty_history", "no_messages", None, True),
+        ]
+    ],
     {
         "id": "latest_single_inbox_local_time",
         "turns": ["could you check for the latest mail that I got in my inbox"],
         "mail_listing": True,
+        "expected_inbox_category": "primary",
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "forbid": ["prepare_workflow", "more_mail"],
+    },
+    {
+        "id": "latest_explicit_primary",
+        "turns": ["Check the latest message in my Primary"],
+        "mail_listing": True,
+        "expected_inbox_category": "primary",
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "forbid": ["prepare_workflow", "more_mail"],
+    },
+    {
+        "id": "latest_all_inbox_categories",
+        "turns": ["Check the latest email across all Inbox categories, including Promotions"],
+        "mail_listing": True,
+        "expected_inbox_category": "all",
+        "kinds": ["message"],
+        "required": ["search_mail"],
+        "forbid": ["prepare_workflow", "more_mail"],
+    },
+    {
+        "id": "latest_primary_after_local_midnight",
+        "turns": ["Check the latest mail in my inbox"],
+        "mail_listing": True,
+        "expected_inbox_category": "primary",
+        "now": "2026-10-06T13:20:00Z",
+        "received_at": "2026-10-06T11:09:00Z",
         "kinds": ["message"],
         "required": ["search_mail"],
         "forbid": ["prepare_workflow", "more_mail"],
@@ -293,6 +345,7 @@ class FixtureRuntime:
     def __init__(self, case, turn=""):
         self.case, self.evidence, self.calls, self.read_scopes = case, {}, [], {}
         self.turn = turn
+        self.mail_anchor = datetime.fromisoformat(case.get("now", "2026-09-23T12:00:00Z"))
         self.search_page = None
         self.search_page_index = -1
         self.search_query = None
@@ -386,6 +439,8 @@ class FixtureRuntime:
         return text
 
     def _search_rows(self):
+        if self.case.get("empty_latest"):
+            return []
         if self.case.get("fresh_sender"):
             return [
                 {
@@ -592,11 +647,11 @@ class FixtureRuntime:
                 for value in (query, sender_email, date_phrase):
                     if value and value.casefold() not in self.user_text.casefold():
                         raise ValueError("Search literals must come from user dialogue")
-                if folder != "all_mail" and folder.casefold() not in self.user_text.casefold():
+                if not inbox_chat.folder_is_grounded(folder, self.user_text):
                     raise ValueError("Folder is not user supplied")
                 start, end = inbox_chat.date_window(
                     date_phrase,
-                    datetime(2026, 9, 23, 12, tzinfo=UTC),
+                    self.mail_anchor,
                     "Australia/Melbourne",
                 )
                 if (
@@ -614,6 +669,7 @@ class FixtureRuntime:
                     received_before=end,
                     limit=limit,
                     timezone="Australia/Melbourne",
+                    inbox_category=args.inbox_category if folder == "INBOX" else "all",
                 ).model_dump(mode="json")
                 self.fresh_search_attempted = True
                 self.search_page_index = 0
@@ -632,8 +688,15 @@ class FixtureRuntime:
             rows = self._search_rows()
             if self.case.get("mail_listing"):
                 rows = rows[: filters["limit"]]
+                if self.case.get("received_at"):
+                    rows = [{**row, "received_at": self.case["received_at"]} for row in rows]
             rows = [
-                {**row, **received_display(row["received_at"], "Australia/Melbourne")}
+                {
+                    **row,
+                    **received_display(
+                        row["received_at"], "Australia/Melbourne", reference_at=self.mail_anchor
+                    ),
+                }
                 for row in rows
             ]
             self.result_order.extend(row["reference"] for row in rows)
@@ -655,6 +718,20 @@ class FixtureRuntime:
                     "persisted": False,
                 },
             }
+            if status := self.case.get("today_status"):
+                local = self.mail_anchor.astimezone(ZoneInfo("Australia/Melbourne"))
+                self.search_page["today_check"] = {
+                    "status": status,
+                    "local_date": local.date().isoformat(),
+                    "timezone": "Australia/Melbourne",
+                    "received_from": local.replace(hour=0, minute=0, second=0).isoformat(),
+                    "received_before": self.mail_anchor.isoformat(),
+                    "folder": filters["folder"],
+                    "inbox_category": filters["inbox_category"],
+                    "query": filters["query"],
+                    "sender_email": filters.get("sender_email", ""),
+                    "coverage_complete": status != "unknown",
+                }
             if name == "search_mail" and self.fresh_search_scope:
                 self.fresh_search_done = True
             observations = [
@@ -667,6 +744,11 @@ class FixtureRuntime:
                 "coverage": self.search_page["coverage"],
                 "date_window": self.search_page["filters"],
                 "displayed_result_order": list(self.result_order),
+                **(
+                    {"today_check": self.search_page["today_check"]}
+                    if "today_check" in self.search_page
+                    else {}
+                ),
             }
         if name == "read_email":
             text = self._read_source(args.reference, args.scope)
@@ -793,8 +875,18 @@ def _contradicts_fixture_mail_count(text, expected):
     return False
 
 
-def _mail_display_failures(text, row, timezone="Australia/Melbourne"):
+_NO_MAIL_TODAY = re.compile(
+    r"\bno\s+(?:matching\s+)?(?:e?mails?|messages)\b[^.!?;]*\btoday\b[^.!?;]*[.!?;]?", re.I
+)
+
+
+def _mail_display_failures(
+    text, row, timezone="Australia/Melbourne", *, reference_at=None, today_check=None
+):
     """Grade optional arrival dates/clocks against the fixture's actual instant."""
+    if today_check:
+        # Arrival language and the separate day-absence claim have independent grades.
+        text = _NO_MAIL_TODAY.sub("", text)
     local = datetime.fromisoformat(row["received_at"]).astimezone(ZoneInfo(timezone))
     normalized = re.sub(r"\b([ap])\.m\.", r"\1m", text, flags=re.I)
     offset_pattern = r"\b(?:UTC|GMT)\s*([+-])(\d{1,2})(?::?(\d{2}))?\b"
@@ -807,6 +899,18 @@ def _mail_display_failures(text, row, timezone="Australia/Melbourne"):
         )
     )
     failures = []
+    if reference_at is not None:
+        relation = received_display(row["received_at"], timezone, reference_at=reference_at)[
+            "received_day_relation"
+        ]
+        relative_arrivals = re.findall(
+            r"\b(?:arrived|received|dated|sent|from|was)\s+(?:on\s+)?(today|yesterday)\b"
+            r"|\b(today|yesterday)(?:'s)?\s+(?:email|message|mail)\b",
+            text,
+            re.I,
+        )
+        if any((first or second).casefold() != relation for first, second in relative_arrivals):
+            failures.append("mail_relative_day_mismatch")
     for match in clocks:
         if match[3]:
             hour = int(match[1]) % 12 + (12 if match[3].upper() == "PM" else 0)
@@ -861,10 +965,30 @@ def grade(case, response, calls, search_page=None):
     for word in case.get("words", []):
         if word.casefold() not in text.casefold():
             failures.append(f"missing_response_term:{word}")
+    if category := case.get("expected_inbox_category"):
+        searches = _tool_inputs(calls, "search_mail")
+        if (
+            len(searches) != 1
+            or searches[0].get("folder") != "INBOX"
+            or searches[0].get("query") != ""
+            or searches[0].get("inbox_category", "primary") != category
+            or not search_page
+            or search_page.get("filters", {}).get("inbox_category") != category
+        ):
+            failures.append("inbox_category_scope_mismatch")
+        if case.get("received_at"):
+            failures.extend(
+                _mail_display_failures(
+                    text,
+                    {"received_at": case["received_at"]},
+                    reference_at=datetime.fromisoformat(case["now"]),
+                    today_check=search_page.get("today_check") if search_page else None,
+                )
+            )
 
     case_id = case["id"]
     workflow = _workflow_input(calls)
-    if case_id == "latest_single_inbox_local_time":
+    if case.get("mail_listing"):
         searches = _tool_inputs(calls, "search_mail")
         if len(searches) != 1 or any(
             searches[0].get(key, "") != value
@@ -877,11 +1001,23 @@ def grade(case, response, calls, search_page=None):
             }.items()
         ):
             failures.append("wrong_single_inbox_search")
-        if not search_page or len(search_page["results"]) != 1:
+        expected_count = 0 if case.get("empty_latest") else 1
+        if not search_page or len(search_page["results"]) != expected_count:
             failures.append("single_inbox_card_count_mismatch")
-        if _contradicts_fixture_mail_count(text, 1):
+        count_text = _NO_MAIL_TODAY.sub("", text) if case.get("today_status") else text
+        if _contradicts_fixture_mail_count(count_text, expected_count):
             failures.append("inbox_answer_count_mismatch")
-        failures.extend(_mail_display_failures(text, {"received_at": "2026-09-23T10:00:00Z"}))
+        if not case.get("received_at") and not case.get("empty_latest"):
+            failures.extend(_mail_display_failures(text, {"received_at": "2026-09-23T10:00:00Z"}))
+        if status := case.get("today_status"):
+            actual = search_page.get("today_check", {}) if search_page else {}
+            if actual.get("status") != status:
+                failures.append("today_check_status_mismatch")
+            claims_none = bool(_NO_MAIL_TODAY.search(text))
+            if status == "no_messages" and not claims_none:
+                failures.append("missing_verified_no_mail_today")
+            elif status != "no_messages" and claims_none:
+                failures.append("unverified_no_mail_today")
     elif case_id == "sender_after_unrelated_search":
         searches = _tool_inputs(calls, "search_mail")
         if (
@@ -1239,8 +1375,7 @@ async def evaluate(trials, *, case_delay_seconds=0):
                         "send": False,
                         "gmail_send_status": "disabled",
                     },
-                    "now": "2026-09-23T12:00:00Z",
-                    "timezone": "Australia/Melbourne",
+                    **clock_context(runtime.mail_anchor, "Australia/Melbourne"),
                 }
                 try:
                     response = await engine.run(context, runtime)

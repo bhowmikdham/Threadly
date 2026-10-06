@@ -1,10 +1,11 @@
 """Read-only conversational inbox discovery; no model-supplied provider operators."""
 
 import re
+from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.mail_search import MailSearchRequest
 
@@ -37,8 +38,15 @@ class InboxFilters(MailSearchRequest):
     limit: int = Field(default=5, ge=1, le=5)
     timezone: str = Field(default="UTC", max_length=80)
     cursor: None = None
+    inbox_category: Literal["primary", "all"] = "all"
 
     timezone_exists = field_validator("timezone")(InboxChatRequest.timezone_exists.__func__)
+
+    @model_validator(mode="after")
+    def category_requires_inbox(self):
+        if self.inbox_category == "primary" and self.folder != "INBOX":
+            raise ValueError("Primary category requires the INBOX folder")
+        return self
 
     @field_validator("sender_email")
     @classmethod
@@ -52,3 +60,19 @@ class InboxPageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     filters: InboxFilters
     cursor: str = Field(min_length=1, max_length=4000)
+
+
+class InboxTodayCheck(BaseModel):
+    """A separate, bounded local-day observation; never a mailbox total."""
+
+    status: Literal["no_messages", "has_messages", "unknown"] = "unknown"
+    local_date: str
+    timezone: str
+    received_from: datetime
+    received_before: datetime
+    folder: Literal["all_mail", "INBOX", "SENT"]
+    inbox_category: Literal["primary", "all"]
+    query: str
+    sender_email: str
+    coverage_complete: bool = False
+    reason: str | None = None

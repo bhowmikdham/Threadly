@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator, model_validator
 
 from app.assistant.drafting import GeneratedDraft
+from app.mail.presentation import has_visible_text
 from app.schemas.assistant import DraftOptions, StrictModel
 from app.schemas.calendar_event import CalendarIntent, EventFieldChange
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS, WINDOW_HELP, CalendarWindow, DateMeaning
@@ -98,6 +99,7 @@ class SearchMail(StrictModel):
     folder: Literal["all_mail", "INBOX", "SENT"] = "all_mail"
     limit: int = Field(default=5, ge=1, le=5)
     selection: Literal["recent_matches", "latest_message"] = "recent_matches"
+    inbox_category: Literal["primary", "all"] = "primary"
 
 
 class MoreMail(StrictModel):
@@ -134,6 +136,13 @@ class CheckDayAvailability(CalendarWindow):
 class Evidence(StrictModel):
     reference: str = Field(min_length=1, max_length=40)
     quote: str = Field(min_length=1, max_length=500)
+
+    @field_validator("quote")
+    @classmethod
+    def visible_quote(cls, value):
+        if not has_visible_text(value):
+            raise ValueError("Cite a visible source excerpt, not whitespace or invisible padding")
+        return value
 
 
 class Respond(StrictModel):
@@ -226,6 +235,11 @@ TOOLS = {
             "the backend uses one card unless an explicit user count takes priority. "
             "Use recent_matches for plural "
             "listings or searches whose candidates need reading (such as latest confirmed order). "
+            "INBOX defaults to inbox_category='primary' (Gmail Primary Inbox). "
+            "Use inbox_category='all' only for an explicit request for all Inbox categories, "
+            "including Promotions/Social. The category is ignored outside INBOX. "
+            "latest_message without date_phrase also checks today's arrivals in the same "
+            "scope; use today_check to state verified no arrivals today, or uncertainty. "
             "Default coverage is the past year. No mailbox import."
         ),
     ),

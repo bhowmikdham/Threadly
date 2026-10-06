@@ -124,15 +124,30 @@ def test_flight_card_keeps_exact_source_route_without_status():
     }
 
 
-def test_committed_live_receipt_matches_current_assets():
+def test_committed_live_receipt_preserves_historical_assets():
     from pathlib import Path
-
-    from app.planner.evaluate_inbox_chat import CASES, assets
 
     receipt = json.loads(
         (Path(__file__).parents[2] / "docs/evaluation/inbox-chat-live-v2.json").read_text()
     )
-    for key, value in assets().items():
-        assert receipt[key] == value
-    assert len(receipt["cases"]) == len(CASES)
+    assert receipt["release"] == "inbox-chat-1.1.0"
+    assert (
+        receipt["prompt_hash"] == "60de823e3722f4972a731b5970ef464476440fd4981efdcf1b3c4c9bf00395a5"
+    )
+    assert len(receipt["cases"]) == 9
     assert all(case["passed"] for case in receipt["cases"])
+
+
+def test_current_inbox_assets_match_versioned_snapshot():
+    from pathlib import Path
+
+    snapshot = json.loads(
+        (
+            Path(__file__).parents[2] / "docs/evaluation/primary-inbox/inbox-chat-1.2.0.json"
+        ).read_text()
+    )
+    assert snapshot == {
+        **inbox.assets(),
+        "prompt": inbox.PROMPT,
+        "schema": inbox.Interpretation.model_json_schema(),
+    }

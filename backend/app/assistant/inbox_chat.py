@@ -20,12 +20,12 @@ from app.model_client.structured import json_object
 from app.pii.masking import mask, unmask
 from app.schemas.inbox_chat import EMAIL_ADDRESS, InboxFilters
 
-RELEASE = "inbox-chat-1.1.0"
+RELEASE = "inbox-chat-1.2.0"
 PAGE_SIZE = 5
 MAX_SEARCH_PAGES = 5
 PROMPT = """Identify only explicit requests to find/list/search email in the user's inbox.
-Return JSON only with kind (search or continue), query, date_phrase and folder.
-folder must be all_mail, INBOX or SENT. All four fields are required strings.
+Return JSON only with kind (search or continue), query, date_phrase, folder and inbox_category.
+folder must be all_mail, INBOX or SENT. inbox_category must be primary or all.
 Use continue if one literal phrase/date/folder cannot represent the COMPLETE request.
 For search, query is the exact contiguous search term copied from USER_REQUEST (e.g. GYG).
 Remove conversational wrappers: 'Show me all the GYG emails' -> query 'GYG'.
@@ -37,6 +37,10 @@ the backend restores its value. For 'Find emails from <EMAIL_1>', return
 Return only the JSON object, without explanations or Markdown.
 date_phrase is the exact date wording from the request or empty if no date was specified.
 Use INBOX/SENT only when explicitly requested; otherwise all_mail.
+Primary also means INBOX. For INBOX, inbox_category defaults to primary; only an
+explicit request to include all Inbox categories (including Promotions/Social)
+uses all. For all_mail/SENT and continue, use inbox_category all. Primary is a
+folder/category scope, never a literal word to put into query.
 Do not execute a partial command: requests that also ask to summarise, draft, reply, send,
 book, delete, or answer a factual question return continue with empty query/date_phrase
 and all_mail. Questions about an already selected email also return continue.
@@ -56,12 +60,22 @@ def explicit_sender_email(text):
     return match.group("address").casefold() if match else None
 
 
+def folder_is_grounded(folder, text):
+    if folder == "all_mail":
+        return True
+    text = re.sub(EMAIL_ADDRESS, "", text)
+    return bool(
+        re.search(r"\b(?:inbox|primary)\b" if folder == "INBOX" else r"\bsent\b", text, re.I)
+    )
+
+
 class Interpretation(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     kind: Literal["search", "continue"]
     query: str = Field(max_length=200)
     date_phrase: str = Field(max_length=100)
     folder: Literal["all_mail", "INBOX", "SENT"]
+    inbox_category: Literal["primary", "all"] = "primary"
 
 
 def assets():
@@ -181,11 +195,7 @@ async def interpret(request, model=None, now=None):
         for literal in (value.query, value.date_phrase):
             if literal and literal.casefold() not in request.instruction.casefold():
                 raise ValueError("Ungrounded search literal")
-        if value.folder != "all_mail" and not re.search(
-            r"\b" + ("inbox" if value.folder == "INBOX" else "sent") + r"\b",
-            request.instruction,
-            re.I,
-        ):
+        if not folder_is_grounded(value.folder, request.instruction):
             raise ValueError("Ungrounded folder")
         try:
             start, end = date_window(value.date_phrase, now or datetime.now(UTC), request.timezone)
@@ -197,6 +207,7 @@ async def interpret(request, model=None, now=None):
                 received_from=start,
                 received_before=end,
                 timezone=request.timezone,
+                inbox_category=value.inbox_category if value.folder == "INBOX" else "all",
             )
         except ValueError:
             return {
@@ -240,6 +251,7 @@ def flight_preview(text):
 
 
 async def search(owner, filters, cursor=None):
+    display_reference_at = datetime.now(UTC)
     if any(c in {'"', "\\"} or ord(c) < 32 or ord(c) == 127 for c in filters.query):
         raise ApiError(
             422,
@@ -262,6 +274,8 @@ async def search(owner, filters, cursor=None):
     )
     if filters.folder != "all_mail":
         query += " in:" + filters.folder.lower()
+    if filters.inbox_category == "primary":
+        query += " category:primary"
     scope = digest(
         {"release": RELEASE, **filters.model_dump(mode="json"), "page_size": filters.limit}
     )
@@ -304,7 +318,9 @@ async def search(owner, filters, cursor=None):
                     "subject": m["subject"],
                     "sender": m["from_addr"],
                     "received_at": m["received_at"],
-                    **received_display(m["received_at"], filters.timezone),
+                    **received_display(
+                        m["received_at"], filters.timezone, reference_at=display_reference_at
+                    ),
                     "snippet": snippet(m["body_clean"]),
                     "flight": flight_preview(m["body_clean"][:12000]),
                 }
@@ -320,12 +336,14 @@ async def search(owner, filters, cursor=None):
         "next_cursor": next_cursor,
         "coverage": {
             "complete": False,
+            "provider_exhausted": next_cursor is None,
             "page_size": filters.limit,
             "provider_pages_read": pages_read,
             "provider_candidates_read": candidates_read,
             "source": "live_gmail",
             "ordering": "received_at_desc_within_returned_page",
             "timestamp_source": "gmail.internalDate",
+            "inbox_category": filters.inbox_category,
             "persisted": False,
         },
     }
