@@ -342,12 +342,16 @@ export function VoiceOrb({
       )
       return
     }
+    // Each effect setup owns its resources, including StrictMode's restart.
+    closed.current = false
     let stream: MediaStream | null = null,
       audio: AudioContext | null = null,
       frame = 0,
+      micFrame = 0,
       silence: ReturnType<typeof setTimeout> | undefined,
       heard = "",
-      broken = false
+      broken = false,
+      stopped = false
     const mic = { level: 0 },
       voice = { level: 0 }
     const r = new Recognition()
@@ -355,7 +359,7 @@ export function VoiceOrb({
     r.interimResults = true
     r.continuous = true
     const listen = () => {
-      if (closed.current || broken) return
+      if (stopped || closed.current || broken) return
       heard = ""
       move("listening")
       try {
@@ -363,6 +367,7 @@ export function VoiceOrb({
       } catch {}
     }
     const reply = async (said: string) => {
+      if (stopped || closed.current) return
       move("thinking")
       try {
         r.stop()
@@ -373,14 +378,14 @@ export function VoiceOrb({
       } catch {
         answer = "Sorry, something went wrong. Try again."
       }
-      if (closed.current) return
+      if (stopped || closed.current) return
       move("speaking")
       setDocked(true)
       await speak(answer, (value) => (voice.level = value))
-      if (!closed.current) listen()
+      if (!stopped && !closed.current) listen()
     }
     r.onresult = (e: any) => {
-      if (phaseRef.current !== "listening") return
+      if (stopped || closed.current || phaseRef.current !== "listening") return
       let text = ""
       for (let i = 0; i < e.results.length; i++)
         text += e.results[i][0].transcript
@@ -391,6 +396,7 @@ export function VoiceOrb({
       }, PAUSE_MS)
     }
     r.onerror = (e: any) => {
+      if (stopped || closed.current) return
       if (e?.error === "no-speech" || e?.error === "aborted") return
       if (
         ["not-allowed", "service-not-allowed", "audio-capture"].includes(
@@ -414,6 +420,7 @@ export function VoiceOrb({
     // The orb follows the user's voice while listening, Threadly's while
     // speaking, and a soft pulse while thinking.
     const animate = (now: number) => {
+      if (stopped) return
       const p = phaseRef.current
       level.current =
         p === "listening"
@@ -424,23 +431,35 @@ export function VoiceOrb({
       frame = requestAnimationFrame(animate)
     }
     frame = requestAnimationFrame(animate)
-    stop.current = () => {
+    const stopResources = () => {
+      // Close and React unmount can both reach this while close() is pending.
+      if (stopped) return
+      stopped = true
       clearTimeout(silence)
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(micFrame)
+      r.onresult = r.onerror = r.onend = null
       try {
         r.abort()
       } catch {}
       stopSpeaking()
       stream?.getTracks().forEach((t) => t.stop())
-      void audio?.close()
+      stream = null
+      const closing = audio
+      audio = null
+      if (closing && closing.state !== "closed") {
+        // A browser teardown may race the state check; never leak its rejection.
+        void closing.close().catch(() => {})
+      }
     }
+    stop.current = stopResources
     listen()
     // A read-only tap on the microphone measures how loudly the user speaks.
     // If it is refused, the orb still breathes and the conversation carries on.
     void navigator.mediaDevices
       ?.getUserMedia({ audio: true })
       .then((s) => {
-        if (closed.current) {
+        if (stopped || closed.current) {
           s.getTracks().forEach((t) => t.stop())
           return
         }
@@ -451,24 +470,24 @@ export function VoiceOrb({
         audio.createMediaStreamSource(s).connect(analyser)
         const samples = new Uint8Array(analyser.fftSize)
         const tick = () => {
-          if (closed.current) return
+          if (stopped || closed.current) return
           analyser.getByteTimeDomainData(samples)
           let sum = 0
           for (const v of samples) sum += ((v - 128) / 128) ** 2
           mic.level = Math.min(1, Math.sqrt(sum / samples.length) * 6)
-          requestAnimationFrame(tick)
+          micFrame = requestAnimationFrame(tick)
         }
         tick()
       })
       .catch(() => {})
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish()
+      if (!stopped && e.key === "Escape") finish()
     }
     addEventListener("keydown", key)
     return () => {
       removeEventListener("keydown", key)
       closed.current = true
-      stop.current()
+      stopResources()
     }
   }, [])
   return (
