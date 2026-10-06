@@ -64,6 +64,37 @@ async function stranded(handler: (m: any) => any) {
 }
 
 describe("guarded recovery of an older unfinished conversation", () => {
+  it("restores remaining calendar choices from a recovered clarification", async () => {
+    const choices = {
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      choices: [
+        {
+          choice_id: "choice-1",
+          label: "Personal calendar",
+          access: "editable"
+        }
+      ]
+    }
+    const { result, calls } = await stranded(() =>
+      recovered({
+        kind: "clarification",
+        text: "Choose a calendar.",
+        error_code: undefined,
+        calendar_choices: choices
+      })
+    )
+    await act(async () => {
+      await result.current.recoverConversation("recover")
+    })
+    expect(result.current.entries[0]).toMatchObject({
+      instruction: "",
+      calendarChoices: choices
+    })
+    expect(result.current.canChooseCalendar(result.current.entries[0])).toBe(
+      true
+    )
+    expect(calls).toHaveLength(2)
+  })
   it("recovers an owned typed event without inventing an instruction or approving it", async () => {
     const { result, calls } = await stranded(() =>
       recovered({

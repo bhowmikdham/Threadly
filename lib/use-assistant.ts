@@ -28,6 +28,8 @@ type ConversationTurnBody = {
   timezone: string
   context_snapshot_id?: string | null
   active_task_id?: string | null
+  // Internal retry metadata. This is sent only to the structured choice endpoint.
+  calendar_choice_id?: string
 }
 
 type PendingTurn = {
@@ -283,6 +285,15 @@ export function useAssistant(user: User) {
           errorCode: h.error_code,
           calendarActionId: h.calendar_action_id
         }))
+        if (value.calendar_choices) {
+          restoredEntries.push({
+            id: `calendar-choices-${value.conversation_id}-${value.version}`,
+            instruction: "",
+            conversationId: value.conversation_id,
+            conversationVersion: value.version,
+            calendarChoices: value.calendar_choices
+          })
+        }
         const pending = saved.pendingTurn
           ? pendingTurn(saved.pendingTurn.id, saved.pendingTurn.body)
           : null
@@ -789,7 +800,16 @@ export function useAssistant(user: User) {
     }
   }
   const sendTurn = async (id: string, body: Readonly<ConversationTurnBody>) => {
-    const turn = await api("/assistant/conversation-turns", body)
+    const turn = body.calendar_choice_id
+      ? await api(
+          `/assistant/conversations/${body.conversation_id}/calendar-choice`,
+          {
+            request_id: body.request_id,
+            expected_version: body.expected_version,
+            choice_id: body.calendar_choice_id
+          }
+        )
+      : await api("/assistant/conversation-turns", body)
     if (
       turn.conversation_id !== body.conversation_id ||
       turn.version !== body.expected_version + 1
@@ -820,6 +840,8 @@ export function useAssistant(user: User) {
       evidence: turn.evidence,
       artifacts: turn.artifacts,
       conversationVersion: turn.version,
+      conversationId: turn.conversation_id,
+      calendarChoices: turn.calendar_choices,
       error: undefined,
       errorCode: turn.error_code,
       calendarAction: turn.calendar_action,
@@ -957,6 +979,45 @@ export function useAssistant(user: User) {
     } finally {
       submitting.current = false
       setBusy(false)
+    }
+  }
+  const canChooseCalendar = (entry: Entry) =>
+    !busy &&
+    !restoring &&
+    !restoreFailed &&
+    !unresolvedTurn() &&
+    entry.conversationId === conversation.current.id &&
+    entry.conversationVersion === conversation.current.version &&
+    Date.parse(entry.calendarChoices?.expires_at || "") > Date.now()
+  const chooseCalendar = async (entry: Entry, choiceId: string) => {
+    if (submitting.current || !canChooseCalendar(entry)) return
+    const choice = entry.calendarChoices?.choices.find(
+      (item) => item.choice_id === choiceId
+    )
+    if (!choice || choice.access !== "editable") return
+    submitting.current = true
+    setBusy(true)
+    setError("")
+    // The label is display data, never a generated user instruction or model input.
+    const id = requestId()
+    const body: ConversationTurnBody = {
+      conversation_id: conversation.current.id,
+      expected_version: conversation.current.version,
+      request_id: id,
+      instruction: "",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      calendar_choice_id: choiceId
+    }
+    retryTurn.current = pendingTurn(id, body)
+    setEntries((old) => [...old, { id, instruction: "", pending: true }])
+    try {
+      await saveConversation(retryTurn.current)
+      await sendTurn(id, retryTurn.current.body)
+    } catch (e) {
+      await reconcileTurnError(id, e)
+    } finally {
+      submitting.current = false
+      if (mounted.current) setBusy(false)
     }
   }
   const recoverConversation = async (operation: "recover" | "cancel") => {
@@ -1315,6 +1376,8 @@ export function useAssistant(user: User) {
     moreEmails,
     submit,
     retry,
+    chooseCalendar,
+    canChooseCalendar,
     canRetry: (entry: Entry) => retryTurn.current?.id === entry.id,
     deleteChat,
     confirm,

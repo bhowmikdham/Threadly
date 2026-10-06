@@ -195,6 +195,37 @@ search result set in working context; arbitrary long-running autonomous
 planning is not implemented. Semantic factual correctness still requires
 human assessment beyond exact-quote validation.
 
+## Clickable Calendar destinations (2026-10-05)
+
+Creation clarifications now render the backend's `calendar_choices` as neutral,
+wrapping buttons. Only options marked `access: "editable"` appear. The selected
+label is display data; the client sends its opaque `choice_id` to
+`POST /assistant/conversations/{id}/calendar-choice` with a fresh `request_id`
+and the displayed conversation's `expected_version`. It does not send a generated
+instruction, provider calendar ID, or event fields. The backend resumes its owned
+pending creation and validates the choice's account, expiry, preferences and ACL.
+
+Buttons are bound to their original conversation/version, expire while displayed,
+and disable during submission or recovery. Repeated clicks cannot start multiple
+requests. A transport failure retains the exact selection identity and endpoint
+for retry, including after the panel reopens. The current server choices can also
+be restored from conversation GET or from a recovered clarification. A settings
+change can return fresh choices for the user to select; none is chosen automatically.
+
+The event result retains the existing exact approval card. Choosing a destination
+does not change Ask/Always settings. Read-only calendars are never offered as
+writable destinations. The companion backend Calendar follow-up is required for
+choice issuance, selection, retained title/date/time and corrected access labels.
+This frontend contains no natural-language calendar resolution or write authority.
+
+The picker is based on merged recovery PR #91 (`b38a08b`) and preserves the merged
+settings redesign. Local checks: 162 unit/controller tests, 32 packaged Chromium
+tests, TypeScript, formatting and both builds passed. The public-origin test is
+skipped in the local build and passed separately in the public build. The browser
+scenario uses synthetic Meeting/4 p.m./tomorrow data,
+tests keyboard selection, panel reopen, exact retry and Ask approval at 320px in
+light/dark themes. It is UI/protocol evidence, not a live model or Google write test.
+
 
 ## Calendar request recovery (2026-09-29)
 

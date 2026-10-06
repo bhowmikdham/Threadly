@@ -314,6 +314,89 @@ test("recovering a saved response does not fabricate a user message or cancel ex
   calls.length = 0
 })
 
+test("clickable calendars retain a multi-turn Meeting and Ask approval through exact selection retry", async () => {
+  await page.getByLabel("Your request").fill("could you create Meeting at 4 pm")
+  await page.getByLabel("Your request").press("Enter")
+  await expect(
+    page.getByText("What day should I use for Meeting at 4 pm?")
+  ).toBeVisible()
+  await page.getByLabel("Your request").fill("tomorrow")
+  await page.getByLabel("Your request").press("Enter")
+  const choices = page
+    .getByRole("region", { name: "Choose an event calendar" })
+    .last()
+  await expect(choices.getByRole("button")).toHaveCount(2)
+  await expect(choices.getByRole("button", { name: "Holidays" })).toHaveCount(0)
+  await page.setViewportSize({ width: 320, height: 740 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    )
+  ).toBe(true)
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "calendar-choices-light.png")
+  })
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await page.getByRole("button", { name: "Switch to dark appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await expect(
+    choices.getByRole("button", { name: "Personal calendar" })
+  ).toBeEnabled()
+  await page.screenshot({
+    animations: "disabled",
+    path: path.join("test-results", "calendar-choices-dark.png")
+  })
+  await page.reload()
+  await expect(
+    choices.getByRole("button", { name: "Personal calendar" })
+  ).toBeEnabled()
+  control.failCalendarChoice = true
+  await choices.getByRole("button", { name: "Personal calendar" }).focus()
+  await page.keyboard.press("Enter")
+  await expect(
+    page.getByRole("button", { name: "Retry response", exact: true })
+  ).toBeVisible()
+  await expect(
+    choices.getByRole("button", { name: "Personal calendar" })
+  ).toBeDisabled()
+  control.failCalendarChoice = false
+  await page
+    .getByRole("button", { name: "Retry response", exact: true })
+    .click()
+  const event = page.getByRole("region", { name: "Calendar event" }).last()
+  await expect(event.getByRole("heading", { name: "Meeting" })).toBeVisible()
+  await expect(event.getByText(/16:00|4:00/)).toBeVisible()
+  await expect(
+    event.getByRole("button", { name: "Create event", exact: true })
+  ).toBeVisible()
+  await expect(event.getByText("Event created", { exact: true })).toHaveCount(0)
+  const selections = calls.filter((call) =>
+    call.path.endsWith("/calendar-choice")
+  )
+  expect(selections).toHaveLength(2)
+  expect(selections[1].body).toEqual(selections[0].body)
+  expect(selections[0].body).toEqual({
+    request_id: expect.any(String),
+    expected_version: 2,
+    choice_id: "00000000-0000-4000-8000-000000000101"
+  })
+  expect(calls.some((call) => call.path.endsWith("/approve"))).toBe(false)
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await expect(choices).toHaveCount(0)
+  await page
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await page.getByRole("button", { name: "Switch to light appearance" }).click()
+  await page.getByRole("button", { name: "Close conversation menu" }).click()
+  await page.setViewportSize({ width: 420, height: 900 })
+  calls.length = 0
+})
+
 test("real extension bridge: selected summary, answer and edited reply without send", async () => {
   await page.getByLabel("Your request").fill("hey")
   await page.getByLabel("Your request").press("Enter")

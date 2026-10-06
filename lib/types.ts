@@ -103,7 +103,13 @@ export interface CalendarAction {
     }
   }
 }
+export interface CalendarChoices {
+  choices: { choice_id: string; label: string; access: "editable" }[]
+  expires_at: string
+}
 export interface Entry {
+  conversationId?: string
+  calendarChoices?: CalendarChoices
   calendarAction?: CalendarAction
   calendarActionId?: string
 
