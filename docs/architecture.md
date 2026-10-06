@@ -701,3 +701,44 @@ This requires compatible code and consistent configuration across API and worker
 public website or OAuth publication alone does not activate application eligibility.
 Changing eligibility does not revoke past Google grants or undo dispatched events.
 Unknown write outcomes continue through the existing read-only reconciliation path.
+
+### Spoken Calendar inputs and interrupted conversation recovery
+
+Conversation 1.7.2 routes recognized time-first Calendar requests through the existing
+exact-payload preparation path and reads durable action state for status questions.
+The backend accepts dotted meridiems, preserves pending slots through empty model
+defaults and emits a terminal, replayable failure after bounded preparation exhaustion.
+The new single-start availability tool computes a displayed interval from the user's
+clock and saved or explicit duration; date and clock constraints remain source-bound.
+It retains the resolved civil date for subsequent checks and never treats partial
+coverage as confirmed availability.
+
+The authenticated conversation recovery endpoint uses User then Conversation locks.
+It finalizes checkpointed work or cancels a childless request only after the lease has
+expired/released and the issued ID/version/hash still match. Cancellation checks all
+existing task/plan/proposal/input/edit/action request keys and saves an exact-hash
+receipt before releasing the pending turn. Candidate mutations and their conversation
+checkpoint share a transaction; losing the old lease rolls that transaction back.
+GET recovery hints are observations, with all decisions rechecked by POST. Hydration
+reads current owned action/task state after the transaction. This does not grant
+Google access, approve actions, retry unknown writes or cancel existing provider work.
+
+
+Calendar creation now freezes its original user authority independently from later
+missing-field answers. Read tools cannot consume those creation replies; explicit
+Calendar discovery offers editable destinations while keeping event details. A
+new independent availability question can still switch to the Calendar read path.
+Backend-issued opaque choice IDs resolve against saved display order and fresh ACL,
+account and preference checks. The selection endpoint enters the existing conversation
+lease/receipt machinery with a distinct internal command type; ordinary turn hashes
+remain unchanged. It bypasses inference and resumes the same pending event, then
+uses the unchanged exact-payload approval/worker path. A checkpoint also preserves
+selected destinations and still-missing fields across interrupted responses.
+
+
+Conversation 1.7.3 extends the leading user-request creation guard to ordinary
+“help me create” wording. It does not replace semantic tool selection or permit
+quoted/provider content to authorize creation. Calendar destination resolution
+rechecks pending expiry after provider reads and returns a typed unavailable
+result. The same-request provider retry preserves structured event details and
+the existing Ask setting; retry/backoff policy and live provider capacity are unchanged.

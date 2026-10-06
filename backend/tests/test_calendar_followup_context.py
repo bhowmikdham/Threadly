@@ -265,3 +265,20 @@ async def test_model_can_quote_original_date_without_selecting_retry_tool(provid
     )
     assert result["calendar_availability"]["date"] == "2026-10-06"
     assert len(provider["calls"]) == 2
+
+
+async def test_single_start_retry_keeps_time_and_date_across_midnight(provider):
+    from app.schemas.calendar_tools import CheckTimeAvailability
+
+    state = {"history": [], "refs": {}}
+    args = CheckTimeAvailability(**DATE, at_time="14:00", at_time_source="2 pm")
+    await runtime(state, "am i free at 2 pm tmrw?").call("check_time_availability", args)
+    first = provider["calls"][-1][1]
+    provider["coverage"] = "complete"
+    result = await runtime(state, "check now", anchor=datetime(2026, 10, 5, 15, tzinfo=UTC)).call(
+        "retry_calendar_read", RetryCalendarRead()
+    )
+    assert result["calendar_tools"]["date"] == "2026-10-06"
+    assert result["calendar_tools"]["duration_minutes"] == 30
+    assert provider["calls"][-1][1].start == first.start
+    assert provider["calls"][-1][1].end == first.end
