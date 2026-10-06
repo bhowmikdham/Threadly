@@ -73,13 +73,22 @@ sequenceDiagram
   timestamp displays as unavailable. Date-only search bounds stay literal days;
   timestamp bounds retain their local time, and the exclusive upper bound is
   explicitly labelled “before”.
+- Inbox scope reflects the returned typed `search.filters.inbox_category`:
+  `primary` displays “Primary Inbox”, and `all` displays “All Inbox categories”.
+  Older responses without a category retain the neutral “Inbox” label. Category
+  labels apply only to the `INBOX` folder; the frontend does not infer categories
+  from senders, subjects or snippet contents. Paging and selection retain the
+  original server result and filter objects.
 - Compact mail previews decode nested entities, collapse hidden padding and
   omit tracking/footer clutter without changing the result object passed to
   source selection. These previews are not source bodies. Assistant prose uses
   a text-only Markdown subset (paragraphs, lists, emphasis and inline code);
   email/assistant HTML, images and link destinations are never executed.
   A Sources excerpt is omitted only when its explicit reference and text are
-  already represented by a card; distinct evidence remains available.
+  already represented by a card or it is empty after display normalization;
+  distinct meaningful evidence remains available. Formatting-only quotes do
+  not produce an empty Sources disclosure. Evidence and original mail bodies
+  remain unchanged.
 - The voice consumer accepts both legacy text and `{text, showChat}` replies.
   Only `text` reaches speech; the structured flag controls whether selectable
   results remain visible. This completes the callback contract introduced by

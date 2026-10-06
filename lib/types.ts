@@ -87,6 +87,7 @@ export interface InboxPage {
     received_from?: string | null
     received_before?: string | null
     folder?: string | null
+    inbox_category?: "primary" | "all"
     timezone?: string
     [key: string]: unknown
   }

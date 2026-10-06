@@ -98,7 +98,9 @@ export function TaskCard({
   const evidence = entry.evidence?.filter((item) => {
     const quote = mailText(item.quote).replace(/\s+/g, " ")
     return (
-      !quote ||
+      // Isolated joining/directional marks are invisible, but remain intact
+      // inside meaningful words. A blank quote must not create a Sources box.
+      Boolean(quote.replace(/[\u200c-\u200f]/g, "").trim()) &&
       !visibleCards.some(
         (mail) =>
           mail &&
