@@ -1,0 +1,185 @@
+{
+  "policy_version": "1.0.0",
+  "prompt_sha256": "be4b86d2c66c264b84b7d95224ee82b3146da6bc90d61d0aab7c58c5226d5591",
+  "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "model_evaluation": "synthetic_seed_cases_completed_not_production_acceptance",
+  "transport": "bedrock_flow",
+  "comparison_transport": "bedrock_converse",
+  "flow_release": "classification-flow-1.0.0",
+  "candidates": [
+    "au.anthropic.claude-haiku-4-5-20251001-v1:0"
+  ],
+  "selected_candidate": "haiku",
+  "output_schema": {
+    "$defs": {
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "needs_reply": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Needs Reply",
+            "type": "array"
+          },
+          "priority": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Priority",
+            "type": "array"
+          },
+          "category": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Category",
+            "type": "array"
+          },
+          "action": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Action",
+            "type": "array"
+          }
+        },
+        "required": [
+          "needs_reply",
+          "priority",
+          "category",
+          "action"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "Labels": {
+        "additionalProperties": false,
+        "properties": {
+          "needs_reply": {
+            "title": "Needs Reply",
+            "type": "boolean"
+          },
+          "priority": {
+            "enum": [
+              "High",
+              "Low",
+              "Medium"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "finance_payments",
+              "hr",
+              "it",
+              "legal_contracts",
+              "meeting_scheduling",
+              "other",
+              "projects"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "action": {
+            "enum": [
+              "approve",
+              "attend",
+              "complete_submit",
+              "edit",
+              "no_action",
+              "reply",
+              "review"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "needs_reply",
+          "priority",
+          "category",
+          "action"
+        ],
+        "title": "Labels",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "status": {
+        "enum": [
+          "classified",
+          "needs_review"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "labels": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Labels"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "evidence": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Evidence"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "reason_codes": {
+        "items": {
+          "enum": [
+            "unanswered_request",
+            "request_resolved",
+            "informational",
+            "time_sensitive",
+            "routine_work",
+            "ambiguous_purpose",
+            "insufficient_context"
+          ],
+          "type": "string"
+        },
+        "maxItems": 7,
+        "minItems": 1,
+        "title": "Reason Codes",
+        "type": "array"
+      }
+    },
+    "required": [
+      "status",
+      "labels",
+      "evidence",
+      "reason_codes"
+    ],
+    "title": "Decision",
+    "type": "object"
+  },
+  "prompt_version": "1.0.1",
+  "evaluation_results": "results/prompt-1.0.1/"
+}

@@ -2,10 +2,14 @@ name: backend-ci
 
 on:
   pull_request:
-    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**", ".github/workflows/backend-ci.yml"]
+    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**", "ml/evals/classification/**", "docs/classification/**", ".github/workflows/backend-ci.yml"]
   push:
-    branches: [main]
-    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**"]
+    branches: [main, release/backend]
+    paths: ["backend/**", "infra/bedrock/**", "infra/deploy/ec2/**", "ml/evals/classification/**", "docs/classification/**", ".github/workflows/backend-ci.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lint-test:
@@ -62,3 +66,8 @@ jobs:
           cd "$RUNNER_TEMP/threadly-summary-console"
           python "$GITHUB_WORKSPACE/infra/bedrock/cloudshell_summary.py" --render-only
           cfn-lint -t threadly-summary-*/template.json
+      - name: Validate classification provisioning and Haiku assets
+        run: |
+          PYTHONPATH=. python -m pytest -q ../infra/bedrock/tests
+          python ../infra/bedrock/classification_flows.py --render-only --output "$RUNNER_TEMP/threadly-classification"
+          cfn-lint -t "$RUNNER_TEMP/threadly-classification/template.json"

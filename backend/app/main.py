@@ -15,6 +15,7 @@ from app.api.routes import (
     auth,
     calendar,
     capabilities,
+    classification,
     draft,
     entities,
     health,
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(sync.router, prefix="/sync", tags=["sync"])
     app.include_router(threads.router, prefix="/threads", tags=["threads"])
+    app.include_router(classification.router, prefix="/threads", tags=["classification"])
     app.include_router(summary.router, prefix="/threads", tags=["summary"])
     app.include_router(draft.router, prefix="/draft", tags=["draft"])
     app.include_router(entities.router, tags=["entities"])

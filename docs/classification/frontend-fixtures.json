@@ -1,0 +1,86 @@
+{
+  "fixture_only": true,
+  "responses": {
+    "classified": {
+      "schema_version": "email-classification-with-action.v1",
+      "thread_id": "abc123",
+      "source_message_ids": [
+        "def456"
+      ],
+      "source_fingerprint": "example-only-fingerprint",
+      "evaluated_at": "2026-10-06T02:00:00Z",
+      "valid_until": "2026-10-06T02:05:00Z",
+      "time_zone": "Australia/Melbourne",
+      "release_id": "example-only-release",
+      "source": "live_gmail",
+      "coverage": "cleaned_text_only",
+      "persisted": false,
+      "status": "classified",
+      "labels": {
+        "needs_reply": true,
+        "priority": "Medium",
+        "category": "legal_contracts",
+        "action": "review"
+      },
+      "evidence": {
+        "needs_reply": [
+          "def456"
+        ],
+        "priority": [
+          "def456"
+        ],
+        "category": [
+          "def456"
+        ],
+        "action": [
+          "def456"
+        ]
+      },
+      "reason_codes": [
+        "unanswered_request"
+      ]
+    },
+    "needs_review": {
+      "schema_version": "email-classification-with-action.v1",
+      "thread_id": "abc123",
+      "source_message_ids": [
+        "def456"
+      ],
+      "source_fingerprint": "example-only-fingerprint",
+      "evaluated_at": "2026-10-06T02:00:00Z",
+      "valid_until": "2026-10-06T02:05:00Z",
+      "time_zone": "Australia/Melbourne",
+      "release_id": "example-only-release",
+      "source": "live_gmail",
+      "coverage": "cleaned_text_only",
+      "persisted": false,
+      "status": "needs_review",
+      "labels": null,
+      "evidence": null,
+      "reason_codes": [
+        "insufficient_context"
+      ]
+    },
+    "skipped": {
+      "schema_version": "email-classification-with-action.v1",
+      "thread_id": "abc123",
+      "source_message_ids": [
+        "def456"
+      ],
+      "source_fingerprint": "example-only-fingerprint",
+      "evaluated_at": "2026-10-06T02:00:00Z",
+      "valid_until": "2026-10-06T02:05:00Z",
+      "time_zone": "Australia/Melbourne",
+      "release_id": "example-only-release",
+      "source": "live_gmail",
+      "coverage": "cleaned_text_only",
+      "persisted": false,
+      "status": "skipped",
+      "labels": null,
+      "evidence": null,
+      "reason_codes": [
+        "not_in_inbox"
+      ]
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "checked_on": "2026-10-06",
+  "verification": "Static artifact/configuration comparison; no inference or retraining performed.",
+  "models": {
+    "category": {
+      "config_path": "Category_Classifier/category_classifier_bert_model/final_model/config.json",
+      "config_sha256": "f5bb7db800c4ef915fc8beeba149773dccc1655068f2f5f553d679ec4b562d80",
+      "metadata_sha256": "463c959dec80041530ba4791b4096b59f029822fccadaae81a055b637e571b3f",
+      "base_model": "bert-base-uncased",
+      "problem_type": "single_label_classification",
+      "id2label": {
+        "0": "finance_payments",
+        "1": "hr",
+        "2": "it",
+        "3": "legal_contracts",
+        "4": "meeting_scheduling",
+        "5": "other",
+        "6": "projects"
+      },
+      "label2id": {
+        "finance_payments": 0,
+        "hr": 1,
+        "it": 2,
+        "legal_contracts": 3,
+        "meeting_scheduling": 4,
+        "other": 5,
+        "projects": 6
+      },
+      "max_length": 256,
+      "zip_mappings_match": true
+    },
+    "priority": {
+      "config_path": "Priority_Classifier/priority_classifier_bert_model/final_model/config.json",
+      "config_sha256": "0ce0b61a0c7f2a73ccc9b8100a13c76b4eaace7323025f3c219eeee99630c89b",
+      "metadata_sha256": "acb56a5569fa87812f6d75a5a3469b1135f2809572d374fa364e26e36318ac01",
+      "base_model": "bert-base-uncased",
+      "problem_type": "single_label_classification",
+      "id2label": {
+        "0": "High",
+        "1": "Low",
+        "2": "Medium"
+      },
+      "label2id": {
+        "High": 0,
+        "Low": 1,
+        "Medium": 2
+      },
+      "max_length": 256,
+      "zip_mappings_match": true
+    },
+    "action": {
+      "config_path": "Action_Classifier/action_classifier_bert_model/final_model/config.json",
+      "config_sha256": "f70b75285a7c19c7ae326b75853f6091d1db56395e1a706a9c2a999f0fe9bdca",
+      "metadata_sha256": "4e4c27b712195235383ac91a22cd08d5356cd8f961309d926b4f4fd9e90417c2",
+      "base_model": "bert-base-uncased",
+      "problem_type": "single_label_classification",
+      "id2label": {
+        "0": "approve",
+        "1": "attend",
+        "2": "complete_submit",
+        "3": "edit",
+        "4": "no_action",
+        "5": "reply",
+        "6": "review"
+      },
+      "label2id": {
+        "approve": 0,
+        "attend": 1,
+        "complete_submit": 2,
+        "edit": 3,
+        "no_action": 4,
+        "reply": 5,
+        "review": 6
+      },
+      "max_length": 256,
+      "zip_mappings_match": true
+    },
+    "intent": {
+      "config_path": "Intent_Classifier/intent_classifier_bert_model/final_model/config.json",
+      "config_sha256": "a7cb7054af26e266b8fa5ad3f2ca69b8a806221212ae7d323e774f8e32857248",
+      "metadata_sha256": "2f865e5d02a8f30a73ebc1e62c2a0f6e452739c6a02c01b2238f629a28f712c0",
+      "base_model": "bert-base-uncased",
+      "problem_type": "multi_label_classification",
+      "id2label": {
+        "0": "summarise",
+        "1": "compose",
+        "2": "reply",
+        "3": "schedule"
+      },
+      "label2id": {
+        "summarise": 0,
+        "compose": 1,
+        "reply": 2,
+        "schedule": 3
+      },
+      "max_length": 256,
+      "zip_mappings_match": true,
+      "thresholds": {
+        "summarise": 0.5,
+        "compose": 0.5,
+        "reply": 0.5,
+        "schedule": 0.5
+      },
+      "preprocessing": {
+        "use_email_selected": false,
+        "email_selected_field": "email_selected",
+        "prompt_field": "prompt",
+        "max_length": 256
+      }
+    }
+  },
+  "source_repository_name": "NLP-Email-Classification"
+}
