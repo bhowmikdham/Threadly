@@ -236,7 +236,20 @@ describe("VoiceOrb audio resource lifecycle", () => {
       const oldResult = recognizers[0].onresult
       act(() => oldResult({ results: [[{ transcript: "Summarise this" }]] }))
       await act(() => vi.advanceTimersByTimeAsync(1300))
+      expect(speak.mock.calls.map(([utterance]) => utterance.text)).toEqual([
+        "Sure, I can do that."
+      ])
+      const acknowledgment = speak.mock.calls[0][0]
+      const cancellations = vi.mocked(window.speechSynthesis.cancel).mock.calls
+        .length
       first.unmount()
+      expect(window.speechSynthesis.cancel).toHaveBeenCalledTimes(
+        cancellations + 1
+      )
+      expect(contexts[0].close).toHaveBeenCalledOnce()
+      expect(recognizers[0].abort).toHaveBeenCalledOnce()
+      expect(recognizers[0].onresult).toBeNull()
+      const spokenBeforeRestart = speak.mock.calls.length
       const respond = vi.fn()
       const second = render(<VoiceOrb respond={respond} onClose={vi.fn()} />)
       await flush()
@@ -244,9 +257,19 @@ describe("VoiceOrb audio resource lifecycle", () => {
         oldError({ error: "not-allowed" })
         oldResult({ results: [[{ transcript: "Late result" }]] })
       })
-      await act(async () => answer.resolve(reply))
+      await act(async () => {
+        // A cancelled browser acknowledgment may still emit a late completion.
+        // Neither that callback nor the old response may speak in the new session.
+        acknowledgment.onend()
+        answer.resolve(reply)
+      })
       await act(() => vi.advanceTimersByTimeAsync(1300))
-      expect(speak).not.toHaveBeenCalled()
+      expect(speak).toHaveBeenCalledTimes(spokenBeforeRestart)
+      expect(
+        speak.mock.calls.some(
+          ([utterance]) => utterance.text === "An old answer"
+        )
+      ).toBe(false)
       expect(firstClose).not.toHaveBeenCalled()
       expect(respond).not.toHaveBeenCalled()
       expect(contexts[1].close).not.toHaveBeenCalled()
