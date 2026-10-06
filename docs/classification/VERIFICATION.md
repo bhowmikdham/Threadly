@@ -4,8 +4,10 @@
 this initial Converse-only snapshot for cloud provisioning and model evaluation.
 Claude Haiku 4.5 is now selected and the Nova Micro Flow is retired; current
 selection/cleanup checks are recorded there.
-Application deployment/enablement remain separate. The historical results below
-are retained to distinguish the implementation stages.
+The [7 October deployment record](ROLLOUT-2026-10-07.md) now records the enabled
+backend, latest CI, application-role evaluation and authorized live Gmail checks.
+Everything below is the historical initial implementation snapshot, retained to
+distinguish the implementation stages.
 
 Recorded 7 October 2026. Scope: the user-requested email classification badge
 service on `codex/llm-classification-service`, based on `release/backend` commit
