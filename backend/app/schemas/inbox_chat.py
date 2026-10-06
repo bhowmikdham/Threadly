@@ -4,7 +4,7 @@ import re
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.mail_search import MailSearchRequest
 
@@ -37,8 +37,15 @@ class InboxFilters(MailSearchRequest):
     limit: int = Field(default=5, ge=1, le=5)
     timezone: str = Field(default="UTC", max_length=80)
     cursor: None = None
+    inbox_category: Literal["primary", "all"] = "all"
 
     timezone_exists = field_validator("timezone")(InboxChatRequest.timezone_exists.__func__)
+
+    @model_validator(mode="after")
+    def category_requires_inbox(self):
+        if self.inbox_category == "primary" and self.folder != "INBOX":
+            raise ValueError("Primary category requires the INBOX folder")
+        return self
 
     @field_validator("sender_email")
     @classmethod

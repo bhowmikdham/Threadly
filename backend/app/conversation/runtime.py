@@ -21,7 +21,7 @@ from app.capabilities.service import build_capabilities
 from app.config import get_settings
 from app.conversation import calendar_context, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
-from app.mail.presentation import received_display
+from app.mail.presentation import clock_context, received_display
 from app.schemas.assistant import AssistantRequest, DraftOptions
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
 from app.schemas.continuation import TaskInputRequest
@@ -527,6 +527,7 @@ class Runtime:
         self.owner, self.request, self.state, self.factory = owner, request, state, factory
         self.lease = lease
         self.calendar_reparse = None
+        self.mail_anchor = datetime.now(UTC)
         self.calendar_anchor = (
             datetime.fromisoformat(state["calendar_read_anchor"])
             if state.get("calendar_read_anchor")
@@ -679,8 +680,7 @@ class Runtime:
         from app.calendar import event_choices
 
         return {
-            "now": datetime.now(UTC).isoformat(),
-            "timezone": self.request.timezone,
+            **clock_context(self.mail_anchor, self.request.timezone),
             # Keep UI history, but never pass provider-authored agenda details as
             # instructions or remembered facts to the next model decision.
             "recent_dialogue": model_history(self.state["history"]),
@@ -809,7 +809,7 @@ class Runtime:
                         date_phrase = ""
                     folder = (
                         "INBOX"
-                        if re.search(r"\binbox\b", self.request.instruction, re.I)
+                        if inbox_chat.folder_is_grounded("INBOX", self.request.instruction)
                         else "all_mail"
                     )
             user_text = "\n".join(
@@ -818,10 +818,10 @@ class Runtime:
             for value in (query, date_phrase, sender_email):
                 if value and value.casefold() not in user_text.casefold():
                     raise ValueError("Search literals must come from user dialogue")
-            if folder != "all_mail" and folder.casefold() not in user_text.casefold():
+            if not inbox_chat.folder_is_grounded(folder, user_text):
                 raise ValueError("Folder is not user supplied")
             start, end = inbox_chat.date_window(
-                date_phrase, datetime.now(UTC), self.request.timezone
+                date_phrase, self.mail_anchor, self.request.timezone
             )
             filters = InboxFilters(
                 schema_version="1.0",
@@ -832,6 +832,7 @@ class Runtime:
                 received_before=end,
                 limit=limit,
                 timezone=self.request.timezone,
+                inbox_category=args.inbox_category if folder == "INBOX" else "all",
             )
         else:
             if self.fresh_search_scope and not self.fresh_search_done:
@@ -860,6 +861,11 @@ class Runtime:
         observations = []
         retained_results = []
         for row in page["results"]:
+            row.update(
+                received_display(
+                    row.get("received_at"), filters.timezone, reference_at=self.mail_anchor
+                )
+            )
             ref = next(
                 (
                     key
@@ -977,7 +983,9 @@ class Runtime:
                 "sender": m["from_addr"],
                 "sent_at": m["sent_at"],
                 "received_at": m["received_at"],
-                **received_display(m["received_at"], self.request.timezone),
+                **received_display(
+                    m["received_at"], self.request.timezone, reference_at=self.mail_anchor
+                ),
                 "reply_to": m["reply_metadata"].get("headers", {}).get("reply-to", []),
                 "body": captured_bodies.get(m["gmail_msg_id"], m["body_clean"][:budget]),
                 "truncated": len(m["body_clean"])
