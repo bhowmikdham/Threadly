@@ -578,3 +578,32 @@ prevent duplicate candidates after an interrupted response. The frozen event and
 exact hash remain the authorization target; no new external-write executor exists.
 Pending user event details (15-minute expiry) stay in encrypted conversation state;
 complete event previews are not duplicated into conversation receipts/history.
+
+
+### Conversation recovery and timed reads (1.7.2)
+
+No table or migration is added. Recovery finalizes `state_enc.pending_result` into
+an existing bounded receipt with the original request ID/hash and next conversation
+version, then clears the pending/lease fields. Childless cancellation records a
+terminal cancellation receipt under the same key; linked work is retained. Replaying
+an already completed receipt does not advance the version. `recovered_request_id`
+is response metadata; recovered history entries add `recovered: true` with an empty
+user string so generated text is never converted into user authority. Existing
+retention, encryption, ownership and compaction limits apply.
+
+`calendar_read_request` can also retain `check_time_availability` with its literal
+clock source, duration and resolved civil date. It stores no provider event content,
+busy intervals or new calendar identifiers. Direct creation policy 1.1.0 still uses
+the same immutable artifacts/actions and exact approval records introduced in 1.5.0;
+previously queued payloads are not reinterpreted.
+
+
+Pending creation additionally retains its original validated user request/field sources,
+a bounded list of previous user-supplied calendar names, and optionally up to ten
+`calendar_choices` (opaque choice ID, owned provider calendar ID and display label,
+account/preference versions). `selected_calendar` stores the explicitly chosen
+identity and versions while other event fields are clarified. This metadata remains
+in the encrypted, expiring conversation state; no event contents are cached. Provider
+IDs and internal authority metadata are excluded from model context/public choices.
+Choice references share the pending event's 15-minute expiry and current turn version;
+current ACL is rechecked at selection and again before eventual event dispatch.

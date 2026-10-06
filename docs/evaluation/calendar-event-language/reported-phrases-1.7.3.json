@@ -1,0 +1,52 @@
+{
+  "release": "contextual-conversation-1.7.3",
+  "creation_policy": "direct-calendar-event-1.1.1",
+  "evidence": "Synthetic model and Google transport; isolated PostgreSQL 16; no live model-quality claim.",
+  "reported_requests": [
+    "could you help me create an event at 6:00 p.m. today",
+    "meeting with Ashu",
+    "could you help me create an event at6pm today named meeting with Ashu"
+  ],
+  "anchor": "2026-10-05T13:53:00Z",
+  "timezone": "Australia/Melbourne",
+  "expected": {
+    "start": "2026-10-06T18:00:00+11:00",
+    "title": "meeting with Ashu",
+    "attendees": [],
+    "send_updates": "none",
+    "action_state": "proposed",
+    "jobs": 0
+  },
+  "provider_retry": "Three synthetic ThrottlingException/429 results, then same request body succeeds; repeat returns same action.",
+  "expiry": "Expiry during CalendarList returns calendar_choice_unavailable in Ask and Always; no action/job; completed response replays.",
+  "focused": {
+    "passed": 215,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 78.25,
+    "case_ids": [
+      "test_ashu_title_followup_throttle_preserves_today_time_ask_and_exact_retry",
+      "test_complete_ashu_title_does_not_require_an_attendee_or_prose_fallback",
+      "test_help_me_creation_is_routed_to_typed_preparation[help me]",
+      "test_help_me_creation_is_routed_to_typed_preparation[please help me]",
+      "test_help_me_creation_is_routed_to_typed_preparation[could you help me]",
+      "test_help_me_creation_is_routed_to_typed_preparation[can you please help me]",
+      "test_help_me_creation_is_routed_to_typed_preparation[would you please help me to]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Could you help me create a summary of this email: create an event at 6pm today]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Help me create a short email saying create an event at 6pm today]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Help me explain this request: create an event at 6pm today]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Could you help me create a summary\\ncreate an event at 6pm today]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Don't help me create an event at 6pm today]",
+      "test_help_me_prefix_does_not_promote_source_or_content_into_event_authority[Explain \"could you help me create an event at 6pm today\"]",
+      "test_choice_expiring_during_calendar_read_returns_unavailable_without_action[ask]",
+      "test_choice_expiring_during_calendar_read_returns_unavailable_without_action[always]",
+      "test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar_read"
+    ]
+  },
+  "runtime_sha256": {
+    "backend/app/calendar/event_creation.py": "a64a8a8ff7e9fc8444c5a02b511d95e389fa7c023bb3f0e9f4e077c611e75a29",
+    "backend/app/calendar/event_choices.py": "7755d9ec1e3b8bee3df0b19f874477fc03f96b808b674535d56dc67d3fe66461",
+    "backend/app/conversation/prompt.py": "0002a1f1b72c2b06c3186e32d5453f7e99bec60d2dc7a8d5b1803c5ec9e69af4"
+  },
+  "full_suite_and_ci": "Terminal results recorded against the final head in draft PR 94; prior green head evidence remains historical."
+}

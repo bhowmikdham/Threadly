@@ -30,13 +30,25 @@ async def turn(owner, request, *, factory=None, model=None):
     try:
         if state.get("pending_result"):
             response = await hydrate_response(owner, state["pending_result"], factory)
+        elif getattr(request, "calendar_choice_id", None):
+            from app.calendar.event_choices import select
+
+            response = await select(runtime, request.calendar_choice_id)
+            response["release"] = engine.RELEASE
         else:
             context = await runtime.context()
             response = await engine.run(context, runtime, model)
+        from app.calendar import event_choices
+
+        if choices := event_choices.public(state):
+            response.setdefault("calendar_choices", choices)
         if runtime.search_page is not None:
             response["search"] = runtime.search_page
         response.setdefault("context_references", runtime.turn_source_references)
         response["latency_ms"] = round((time.monotonic() - started) * 1000)
+        if getattr(request, "calendar_choice_id", None) and not state.get("pending_result"):
+            async with factory.begin() as session:
+                await store.checkpoint(session, owner, request, lease, state, response)
         async with factory.begin() as session:
             return await store.complete(session, owner, request, lease, state, response)
     except BaseException:
@@ -86,7 +98,22 @@ async def hydrate_response(owner, saved, factory):
     return result
 
 
+async def choose_calendar(owner, identifier, selection, *, factory=None):
+    from app.schemas.conversation import CalendarChoiceTurn
+
+    request = CalendarChoiceTurn(
+        conversation_id=identifier,
+        request_id=selection.request_id,
+        expected_version=selection.expected_version,
+        instruction="Use the selected calendar for this event.",
+        calendar_choice_id=selection.choice_id,
+    )
+    return await turn(owner, request, factory=factory)
+
+
 async def get(owner, identifier, factory=None):
+    from app.calendar import event_choices
+
     factory = factory or get_session_factory()
     async with factory() as session:
         row = await store.owned(session, owner, identifier)
@@ -105,7 +132,16 @@ async def get(owner, identifier, factory=None):
             "active_task_id": state.get("active_task_id"),
             "active_proposal_id": state.get("proposal_id"),
             "proposal": proposal,
+            "calendar_choices": event_choices.public(state),
             "pending_request_id": row.pending_request_id,
+            "pending_recovery": (
+                {
+                    "active": bool(row.lease_until and row.lease_until > datetime.now(UTC)),
+                    "has_saved_result": bool(state.get("pending_result")),
+                }
+                if row.pending_request_id
+                else None
+            ),
             "context_snapshot_id": state["refs"].get("selected", {}).get("context_id"),
         }
 
