@@ -221,6 +221,45 @@ async def run(context, runtime, model=None):
                             last_verified_evidence = []
                         result = {"json": outcome}
                         status = "success"
+                    except event_draft.IncompleteEventTitle as exc:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_title_incomplete",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_title_incomplete",
+                                "message": "Copy the complete user-supplied title after 'for'. "
+                                "Keep its final words, even words that also name commands. "
+                                "Repair the tool call; do not ask the user to repeat the title.",
+                                "expected_title": exc.title,
+                            }
+                        }
+                        status = "error"
+                    except conversation_guard.CalendarNewGoalRequired:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_new_goal_required",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_new_goal_required",
+                                "message": (
+                                    "This is a new explicit event-creation directive. Use "
+                                    "continue_previous=false and intent.operation=create. Extract "
+                                    "the complete new title, date, time and other fields from "
+                                    "the current user_turn; do not retain the previous title or "
+                                    "details. Missing fields belong to this new request."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except event_draft.IntentSourceMismatch:
                         trace.append(
                             {

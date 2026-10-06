@@ -40,7 +40,7 @@ def creation_target(text):
     leading = user_directive(text).casefold()
     leading = leading.replace("craete", "create").replace("creat ", "create ")
     leading = re.sub(r"\bat(?=\d)", "at ", leading)
-    match = re.search(r"\b(?:create|add|book|schedule|reserve|put|block)\s+", leading)
+    match = re.search(r"\b(?:create|make|add|book|schedule|reserve|put|block)\s+", leading)
     if not match:
         return None
     # Check the directive, not its title. A small request grammar accepts optional
@@ -126,6 +126,7 @@ def creation_request(text, title="", date_source="", time_source=""):
 def source_fields(args, text, previous_calendar_names=()):
     if re.search(r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat)\b", text, re.I):
         raise RequestClarification("I can create one-time events. Which single date should I use?")
+    complete_trailing_title(args, text)
     for value in (args.title, args.location, args.description, args.calendar_name):
         if value:
             literal(value, text)
@@ -169,6 +170,44 @@ def source_fields(args, text, previous_calendar_names=()):
             args.time
         ):
             raise RequestClarification("What time should it start? Please include AM or PM.")
+
+
+def complete_trailing_title(args, text):
+    # Narrow unambiguous form: "make an event at <time> <date> for <title>".
+    # Do not infer titles when dates or other fields still follow the marker.
+    if not (args.title and args.date_source and args.time_source and creation_request(text)):
+        return
+
+    def normalized(value):
+        return " ".join(value.casefold().split())
+
+    for marker in re.finditer(r"\bfor\s+", text, re.I):
+        before = normalized(text[: marker.start()])
+        if any(normalized(source) not in before for source in (args.date_source, args.time_source)):
+            continue
+        title = text[marker.end() :].strip().rstrip(".!?").strip().strip('"“”')
+        other_fields = (
+            args.duration_phrase,
+            args.location,
+            args.description,
+            args.calendar_name,
+            *args.attendees,
+        )
+        if (
+            not title
+            or len(title) > 300
+            or any(value and normalized(value) in normalized(title) for value in other_fields)
+        ):
+            return
+        without_article = re.sub(
+            r"^(?:a|an|the)\s+(?=(?:meeting|call|appointment|event)\b)", "", title, flags=re.I
+        )
+        if normalized(args.title.strip('"“”')) not in {
+            normalized(title),
+            normalized(without_article),
+        }:
+            raise event_draft.IncompleteEventTitle(title)
+        return
 
 
 def resolve_times(args, text, preferences, anchor):
@@ -236,7 +275,7 @@ async def prepare(runtime, args):
         }
     try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
-    except event_draft.IntentSourceMismatch:
+    except (event_draft.IntentSourceMismatch, event_draft.IncompleteEventTitle):
         # This is a model protocol error, not information missing from the user.
         # Keep the exact-source fence and let the bounded engine repair the call.
         raise
@@ -480,6 +519,9 @@ async def propose(
             "session_version": user.threadly_session_version,
             "approval_mode": policy["mode"],
             "permission_version": policy["version"],
+            "default_duration_minutes": preferences["default_duration_minutes"]
+            if not args.duration_phrase
+            else None,
         },
         expires_at=min(now + timedelta(minutes=10), start),
     )
@@ -544,6 +586,14 @@ async def response(session, owner, action_id):
         "superseded": "Calendar settings or availability changed. Prepare this event again.",
         "failed": "This event couldn't be created.",
     }
+    if action["state"] == "proposed":
+        # view() has already verified ownership. Keep this explanation tied to
+        # the immutable candidate, not to a possibly newer preference value.
+        stored = await session.get(AssistantAction, action_id)
+        if minutes := stored.source_versions.get("default_duration_minutes"):
+            messages["proposed"] = (
+                f"Using your saved {minutes}-minute duration. Review this event before creating it."
+            )
     return {
         "kind": "calendar_event",
         "text": messages.get(action["state"], "Check the event status below."),

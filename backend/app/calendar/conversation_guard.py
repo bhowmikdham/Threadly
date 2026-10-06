@@ -8,6 +8,25 @@ class CalendarPreparationRequired(ValueError):
     """A Calendar creation turn needs a typed event result, not a prose promise."""
 
 
+class CalendarNewGoalRequired(ValueError):
+    """A complete new creation directive must not inherit the previous draft."""
+
+
+def social_response(text):
+    # Only complete standalone phrases qualify. A greeting/thanks prefix must
+    # never hide an event request, correction, status question or quoted source.
+    value = " ".join(text.strip().casefold().split()).rstrip(".! ")
+    if re.fullmatch(r"(?:no,? (?:thank you|thanks)|that(?:'s| is) all(?:,? thanks)?)", value):
+        return {"kind": "message", "text": "All right. Take care!"}
+    if re.fullmatch(
+        r"(?:thanks(?: a lot| so much)?|thank you(?: very much| so much)?)"
+        r"(?:,? (?:threadly|alfred))?",
+        value,
+    ):
+        return {"kind": "message", "text": "You're welcome."}
+    return None
+
+
 def creation_turn(text):
     # This recognizes routing, not write authorization. prepare() still performs
     # the complete literal-source and exact-payload approval checks.
@@ -94,6 +113,8 @@ async def respond(runtime, answer):
     if request is None:
         return None
     text = request.instruction
+    if acknowledgment := social_response(text):
+        return acknowledgment
     state = getattr(runtime, "state", {})
     pending = pending_event(runtime)
     if pending and re.fullmatch(r"\s*(?:cancel|never mind|nevermind)[.! ]*", text, re.I):

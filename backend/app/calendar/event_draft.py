@@ -23,6 +23,14 @@ class IntentSourceMismatch(ValueError):
     """The model must repair its source quote before any draft state changes."""
 
 
+class IncompleteEventTitle(ValueError):
+    """An unambiguous trailing title was shortened by the model."""
+
+    def __init__(self, title):
+        self.title = title
+        super().__init__("Preserve the complete user-supplied event title")
+
+
 def evidence(arguments):
     values = [arguments.get(SOURCE_FIELDS.get(field, field)) for field in FIELDS]
     return "\n".join(

@@ -1304,3 +1304,16 @@ Changed existing details invalidate old calendar choice handles; filling a missi
 field preserves an explicitly chosen destination, rechecked against current ACLs
 and preference/account versions. Published response shapes and picker endpoints
 are unchanged. No migration, OAuth scope or production setting is required.
+
+
+### Calendar voice follow-ups (conversation 1.8.2)
+
+“Make an event” uses the same preparation path as “create an event”. A model's
+truncated intent source, incomplete unambiguous trailing title or attempted
+continuation of a new creation goal is repaired within the existing bounded tool
+loop before draft mutation. Exhaustion does not promise an unexecuted retry.
+Standalone gratitude and conversation-closing phrases return plain messages and
+cannot replay an event card through the preparation tool. Proposed direct events
+explain when they use the saved default duration; this explanation is tied to the
+immutable candidate's source metadata. Request/approval envelopes and execution
+authority are unchanged.
