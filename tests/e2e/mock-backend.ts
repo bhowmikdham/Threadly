@@ -611,17 +611,21 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
       else if (/^(show|find)\b.*emails?\b/i.test(body.instruction))
         data = {
           kind: "search",
+          text: "Here are the **matching emails**.\n\n- Your recent receipt\n- Your flight itinerary",
+          evidence: [{ reference: "mail-1", quote: "Thanks for your order." }],
           search: {
             filters: {
               schema_version: "1.0",
               query: "receipt",
               folder: "all_mail",
+              timezone: "Australia/Melbourne",
               received_from: "2026-01-01T00:00:00Z",
               received_before: "2026-10-01T00:00:00Z"
             },
             // One conversational turn can page Gmail internally and return
             // more than five addressable cards without another UI request.
             results: Array.from({ length: 10 }, (_, i) => ({
+              reference: `mail-${i + 1}`,
               message_id: i ? `msg${i}` : target,
               thread_id: thread,
               subject:
@@ -636,7 +640,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
               snippet:
                 i === 1
                   ? "Your flight itinerary: JFK → MEL. Flight QF12"
-                  : "Thanks for your order. Your receipt and pickup details are inside.",
+                  : "Thanks for your order. &amp;zwnj;&amp;zwnj;\u200b Your receipt and pickup details are inside. https://example.test/click?id=tracking\nUnsubscribe from these emails.",
               flight:
                 i === 1
                   ? {
@@ -659,6 +663,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
           schema_version: "1.0",
           query: "receipt",
           folder: "all_mail",
+          timezone: "Australia/Melbourne",
           received_from: "2026-01-01T00:00:00Z",
           received_before: "2026-10-01T00:00:00Z"
         },

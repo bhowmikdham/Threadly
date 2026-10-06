@@ -1288,6 +1288,19 @@ summary:focus-visible {
 .chat-response {
   font-size: 15px;
   line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.chat-response p {
+  white-space: pre-line;
+  margin: 0 0 0.75em;
+}
+.chat-response ul,
+.chat-response ol {
+  padding-left: 1.5em;
+  margin: 0 0 0.75em;
+}
+.chat-response li + li {
+  margin-top: 0.35em;
 }
 .thinking {
   display: flex;
@@ -1327,6 +1340,10 @@ summary:focus-visible {
   font-size: 11px;
   color: var(--muted);
   margin: 0 0 13px;
+  overflow-wrap: anywhere;
+}
+.inbox-date-window {
+  display: block;
 }
 .mail-card-list {
   display: grid;
@@ -1426,8 +1443,10 @@ summary:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mail-card-meta time {
-  flex: none;
+.mail-card-date {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .mail-card-content strong {
   font-size: 13px;

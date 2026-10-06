@@ -28,6 +28,35 @@ beforeEach(() => {
   }
 })
 describe("backend-owned conversation", () => {
+  it("passes the browser IANA timezone unchanged for mail search and pagination", async () => {
+    const original = Intl.DateTimeFormat.prototype.resolvedOptions
+    const zone = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockImplementation(function () {
+        return { ...original.call(this), timeZone: "Australia/Melbourne" }
+      })
+    try {
+      const calls = mock((m) =>
+        respond(m, {
+          search: { filters: {}, results: [], next_cursor: "next" }
+        })
+      )
+      const { result } = renderHook(() => useAssistant(user))
+      await act(async () => {
+        await result.current.submit("Check my latest inbox mail")
+      })
+      await act(async () => {
+        await result.current.moreEmails(result.current.entries[0])
+      })
+      expect(calls).toHaveLength(2)
+      expect(calls.map((call) => call.body.timezone)).toEqual([
+        "Australia/Melbourne",
+        "Australia/Melbourne"
+      ])
+    } finally {
+      zone.mockRestore()
+    }
+  })
   it("sends informal turns unchanged in one versioned conversation without client intent rules", async () => {
     const calls = mock((m) => respond(m))
     const { result } = renderHook(() => useAssistant(user))
