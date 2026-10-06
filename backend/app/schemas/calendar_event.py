@@ -10,7 +10,13 @@ from app.schemas.calendar_tools import DateMeaning
 
 class CalendarIntent(StrictModel):
     operation: Literal["create", "resume", "revise", "cancel"]
-    source: str = Field(min_length=1, max_length=6000)
+    source: str = Field(
+        min_length=1,
+        max_length=6000,
+        description="Copy the entire current top-level user directive exactly, including "
+        "greetings, polite prefixes and punctuation. Do not paraphrase, truncate "
+        "or use an earlier turn.",
+    )
 
 
 class EventFieldChange(StrictModel):

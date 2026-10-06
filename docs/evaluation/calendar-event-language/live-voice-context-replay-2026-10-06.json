@@ -1,0 +1,428 @@
+{
+  "release": "contextual-conversation-1.8.2",
+  "mode": "bounded candidate source in isolated processes; no deployed API modification",
+  "comprehensive_replay": {
+    "release": "contextual-conversation-1.8.2",
+    "mode": "isolated 1.8.2 candidate with real model and Google reads, no live service/source changes",
+    "stages": [
+      {
+        "stage": "polite_incomplete_create",
+        "kind": "clarification",
+        "response": "What day should I use?",
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "prepare_calendar_event",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "availability_detour",
+        "kind": "message",
+        "response": null,
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "check_time_availability",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "resume_day",
+        "kind": "calendar_event",
+        "response": null,
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "prepare_calendar_event",
+            "status": "invalid"
+          },
+          {
+            "tool": "prepare_calendar_event",
+            "status": "invalid"
+          },
+          {
+            "tool": "prepare_calendar_event",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "replace_time_clear_location",
+        "kind": "calendar_event",
+        "response": null,
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "prepare_calendar_event",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "gratitude",
+        "kind": "message",
+        "response": "You're welcome.",
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "respond",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "voice_gratitude",
+        "kind": "message",
+        "response": "You're welcome!",
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "respond",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "closing",
+        "kind": "message",
+        "response": "All right. Take care!",
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "respond",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      },
+      {
+        "stage": "make_synonym",
+        "kind": "calendar_event",
+        "response": "Using your saved 30-minute duration. Review this event before creating it.",
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "prepare_calendar_event",
+            "status": "invalid"
+          },
+          {
+            "tool": "prepare_calendar_event",
+            "status": "invalid",
+            "reason": "calendar_new_goal_required"
+          },
+          {
+            "tool": "prepare_calendar_event",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      }
+    ],
+    "external_writes": 0,
+    "approved_artifacts": 0,
+    "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "model_decisions": [
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "title": "Threadly validation",
+            "time": "16:00",
+            "time_source": "4pm",
+            "intent": {
+              "operation": "create",
+              "source": "Hi, could you create an event called Threadly validation at 4pm in Validation room?"
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "check_time_availability",
+          "arguments": {
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow"
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "title": "Threadly validation",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "time": "16:00",
+            "time_source": "4pm",
+            "continue_previous": true,
+            "intent": {
+              "operation": "create",
+              "source": "tomorrow"
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "continue_previous": true,
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "intent": {
+              "operation": "create",
+              "source": "tomorrow"
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "continue_previous": true,
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow"
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "continue_previous": true,
+            "intent": {
+              "operation": "revise",
+              "source": "Change the time to 5pm and clear the location."
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "respond",
+          "arguments": {}
+        }
+      ],
+      [
+        {
+          "tool": "respond",
+          "arguments": {}
+        }
+      ],
+      [
+        {
+          "tool": "respond",
+          "arguments": {}
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "title": "Threadly validation",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "time": "18:00",
+            "time_source": "6:00 p.m.",
+            "continue_previous": true,
+            "intent": {
+              "operation": "revise",
+              "source": "make an event at 6:00 p.m. tomorrow for Threadly validation make"
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "continue_previous": true,
+            "intent": {
+              "operation": "revise",
+              "source": "make an event at 6:00 p.m. tomorrow for Threadly validation make"
+            }
+          }
+        }
+      ],
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "title": "Threadly validation make",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "time": "18:00",
+            "time_source": "6:00 p.m.",
+            "intent": {
+              "operation": "create",
+              "source": "make an event at 6:00 p.m. tomorrow for Threadly validation make"
+            }
+          }
+        }
+      ]
+    ],
+    "availability": {
+      "coverage": "complete",
+      "start": "2026-10-07T05:00:00+00:00",
+      "end": "2026-10-07T05:30:00+00:00",
+      "date": "2026-10-07"
+    },
+    "core_checks_passed": true,
+    "social_checks_passed": true,
+    "voice_checks": {
+      "gratitude_no_card": true,
+      "garbled_name_gratitude_no_card": true,
+      "closing_no_question": true,
+      "make_synonym_preview": true,
+      "saved_duration_explained": true
+    },
+    "preview": {
+      "title": "Threadly validation",
+      "start": {
+        "dateTime": "2026-10-07T06:00:00+00:00",
+        "timeZone": "Australia/Melbourne"
+      },
+      "location_cleared": true,
+      "attendee_count": 0,
+      "state": "proposed",
+      "mode": "ask",
+      "old_preview_superseded": true,
+      "exact_retry_same_action": true,
+      "panel_state_restored": true
+    },
+    "passed": true,
+    "created_preview_count": 3,
+    "action_states_before_cleanup": [
+      "superseded",
+      "proposed",
+      "superseded"
+    ],
+    "action_approvals": 0,
+    "action_jobs": 0,
+    "action_attempts": 0,
+    "validation_chat_removed": true,
+    "remaining_live_preview": false,
+    "model_calls": 12,
+    "google_reads": {
+      "GET /users/me/calendarList": 4,
+      "POST /freeBusy": 1
+    },
+    "finished_at": "2026-10-06T09:12:49.735078+00:00"
+  },
+  "comprehensive_source_hashes": {
+    "app/calendar/event_draft.py": "6c515af5354040844cf200d1cabb99a5dc84373aa50f4bfb7c232db71c83c6a9",
+    "app/calendar/event_creation.py": "e4ee73b05350d770a23780ae6e44979babcaf3518389c5159e9465914ec82896",
+    "app/calendar/conversation_guard.py": "7c639977923d851bd3ed9cb88014dbf9603d10bf523e8fdbd9ae2c5f56f82dca",
+    "app/conversation/engine.py": "c2d451fe45eb49fd8a2ac0d1e93f8316bc0344673a182ca53c8fc3e0f52d7ae7",
+    "app/conversation/prompt.py": "224fa076871e9f8bfaa24afd12638b98bad908a555ecdc6def387835d216e0b7",
+    "app/conversation/runtime.py": "a701fa4a05fb180d5f63a6e43e7d22de0001ddfcf7f19262bdf4314c1d6d8cb1",
+    "app/schemas/calendar_event.py": "5237e7bdc23833aefc9567f962cad0084e22975825e26a70b4e4e585b22c26b4"
+  },
+  "final_source_followup": {
+    "release": "contextual-conversation-1.8.2",
+    "mode": "isolated 1.8.2 candidate with real model and Google reads, no live service/source changes",
+    "stages": [
+      {
+        "stage": "article_title",
+        "kind": "calendar_event",
+        "response": null,
+        "error_code": null,
+        "trace": [
+          {
+            "tool": "prepare_calendar_event",
+            "status": "ok"
+          }
+        ],
+        "choice_count": 0
+      }
+    ],
+    "external_writes": 0,
+    "approved_artifacts": 0,
+    "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "model_decisions": [
+      [
+        {
+          "tool": "prepare_calendar_event",
+          "arguments": {
+            "title": "meeting about validation",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "time": "18:00",
+            "time_source": "6:00 p.m.",
+            "intent": {
+              "operation": "create",
+              "source": "make an event at 6:00 p.m. tomorrow for a meeting about validation"
+            }
+          }
+        }
+      ]
+    ],
+    "final_source_checks": {
+      "make_preview": true,
+      "full_title_with_article": true,
+      "saved_duration_explained": true,
+      "approval_mode": "ask"
+    },
+    "passed": true,
+    "created_preview_count": 1,
+    "action_states_before_cleanup": [
+      "proposed"
+    ],
+    "action_approvals": 0,
+    "action_jobs": 0,
+    "action_attempts": 0,
+    "validation_chat_removed": true,
+    "remaining_live_preview": false,
+    "model_calls": 1,
+    "google_reads": {
+      "GET /users/me/calendarList": 1
+    },
+    "finished_at": "2026-10-06T09:14:57.638540+00:00"
+  },
+  "final_source_hashes": {
+    "app/calendar/event_draft.py": "6c515af5354040844cf200d1cabb99a5dc84373aa50f4bfb7c232db71c83c6a9",
+    "app/calendar/event_creation.py": "094c5401fd1b8477031079dafb104456ab7dd5cf5e1e82ebc4b0702ef4ba8771",
+    "app/calendar/conversation_guard.py": "7c639977923d851bd3ed9cb88014dbf9603d10bf523e8fdbd9ae2c5f56f82dca",
+    "app/conversation/engine.py": "c2d451fe45eb49fd8a2ac0d1e93f8316bc0344673a182ca53c8fc3e0f52d7ae7",
+    "app/conversation/prompt.py": "224fa076871e9f8bfaa24afd12638b98bad908a555ecdc6def387835d216e0b7",
+    "app/conversation/runtime.py": "a701fa4a05fb180d5f63a6e43e7d22de0001ddfcf7f19262bdf4314c1d6d8cb1",
+    "app/schemas/calendar_event.py": "5237e7bdc23833aefc9567f962cad0084e22975825e26a70b4e4e585b22c26b4"
+  },
+  "scope_note": "The comprehensive run preceded only the article compatibility normalization (a meeting -> meeting). The final-source follow-up verifies that adjustment; local regression covers both paths. No live browser or speech-recognition test is claimed.",
+  "failed_replays_preserved_locally": [
+    "calendar-voice-live-candidate-result.json",
+    "calendar-voice-final-candidate-result.json"
+  ],
+  "observed_model_corrections": "Day resume needed two schema corrections. The final comprehensive make request needed schema correction and the new-goal fence before producing the complete title. This is bounded acceptance evidence, not a population success rate."
+}

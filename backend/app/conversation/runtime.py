@@ -718,8 +718,17 @@ class Runtime:
             if event_choices.pending(self.state):
                 return await event_choices.show(self)
         if name == "prepare_calendar_event":
+            from app.calendar.conversation_guard import (
+                CalendarNewGoalRequired,
+                creation_turn,
+                social_response,
+            )
             from app.calendar.event_creation import prepare
 
+            if acknowledgment := social_response(self.request.instruction):
+                return acknowledgment
+            if args.continue_previous and creation_turn(self.request.instruction):
+                raise CalendarNewGoalRequired
             return await prepare(self, args)
         if name == "retry_calendar_read":
             return await calendar_context.retry(self)

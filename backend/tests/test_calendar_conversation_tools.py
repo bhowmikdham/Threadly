@@ -527,7 +527,7 @@ def test_committed_release_matches_current_prompt_and_tools():
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
     saved = json.loads(
-        (root.parent / "calendar-event-language/contextual-conversation-1.8.0.json").read_text()
+        (root.parent / "calendar-event-language/contextual-conversation-1.8.2.json").read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())

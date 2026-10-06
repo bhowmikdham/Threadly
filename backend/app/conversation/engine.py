@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import conversation_guard
+from app.calendar import conversation_guard, event_draft
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -221,6 +221,68 @@ async def run(context, runtime, model=None):
                             last_verified_evidence = []
                         result = {"json": outcome}
                         status = "success"
+                    except event_draft.IncompleteEventTitle as exc:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_title_incomplete",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_title_incomplete",
+                                "message": "Copy the complete user-supplied title after 'for'. "
+                                "Keep its final words, even words that also name commands. "
+                                "Repair the tool call; do not ask the user to repeat the title.",
+                                "expected_title": exc.title,
+                            }
+                        }
+                        status = "error"
+                    except conversation_guard.CalendarNewGoalRequired:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_new_goal_required",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_new_goal_required",
+                                "message": (
+                                    "This is a new explicit event-creation directive. Use "
+                                    "continue_previous=false and intent.operation=create. Extract "
+                                    "the complete new title, date, time and other fields from "
+                                    "the current user_turn; do not retain the previous title or "
+                                    "details. Missing fields belong to this new request."
+                                ),
+                            }
+                        }
+                        status = "error"
+                    except event_draft.IntentSourceMismatch:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_intent_source_mismatch",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_intent_source_mismatch",
+                                "message": (
+                                    "Repair intent.source by copying the complete current "
+                                    "user_turn directive, including its greeting, polite prefix "
+                                    "and punctuation. "
+                                    "Do not shorten, paraphrase or use a prior turn. Exclude any "
+                                    "separately quoted email/source body. Keep the other grounded "
+                                    "event fields and call prepare_calendar_event again. "
+                                    "Do not ask the user to repair a tool field."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except IncompleteSearchCoverage:
                         # Citation validation precedes coverage validation. The
                         # fallback can therefore retain these exact verified
