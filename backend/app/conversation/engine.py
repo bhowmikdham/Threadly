@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import conversation_guard
+from app.calendar import conversation_guard, event_draft
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -221,6 +221,29 @@ async def run(context, runtime, model=None):
                             last_verified_evidence = []
                         result = {"json": outcome}
                         status = "success"
+                    except event_draft.IntentSourceMismatch:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_intent_source_mismatch",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_intent_source_mismatch",
+                                "message": (
+                                    "Repair intent.source by copying the complete current "
+                                    "user_turn directive, including its greeting, polite prefix "
+                                    "and punctuation. "
+                                    "Do not shorten, paraphrase or use a prior turn. Exclude any "
+                                    "separately quoted email/source body. Keep the other grounded "
+                                    "event fields and call prepare_calendar_event again. "
+                                    "Do not ask the user to repair a tool field."
+                                ),
+                            }
+                        }
+                        status = "error"
                     except IncompleteSearchCoverage:
                         # Citation validation precedes coverage validation. The
                         # fallback can therefore retain these exact verified

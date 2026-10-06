@@ -19,6 +19,10 @@ CONTROLS = {"intent", "changes", "continue_previous"}
 SOURCE_FIELDS = {"date": "date_source", "time": "time_source"}
 
 
+class IntentSourceMismatch(ValueError):
+    """The model must repair its source quote before any draft state changes."""
+
+
 def evidence(arguments):
     values = [arguments.get(SOURCE_FIELDS.get(field, field)) for field in FIELDS]
     return "\n".join(
@@ -92,7 +96,7 @@ def merge(runtime, args, pending):
     latest = user_directive(runtime.request.instruction)
     if args.intent:
         if " ".join(args.intent.source.split()) != " ".join(latest.split()):
-            raise ValueError("Quote the complete top-level user directive for the intent")
+            raise IntentSourceMismatch
     if pending and re.match(
         r"\s*(?:summari[sz]e|translate|quote|read|explain|draft|reply|search)\b", latest, re.I
     ):

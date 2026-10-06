@@ -1,0 +1,237 @@
+{
+  "release": "contextual-conversation-1.8.1",
+  "mode": "candidate source in isolated process; real production model and Google reads; no live service changes",
+  "stages": [
+    {
+      "stage": "polite_incomplete_create",
+      "kind": "clarification",
+      "response": "What day should I use?",
+      "error_code": null,
+      "trace": [
+        {
+          "tool": "prepare_calendar_event",
+          "status": "ok"
+        }
+      ],
+      "choice_count": 0
+    },
+    {
+      "stage": "availability_detour",
+      "kind": "message",
+      "response": "I couldn't complete the Calendar read. Review your Calendar connection and selections in Calendar settings, then try again.",
+      "error_code": "calendar_preferences_stale",
+      "trace": [
+        {
+          "tool": "check_time_availability",
+          "status": "calendar_preferences_stale"
+        }
+      ],
+      "choice_count": 0
+    },
+    {
+      "stage": "resume_day",
+      "kind": "message",
+      "response": "Review Calendar settings so I can use the right calendar and timezone.",
+      "error_code": "calendar_preferences_missing",
+      "trace": [
+        {
+          "tool": "prepare_calendar_event",
+          "status": "invalid"
+        },
+        {
+          "tool": "prepare_calendar_event",
+          "status": "invalid"
+        },
+        {
+          "tool": "prepare_calendar_event",
+          "status": "calendar_preferences_missing"
+        }
+      ],
+      "choice_count": 0
+    },
+    {
+      "stage": "replace_time_clear_location",
+      "kind": "message",
+      "response": "Review Calendar settings so I can use the right calendar and timezone.",
+      "error_code": "calendar_preferences_missing",
+      "trace": [
+        {
+          "tool": "prepare_calendar_event",
+          "status": "calendar_preferences_missing"
+        }
+      ],
+      "choice_count": 0
+    }
+  ],
+  "external_writes": 0,
+  "approved_artifacts": 0,
+  "preferences_need_review": true,
+  "preferences_account_version": 42,
+  "current_account_version": 43,
+  "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "live_google_calendar_list": {
+    "passed": true,
+    "calendar_count": 4
+  },
+  "model_decisions": [
+    [
+      {
+        "tool": "prepare_calendar_event",
+        "arguments": {
+          "title": "Threadly validation",
+          "time": "16:00",
+          "time_source": "4pm",
+          "location": "Validation room",
+          "intent": {
+            "operation": "create",
+            "source": "Hi, could you create an event called Threadly validation at 4pm in Validation room?"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "tool": "check_time_availability",
+        "arguments": {
+          "subject": "self",
+          "date": {
+            "kind": "relative",
+            "offset_days": 1
+          },
+          "date_source": "tomorrow",
+          "at_time": "16:00",
+          "at_time_source": "4pm"
+        }
+      }
+    ],
+    [
+      {
+        "tool": "prepare_calendar_event",
+        "arguments": {
+          "title": "Threadly validation",
+          "date": {
+            "kind": "relative",
+            "offset_days": 1
+          },
+          "date_source": "tomorrow",
+          "time": "16:00",
+          "time_source": "4pm",
+          "location": "Validation room",
+          "continue_previous": true,
+          "intent": {
+            "operation": "create",
+            "source": "tomorrow"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "tool": "prepare_calendar_event",
+        "arguments": {
+          "continue_previous": true,
+          "date": {
+            "kind": "relative",
+            "offset_days": 1
+          },
+          "date_source": "tomorrow",
+          "intent": {
+            "operation": "create",
+            "source": "tomorrow"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "tool": "prepare_calendar_event",
+        "arguments": {
+          "continue_previous": true,
+          "date": {
+            "kind": "relative",
+            "offset_days": 1
+          },
+          "date_source": "tomorrow"
+        }
+      }
+    ],
+    [
+      {
+        "tool": "prepare_calendar_event",
+        "arguments": {
+          "continue_previous": true,
+          "changes": [
+            {
+              "field": "time",
+              "operation": "replace",
+              "source": "5pm",
+              "value": "17:00"
+            },
+            {
+              "field": "location",
+              "operation": "clear",
+              "source": "clear the location"
+            }
+          ],
+          "intent": {
+            "operation": "revise",
+            "source": "Change the time to 5pm and clear the location."
+          }
+        }
+      }
+    ]
+  ],
+  "availability": {
+    "blocked": true,
+    "code": "calendar_preferences_stale",
+    "response": "I couldn't complete the Calendar read. Review your Calendar connection and selections in Calendar settings, then try again."
+  },
+  "context_checks": {
+    "polite_missing_day_clarification": true,
+    "read_detour_retained_pending_goal": true,
+    "resume_added_day": true,
+    "replaced_time": true,
+    "cleared_location": true,
+    "exact_retry_no_provider_calls": true,
+    "service_state_restored": true,
+    "approval_mode": "ask"
+  },
+  "preview": {
+    "blocked": true,
+    "code": "calendar_preferences_missing",
+    "response": "Review Calendar settings so I can use the right calendar and timezone."
+  },
+  "acceptance_complete": false,
+  "remaining_gate": "Review and save Calendar settings against the current Google connection, then rerun free/busy and Ask-preview validation.",
+  "safe_checks_passed": true,
+  "passed": false,
+  "created_preview_count": 0,
+  "action_states_before_cleanup": [],
+  "action_approvals": 0,
+  "action_jobs": 0,
+  "action_attempts": 0,
+  "validation_chat_removed": true,
+  "remaining_live_preview": false,
+  "model_calls": 6,
+  "google_reads": {
+    "GET /users/me/calendarList": 1
+  },
+  "finished_at": "2026-10-06T08:42:34.740745+00:00",
+  "source_files_sha256": {
+    "app/calendar/event_draft.py": "0946de308ce0b28b95d7305a63eaeb88176b7f4928ddf06968d31eeab48f61c7",
+    "app/calendar/event_creation.py": "d89d98dcf779371420bac14037af109f3d7986d1a526efb3759803b4beb1dba5",
+    "app/conversation/engine.py": "8e7336f14beed0c7bb1b1fe1604b1c0cd2b9bbca885a6072d2063a9a6e1083f2",
+    "app/conversation/prompt.py": "725b9879713880e5c8de6bbc4110ebc685628ff81305d6057274f417552ada43",
+    "app/schemas/calendar_event.py": "5237e7bdc23833aefc9567f962cad0084e22975825e26a70b4e4e585b22c26b4"
+  },
+  "ssm_command_id": "4adcace6-7ceb-43f8-b3ac-54971de02398",
+  "deployed_baseline": "9dadd558beb628bd7ef7d3e4d737e7f2f0c1f2d9",
+  "scope": "Bounded isolated candidate, not a deployed service or browser test. No preference/security/approval changes.",
+  "original_live_failure": {
+    "model_calls": 2,
+    "error": "Quote the complete top-level user directive for the intent",
+    "truncated_source": "create an event called Threadly validation at 4pm in Validation room",
+    "retained_event_request": false
+  },
+  "total_live_model_calls": 8
+}

@@ -236,6 +236,10 @@ async def prepare(runtime, args):
         }
     try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
+    except event_draft.IntentSourceMismatch:
+        # This is a model protocol error, not information missing from the user.
+        # Keep the exact-source fence and let the bounded engine repair the call.
+        raise
     except (RequestClarification, ValueError) as error:
         return {"kind": "clarification", "text": str(error)}
     saved["creation_origin"] = origin
