@@ -5,10 +5,11 @@ import base64
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser
+from app.api.errors import ApiError
 from app.pii.masking import mask
 
 router = APIRouter()
@@ -31,9 +32,10 @@ async def speak(user_id: CurrentUser, req: SpeakRequest):
     voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
     if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="ELEVENLABS_API_KEY is not configured on the backend server",
+        raise ApiError(
+            503,
+            "voice_unavailable",
+            "Speech is unavailable right now. Try again later.",
         )
 
     # 2. Mask sensitive user PII before sending payload off-server
@@ -55,13 +57,26 @@ async def speak(user_id: CurrentUser, req: SpeakRequest):
     }
 
     # 3. Call ElevenLabs API
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, headers=headers, timeout=15.0)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers, timeout=15.0)
+    except httpx.TimeoutException as exc:
+        raise ApiError(504, "voice_timeout", "Speech took too long. Try again later.") from exc
+    except httpx.RequestError as exc:
+        raise ApiError(
+            503,
+            "voice_unavailable",
+            "Speech is unavailable right now. Try again later.",
+        ) from exc
 
     if response.status_code != 200:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=f"ElevenLabs error: {response.text}",
+        # Provider credentials/quota belong to this service, not the user's
+        # Threadly session or Google grant. Only CurrentUser may reject auth.
+        # Do not forward provider bodies, which may contain private diagnostics.
+        raise ApiError(
+            502,
+            "voice_provider_error",
+            "Speech is unavailable right now. Try again later.",
         )
 
     # 4. Base64-encode MP3 bytes for VoiceOrb.tsx
