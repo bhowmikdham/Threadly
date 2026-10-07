@@ -672,7 +672,7 @@ async def run(context, runtime, model=None):
             "kind": "message",
             "text": "I couldn’t finish the draft card yet. "
             "I’ve kept your supplied details; please ask me to try again. "
-            "Nothing has been saved in Gmail or sent.",
+            "This chat turn did not save anything in Gmail or send an email.",
             "error_code": "email_draft_not_prepared",
             "release": RELEASE,
             "trace": trace,

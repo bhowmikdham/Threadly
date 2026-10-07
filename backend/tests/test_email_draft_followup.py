@@ -239,6 +239,20 @@ async def test_deliberate_click_after_followup_has_owned_receipt_and_no_duplicat
         turn = next_turn(turn, instruction)
         result = await service.turn(1, turn, factory=db_sessionmaker, model=Model())
         assert result["email_draft_review"]["save_status"] == status
+    # Failed edits must not deny or erase an existing save attempt/receipt.
+    turn = next_turn(turn, "Make it shorter")
+    result = await service.turn(
+        1,
+        turn,
+        factory=db_sessionmaker,
+        model=Model(*([tool("prepare_email_draft", continue_previous=True)] * 8)),
+    )
+    assert result["error_code"] == "email_draft_not_prepared"
+    assert "This chat turn did not save" in result["text"]
+    assert result["active_email_draft_id"] == identifier
+    turn = next_turn(turn, "is the draft saved?")
+    result = await service.turn(1, turn, factory=db_sessionmaker, model=Model())
+    assert result["email_draft_review"]["save_status"] == status
     assert len(calls) == 1
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 0
