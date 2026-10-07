@@ -13,7 +13,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from app.actions import gmail_draft
+from app.actions import email_payload, gmail_draft
 from app.api.errors import ApiError
 from app.conversation import store
 from app.db.models import ActionApproval, AssistantAction, Conversation, GmailDraftSave, User
@@ -24,6 +24,21 @@ from tests.test_durable_tasks import mailbox
 from tests.test_email_previews import connect
 
 __all__ = ["mailbox"]
+
+
+def test_long_draft_mime_wraps_transfer_lines_without_changing_editor_text():
+    body = "  Café 👋\r\n" * 900 + "No terminal newline  "
+    payload = email_payload.build(
+        {"from_address": "me@example.test", "to": ["you@example.test"], "cc": [], "bcc": []},
+        {"subject": "Edited", "body": body, "unresolved_fields": []},
+        sender="me@example.test", now=datetime.now(UTC), identifier=str(uuid4()),
+        draft_only=True,
+    )
+    mime = BytesParser(policy=policy.default).parsebytes(
+        base64.urlsafe_b64decode(payload["mime_base64url"])
+    )
+    assert mime.get_payload(decode=True).decode("utf-8") == body
+    assert all(len(line) <= 76 for line in mime.get_payload().splitlines())
 
 
 @pytest.fixture

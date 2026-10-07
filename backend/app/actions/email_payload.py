@@ -124,7 +124,7 @@ def build(envelope, content, *, sender, now, identifier, reply=None, draft_only=
     if draft_only:
         # set_content adds a terminal newline; explicit transfer encoding preserves
         # exactly the user's text, including whitespace and a missing final newline.
-        message.set_payload(base64.b64encode(body.encode("utf-8")).decode("ascii"))
+        message.set_payload(base64.encodebytes(body.encode("utf-8")).decode("ascii"))
     raw = message.as_bytes()
     if len(raw) > 64000:
         raise blocked("email_too_large")
