@@ -180,7 +180,9 @@ def extract_body_text(payload: dict) -> str:
 def strip_html(html: str) -> str:
     import re
 
-    text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+    # Outlook conditional XML (e.g. PixelsPerInch=96) is metadata, not mail text.
+    text = re.sub(r"(?s)<!--.*?-->", " ", html)
+    text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", text)
     text = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>", "\n", text)
     text = re.sub(r"<[^>]+>", " ", text)
     text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")

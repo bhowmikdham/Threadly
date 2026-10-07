@@ -6,9 +6,9 @@ import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-POLICY = "mail-presentation-1.1"
+POLICY = "mail-presentation-1.2"
 _INVISIBLE = re.compile(r"[\u00ad\u200b\u200e\u200f\u202a-\u202e\u2060-\u2069\ufeff]")
-_JOINERS = re.compile(r"[\u200c\u200d]+")
+_JOINERS = re.compile(r"[\u034f\u200c\u200d]+")
 _URL = re.compile(r"https?://[^\s<>]+", re.I)
 _FOOTER = re.compile(
     r"^\s*(?:unsubscribe\b|manage (?:your )?(?:email |notification )?preferences\b|"
@@ -26,7 +26,10 @@ def has_visible_text(value):
         if decoded == text:
             break
         text = decoded
-    return any(not c.isspace() and unicodedata.category(c) not in {"Cf", "Cc"} for c in text)
+    return any(
+        c != "\u034f" and not c.isspace() and unicodedata.category(c) not in {"Cf", "Cc"}
+        for c in text
+    )
 
 
 def snippet(value, limit=220):
@@ -38,7 +41,7 @@ def snippet(value, limit=220):
             break
         text = decoded
     text = _INVISIBLE.sub("", text)
-    # Repeated/boundary joiners are padding. Preserve meaningful joiners within
+    # Repeated/boundary combining and zero-width joiners are padding. Preserve single joiners within
     # words and emoji sequences instead of deleting every Unicode format character.
     text = _JOINERS.sub(
         lambda m: (

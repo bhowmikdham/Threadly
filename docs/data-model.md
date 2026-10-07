@@ -642,3 +642,16 @@ current structured editor. No migration is required. Conversation history may
 include read-only `email_draft_review` receipt/status guidance; it is not write
 authority. Source/account ownership and frozen Gmail draft-save receipts are
 unchanged.
+
+### Mail retrieval and reply goals (1.8.8)
+
+Optional encrypted conversation keys `mail_goal` and `mail_reply_goal` retain
+bounded USER instructions, literal entity/sender constraints, date anchor and
+timezone, folder scope, ordering/purpose, candidate reference dispositions,
+page count and preparation status. The reply goal binds a source reference and,
+after submission, an owned task ID. They contain no original mail body, snippet,
+assessment quote or generated recipient address. New searches reset candidate
+assessments; new goals replace retained constraints. A continuation preserves
+scope; changing it requires an explicit new goal. Existing account/version/lease
+and conversation expiry fences apply. No schema migration is required. Runtime
+search cards remain transient; filtered card ordinals cannot rename source IDs.

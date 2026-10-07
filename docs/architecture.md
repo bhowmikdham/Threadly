@@ -796,3 +796,36 @@ across follow-ups. The read-only draft review tool reads owned save receipts and
 renders actual card/permission controls. Account draft grants do not grant the
 conversation a write tool. Only the existing explicit UI save freezes and submits
 an exact payload; generic chat confirmations never save, send or approve mail.
+
+### Mail goal and reply continuity (1.8.8)
+
+Conversation search accepts a typed USER interpretation containing an entity,
+sender, receipt/application purpose and latest ordering. Refinement keeps the
+original date anchor, timezone and folder/sender scope. A new goal replaces it.
+Entity discovery avoids accidentally quoting the entire task as a Gmail phrase;
+optional literal USER fragments form separate AND terms. Named senders are
+checked against the actual incoming From header, never a body mention.
+
+Receipt/application candidates require exact evidence from their own messages
+before relevance assessment. The model supplies the semantic assessment; backend
+code checks reference and quote provenance. At most two result pages are examined
+for a goal (each retains the existing five-provider-page fill bound). Responses
+and visible cards use the same verified relevant set. Unknown or incomplete
+coverage cannot establish absence or an application decision. Tool exhaustion
+retains the goal and excludes unchecked cards.
+
+A typed source-bound reply-preparation intent uses complete current USER text,
+not a growing list of spoken trigger phrases. The backend retains user-only
+context, checks the newest displayed incoming target, sender ambiguity and fresh
+thread metadata, and requires the selected full scope to be read. Specific repair
+codes can be retried within the same eight-call budget. Failed calls are not
+deduplicated as successful observations. An interrupted preparation retains its
+source identity; retrying a prepared request reuses its task. The durable worker
+still requires explicit outgoing recipients and the existing review/approval
+fences. Chat clarification reloads the owned effective capture before its DB
+transaction. No new Gmail write capability, grant or migration is introduced.
+
+Mail presentation 1.2 removes hidden HTML comment metadata and repeated/boundary
+combining joiner padding while retaining ordinary numbers and meaningful Unicode
+joiners. Historical model/tool assets remain immutable. The versioned 1.8.8
+snapshot and synthetic replay live in `docs/evaluation/handsfree-mail/`.

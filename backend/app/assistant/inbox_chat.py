@@ -5,6 +5,7 @@ import calendar
 import json
 import re
 from datetime import UTC, datetime, timedelta
+from email.utils import parseaddr
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -76,6 +77,23 @@ class Interpretation(BaseModel):
     date_phrase: str = Field(max_length=100)
     folder: Literal["all_mail", "INBOX", "SENT"]
     inbox_category: Literal["primary", "all"] = "primary"
+
+
+def sender_matches(sender, name):
+    """Match a USER-supplied name to actual From, never quoted body headers."""
+
+    def words(value):
+        return " ".join(re.findall(r"[^\W_]+", value.casefold()))
+
+    display, address = parseaddr(sender or "")
+    needle = words(name)
+    return bool(
+        needle
+        and (
+            f" {needle} " in f" {words(display)} "
+            or needle.replace(" ", "") == words(address.split("@")[0]).replace(" ", "")
+        )
+    )
 
 
 def assets():
@@ -252,7 +270,10 @@ def flight_preview(text):
 
 async def search(owner, filters, cursor=None):
     display_reference_at = datetime.now(UTC)
-    if any(c in {'"', "\\"} or ord(c) < 32 or ord(c) == 127 for c in filters.query):
+    if any(
+        len(value) > 200 or any(c in {'"', "\\"} or ord(c) < 32 or ord(c) == 127 for c in value)
+        for value in [filters.query, *filters.query_terms]
+    ):
         raise ApiError(
             422,
             "mail_search_query_invalid",
@@ -265,7 +286,13 @@ async def search(owner, filters, cursor=None):
     # enforce the exact inclusive start/exclusive end locally so neither the
     # start instant nor subsecond arrivals in the last second are lost.
     query = (
-        (f'"{filters.query}" ' if filters.query else "")
+        (
+            " ".join(f'"{term}"' for term in filters.query_terms) + " "
+            if filters.query_terms
+            else f'"{filters.query}" '
+            if filters.query
+            else ""
+        )
         + (f"from:{filters.sender_email} " if filters.sender_email else "")
         + (
             f"-in:spam -in:trash after:{int(filters.received_from.timestamp()) - 1} "
@@ -276,9 +303,13 @@ async def search(owner, filters, cursor=None):
         query += " in:" + filters.folder.lower()
     if filters.inbox_category == "primary":
         query += " category:primary"
-    scope = digest(
-        {"release": RELEASE, **filters.model_dump(mode="json"), "page_size": filters.limit}
-    )
+    cursor_filters = filters.model_dump(mode="json")
+    # Keep unexpired pre-1.8.8 cursors valid when the new filters are unused.
+    # Non-default constraints remain part of the signed scope.
+    for key in ("query_terms", "sender_name", "inbound_only"):
+        if not cursor_filters[key]:
+            cursor_filters.pop(key)
+    scope = digest({"release": RELEASE, **cursor_filters, "page_size": filters.limit})
     rows = []
     next_cursor = cursor
     seen_ids = set()
@@ -309,6 +340,12 @@ async def search(owner, filters, cursor=None):
             if (
                 filters.sender_email
                 and filters.sender_email not in m["reply_metadata"]["addresses"]["from"]
+            ):
+                continue
+            if filters.sender_name and not sender_matches(m["from_addr"], filters.sender_name):
+                continue
+            if filters.inbound_only and (
+                m.get("is_from_user") or "SENT" in m["reply_metadata"]["label_ids"]
             ):
                 continue
             rows.append(
@@ -345,5 +382,14 @@ async def search(owner, filters, cursor=None):
             "timestamp_source": "gmail.internalDate",
             "inbox_category": filters.inbox_category,
             "persisted": False,
+            **(
+                {
+                    "sender_identity_count": len(
+                        {parseaddr(r["sender"] or "")[1].casefold() for r in rows}
+                    )
+                }
+                if filters.sender_name
+                else {}
+            ),
         },
     }

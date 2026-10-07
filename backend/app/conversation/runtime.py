@@ -19,7 +19,7 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
-from app.conversation import calendar_context, email_draft, email_review, mail_context
+from app.conversation import calendar_context, email_draft, email_review, mail_context, mail_goal
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.mail.inbox_status import check_today
 from app.mail.presentation import clock_context, received_display
@@ -692,6 +692,8 @@ class Runtime:
             "recent_dialogue": model_history(self.state["history"]),
             "previous_calendar_request": calendar_context.model_context(self.state),
             "remembered_email_sources": mail_context.model_context(self.state),
+            "pending_mail_goal": self.state.get(mail_goal.KEY),
+            "pending_mail_reply": self.state.get(mail_goal.REPLY),
             "pending_calendar_event": event_choices.model_context(self.state),
             "pending_email_draft": email_draft.model_context(self.state),
             "email_draft_controls": self.email_draft_review,
@@ -791,6 +793,7 @@ class Runtime:
             raise ApiError(409, "live_inbox_required", "Connect live Gmail to search.")
         cursor = None
         if args is not None:
+            args = mail_goal.search_goal(self, args)
             query, sender_email, folder, date_phrase, limit = (
                 args.query,
                 args.sender_email,
@@ -831,13 +834,15 @@ class Runtime:
             user_text = "\n".join(
                 [h["user"] for h in self.state["history"]] + [self.request.instruction]
             )
-            for value in (query, date_phrase, sender_email):
+            for value in (query, date_phrase, sender_email, *args.query_terms):
                 if value and value.casefold() not in user_text.casefold():
                     raise ValueError("Search literals must come from user dialogue")
             if not inbox_chat.folder_is_grounded(folder, user_text):
                 raise ValueError("Folder is not user supplied")
+            goal = self.state.get(mail_goal.KEY)
+            anchor = datetime.fromisoformat(goal["anchor"]) if goal else self.mail_anchor
             start, end = inbox_chat.date_window(
-                date_phrase, self.mail_anchor, self.request.timezone
+                date_phrase, anchor, goal["timezone"] if goal else self.request.timezone
             )
             filters = InboxFilters(
                 schema_version="1.0",
@@ -849,8 +854,22 @@ class Runtime:
                 limit=limit,
                 timezone=self.request.timezone,
                 inbox_category=args.inbox_category if folder == "INBOX" else "all",
+                query_terms=args.query_terms,
+                sender_name=(self.state.get(mail_goal.KEY) or {}).get("sender_name", ""),
+                inbound_only=bool((self.state.get(mail_goal.KEY) or {}).get("sender_name")),
             )
         else:
+            goal = self.state.get(mail_goal.KEY)
+            if (
+                goal
+                and goal["purpose"] != "discovery"
+                and goal.get("pages_read", 0) >= mail_goal.MAX_PAGES
+            ):
+                raise mail_goal.MailRepair(
+                    "mail_page_limit",
+                    "This goal reached its page budget. Report the checked scope "
+                    "or ask the USER to narrow the sender or dates.",
+                )
             if self.fresh_search_scope and not self.fresh_search_done:
                 raise ValueError("Start a new search for this request before paging")
             previous = self.state.get("search")
@@ -861,6 +880,13 @@ class Runtime:
             filters = InboxFilters.model_validate_json(json.dumps(previous["filters"]))
             cursor = previous["next_cursor"]
         page = await inbox_chat.search(self.owner, filters, cursor)
+        if goal := self.state.get(mail_goal.KEY):
+            goal["search_complete"] = True
+            goal["pages_read"] = goal.get("pages_read", 0) + 1
+            goal["sender_identity_count"] = max(
+                goal.get("sender_identity_count", 0),
+                page["coverage"].get("sender_identity_count", 0),
+            )
         if args is not None and args.selection == "latest_message" and not date_phrase:
             page["today_check"] = await check_today(self.owner, filters, self.mail_anchor)
         elif args is None and self.search_page and "today_check" in self.search_page:
@@ -898,7 +924,21 @@ class Runtime:
             if ref is None:
                 if len(self.state["result_order"]) >= SEARCH_REFERENCE_LIMIT:
                     continue
-                ref = f"mail-{len(self.state['result_order']) + 1}"
+                # Relevance filtering changes displayed ordinals, never source IDs.
+                number = (
+                    max(
+                        (
+                            int(k[5:])
+                            for k in self.state["refs"]
+                            if re.fullmatch(r"mail-[1-9][0-9]*", k)
+                        ),
+                        default=0,
+                    )
+                    + 1
+                )
+                if number > SEARCH_REFERENCE_LIMIT:
+                    continue
+                ref = f"mail-{number}"
                 self.state["refs"][ref] = {
                     "message_id": row["message_id"],
                     "thread_id": row["thread_id"],
@@ -1177,8 +1217,22 @@ class Runtime:
         return context.id, message_id
 
     async def workflow(self, args):
-        instruction = self.authoritative_instruction()
-        authorize_workflow(instruction, args.intent, args.compound)
+        interpreted = mail_goal.prepare_reply(self, args)
+        if reused := getattr(self, "reuse_mail_reply_task", None):
+            from app.api.routes.assistant import task_view
+
+            async with self.factory() as session:
+                task = await tasks.owned_task(session, self.owner, reused)
+                view = await task_view(session, task)
+            return {
+                "kind": "task",
+                "text": "Here is the existing reply request.",
+                "task_id": task.id,
+                "task": view,
+            }
+        instruction = interpreted or self.authoritative_instruction()
+        if interpreted is None:
+            authorize_workflow(instruction, args.intent, args.compound)
         validate_workflow_bindings(
             args, set(self.loaded), set(self.recipients), self.recipient_roles
         )
@@ -1302,6 +1356,8 @@ class Runtime:
             view = await task_view(session, task)
             self.state["active_task_id"] = task.id
             self.state.pop("proposal_id", None)
+            if interpreted is not None:
+                self.state[mail_goal.REPLY].update(status="prepared", task_id=task.id)
             await self.checkpoint(
                 session, {"kind": "task", "text": "I’m preparing that for you.", "task_id": task.id}
             )
@@ -1335,6 +1391,24 @@ class Runtime:
             self.active["question"],
             self.request.timezone,
         )
+        # Conversation turns do not pass through the task-input route's source
+        # prefetch dependency. Reload only this owned task's effective capture
+        # before opening the continuation transaction; do not reuse stale text.
+        context_id = self.active.get("effective_context_snapshot_id") or self.active.get(
+            "context_snapshot_id"
+        )
+        if context_id:
+            async with self.factory() as session:
+                context = await session.scalar(
+                    select(ContextSnapshot).where(
+                        ContextSnapshot.id == context_id,
+                        ContextSnapshot.user_id == self.owner,
+                    )
+                )
+                if context is None:
+                    raise ApiError(404, "context_not_found", "Select the source again.")
+                reference = context.payload
+            await source_data.prefetch(self.owner, [reference])
         async with self.factory.begin() as session:
             task = await continuation.accept_input(
                 session, self.owner, self.active["task_id"], request
