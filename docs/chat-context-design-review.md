@@ -6,7 +6,9 @@ Status: locally committed, integrated implementation, prompt
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
 The frontend incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and
 PR126 at `1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`, preserving open-email following,
-the newest visible incoming reply target and the inbox classification badges.
+the newest visible incoming reply target and the inbox classification badges. PR127
+at `e2200f134ddb4a2b772913019291d4afea477874` is also integrated: ready Calendar
+cards lift the voice orb while preserving existing speech and approval behavior.
 The voice repair remains intact. This document separates implemented mechanics
 from conversational quality. The `.2` diagnostic found partial successes and
 contract failures. The [second `.3` diagnostic](evaluation/chat-context/second-stage-results.md)

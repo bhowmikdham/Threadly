@@ -1,6 +1,6 @@
 {
-  "status": "offline_context5_operation_repair_and_pr126_mechanical_gates_pass_live_semantic_gates_open",
-  "recorded_at": "2026-10-07T14:24:16.466919+00:00",
+  "status": "offline_context5_operation_repair_and_pr127_mechanical_gates_pass_live_semantic_gates_open",
+  "recorded_at": "2026-10-07T14:50:22.683346+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
   "prompt_release": "contextual-conversation-1.8.9+chat-context.5",
@@ -20,7 +20,7 @@
       "lib/context.ts": "3e8d771b2bae21afa0c858eca7257959339f5dd2b9547fa7102490f3e01a69b2",
       "lib/gmail-context.ts": "d96d6dccc08bc1448246180819e6194269b54f9b7c5c5550d5523d753a2f8fa5",
       "lib/meeting-email.ts": "713a7f6fcb20a275481e3a056d0b3a39fc9c28cab0941162251f0c23ebbca320",
-      "lib/spoken-reply.ts": "76e2f45897c206aaf49cb587d306c5f3a9378e6642e7dc3bede46625aca58a38",
+      "lib/spoken-reply.ts": "c659c6aad0ed43d9bb4a90d18bd70be0ec9311fe1698a1471a1418dc49e48053",
       "lib/use-assistant.ts": "11ec4f08be64c4911e297d71e77e1bd50915bbf0d3b33c643b48b94ce6d64994",
       "sidepanel.tsx": "4518ab837c047dc56dc436872d92cb0567d4590a76c1fa00648b7c00a49843dd",
       "tests/artifacts.test.tsx": "2514bc8f8767a2ce72d232a658c702730b59a204021211a2e4712bd46693198e",
@@ -30,13 +30,14 @@
       "tests/e2e/extension.spec.ts": "c736248e7b2a104c72e41c301bc043bdfc9871f0d86315804313b5c4d8306633",
       "tests/e2e/inbox-badges.spec.ts": "958a50f7730b6e832c8545de74e94cd100905560a31ab978ae555003330da71f",
       "tests/e2e/meeting-email-event.spec.ts": "af59ef524b9ee6ee54156ac01041d37d86f2d41f1d9c95552331e46094f5e48a",
+      "tests/e2e/voice-calendar-session.spec.ts": "4e14aa4d27ccb340a76e6bdf7ce0efb232265ea9ca3633633b90b7057eef4bdc",
       "tests/meeting-email-event.test.tsx": "0c076d8a70c66c6298a1c0974db5780d959a8517e96bce15fee65b8eddf60036",
       "tests/security.test.ts": "ca32c73caf3e60b97e320121aeb3a8494a37a18d0955b4ddc84d317cf0b277b2"
     },
-    "code_and_test_head": "277be033ee5d7276517adde1ab9acd1886810602",
-    "head_with_evidence": "357c06565ee61403dacf4df2f5e7ecdd3052aca3",
-    "upstream_base_commit": "1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1",
-    "merge_commit": "277be033ee5d7276517adde1ab9acd1886810602",
+    "code_and_test_head": "f4601ff85461283ffe535a847450a0f1427ffd58",
+    "head_with_evidence": "86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf",
+    "upstream_base_commit": "e2200f134ddb4a2b772913019291d4afea477874",
+    "merge_commit": "f4601ff85461283ffe535a847450a0f1427ffd58",
     "pr122_preserved": true,
     "pr126_preserved": true,
     "observed_origin_frontend": "e2200f134ddb4a2b772913019291d4afea477874",
@@ -46,14 +47,12 @@
         "files": [
           "lib/spoken-reply.ts",
           "sidepanel.tsx"
-        ]
+        ],
+        "state": "open_unmerged"
       },
-      "127": {
-        "head": "afd93bd507bc5ec3e461f7ddd0bcc54b43063bf2",
-        "merged_upstream": true,
-        "files": [
-          "lib/spoken-reply.ts"
-        ]
+      "128": {
+        "head": "cac8dae789ff5c0ddc8aadddcf976fa969dc365c",
+        "state": "closed_unmerged"
       }
     },
     "previous_integration": {
@@ -62,6 +61,21 @@
       "upstream_base_commit": "60a7aa8dd02dd94105b90ae1ee68f742cf23d204",
       "merge_commit": "d7ab1e05bd80a96ce20756196d951532e855832d",
       "pr122_preserved": true
+    },
+    "pr126_integration": {
+      "code_and_test_head": "277be033ee5d7276517adde1ab9acd1886810602",
+      "head_with_evidence": "357c06565ee61403dacf4df2f5e7ecdd3052aca3",
+      "upstream_base_commit": "1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1",
+      "merge_commit": "277be033ee5d7276517adde1ab9acd1886810602"
+    },
+    "pr127_preserved": true,
+    "pr127_review": {
+      "remote_verified": "e2200f134ddb4a2b772913019291d4afea477874",
+      "changed_runtime_file": "lib/spoken-reply.ts",
+      "upstream_patch_unchanged": true,
+      "red_before": "Ready Calendar card did not dock the voice overlay; packaged browser assertion failed before merge.",
+      "green_after": "Card control receives a trial click while voice remains open; social next turn centers the orb; five non-auth speech failure statuses preserve session/callback behavior.",
+      "browser_coverage": "12 focused local + 1 public-origin case at current head; prior full 50+1 browser suite belongs to PR126 head."
     }
   },
   "integrated_with_new_voice_release": true,
@@ -94,8 +108,8 @@
     "ruff": "passed",
     "git_diff_check_backend_and_frontend": "passed",
     "plan_documentation_validator": "passed",
-    "typecheck": "passed after PR126 integration",
-    "local_and_public_build": "passed after PR126 integration; synthetic public origin",
+    "typecheck": "passed after PR127 integration",
+    "local_and_public_build": "passed after PR127 integration; synthetic public origin",
     "lint": "ruff passed at final runtime",
     "doc_validator": "passed; planning consistency only",
     "ruff_format_changed_files": "11 changed Python files pass; optional whole-tree format check reported existing formatting differences (60 files before formatting one touched test); no whole-tree rewrite"
@@ -394,6 +408,55 @@
       "scope": "All offline guard/rehearsal tests pass against owned disposable DB. Live Bedrock harness intentionally skipped: separate paid approval required.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-operation-offline-guard-with-db.log",
       "log_sha256": "18534925afb5681f74a6b3234547d61f261de050c7571ab1787becdedf48608f"
+    },
+    {
+      "name": "pr127_red_browser",
+      "result": "1 failed before merging PR127",
+      "scope": "Ready Calendar action left the voice overlay centered; no provider actions.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-red-browser.log",
+      "log_sha256": "bae3594f1312c85850e7448fec5616f70f2eba718d25186a260535ddba868367"
+    },
+    {
+      "name": "pr127_full_unit",
+      "result": "254 passed, 24 files",
+      "scope": "Full unit suite at f4601ff85461283ffe535a847450a0f1427ffd58.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-full-unit.log",
+      "log_sha256": "f4820d7792f9802fb5c70be3ca178ba40a678cf5f88eed110fd262234469e47a"
+    },
+    {
+      "name": "pr127_typecheck",
+      "result": "passed",
+      "scope": "TypeScript at current runtime/test head.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-typecheck.log",
+      "log_sha256": "3c8307e06e4e8a6d8e516c5f213bc1422ef6a233f6ebfdbf127cbf4a407b6c59"
+    },
+    {
+      "name": "pr127_local_build",
+      "result": "passed",
+      "scope": "Local extension build, no publication.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-local-build.log",
+      "log_sha256": "03f664e934e7c1c7f3968dcf3d54c60261b9b7fb8bcb3e8948c46af234c2eee4"
+    },
+    {
+      "name": "pr127_focused_browser",
+      "result": "12 passed in 53.0s",
+      "scope": "Voice Calendar/session/fallback/closing, audio lifecycle, meeting-email Always/manual approval isolation. Synthetic providers only.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-focused-browser.log",
+      "log_sha256": "4e0e64d6eb4dd337c0f683cbcdf2920c3761b379f10b975a9f3a7a0d0cb9964d"
+    },
+    {
+      "name": "pr127_public_build",
+      "result": "passed",
+      "scope": "Synthetic https://api.threadly.example.test; no deployment.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-public-build.log",
+      "log_sha256": "14ab8bcb92f0a968d61121a2668a523cdded303f1ac12a0d59a0303aa327d281"
+    },
+    {
+      "name": "pr127_public_browser",
+      "result": "1 passed in 1.2s",
+      "scope": "Packaged public-origin check, mocked denied permission, no real service call.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-public-browser.log",
+      "log_sha256": "a310fe7239db0e1c961bd042ae67c8dad2eda11c15c840f97db486b390e296c6"
     }
   ],
   "previous_runs": [
@@ -546,7 +609,7 @@
     "Explicit legacy new email with a stale goal ID does not select or mutate that retained goal.",
     "New and continuing drafts have distinct model tools; reason-specific repair and 2-same/3-total invalid-call bounds.",
     "Explicitly bound recipient/wording corrections preserve goal identity.",
-    "PR126 integrated unchanged; PR125/127 inspected and excluded."
+    "PR126 and subsequently authorized PR127 integrated unchanged; open PR125 and closed/unmerged PR128 excluded."
   ],
   "remaining_gates": [
     "Live .5 two-draft completion and varied new/continue semantic acceptance; exact six-response replay now passes offline in one call with Alex unchanged.",
@@ -655,5 +718,9 @@
     "second_cumulative_sha256": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
     "unchanged": true,
     "paid_calls_added": 0
+  },
+  "pr127_integration_evidence": {
+    "path": "pr127-integration-evidence.json.gz",
+    "sha256": "b0bc004406259f478445e95cb3775bf67cc0acedee6b03a15c58afd0398d02b6"
   }
 }

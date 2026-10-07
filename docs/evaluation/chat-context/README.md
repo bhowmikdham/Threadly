@@ -10,14 +10,16 @@ remains locally committed and unpublished, with behavioral release gates open.
 
 Backend runtime/test head: `7fb055f409c46479bc1cd1194aa870ff93ccf187`, based on
 released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
-Frontend runtime/test head: `277be033ee5d7276517adde1ab9acd1886810602`, with evidence
-head `357c06565ee61403dacf4df2f5e7ecdd3052aca3`. It includes released voice repair,
+Frontend runtime/test head: `f4601ff85461283ffe535a847450a0f1427ffd58`, with evidence
+head `86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf`. It includes released voice repair,
 PR122 `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and PR126
-`1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`. PR125/127 were inspected but not adopted.
+`1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`, plus merged PR127
+`e2200f134ddb4a2b772913019291d4afea477874`. PR125 and PR128 remain unmerged/excluded.
 
 Current checks: **2,300 backend tests passed, no skips**, **254 frontend unit tests
-passed**, TypeScript, Ruff, both builds, **50 local browser tests plus one separately
-run public-origin browser test**. The exact recorded new-Casey call now returns a
+passed**, TypeScript, Ruff and both builds. PR127 verification passed **12 focused
+local browser tests plus one public-origin test**. The earlier PR126 head passed
+the full **50 local + one public-origin** suite; that was not repeated in full for PR127. The exact recorded new-Casey call now returns a
 normal missing-purpose clarification in one scripted call, with Alex unchanged.
 These are deterministic/runtime checks, not proof of live semantic quality.
 

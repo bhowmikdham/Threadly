@@ -63,8 +63,10 @@ Scripted outputs verify deterministic behavior, not live model semantic quality.
 
 Frontend PR126 is integrated at `277be033ee5d7276517adde1ab9acd1886810602`;
 254 unit tests, TypeScript, both builds, 50 local browser tests and the separate
-public-origin browser test pass. PR125/127 were inspected but excluded. The PR126
-files and released voice files are preserved byte-for-byte.
+public-origin browser test passed on that head. PR127 was subsequently authorized
+and integrated at `f4601ff85461283ffe535a847450a0f1427ffd58`; see the receipt for
+its focused verification. PR125 remains open/unmerged, and PR128 closed/unmerged;
+both are excluded. PR126 files and released VoiceOrb remain byte-for-byte unchanged.
 
 ## Narrow next live gate — proposal only, not executed or approved
 
