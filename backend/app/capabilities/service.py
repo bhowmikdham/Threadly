@@ -136,7 +136,9 @@ def build_capabilities(user: User) -> dict[str, Any]:
         "reconnect": {
             "available": True,
             "method": "POST /auth/google/reconnect",
-            "requestable_capabilities": ["gmail_read", "calendar_read", "calendar_events_read"]
+            "requestable_capabilities": [
+                "gmail_read", "gmail_draft", "calendar_read", "calendar_events_read"
+            ]
             + (["gmail_send"] if pilot else [])
             + (["calendar_write"] if calendar_eligible else []),
             "state_pkce_required": True,

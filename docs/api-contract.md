@@ -1440,8 +1440,8 @@ user-edit receipt records the exact outgoing snapshot and parent revision/hash.
 Changing a reply subject deliberately creates a new unthreaded email.
 
 `gmail_draft` capability accepts already-recorded `gmail.compose`, `gmail.modify`
-or full-mail scope. `gmail.send` alone is insufficient. This feature neither adds
-OAuth scope requests nor enables the send worker. No send approval/job is created;
+or full-mail scope. `gmail.send` alone is insufficient. This save endpoint neither
+requests OAuth scope nor enables the send worker. No send approval/job is created;
 Gmail's `users.drafts.create` is the only provider write. MIME uses the shared
 validated builder with draft-only exact plain-text body preservation. Placeholders
 may remain in a Gmail draft for the user to finish before sending.
@@ -1449,3 +1449,26 @@ may remain in a Gmail draft for the user to finish before sending.
 Migration `g071026e9042` must precede enabling these routes. It adds only the draft
 receipt table and refuses downgrade when receipts exist. No credentials, grants,
 classification, Calendar, Primary Inbox or voice behavior change.
+
+### Explicit draft-consent follow-up
+
+Authenticated `POST /auth/google/reconnect` additionally accepts
+`capabilities:["gmail_draft"]` for ordinary connected users. It requests
+`gmail.compose` alongside the existing identity/read scopes, using the same
+one-use state, PKCE, exact callback, current account/session versions and same-user
+exchange. Initial sign-in remains read-only. The capability's requestability is
+advertised separately from actual readiness; only returned, recorded Google grants
+make it ready. Cancellation or a reduced grant cannot enable draft saving.
+
+Google's compose permission permits **managing drafts and sending email**. The UI
+discloses that before Enable draft creation. Threadly's draft feature only saves
+drafts; this consent does not enable Gmail send eligibility, its pilot enrollment,
+write flag, approvals or dispatch. Combined draft+send requests still face the
+existing send-pilot restriction. No Google console/security setting or grant is
+changed by installing this code; the user must approve Google's consent flow.
+
+The editor retains its current fields through cancellation or successful reconnect,
+refreshes capabilities/account version after callback, and waits for a separate
+Create draft click. OAuth completion never calls the draft-save endpoint. The
+follow-up is a separate release requiring its own deployment approval and introduces
+no additional schema migration.
