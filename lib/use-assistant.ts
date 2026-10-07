@@ -5,6 +5,7 @@ import { calendarAvailability } from "./calendar-availability"
 import { activeGmail, capture } from "./context"
 import type {
   Artifact,
+  EmailDraft,
   Entry,
   InboxPage,
   InboxResult,
@@ -87,6 +88,8 @@ const validSelectionReference = (value: any): value is SelectionReference =>
       value.selectedIds.includes(value.targetId)))
 
 type ConversationHistoryItem = {
+  email_draft?: EmailDraft
+  version?: number
   calendar_action_id?: string
   error_code?: string
   user: string
@@ -283,6 +286,9 @@ export function useAssistant(user: User) {
           id: h.request_id || `restored-${i}`,
           instruction: h.user,
           message: h.assistant,
+          emailDraft: h.email_draft,
+          conversationId: value.conversation_id,
+          conversationVersion: h.version,
           errorCode: h.error_code,
           calendarActionId: h.calendar_action_id
         }))
@@ -834,6 +840,7 @@ export function useAssistant(user: User) {
     update(id, {
       pending: false,
       message: turn.text,
+      emailDraft: turn.email_draft,
       inbox: turn.search,
       task: turn.task,
       proposal: turn.proposal,
@@ -1336,6 +1343,14 @@ export function useAssistant(user: User) {
     conversationId: conversation.current.id,
     rememberConversation: () => saveConversation(),
     email: user.email,
+    user,
+    canCreateDraft: (entry: Entry) =>
+      !busy &&
+      !restoring &&
+      !unresolvedTurn() &&
+      (!entry.conversationId ||
+        (entry.conversationId === conversation.current.id &&
+          entry.conversationVersion === conversation.current.version)),
     entries,
     selection,
     setSelection: (value: Selection | null) => {

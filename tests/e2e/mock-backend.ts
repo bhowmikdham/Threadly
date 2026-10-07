@@ -64,6 +64,7 @@ export type Verify = (label: string, actual: unknown, expected: unknown) => void
 
 export function createMockBackend(verify: Verify = () => {}): MockBackend {
   const control: MockControl = { failLogout: false, calendarConnected: true }
+  const draftSaves = new Map<string, any>()
   const calls: Call[] = [],
     tasks = new Map<string, any>(),
     artifacts = new Map<string, any>()
@@ -245,6 +246,11 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     if (conversational) {
       // A deterministic API fixture. Actual semantic decisions are evaluated against Bedrock.
       if (
+        body.instruction ===
+        "Draft an email to Alex thanking them for their help"
+      )
+        p = "/fixture/named-email-draft"
+      else if (
         [
           "am I free at 5pm tomorrow",
           "am I free at 6pm tomorrow",
@@ -332,7 +338,38 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
     const stranded = control.strandedConversation
-    if (p === "/fixture/calendar-availability") {
+    if (p === "/fixture/named-email-draft") {
+      data = {
+        kind: "message",
+        text: "Here’s a draft you can edit.",
+        email_draft: {
+          draft_id: originalTurn.request_id,
+          recipient: "Alex",
+          subject: "Thank you for your help",
+          body: "Hi Alex,\n\nThank you for taking the time to help me. I really appreciate it.",
+          unresolved_fields: []
+        }
+      }
+    } else if (p === "/assistant/gmail-drafts" && req.method === "POST") {
+      const source = body.artifact_id
+        ? "task/" + artifacts.get(body.artifact_id).task_id
+        : "conversation/" + body.draft_id
+      data = draftSaves.get(source) || {
+        save_id: "draft-save-1",
+        state: "succeeded",
+        preview: {
+          from_address: body.from_address,
+          subject: body.subject,
+          body: body.body,
+          ...body.recipients
+        },
+        result: { draft_id: "gmail-draft-1" },
+        sending_available: false
+      }
+      draftSaves.set(source, data)
+    } else if (p.startsWith("/assistant/gmail-drafts/"))
+      data = draftSaves.get(p.replace("/assistant/gmail-drafts/", "")) || null
+    else if (p === "/fixture/calendar-availability") {
       const partial = body.instruction === "am I free at 6pm tomorrow"
       const free = body.instruction === "Check that availability again"
       const start = partial ? "2026-10-07T07:00:00Z" : "2026-10-07T06:00:00Z"
@@ -634,7 +671,9 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         }
     } else if (p === "/assistant/capabilities")
       data = {
+        account: { account_version: 2 },
         capabilities: [
+          { id: "gmail_draft", ready: true },
           { id: "gmail_read", ready: true },
           { id: "calendar_read", ready: control.calendarConnected },
           { id: "calendar_list", ready: control.calendarConnected },

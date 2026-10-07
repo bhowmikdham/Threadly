@@ -1,14 +1,9 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 
-import {
-  actionReference,
-  addresses,
-  api,
-  errorText,
-  requestId
-} from "../lib/api"
-import type { Artifact, EmailAction } from "../lib/types"
+import { api, errorText, requestId } from "../lib/api"
+import type { Artifact, User } from "../lib/types"
 import { Booking } from "./Booking"
+import { GmailDraftCard } from "./GmailDraftCard"
 import { Icon } from "./Icon"
 
 const display = (x: any): string =>
@@ -16,11 +11,17 @@ const display = (x: any): string =>
 export function ArtifactCard({
   value,
   replace,
-  report
+  report,
+  draftContext
 }: {
   value: Artifact
   replace: (a: Artifact) => void
   report: (s: string) => void
+  draftContext?: {
+    user: User
+    conversation?: { id: string; version: number }
+    enabled: boolean
+  }
 }) {
   const { artifact } = value,
     c = artifact.content
@@ -60,7 +61,20 @@ export function ArtifactCard({
       setNotice("Copied to clipboard.")
     })
   if (artifact.kind === "draft")
-    return <DraftCard value={value} replace={replace} />
+    return (
+      <GmailDraftCard
+        artifact={value}
+        user={
+          draftContext?.user || {
+            id: 0,
+            email: value.draft_envelope?.from_address || "",
+            name: null
+          }
+        }
+        conversation={draftContext?.conversation}
+        enabled={Boolean(draftContext?.enabled) && value.is_latest !== false}
+      />
+    )
   return (
     <section
       className={`artifact result-${artifact.kind}`}
@@ -234,399 +248,5 @@ function PlanReview({
       </button>
       {error && <p role="status">{error}</p>}
     </div>
-  )
-}
-function DraftCard({
-  value,
-  replace
-}: {
-  value: Artifact
-  replace: (a: Artifact) => void
-}) {
-  const c = value.artifact.content,
-    envelope = value.draft_envelope
-  // Two editable boxes, who it goes to and the message itself; anything else
-  // is asked for in the chat and arrives from the backend as a new revision.
-  const savedTo = (envelope?.to || []).join(", ")
-  const [to, setTo] = useState(savedTo),
-    [body, setBody] = useState(c.body),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState(""),
-    [action, setAction] = useState<EmailAction | null>(null),
-    [confirmed, setConfirmed] = useState(false),
-    [replyOpen, setReplyOpen] = useState(false)
-  const key = useRef(requestId()),
-    decisionKey = useRef(requestId())
-  const dirty = to !== savedTo || body !== c.body
-  useEffect(() => {
-    setTo(savedTo)
-    setBody(c.body)
-    setAction(null)
-    setConfirmed(false)
-    key.current = requestId()
-  }, [value.artifact_id])
-  useEffect(() => {
-    let current = true
-    void actionReference(value.artifact_id, "email")
-      .then(async (id) => (id ? api(`/assistant/actions/${id}`) : null))
-      .then((a) => {
-        if (current && a) setAction(a)
-      })
-      .catch((e) => {
-        if (current) setNotice(errorText(e))
-      })
-    return () => {
-      current = false
-    }
-  }, [value.artifact_id])
-  useEffect(() => {
-    if (
-      !action ||
-      ![
-        "approved",
-        "queued",
-        "executing",
-        "outcome_unknown",
-        "uncertain",
-        "reconciling"
-      ].includes(action.state)
-    )
-      return
-    let active = true
-    const timer = setInterval(
-      () =>
-        api(`/assistant/actions/${action.action_id}`)
-          .then((a) => {
-            if (active) setAction(a)
-          })
-          .catch(() => {
-            if (active)
-              setNotice(
-                "Could not refresh the sending status. Use Refresh status; do not send another copy."
-              )
-          }),
-      3000
-    )
-    return () => {
-      active = false
-      clearInterval(timer)
-    }
-  }, [action?.action_id, action?.state])
-  // Insert is only offered while Gmail shows a reply box for this thread.
-  useEffect(() => {
-    const threadId = envelope?.reply?.gmail_thread_id
-    if (!threadId || !chrome.tabs?.query) return
-    let active = true
-    const check = async () => {
-      try {
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          lastFocusedWindow: true
-        })
-        const open =
-          !!tab?.id &&
-          !!tab.url?.startsWith("https://mail.google.com/") &&
-          (await chrome.tabs
-            .sendMessage(tab.id, { action: "THREADLY_SELECTION" })
-            .then(
-              (s: any) => s?.replyEditorOpen === true && s.threadId === threadId
-            ))
-        if (active) setReplyOpen(open)
-      } catch {
-        if (active) setReplyOpen(false)
-      }
-    }
-    void check()
-    const timer = setInterval(check, 1500)
-    return () => {
-      active = false
-      clearInterval(timer)
-    }
-  }, [envelope?.reply?.gmail_thread_id])
-  const run = async (fn: () => Promise<void>) => {
-    if (busy) return
-    setBusy(true)
-    setNotice("")
-    try {
-      await fn()
-    } catch (e) {
-      setNotice(errorText(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-  const save = () =>
-    run(async () => {
-      const result = await api(
-        `/assistant/tasks/${value.task_id}/draft-revisions`,
-        {
-          request_id: requestId(),
-          expected_revision: value.revision,
-          subject: c.subject,
-          body,
-          recipients: {
-            to: addresses(to),
-            cc: envelope?.cc || [],
-            bcc: envelope?.bcc || []
-          },
-          unresolved_fields: c.unresolved_fields
-        }
-      )
-      replace(result)
-      setNotice("Changes saved.")
-    })
-  const discard = () => {
-    setTo(savedTo)
-    setBody(c.body)
-    setNotice("")
-  }
-  const prepare = () =>
-    run(async () => {
-      const reviewed = await api(
-        `/assistant/artifacts/${value.artifact_id}/review`,
-        {
-          expected_revision: value.revision,
-          payload_hash: value.review.payload_hash
-        }
-      )
-      replace(reviewed)
-      const a = await api(`/assistant/artifacts/${value.artifact_id}/actions`, {
-        request_id: key.current,
-        expected_revision: value.revision,
-        action_type: "send_email"
-      })
-      await actionReference(value.artifact_id, "email", a.action_id)
-      setAction(a)
-      setConfirmed(false)
-      decisionKey.current = requestId()
-    })
-  const insert = () =>
-    run(async () => {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        lastFocusedWindow: true
-      })
-      if (!tab?.id || !tab.url?.startsWith("https://mail.google.com/"))
-        throw new Error("Open the selected Gmail thread first.")
-      const reply = envelope?.reply
-      const result = await chrome.tabs.sendMessage(tab.id, {
-        action: "THREADLY_INSERT",
-        threadId: reply.gmail_thread_id,
-        messageId: reply.gmail_message_id,
-        body: c.body
-      })
-      if (!result?.ok)
-        throw new Error(result?.message || "Could not insert the draft.")
-      setNotice(
-        "Body inserted into Gmail’s reply editor. Gmail may autosave it as a draft; nothing was sent."
-      )
-    })
-  const locked =
-    busy ||
-    (!!action &&
-      ![
-        "proposed",
-        "rejected",
-        "cancelled",
-        "expired",
-        "superseded",
-        "invalidated"
-      ].includes(action.state))
-  const copyDraft = () =>
-    run(async () => {
-      await navigator.clipboard.writeText(body)
-      setNotice("Copied. Nothing was sent.")
-    })
-  // The draft reads as the email itself: who it goes to and the message, both
-  // editable in place, with Insert and Copy. The send review sits underneath.
-  return (
-    <section className="artifact draft-card" aria-label="draft result">
-      <div className="draft-box">
-        <label className="draft-to">
-          <span>To</span>
-          <input
-            value={to}
-            disabled={locked}
-            placeholder="name@example.com"
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
-        {!envelope?.reply && c.subject && (
-          <p className="draft-subject">{c.subject}</p>
-        )}
-        <textarea
-          className="draft-body"
-          aria-label="Message"
-          value={body}
-          disabled={locked}
-          onChange={(e) => setBody(e.target.value)}
-        />
-        {c.unresolved_fields?.length > 0 && (
-          <div className="warning">
-            <b>Needs your input</b>
-            <ul>
-              {c.unresolved_fields.map((x: string) => (
-                <li key={x}>{x}</li>
-              ))}
-            </ul>
-            <p>Tell Threadly the missing details in the chat.</p>
-          </div>
-        )}
-        <div className="draft-actions">
-          {dirty ? (
-            <>
-              <button disabled={busy || !body.trim()} onClick={save}>
-                Save changes
-              </button>
-              <button disabled={busy} onClick={discard}>
-                Undo
-              </button>
-            </>
-          ) : (
-            <>
-          {envelope?.reply && (
-            // Ready once Gmail's reply box is open for this thread.
-            <button disabled={busy || !replyOpen} onClick={insert}>
-              Insert
-            </button>
-          )}
-          <button disabled={busy} onClick={copyDraft}>
-            Copy
-          </button>
-            </>
-          )}
-        </div>
-        {notice && (
-          <p className="draft-notice" role="status">
-            {notice}
-          </p>
-        )}
-      </div>
-      <div className="draft-footer">
-        <button
-          className="icon-button"
-          aria-label="Review outgoing email"
-          title="Review and send"
-          disabled={
-            dirty ||
-            locked ||
-            !value.is_latest ||
-            !!value.review?.blockers?.length
-          }
-          onClick={prepare}>
-          <Icon name="shield" size={15} />
-        </button>
-      </div>
-      {value.review?.blockers?.length > 0 && (
-        <p className="warning">
-          Review blocked:{" "}
-          {value.review.blockers.join(", ").replaceAll("_", " ")}.
-        </p>
-      )}
-      {!value.is_latest && (
-        <button
-          onClick={() =>
-            run(async () =>
-              replace(
-                await api(`/assistant/artifacts/${value.latest_artifact_id}`)
-              )
-            )
-          }>
-          Load latest revision
-        </button>
-      )}
-      {action && (
-        <div className="approval">
-          <b>Exact outgoing email</b>
-          <p>
-            From: {action.preview.from_address}
-            <br />
-            To: {action.preview.to.join(", ")}
-            {action.preview.cc.length > 0 && (
-              <>
-                <br />
-                Cc: {action.preview.cc.join(", ")}
-              </>
-            )}
-            {action.preview.bcc.length > 0 && (
-              <>
-                <br />
-                Bcc: {action.preview.bcc.join(", ")}
-              </>
-            )}
-          </p>
-          <b>{action.preview.subject}</b>
-          <p className="prose">{action.preview.body}</p>
-          <p>Status: {action.state.replaceAll("_", " ")}</p>
-          {action.blockers.length > 0 && (
-            <p className="warning">
-              {action.blockers.join(", ").replaceAll("_", " ")}
-            </p>
-          )}
-          {action.recovery && <p>{action.recovery.guidance}</p>}
-          {action.approval_available && action.sending_available && (
-            <>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                />
-                I approve sending this exact email to these recipients.
-              </label>
-              <button
-                className="primary"
-                disabled={!confirmed || busy}
-                onClick={() =>
-                  run(async () => {
-                    const r = await api(
-                      `/assistant/actions/${action.action_id}/approve`,
-                      {
-                        request_id: decisionKey.current,
-                        expected_version: action.version,
-                        payload_hash: action.payload_hash
-                      }
-                    )
-                    setAction(r.action)
-                    setConfirmed(false)
-                  })
-                }>
-                Approve and send
-              </button>
-            </>
-          )}
-          <button
-            disabled={busy}
-            onClick={() =>
-              run(async () =>
-                setAction(await api(`/assistant/actions/${action.action_id}`))
-              )
-            }>
-            Refresh status
-          </button>
-          {action.allowed_operations
-            .filter((op) => ["reject", "cancel"].includes(op))
-            .map((op) => (
-              <button
-                key={op}
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    const r = await api(
-                      `/assistant/actions/${action.action_id}/${op}`,
-                      {
-                        request_id: requestId(),
-                        expected_version: action.version
-                      }
-                    )
-                    setAction(r.action)
-                  })
-                }>
-                {op === "reject" ? "Reject preview" : "Request cancellation"}
-              </button>
-            ))}
-        </div>
-      )}
-    </section>
   )
 }

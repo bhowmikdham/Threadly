@@ -414,6 +414,14 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         let s: Session | undefined
         try {
           s = await activeSession()
+          if (
+            message.expectedUserId !== undefined &&
+            message.expectedUserId !== s.user.id
+          )
+            throw Object.assign(
+              new Error("Your account changed. Reload this draft."),
+              { code: "session_changed", status: 409 }
+            )
           return await transport(
             s.origin,
             message.path,
