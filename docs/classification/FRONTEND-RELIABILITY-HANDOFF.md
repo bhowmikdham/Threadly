@@ -62,3 +62,40 @@ are unaffected. Fresh source/account/session checks remain in place.
 Logs record only allowlisted provider codes/operations and Gmail reasons, never
 provider messages, email content or tokens. No database migration or saved
 classification data is introduced.
+
+## Findings from frontend PR #126
+
+The reviewed implementation already limits requests to two concurrently in
+`contents/inbox-badges.ts`, shares two background slots across Gmail tabs in
+`background.ts`, renders successful badges as responses arrive, invalidates when
+`lastMessageId` changes and honors the backend's `valid_until`. Keep those behaviors.
+
+The required adjustment is cooldown propagation and scheduling:
+
+1. The HTTP transport should preserve the numeric `Retry-After` header on errors
+   (also accept an HTTP-date if its shared implementation supports it).
+2. `background.ts` currently returns only `ok`, `code` and `status` on errors.
+   Pass a `retryAfterSeconds` value to the content script as well.
+3. `contents/inbox-badges.ts` currently retries `classification_busy` after fixed
+   5/10/15-second delays. Replace this with the actual server delay plus positive
+   jitter. Pause the classification queue across all Gmail tabs in the background
+   handler, not only the failed row, so other queued requests do not continue
+   hammering the exhausted budget. Keep pending rows unclassified, then resume.
+4. Treat `gmail_rate_limited` the same way for that Gmail account. Respect the
+   longer `gmail_quota_exceeded` cooldown. Use bounded retries for provider 503s.
+5. Recheck account/session, thread generation and visibility before releasing a
+   waiting/retry request; drop work for closed/hidden/changed rows. Resolve or clear
+   old timers when the account changes. Do not insert stale work into the new queue.
+6. Tests should cover a 60-second Retry-After (not just 5), two Gmail tabs, quota
+   exhaustion, a hidden row during cooldown, account changes, and successful
+   results retained until the returned one-hour expiry.
+
+No new batch endpoint is required: each API request still classifies one thread.
+Two in-flight requests plus a shared cooldown provide progressive loading under
+the present quota. A quota rejection should remain a pending cooldown rather than
+being converted to a five-minute failed-row state after three rapid retries.
+
+PR #126 also uses `chrome.storage.session` for temporary cross-tab results. This
+is existing frontend behavior, not new backend storage or a relaxation of the
+HTTP `no-store` policy. Extend no retention beyond the returned validity and
+preserve account/logout invalidation.

@@ -1,4 +1,6 @@
 """Only documented read throttles retry; permission failures remain explicit."""
+import gzip
+import json
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 
@@ -7,6 +9,27 @@ import pytest
 
 from app.mail.live import provider_error
 from app.sync import gmail
+
+
+@pytest.mark.parametrize("status", [200, 403])
+async def test_compressed_response_is_decoded_once_and_keeps_retry_after(status):
+    body = ({"historyId": "123"} if status == 200 else
+            {"error": {"errors": [{"reason": "userRateLimitExceeded"}]}})
+
+    def handler(request):
+        return httpx.Response(status, stream=httpx.ByteStream(gzip.compress(
+            json.dumps(body).encode())), headers={
+                "Content-Encoding": "gzip", "Retry-After": "60"})
+
+    client = gmail.GmailClient("token", transport=httpx.MockTransport(handler))
+    if status == 200:
+        assert await client.get_profile() == body
+    else:
+        with pytest.raises(gmail.GmailError) as error:
+            await client.get_profile()
+        mapped = provider_error(error.value)
+        assert mapped.code == "gmail_rate_limited"
+        assert mapped.status == 429 and mapped.headers == {"Retry-After": "60"}
 
 
 @pytest.mark.parametrize("status,reason", [(403, "rateLimitExceeded"),

@@ -1,4 +1,6 @@
-# Draft AWS support request
+# AWS support request — submitted 8 October 2026
+
+Submitted through the AWS Support console as case [179141544300892](https://support.console.aws.amazon.com/support/home#/case/?displayId=179141544300892&language=en). Initial status: Unassigned. The Basic plan prevented API submission; the console accepted the service-limit case. Capacity is not approved yet.
 
 Subject: Bedrock Haiku 4.5 applied RPM quota 10; increase to 120 rejected against default 10000
 
