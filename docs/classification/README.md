@@ -9,6 +9,9 @@ See the [deployment evidence and limitations](ROLLOUT-2026-10-07.md).
 The Nova Micro Flow is retired. The frontend team owns calling this service,
 request scheduling and badge rendering; no frontend implementation was deployed.
 
+See the [8 October reliability handoff](FRONTEND-RELIABILITY-HANDOFF.md) for the
+one-hour validity, variable retry delays, Gmail throttling errors and capacity limits.
+
 ## Release baseline and scope
 
 The earlier audit inspected old `main`. The release backend already has Bedrock,
@@ -55,7 +58,7 @@ subjects, account IDs, model IDs or predicted labels; extra request keys fail.
   },
   "reason_codes": ["unanswered_request"],
   "evaluated_at": "2026-10-06T02:00:00Z",
-  "valid_until": "2026-10-06T02:05:00Z",
+  "valid_until": "2026-10-06T03:00:00Z",
   "time_zone": "Australia/Melbourne",
   "release_id": "<backend release digest>",
   "source": "live_gmail",
@@ -99,10 +102,12 @@ records all four models, their native label IDs and source hashes.
 | 200 `skipped` | Null labels/evidence; not_in_inbox means no eligible inbox message. |
 | 409 `classification_source_changed` | Clear obsolete badges, refetch visible thread, offer/retry one fresh classification. |
 | 409 `classification_release_changed` or `classification_expired` | Discard; reclassify if still visible. |
-| 429 `classification_busy` | Respect Retry-After: 5 with bounded backoff. |
+| 429 `classification_busy` | Respect the actual Retry-After header with bounded backoff; the value varies with the rolling rate budget. |
+| 429 `gmail_rate_limited` | Temporary Gmail cooldown; honor Retry-After, no reconnect prompt. |
+| 503 `gmail_quota_exceeded` | Gmail quota exhausted; honor Retry-After (default one hour), no immediate retry. |
 | 503 `classification_disabled` / `classification_not_configured` | Hide unavailable badges; no repeated retry. |
 | 502 `classification_output_invalid` | No badges; invalid JSON/labels/evidence or incomplete output. |
-| 503 `classification_provider_unavailable` | No badges; permit deliberate retry. No automatic fallback. |
+| 503 `classification_provider_unavailable` | No badges; honor Retry-After: 5 after bounded backend retries. No automatic fallback. |
 | 401/403/404 or Google connection errors | Existing sign-in/reconnect/source-missing UX. |
 | 422 | Correct invalid input/ID/zone or oversized Gmail source before retry. |
 
@@ -111,8 +116,11 @@ Errors use the existing envelope:
 An error contains no successful-label fields.
 
 Use at most two concurrent badge requests per client initially, for visible or
-selected threads only. The server caps model calls per API process (default two),
-not across the deployment. Repeated requests may invoke the model again: there is
+selected threads only. The server admits at most two classifications per API process before Gmail reads
+and budgets eight inference attempts per rolling minute by default. Both are
+process-local limits, not distributed deployment limits. Pause the queue on 429
+until Retry-After elapses, add positive jitter, and render each completed badge
+progressively. The request rate budget includes retries. Repeated requests may invoke the model again: there is
 no shared cache, single-flight deduplication or exactly-once billing guarantee.
 Do not reclassify on every component render.
 
@@ -121,6 +129,7 @@ Use a local request-generation counter and discard older responses. Clear badges
 on new mail, sending, draft changes, account change/disconnect or valid_until.
 Refresh only while visible. An obsolete badge must not remain actionable during refresh.
 
+New results default to a one-hour lifetime from evaluated_at.
 valid_until is a maximum display lifetime, not a guarantee Gmail stayed unchanged.
 The backend independently refetches after inference and rejects changed fingerprints.
 Gmail can change immediately after that final read; there is no atomic transaction
@@ -158,7 +167,8 @@ CLASSIFICATION_MODEL_ID=au.anthropic.claude-haiku-4-5-20251001-v1:0
 CLASSIFICATION_TRANSPORT=bedrock_flow
 CLASSIFICATION_FLOW_MANIFEST=
 CLASSIFICATION_MAX_CONCURRENCY=2
-CLASSIFICATION_VALID_SECONDS=300
+CLASSIFICATION_REQUESTS_PER_MINUTE=8
+CLASSIFICATION_VALID_SECONDS=3600
 BEDROCK_REGION=ap-southeast-2
 BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=false
 ```
@@ -177,10 +187,15 @@ Both paths cap prompt output at 1,500 tokens and validate JSON/evidence identica
 Flow calls require terminal SUCCESS and verify the alias before and after execution.
 They read the numbered prompt and graph to reject release drift. Flow reads have
 a 10-second SDK read timeout within the manifest's overall deadline (default 90s);
-Converse uses BEDROCK_READ_TIMEOUT_S. No application retry or repair call is made;
-Bedrock may retry internal work, so billing is not exactly once. Cancellation keeps
+Converse uses BEDROCK_READ_TIMEOUT_S. Read-only transient provider failures
+(including streamed Flow throttles) retry at most three total attempts with jittered
+backoff and a rolling attempt budget. Access failures, invalid outputs and release
+drift are not retried. No output repair call is made. Bedrock may also retry
+internal work, so billing is not exactly once. Cancellation keeps
 the process concurrency slot until the SDK worker closes. Provider errors expose
-no raw details. See [visual Flow setup](VISUAL-FLOWS.md).
+no raw details. Logs record allowlisted error-code and operation enums. Gmail GET
+reads retry documented rate limits and transient 5xx failures at most three times;
+permission failures and long cooldowns return immediately. Gmail writes are unchanged. See [visual Flow setup](VISUAL-FLOWS.md).
 
 The release digest binds model, region, prompt, schema, policy, timeout, validity
 and the full Flow target when configured.

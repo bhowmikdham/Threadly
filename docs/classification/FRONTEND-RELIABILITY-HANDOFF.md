@@ -1,0 +1,64 @@
+# Classification reliability handoff — 8 October 2026
+
+Release status: implementation and validation in progress; deployment evidence will
+be recorded separately. This note does not claim these changes are live yet.
+
+## Integration changes
+
+- Keep the existing endpoint, request body, authentication and label mappings.
+- Use the returned `valid_until`. New results default to one hour from
+  `evaluated_at` instead of five minutes. Do not hardcode a five-minute refresh.
+  Continue invalidating immediately on new mail, sends, draft changes, account
+  changes and disconnects. Expiry is a maximum display lifetime, not a promise
+  that Gmail remained unchanged.
+- For **429 `classification_busy`**, honor the actual `Retry-After` header, which
+  now varies with remaining capacity. A hardcoded five-second retry is insufficient.
+  Pause the client's classification queue for that duration, add small positive
+  jitter and resume with at most two concurrent requests. Render each successful
+  badge as it arrives. Only enqueue visible threads; deduplicate in-flight requests.
+- Handle **429 `gmail_rate_limited`** as a temporary Gmail cooldown, honoring
+  `Retry-After`. Do not show a reconnect prompt for this code.
+- Handle **503 `gmail_quota_exceeded`** as exhausted Gmail quota, honoring its
+  longer `Retry-After` (default one hour). Do not immediately retry or reconnect.
+- **503 `classification_provider_unavailable`** remains compatible and now has
+  `Retry-After: 5` after bounded backend retries. Retry with bounded backoff only
+  while the thread is visible. Permanent configuration failures still need backend
+  investigation; never retry forever or invent fallback labels.
+- **403 `gmail_access_denied`** remains a genuine or unrecognized access refusal.
+  Preserve existing error UX; the backend does not assume every 403 is throttling.
+
+Keep results in view memory and discard obsolete responses using the existing
+request-generation/account checks. No persistent browser cache is introduced by
+this change; successful responses retain `Cache-Control: no-store`.
+
+## Capacity and frontend scheduling
+
+AWS reports an applied Sydney Haiku 4.5 cross-region quota of **10 requests/minute**
+for this account. Backend classification defaults to **8 model attempts/minute**
+to leave some headroom for other consumers. Retries count against that budget.
+It is a rolling process-local limit, not a distributed account-wide quota manager.
+Other assistant traffic can still exhaust shared AWS capacity.
+
+Concurrency remains two until a higher applied quota is verified. A cold page of
+22 uncached threads can take over two minutes under the current capacity; merely
+serializing requests or increasing concurrency cannot remove that limit. The
+one-hour validity cuts repeated refresh demand. New work is rejected before Gmail
+reads when the backend is full, reducing retry-driven Gmail traffic.
+
+AWS rejected a requested increase to 120/minute because its increase API compares
+against a default quota of 10,000/minute despite returning an applied value of 10.
+An AWS support resolution is required before claiming faster inbox throughput.
+
+## Backend behavior
+
+Transient inference failures have at most three total attempts with jittered
+backoff, within the existing request timeout. Flow-stream throttles are covered.
+Invalid output, changed releases and access-denied failures are not retried.
+No model, prompt, Flow version or label semantics changed.
+
+Gmail GET requests retry documented rate-limit 403s, 429s and selected 5xx errors
+at most three times. Long cooldowns return immediately to the caller. Mail writes
+are unaffected. Fresh source/account/session checks remain in place.
+Logs record only allowlisted provider codes/operations and Gmail reasons, never
+provider messages, email content or tokens. No database migration or saved
+classification data is introduced.

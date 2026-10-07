@@ -53,6 +53,12 @@ async def check_account(owner, version):
 
 
 def provider_error(exc):
+    if exc.rate_limited:
+        return ApiError(429, "gmail_rate_limited", "Gmail is busy; try again later.",
+                        headers={"Retry-After": str(exc.retry_after or 5)})
+    if exc.status == 403 and exc.reason == "dailyLimitExceeded":
+        return ApiError(503, "gmail_quota_exceeded", "Gmail quota is exhausted.",
+                        headers={"Retry-After": str(exc.retry_after or 3600)})
     code = {
         401: (401, "gmail_reauth_required"),
         403: (403, "gmail_access_denied"),

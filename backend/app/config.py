@@ -81,7 +81,8 @@ class Settings(BaseSettings):
     classification_transport: Literal["converse", "bedrock_flow"] = "converse"
     classification_flow_manifest: str = ""
     classification_max_concurrency: int = Field(default=2, ge=1, le=8)
-    classification_valid_seconds: int = Field(default=300, ge=30, le=900)
+    classification_requests_per_minute: int = Field(default=8, ge=1, le=1000)
+    classification_valid_seconds: int = Field(default=3600, ge=30, le=3600)
 
     # Optional JSON registry. Empty preserves native task acceptance. Never use DRAFT aliases.
     conversation_enabled: bool = False

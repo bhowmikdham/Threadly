@@ -13,8 +13,10 @@ from app.workflows.registry import FlowEntry, flow_definition
 
 
 class FlowError(Exception):
-    def __init__(self, code: str, retryable: bool = False):
+    def __init__(self, code: str, retryable: bool = False, *, provider_code="unknown",
+                 operation="unknown"):
         self.code, self.retryable = code, retryable
+        self.provider_code, self.operation = provider_code, operation
         super().__init__(code)
 
 
@@ -162,14 +164,16 @@ class FlowInvoker:
                     "badGatewayException",
                     "serviceQuotaExceededException",
                 }:
-                    raise FlowError("workflow_upstream_unavailable", True)
+                    raise FlowError("workflow_upstream_unavailable", True,
+                                    provider_code=kind, operation="InvokeFlowStream")
                 elif kind in {
                     "accessDeniedException",
                     "resourceNotFoundException",
                     "validationException",
                     "dependencyFailedException",
                 }:
-                    raise FlowError("workflow_upstream_rejected")
+                    raise FlowError("workflow_upstream_rejected", provider_code=kind,
+                                    operation="InvokeFlowStream")
                 else:
                     # Trace was disabled. Unknown events are not an assumed success.
                     raise FlowError("invalid_flow_output")
@@ -213,6 +217,8 @@ class FlowInvoker:
             raise FlowError(
                 "workflow_upstream_unavailable" if retryable else "workflow_upstream_rejected",
                 retryable,
+                provider_code=code or type(exc).__name__,
+                operation=getattr(exc, "operation_name", "unknown"),
             ) from None
         finally:
             for resource in (stream, runtime, control):
