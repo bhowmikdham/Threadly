@@ -1,0 +1,1967 @@
+{
+  "release": "contextual-conversation-1.8.9+chat-context.3",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+  "prompt_hash": "a31874ec7687c014e677c24975e172508fc95d9089b83c9be560f93e3d2e30cf",
+  "tools_hash": "4fcf99746abbd2db4358b73e9cbce902ff8fd9fb174342845f3851318ecfa88e",
+  "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "batch": "second-approved-context-evaluation-2026-10-07",
+  "started_at": "2026-10-07T12:07:26.372394+00:00",
+  "model_id": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "region": "ap-southeast-2",
+  "scenarios": [
+    {
+      "id": "corrected_draft_completion",
+      "setup": "One scripted unfinished Alex draft; no generated draft yet.",
+      "turns": [
+        "Another email for Casey, please.",
+        "Back to Alex: ask whether the sapphire crate has arrived.",
+        "Now Casey's one: thank them for the map."
+      ],
+      "rubric": "Separate Alex/Casey goals; useful generated text for both; no writes.",
+      "scripted_setup": {
+        "previous": {
+          "kind": "clarification",
+          "text": "What would you like to say?",
+          "release": "contextual-conversation-1.8.9+chat-context.3",
+          "trace": [
+            {
+              "tool": "prepare_email_draft",
+              "status": "ok"
+            }
+          ],
+          "context_references": [],
+          "context_memory_version": 1,
+          "active_email_draft_id": null,
+          "latency_ms": 18,
+          "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+          "version": 1
+        },
+        "seed_responses": [
+          {
+            "kind": "clarification",
+            "text": "What would you like to say?",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 18,
+            "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+            "version": 1
+          }
+        ]
+      },
+      "actual_turns": [
+        {
+          "user": "Another email for Casey, please.",
+          "response": {
+            "kind": "clarification",
+            "text": "What would you like to say?",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 2029,
+            "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+            "version": 2
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Can you help with an email for Alex?",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:07:25.492823+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Another email for Casey, please.",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:07:26.372538+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:07:26.372538+00:00",
+            "archived_through_version": 2,
+            "goal_pointers": {
+              "email_draft": "00a21d21-dff4-4281-a2e2-3157a091a68b"
+            },
+            "active_goal_id": "00a21d21-dff4-4281-a2e2-3157a091a68b",
+            "receipts": [
+              {
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "hash": "cb0e9d800d882130705c4349518b32174f206d0a30f85b53cf23174a37f521f6",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 18,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "hash": "4f4c321b9ded549bb451d5559c9d11b94ff609d545bf02d1fb3a7454bf5f25c4",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 2029,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 2
+                }
+              }
+            ],
+            "email_draft_goal": {
+              "recipient": "Casey",
+              "purpose": "",
+              "instruction": "Another email for Casey, please.",
+              "semantic_request": true,
+              "recipient_instruction": "Another email for Casey, please.",
+              "status": "clarification",
+              "field_provenance": {},
+              "user_context": [],
+              "origin_request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+              "superseded_task_id": null,
+              "recipient_roles": {
+                "to": [],
+                "cc": [],
+                "bcc": []
+              },
+              "goal_id": "00a21d21-dff4-4281-a2e2-3157a091a68b"
+            },
+            "active_goal": "email_draft",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "00a21d21-dff4-4281-a2e2-3157a091a68b",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Casey",
+                "updated_version": 2,
+                "focused": true
+              },
+              {
+                "goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Alex",
+                "updated_version": 1,
+                "focused": false
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Back to Alex: ask whether the sapphire crate has arrived.",
+          "response": {
+            "kind": "message",
+            "email_draft": {
+              "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+              "recipient": "Alex",
+              "subject": "Has the sapphire crate arrived?",
+              "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+              "unresolved_fields": []
+            },
+            "text": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Has the sapphire crate arrived?\n\nHi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "select_conversation_goal",
+                "status": "ok"
+              },
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+            "latency_ms": 21233,
+            "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+            "version": 3
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Can you help with an email for Alex?",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:07:25.492823+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Another email for Casey, please.",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:07:26.372538+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Back to Alex: ask whether the sapphire crate has arrived.",
+                "assistant": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Has the sapphire crate arrived?\n\nHi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                "kind": "message",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": {
+                  "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                  "recipient": "Alex",
+                  "subject": "Has the sapphire crate arrived?",
+                  "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                  "unresolved_fields": []
+                },
+                "email_draft_review": null,
+                "version": 3,
+                "recorded_at": "2026-10-07T12:07:28.448464+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:07:28.448464+00:00",
+            "archived_through_version": 3,
+            "goal_pointers": {
+              "email_draft": "de457630-b1bb-481a-a42d-bdc62d672943"
+            },
+            "active_goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+            "receipts": [
+              {
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "hash": "cb0e9d800d882130705c4349518b32174f206d0a30f85b53cf23174a37f521f6",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 18,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "hash": "4f4c321b9ded549bb451d5559c9d11b94ff609d545bf02d1fb3a7454bf5f25c4",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 2029,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 2
+                }
+              },
+              {
+                "request_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                "hash": "568e062714ce538365b67dad13be132eb9f0072f9643aa36881a7420c8f54e48",
+                "response": {
+                  "kind": "message",
+                  "email_draft": {
+                    "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                    "recipient": "Alex",
+                    "subject": "Has the sapphire crate arrived?",
+                    "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                    "unresolved_fields": []
+                  },
+                  "text": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Has the sapphire crate arrived?\n\nHi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "select_conversation_goal",
+                      "status": "ok"
+                    },
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                  "latency_ms": 21233,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 3
+                }
+              }
+            ],
+            "email_draft_goal": {
+              "recipient": "Alex",
+              "purpose": "ask whether the sapphire crate has arrived",
+              "goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+              "instruction": "Can you help with an email for Alex?\nUser follow-up: Back to Alex: ask whether the sapphire crate has arrived.",
+              "semantic_request": true,
+              "recipient_instruction": "Can you help with an email for Alex?",
+              "status": "drafted",
+              "field_provenance": {},
+              "user_context": [],
+              "origin_request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+              "superseded_task_id": null,
+              "recipient_roles": {
+                "to": [],
+                "cc": [],
+                "bcc": []
+              },
+              "draft": {
+                "subject": "Has the sapphire crate arrived?",
+                "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                "unresolved_fields": [],
+                "sources": []
+              },
+              "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32"
+            },
+            "active_goal": "email_draft",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Alex",
+                "updated_version": 3,
+                "focused": true
+              },
+              {
+                "goal_id": "00a21d21-dff4-4281-a2e2-3157a091a68b",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Casey",
+                "updated_version": 2,
+                "focused": false
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Now Casey's one: thank them for the map.",
+          "response": {
+            "kind": "message",
+            "email_draft": {
+              "draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+              "recipient": "Casey",
+              "subject": "Thank you for the map",
+              "body": "Hi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+              "unresolved_fields": []
+            },
+            "text": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Thank you for the map\n\nHi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+            "latency_ms": 10679,
+            "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+            "version": 4
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Can you help with an email for Alex?",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:07:25.492823+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Another email for Casey, please.",
+                "assistant": "What would you like to say?",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:07:26.372538+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Back to Alex: ask whether the sapphire crate has arrived.",
+                "assistant": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Has the sapphire crate arrived?\n\nHi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                "kind": "message",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": {
+                  "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                  "recipient": "Alex",
+                  "subject": "Has the sapphire crate arrived?",
+                  "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                  "unresolved_fields": []
+                },
+                "email_draft_review": null,
+                "version": 3,
+                "recorded_at": "2026-10-07T12:07:28.448464+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Now Casey's one: thank them for the map.",
+                "assistant": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Thank you for the map\n\nHi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+                "kind": "message",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": {
+                  "draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+                  "recipient": "Casey",
+                  "subject": "Thank you for the map",
+                  "body": "Hi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+                  "unresolved_fields": []
+                },
+                "email_draft_review": null,
+                "version": 4,
+                "recorded_at": "2026-10-07T12:07:49.720735+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:07:49.720735+00:00",
+            "archived_through_version": 4,
+            "goal_pointers": {
+              "email_draft": "de457630-b1bb-481a-a42d-bdc62d672943"
+            },
+            "active_goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+            "receipts": [
+              {
+                "request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+                "hash": "cb0e9d800d882130705c4349518b32174f206d0a30f85b53cf23174a37f521f6",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 18,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "7788e7f2-bc0d-4e8b-90a1-f39bbbe4b181",
+                "hash": "4f4c321b9ded549bb451d5559c9d11b94ff609d545bf02d1fb3a7454bf5f25c4",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What would you like to say?",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 2029,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 2
+                }
+              },
+              {
+                "request_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                "hash": "568e062714ce538365b67dad13be132eb9f0072f9643aa36881a7420c8f54e48",
+                "response": {
+                  "kind": "message",
+                  "email_draft": {
+                    "draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                    "recipient": "Alex",
+                    "subject": "Has the sapphire crate arrived?",
+                    "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                    "unresolved_fields": []
+                  },
+                  "text": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Has the sapphire crate arrived?\n\nHi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "select_conversation_goal",
+                      "status": "ok"
+                    },
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": "22ca8533-5a57-4cb6-aaf4-db0001d1bb32",
+                  "latency_ms": 21233,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 3
+                }
+              },
+              {
+                "request_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+                "hash": "9d162a72c3a8d1e75a247f79d004947721d9152be0a78af46722d856cba0d3bf",
+                "response": {
+                  "kind": "message",
+                  "email_draft": {
+                    "draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+                    "recipient": "Casey",
+                    "subject": "Thank you for the map",
+                    "body": "Hi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+                    "unresolved_fields": []
+                  },
+                  "text": "Here\u2019s a draft you can edit. Nothing has been sent.\n\nSubject: Thank you for the map\n\nHi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff",
+                  "latency_ms": 10679,
+                  "conversation_id": "e2f00bf5-c6e6-4b4b-a5aa-36538769d9c5",
+                  "version": 4
+                }
+              }
+            ],
+            "email_draft_goal": {
+              "recipient": "Casey",
+              "purpose": "thank them for the map",
+              "goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+              "instruction": "Can you help with an email for Alex?\nUser follow-up: Back to Alex: ask whether the sapphire crate has arrived.\nUser follow-up: Now Casey's one: thank them for the map.",
+              "semantic_request": true,
+              "recipient_instruction": "Now Casey's one: thank them for the map.",
+              "status": "drafted",
+              "field_provenance": {},
+              "user_context": [],
+              "origin_request_id": "bf9acf68-a84a-4c63-814c-90a3ba8b43cc",
+              "superseded_task_id": null,
+              "recipient_roles": {
+                "to": [],
+                "cc": [],
+                "bcc": []
+              },
+              "draft": {
+                "subject": "Thank you for the map",
+                "body": "Hi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+                "unresolved_fields": [],
+                "sources": []
+              },
+              "draft_id": "1634fbcd-e613-4d9b-b0a6-942b152164ff"
+            },
+            "active_goal": "email_draft",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "de457630-b1bb-481a-a42d-bdc62d672943",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Casey",
+                "updated_version": 4,
+                "focused": true
+              },
+              {
+                "goal_id": "00a21d21-dff4-4281-a2e2-3157a091a68b",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Casey",
+                "updated_version": 2,
+                "focused": false
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        }
+      ]
+    },
+    {
+      "id": "calendar_preview_revision",
+      "setup": "Empty owned chat, synthetic Calendar preferences, Ask approval mode.",
+      "turns": [
+        "Put Quiet hour in my diary tomorrow at 2 pm.",
+        "Make it 3 pm instead.",
+        "Thanks, that's all."
+      ],
+      "rubric": "Correct preview/revision; retain original day/title; no approval/job.",
+      "scripted_setup": {
+        "previous": null,
+        "seed_responses": []
+      },
+      "actual_turns": [
+        {
+          "user": "Put Quiet hour in my diary tomorrow at 2 pm.",
+          "response": {
+            "kind": "calendar_event",
+            "text": "Using your saved 30-minute duration. Review this event before creating it.",
+            "calendar_action": {
+              "action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+              "task_id": "372b6a07-90ba-59a3-8571-85105ece5d78",
+              "artifact_id": "ccc573bc-61ad-56db-b882-9395b101514e",
+              "action_type": "create_event",
+              "state": "proposed",
+              "version": 1,
+              "payload_hash": "bac4ea86a4eb952a68cc7d72e6fc38df72c27995ca5b8b75b7e5063362ddb2b3",
+              "payload_schema": "calendar-event-1.0.0",
+              "expires_at": "2026-10-07T12:18:11.173406+00:00",
+              "preview": {
+                "event": {
+                  "id": "2a41646e5f895058b2b7db3ed3be19b0",
+                  "end": {
+                    "dateTime": "2026-10-08T03:30:00+00:00",
+                    "timeZone": "Australia/Melbourne"
+                  },
+                  "start": {
+                    "dateTime": "2026-10-08T03:00:00+00:00",
+                    "timeZone": "Australia/Melbourne"
+                  },
+                  "summary": "Quiet hour",
+                  "location": "",
+                  "attendees": [],
+                  "reminders": {
+                    "useDefault": false
+                  },
+                  "description": "",
+                  "guestsCanModify": false,
+                  "extendedProperties": {
+                    "private": {
+                      "threadlyAction": "de34b016a50fd6b894a0ad6d188558dc97ff386db654e99c93ebac929eb5c6bc"
+                    }
+                  },
+                  "guestsCanInviteOthers": false,
+                  "guestsCanSeeOtherGuests": true
+                },
+                "calendar_id": "work@example.test",
+                "send_updates": "none",
+                "calendar_name": "Work"
+              },
+              "blockers": [],
+              "approval_available": true,
+              "result": null,
+              "error_code": null,
+              "authorization": "separate_exact_event_approval",
+              "calendar_name": "Work",
+              "atomic_with_email": false
+            },
+            "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_calendar_event",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 10741,
+            "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+            "version": 1
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "assistant": "Using your saved 30-minute duration. Review this event before creating it.",
+                "kind": "calendar_event",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:08:00.438197+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:08:00.438197+00:00",
+            "archived_through_version": 1,
+            "goal_pointers": {
+              "calendar_event": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+            },
+            "active_goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+            "receipts": [
+              {
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "hash": "6e632d425158ddb74b083b3fb0312b419aa763fecbef2cad4d8a003498ed868e",
+                "response": {
+                  "kind": "calendar_event",
+                  "text": "Using your saved 30-minute duration. Review this event before creating it.",
+                  "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10741,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 1
+                }
+              }
+            ],
+            "calendar_event_request": {
+              "schema_version": 2,
+              "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+              "revision": 1,
+              "arguments": {
+                "title": "Quiet hour",
+                "date": {
+                  "kind": "absolute",
+                  "start": "2026-10-08"
+                },
+                "date_source": "tomorrow",
+                "time": "14:00",
+                "time_source": "2 pm",
+                "timezone": "",
+                "timezone_source": "",
+                "duration_phrase": "",
+                "calendar_name": "",
+                "location": "",
+                "description": "",
+                "attendees": []
+              },
+              "field_provenance": {
+                "title": {
+                  "operation": "replace",
+                  "source": "Quiet hour",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "date": {
+                  "operation": "replace",
+                  "source": "tomorrow",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "time": {
+                  "operation": "replace",
+                  "source": "2 pm",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                }
+              },
+              "user_text": "Quiet hour\ntomorrow\n2 pm",
+              "anchor": "2026-10-07T12:08:00.438197+00:00",
+              "date_anchor_timezone": null,
+              "expires_at": "2026-10-14T12:08:11.134931+00:00",
+              "last_request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+              "creation_origin": {
+                "text": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "policy": "calendar-semantic-intent-1.0.0"
+              },
+              "action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84"
+            },
+            "last_calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+            "active_goal": "calendar_event",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "kind": "calendar_event",
+                "status": "retained",
+                "label": "Quiet hour",
+                "updated_version": 1,
+                "focused": true
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Make it 3 pm instead.",
+          "response": {
+            "kind": "calendar_event",
+            "text": "Using your saved 30-minute duration. Review this event before creating it.",
+            "calendar_action": {
+              "action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+              "task_id": "60921b1a-a5dc-5f21-9ac9-89bef753e98a",
+              "artifact_id": "beccca8b-2d1f-5eaf-ac61-77931d019f70",
+              "action_type": "create_event",
+              "state": "proposed",
+              "version": 1,
+              "payload_hash": "6a1c0dd26c0ce8d8fdfe703aed86311d252b02d069a10d41d24bbdb0251f6527",
+              "payload_schema": "calendar-event-1.0.0",
+              "expires_at": "2026-10-07T12:18:21.648129+00:00",
+              "preview": {
+                "event": {
+                  "id": "c4ea3ca7a6cf58c08793798f2b8c85ec",
+                  "end": {
+                    "dateTime": "2026-10-08T04:30:00+00:00",
+                    "timeZone": "Australia/Melbourne"
+                  },
+                  "start": {
+                    "dateTime": "2026-10-08T04:00:00+00:00",
+                    "timeZone": "Australia/Melbourne"
+                  },
+                  "summary": "Quiet hour",
+                  "location": "",
+                  "attendees": [],
+                  "reminders": {
+                    "useDefault": false
+                  },
+                  "description": "",
+                  "guestsCanModify": false,
+                  "extendedProperties": {
+                    "private": {
+                      "threadlyAction": "87e8f71130abc6f651169d08105f6cbc07860ec4564b7c0d45a5ae5dc317404a"
+                    }
+                  },
+                  "guestsCanInviteOthers": false,
+                  "guestsCanSeeOtherGuests": true
+                },
+                "calendar_id": "work@example.test",
+                "send_updates": "none",
+                "calendar_name": "Work"
+              },
+              "blockers": [],
+              "approval_available": true,
+              "result": null,
+              "error_code": null,
+              "authorization": "separate_exact_event_approval",
+              "calendar_name": "Work",
+              "atomic_with_email": false
+            },
+            "calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_calendar_event",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 10449,
+            "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+            "version": 2
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "assistant": "Using your saved 30-minute duration. Review this event before creating it.",
+                "kind": "calendar_event",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:08:00.438197+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Make it 3 pm instead.",
+                "assistant": "Using your saved 30-minute duration. Review this event before creating it.",
+                "kind": "calendar_event",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+                "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:08:11.202202+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:08:11.202202+00:00",
+            "archived_through_version": 2,
+            "goal_pointers": {
+              "calendar_event": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+            },
+            "active_goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+            "receipts": [
+              {
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "hash": "6e632d425158ddb74b083b3fb0312b419aa763fecbef2cad4d8a003498ed868e",
+                "response": {
+                  "kind": "calendar_event",
+                  "text": "Using your saved 30-minute duration. Review this event before creating it.",
+                  "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10741,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+                "hash": "e2c0936f618b927c7f05c2ff0ddbb070d358821574295d09db215e85f72b2a1c",
+                "response": {
+                  "kind": "calendar_event",
+                  "text": "Using your saved 30-minute duration. Review this event before creating it.",
+                  "calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10449,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 2
+                }
+              }
+            ],
+            "calendar_event_request": {
+              "schema_version": 2,
+              "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+              "revision": 2,
+              "arguments": {
+                "title": "Quiet hour",
+                "date": {
+                  "kind": "absolute",
+                  "start": "2026-10-08"
+                },
+                "date_source": "tomorrow",
+                "time": "15:00",
+                "time_source": "3 pm",
+                "timezone": "",
+                "timezone_source": "",
+                "duration_phrase": "",
+                "calendar_name": "",
+                "location": "",
+                "description": "",
+                "attendees": []
+              },
+              "field_provenance": {
+                "title": {
+                  "operation": "replace",
+                  "source": "Quiet hour",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "date": {
+                  "operation": "replace",
+                  "source": "tomorrow",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "time": {
+                  "operation": "replace",
+                  "source": "3 pm",
+                  "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc"
+                }
+              },
+              "user_text": "Quiet hour\ntomorrow\n3 pm",
+              "anchor": "2026-10-07T12:08:00.438197+00:00",
+              "date_anchor_timezone": null,
+              "expires_at": "2026-10-14T12:08:11.134931+00:00",
+              "last_request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+              "creation_origin": {
+                "text": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "policy": "calendar-semantic-intent-1.0.0"
+              },
+              "action_id": "675de3ce-573d-4feb-9091-f364e9a696ac"
+            },
+            "last_calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+            "active_goal": "calendar_event",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "kind": "calendar_event",
+                "status": "retained",
+                "label": "Quiet hour",
+                "updated_version": 2,
+                "focused": true
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Thanks, that's all.",
+          "response": {
+            "kind": "message",
+            "text": "Got it. Your \"Quiet hour\" event is ready for tomorrow at 3 pm\u2014just click Create draft to save it to your calendar.",
+            "evidence": [],
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "respond",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 10243,
+            "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+            "version": 3
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "assistant": "Using your saved 30-minute duration. Review this event before creating it.",
+                "kind": "calendar_event",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:08:00.438197+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Make it 3 pm instead.",
+                "assistant": "Using your saved 30-minute duration. Review this event before creating it.",
+                "kind": "calendar_event",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+                "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:08:11.202202+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Thanks, that's all.",
+                "assistant": "Got it. Your \"Quiet hour\" event is ready for tomorrow at 3 pm\u2014just click Create draft to save it to your calendar.",
+                "kind": "message",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "1bb62742-e4f3-44e9-a524-20d568ea4737",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 3,
+                "recorded_at": "2026-10-07T12:08:21.672919+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {},
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:08:21.672919+00:00",
+            "archived_through_version": 3,
+            "goal_pointers": {
+              "calendar_event": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+            },
+            "active_goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+            "receipts": [
+              {
+                "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "hash": "6e632d425158ddb74b083b3fb0312b419aa763fecbef2cad4d8a003498ed868e",
+                "response": {
+                  "kind": "calendar_event",
+                  "text": "Using your saved 30-minute duration. Review this event before creating it.",
+                  "calendar_action_id": "38cd59d2-70a8-4e2b-908d-4e6d15528f84",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10741,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+                "hash": "e2c0936f618b927c7f05c2ff0ddbb070d358821574295d09db215e85f72b2a1c",
+                "response": {
+                  "kind": "calendar_event",
+                  "text": "Using your saved 30-minute duration. Review this event before creating it.",
+                  "calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10449,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 2
+                }
+              },
+              {
+                "request_id": "1bb62742-e4f3-44e9-a524-20d568ea4737",
+                "hash": "36ce9104d2ec171d9f21d5cbf2d2752c6344987a0cb206ea0d315fde732bfa52",
+                "response": {
+                  "kind": "message",
+                  "text": "Got it. Your \"Quiet hour\" event is ready for tomorrow at 3 pm\u2014just click Create draft to save it to your calendar.",
+                  "evidence": [],
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "respond",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 10243,
+                  "conversation_id": "5b827dff-f9c4-42a9-a918-c74dfb78f20c",
+                  "version": 3
+                }
+              }
+            ],
+            "calendar_event_request": {
+              "schema_version": 2,
+              "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+              "revision": 2,
+              "arguments": {
+                "title": "Quiet hour",
+                "date": {
+                  "kind": "absolute",
+                  "start": "2026-10-08"
+                },
+                "date_source": "tomorrow",
+                "time": "15:00",
+                "time_source": "3 pm",
+                "timezone": "",
+                "timezone_source": "",
+                "duration_phrase": "",
+                "calendar_name": "",
+                "location": "",
+                "description": "",
+                "attendees": []
+              },
+              "field_provenance": {
+                "title": {
+                  "operation": "replace",
+                  "source": "Quiet hour",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "date": {
+                  "operation": "replace",
+                  "source": "tomorrow",
+                  "request_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e"
+                },
+                "time": {
+                  "operation": "replace",
+                  "source": "3 pm",
+                  "request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc"
+                }
+              },
+              "user_text": "Quiet hour\ntomorrow\n3 pm",
+              "anchor": "2026-10-07T12:08:00.438197+00:00",
+              "date_anchor_timezone": null,
+              "expires_at": "2026-10-14T12:08:11.134931+00:00",
+              "last_request_id": "794fdb96-656a-45a6-977b-ec730cf78bdc",
+              "creation_origin": {
+                "text": "Put Quiet hour in my diary tomorrow at 2 pm.",
+                "policy": "calendar-semantic-intent-1.0.0"
+              },
+              "action_id": "675de3ce-573d-4feb-9091-f364e9a696ac"
+            },
+            "last_calendar_action_id": "675de3ce-573d-4feb-9091-f364e9a696ac",
+            "active_goal": "calendar_event",
+            "archived_from_version": 1
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "d9775589-7c71-4ffc-96a4-5d0e2c3b550e",
+                "kind": "calendar_event",
+                "status": "retained",
+                "label": "Quiet hour",
+                "updated_version": 2,
+                "focused": true
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        }
+      ]
+    },
+    {
+      "id": "saved_draft_resumption",
+      "setup": "Scripted source-based saved reply, then a separate unfinished Calendar goal.",
+      "turns": [
+        "Set that aside and bring back the saved agenda reply draft."
+      ],
+      "rubric": "Return existing task/artifact; retain Calendar goal; no regeneration.",
+      "scripted_setup": {
+        "previous": {
+          "kind": "clarification",
+          "text": "What time should it start? Please include AM or PM.",
+          "release": "contextual-conversation-1.8.9+chat-context.3",
+          "trace": [
+            {
+              "tool": "prepare_calendar_event",
+              "status": "ok"
+            }
+          ],
+          "context_references": [],
+          "context_memory_version": 1,
+          "active_email_draft_id": null,
+          "latency_ms": 23,
+          "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+          "version": 3
+        },
+        "seed_responses": [
+          {
+            "kind": "task",
+            "text": "Thanks, I\u2019ll use that.",
+            "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+            "task": {
+              "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+              "instruction": "Draft a reply",
+              "read_options": null,
+              "scheduling": null,
+              "compound": null,
+              "workflow": null,
+              "intent": "reply",
+              "route": {
+                "source": "rule",
+                "release": "contextual-task-1.2.0",
+                "decision": {
+                  "intent": "reply",
+                  "status": "ready",
+                  "rationale": "Exact supported user command.",
+                  "operations": [
+                    "draft_reply"
+                  ],
+                  "parameters": {
+                    "tone": null,
+                    "slot_count": null,
+                    "date_phrase": null,
+                    "time_phrase": null,
+                    "recipient_refs": [],
+                    "duration_minutes": null
+                  },
+                  "output_kind": "draft",
+                  "clarification": null,
+                  "missing_fields": [],
+                  "schema_version": "1.0",
+                  "requested_action": "none",
+                  "context_snapshot_id": "4ae2301a-7e5c-4a2a-b082-840890208370"
+                },
+                "provenance": null,
+                "router_version": "intent-preview-1.3.1"
+              },
+              "question": null,
+              "continuation_release": {
+                "version": "typed-continuation-1.0.0",
+                "contract_hash": "ee3ec0a654c28c67a32225aa7476676122b7fcab5caf2d729d22a33c024efbcf"
+              },
+              "input_version": 1,
+              "effective_context_snapshot_id": "4ae2301a-7e5c-4a2a-b082-840890208370",
+              "effective_draft_input": {
+                "cc": [],
+                "to": [
+                  "sender@example.test"
+                ],
+                "bcc": [],
+                "reply": {
+                  "subject": "Re: Agenda",
+                  "rfc_message_id": "<original@example.test>",
+                  "thread_version": 1,
+                  "gmail_thread_id": "abc123",
+                  "gmail_message_id": "def456"
+                },
+                "from_address": "owner1@example.test",
+                "reply_message_id": "def456"
+              },
+              "resolved_inputs": {
+                "recipients": [
+                  "sender@example.test"
+                ]
+              },
+              "draft_input": {
+                "cc": [],
+                "to": [],
+                "bcc": [],
+                "reply": {
+                  "subject": "Re: Agenda",
+                  "rfc_message_id": "<original@example.test>",
+                  "thread_version": 1,
+                  "gmail_thread_id": "abc123",
+                  "gmail_message_id": "def456"
+                },
+                "from_address": "owner1@example.test",
+                "reply_message_id": "def456"
+              },
+              "state": "queued",
+              "version": 5,
+              "latest_sequence": 5,
+              "context_snapshot_id": "4ae2301a-7e5c-4a2a-b082-840890208370",
+              "artifact_id": null,
+              "error_code": null,
+              "release": {
+                "workflow": "summary-quality-task-1.1.0",
+                "base_release": {
+                  "summary": {
+                    "workflow": "summary-task-1.0.0",
+                    "prompt_hash": "80b22fa39b763f43befc092ec5098553ba7d55b710540c3126b4f78e10bb43c6",
+                    "configuration_hash": "8188002d31e91522bc5f028662577941d945bca2c438e68ffb5b1572b28b2507"
+                  },
+                  "workflow": "contextual-task-1.2.0",
+                  "draft_release": "draft-artifact-1.2.2",
+                  "router_version": "intent-preview-1.3.1",
+                  "grounded_answer": {
+                    "workflow": "grounded-answer-1.0.0",
+                    "validation": "exact-source-span-whitespace-only-v1",
+                    "prompt_hash": "6ba2e52ad993dc999db789c11fb52e6d84ec5be71f5a2228da537257680c61db",
+                    "schema_hash": "71290c7d925cd5cde746709f0ab7fbfef3af297305a13a0b1b2d314ef9b2990f"
+                  },
+                  "draft_prompt_hash": "02b04d01f10c12abdf9e91db3bbc4fcf363af0bde92e4010febb9e65eb70e71d",
+                  "draft_schema_hash": "aee42b960aab9a273013b98e418f06ce6af903c7a50d86799f9a7d77f4a5a158",
+                  "reply_prompt_hash": "c81a1ac8cb9771833362acc5c6de22ee764a19a533c2e0b127d1ca5617fda57e",
+                  "reply_schema_hash": "412d1c884b3d4cf7efab6f57088a8dda0c746a226b0c137518a7bc3fc81a0ed9",
+                  "routing_prompt_hash": "3c6bc58fe0e8514f023e707203c132a7c305e1e80721eb7de06e6671f6a80280",
+                  "routing_schema_hash": "3ffc195d2780484238d2f21d34798373b00b8b3c475e88bbd89c09c8587bfff2",
+                  "summary_prompt_hash": "caa32fee3045d2002fb87bced04e686e10398c6f644eeb5b6a6b80ccf9040ae8",
+                  "reference_policy_hash": "98a638acbf6773b50ec1e130b707ca75ff7c55675c2c900b4b83c986c29c4620",
+                  "routing_configuration_hash": "b866dab1876d96a7ffb8948cfc7697b913e871b1c03a536ff8192734da733b88"
+                },
+                "contract_hash": "7272c6453b34d445a25f06d986bec01d1364f42b4a3488d2be57b48fd2a9962a"
+              },
+              "created_at": "2026-10-07T12:07:25.688109+00:00",
+              "updated_at": "2026-10-07T12:07:25.804844+00:00",
+              "events_url": "/assistant/tasks/a685b69c-747c-4380-a8e3-2b900c478a9f/events"
+            },
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "answer_question",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 62,
+            "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+            "version": 2
+          },
+          {
+            "kind": "clarification",
+            "text": "What time should it start? Please include AM or PM.",
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "prepare_calendar_event",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 23,
+            "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+            "version": 3
+          }
+        ],
+        "saved_artifact": {
+          "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+          "artifact_id": "56550b6f-c6f9-4eb4-ab5c-77d54806616a",
+          "artifact": {
+            "kind": "draft",
+            "content": {
+              "body": "Thanks for the agenda.",
+              "mode": "reply",
+              "cc_refs": [],
+              "subject": "Re: Agenda",
+              "to_refs": [
+                "to-1"
+              ],
+              "bcc_refs": [],
+              "thread_ref": "abc123",
+              "fact_ref_ids": [
+                "user-request",
+                "source-1"
+              ],
+              "attachment_refs": [],
+              "unresolved_fields": []
+            },
+            "coverage": "partial",
+            "evidence": [
+              {
+                "quote": null,
+                "ref_id": "user-request",
+                "source_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                "source_kind": "user_input",
+                "source_version": "6360422a707e39483bc502370d7c76a765d4154cdc5bad43bc5e40163a3c1747"
+              },
+              {
+                "quote": null,
+                "ref_id": "source-1",
+                "source_id": "def456",
+                "source_kind": "message",
+                "source_version": "aa1b2fff1accc20cce24730d82a1dec2314561efaaf7fe66ad3ec1e1f3ee9ce6"
+              }
+            ],
+            "assumptions": [
+              "Reviewable text only; not approved, sent, inserted, or saved in Gmail.",
+              "Based on the user request and saved excerpts; no live availability or attachments.",
+              "Context includes 1 messages across 1 threads; 0 messages omitted and 0 excerpts truncated. Attachment contents not read."
+            ],
+            "schema_version": "1.0",
+            "context_snapshot_id": "4ae2301a-7e5c-4a2a-b082-840890208370"
+          }
+        }
+      },
+      "actual_turns": [
+        {
+          "user": "Set that aside and bring back the saved agenda reply draft.",
+          "response": {
+            "kind": "message",
+            "text": "Your draft is still in this chat. Use Enable draft creation on its card to connect draft access, then review the recipient, subject and body and click Create draft separately. Chat replies don\u2019t save or send it. If the card or button is missing or disabled, update/reload the extension and reopen this chat.",
+            "email_draft_review": {
+              "execution": "user_card_click_only",
+              "chat_can_save": false,
+              "chat_can_send": false,
+              "source": {
+                "kind": "task",
+                "id": "a685b69c-747c-4380-a8e3-2b900c478a9f"
+              },
+              "save_status": "not_saved",
+              "save_id": null,
+              "gmail_draft_capability": "scope_missing",
+              "create_control": "Create draft",
+              "permission_control": "Enable draft creation",
+              "installed_client_verified": false,
+              "recipient_needs_confirmation": false
+            },
+            "release": "contextual-conversation-1.8.9+chat-context.3",
+            "trace": [
+              {
+                "tool": "read_email",
+                "status": "ok"
+              },
+              {
+                "tool": "review_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [
+              "context-1"
+            ],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 22002,
+            "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+            "version": 4
+          },
+          "state": {
+            "history": [
+              {
+                "user": "Draft a reply",
+                "assistant": "I\u2019m preparing that for you.",
+                "kind": "task",
+                "source": null,
+                "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "9e3e8197-e22d-4f5d-ae4e-b8f98a581b0f",
+                "context_references": [
+                  "context-1"
+                ],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 1,
+                "recorded_at": "2026-10-07T12:07:25.553549+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Use sender@example.test",
+                "assistant": "Thanks, I\u2019ll use that.",
+                "kind": "task",
+                "source": null,
+                "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "4872624e-c4ab-4366-a1e3-db94e98d114d",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 2,
+                "recorded_at": "2026-10-07T12:07:25.751123+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Create Focus tomorrow",
+                "assistant": "What time should it start? Please include AM or PM.",
+                "kind": "clarification",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+                "context_references": [],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": null,
+                "version": 3,
+                "recorded_at": "2026-10-07T12:07:25.899330+00:00",
+                "timezone": "UTC"
+              },
+              {
+                "user": "Set that aside and bring back the saved agenda reply draft.",
+                "assistant": "Your draft is still in this chat. Use Enable draft creation on its card to connect draft access, then review the recipient, subject and body and click Create draft separately. Chat replies don\u2019t save or send it. If the card or button is missing or disabled, update/reload the extension and reopen this chat.",
+                "kind": "message",
+                "source": null,
+                "task_id": null,
+                "proposal_id": null,
+                "calendar_action_id": null,
+                "request_id": "15d2d7d0-97c7-4781-b411-7fa8823eb90b",
+                "context_references": [
+                  "context-1"
+                ],
+                "error_code": null,
+                "email_draft": null,
+                "email_draft_review": {
+                  "execution": "user_card_click_only",
+                  "chat_can_save": false,
+                  "chat_can_send": false,
+                  "source": {
+                    "kind": "task",
+                    "id": "a685b69c-747c-4380-a8e3-2b900c478a9f"
+                  },
+                  "save_status": "not_saved",
+                  "save_id": null,
+                  "gmail_draft_capability": "scope_missing",
+                  "create_control": "Create draft",
+                  "permission_control": "Enable draft creation",
+                  "installed_client_verified": false,
+                  "recipient_needs_confirmation": false
+                },
+                "version": 4,
+                "recorded_at": "2026-10-07T12:08:31.944615+00:00",
+                "timezone": "UTC"
+              }
+            ],
+            "refs": {
+              "selected": {
+                "message_id": "def456",
+                "context_id": "ec7e4a3b-7f78-47d8-ad9e-e29b1771d3bc",
+                "thread_id": "abc123"
+              },
+              "context-1": {
+                "message_id": "def456",
+                "context_id": "ec7e4a3b-7f78-47d8-ad9e-e29b1771d3bc",
+                "thread_id": "abc123",
+                "remembered_scope": "thread"
+              }
+            },
+            "result_order": [],
+            "calendar_read_anchor": "2026-10-07T12:08:31.944615+00:00",
+            "archived_through_version": 4,
+            "goal_pointers": {
+              "task": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+              "calendar_event": "59978127-84ad-4fb0-abe6-a1fbe8941499"
+            },
+            "active_goal_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+            "receipts": [
+              {
+                "request_id": "9e3e8197-e22d-4f5d-ae4e-b8f98a581b0f",
+                "hash": "6aa1594612d2804bce2a1af4413d6a77cfccf0e1fe2089f2fc8b9bfe25c8997c",
+                "response": {
+                  "kind": "task",
+                  "text": "I\u2019m preparing that for you.",
+                  "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "read_email",
+                      "status": "ok"
+                    },
+                    {
+                      "tool": "prepare_workflow",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [
+                    "context-1"
+                  ],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 141,
+                  "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+                  "version": 1
+                }
+              },
+              {
+                "request_id": "4872624e-c4ab-4366-a1e3-db94e98d114d",
+                "hash": "4989d20978f06b8852b6daa6cb99b586588b9f624cbde292ae9e16d972dfa2b6",
+                "response": {
+                  "kind": "task",
+                  "text": "Thanks, I\u2019ll use that.",
+                  "task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "answer_question",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 62,
+                  "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+                  "version": 2
+                }
+              },
+              {
+                "request_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+                "hash": "7c7102ba4fc30a69853b9b26481fde9dfb9f54b3fe5cb8327b83620e9335e204",
+                "response": {
+                  "kind": "clarification",
+                  "text": "What time should it start? Please include AM or PM.",
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "prepare_calendar_event",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 23,
+                  "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+                  "version": 3
+                }
+              },
+              {
+                "request_id": "15d2d7d0-97c7-4781-b411-7fa8823eb90b",
+                "hash": "2640037c4bdc495e107c871d26d28cb4c29fe102443b0cca9cd863475a7dfdc8",
+                "response": {
+                  "kind": "message",
+                  "text": "Your draft is still in this chat. Use Enable draft creation on its card to connect draft access, then review the recipient, subject and body and click Create draft separately. Chat replies don\u2019t save or send it. If the card or button is missing or disabled, update/reload the extension and reopen this chat.",
+                  "email_draft_review": {
+                    "execution": "user_card_click_only",
+                    "chat_can_save": false,
+                    "chat_can_send": false,
+                    "source": {
+                      "kind": "task",
+                      "id": "a685b69c-747c-4380-a8e3-2b900c478a9f"
+                    },
+                    "save_status": "not_saved",
+                    "save_id": null,
+                    "gmail_draft_capability": "scope_missing",
+                    "create_control": "Create draft",
+                    "permission_control": "Enable draft creation",
+                    "installed_client_verified": false,
+                    "recipient_needs_confirmation": false
+                  },
+                  "release": "contextual-conversation-1.8.9+chat-context.3",
+                  "trace": [
+                    {
+                      "tool": "read_email",
+                      "status": "ok"
+                    },
+                    {
+                      "tool": "review_email_draft",
+                      "status": "ok"
+                    }
+                  ],
+                  "context_references": [
+                    "context-1"
+                  ],
+                  "context_memory_version": 1,
+                  "active_email_draft_id": null,
+                  "latency_ms": 22002,
+                  "conversation_id": "91a81034-5357-4fe1-b810-8655c5b69754",
+                  "version": 4
+                }
+              }
+            ],
+            "context_order": [
+              "context-1"
+            ],
+            "next_context_reference": 2,
+            "active_task_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+            "active_goal": "calendar_event",
+            "archived_from_version": 1,
+            "calendar_event_request": {
+              "schema_version": 2,
+              "goal_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+              "revision": 1,
+              "arguments": {
+                "title": "Focus",
+                "date": {
+                  "kind": "relative",
+                  "offset_days": 1,
+                  "days": 1
+                },
+                "date_source": "tomorrow",
+                "time": "",
+                "time_source": "",
+                "timezone": "",
+                "timezone_source": "",
+                "duration_phrase": "",
+                "calendar_name": "",
+                "location": "",
+                "description": "",
+                "attendees": []
+              },
+              "field_provenance": {
+                "title": {
+                  "operation": "replace",
+                  "source": "Focus",
+                  "request_id": "59978127-84ad-4fb0-abe6-a1fbe8941499"
+                },
+                "date": {
+                  "operation": "replace",
+                  "source": "tomorrow",
+                  "request_id": "59978127-84ad-4fb0-abe6-a1fbe8941499"
+                }
+              },
+              "user_text": "Focus\ntomorrow",
+              "anchor": "2026-10-07T12:07:25.899330+00:00",
+              "date_anchor_timezone": null,
+              "expires_at": "2026-10-14T12:07:25.931878+00:00",
+              "last_request_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+              "creation_origin": {
+                "text": "Create Focus tomorrow",
+                "policy": "calendar-semantic-intent-1.0.0"
+              }
+            }
+          },
+          "action_jobs": 0,
+          "approved_actions": 0,
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "59978127-84ad-4fb0-abe6-a1fbe8941499",
+                "kind": "calendar_event",
+                "status": "retained",
+                "label": "Focus",
+                "updated_version": 3,
+                "focused": true
+              },
+              {
+                "goal_id": "a685b69c-747c-4380-a8e3-2b900c478a9f",
+                "kind": "task",
+                "status": "retained",
+                "label": "Draft a reply",
+                "updated_version": 1,
+                "focused": false
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        }
+      ]
+    }
+  ],
+  "calendar_calls": [
+    {
+      "method": "GET",
+      "path": "/calendar/v3/users/me/calendarList"
+    },
+    {
+      "method": "GET",
+      "path": "/calendar/v3/users/me/calendarList"
+    }
+  ],
+  "human_review_required": true,
+  "finished_at": "2026-10-07T12:08:53.976631+00:00"
+}

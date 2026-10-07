@@ -6,7 +6,9 @@ Status: locally committed, integrated implementation, prompt
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
 The voice repair remains intact. This document separates implemented mechanics
 from conversational quality. The `.2` diagnostic found partial successes and
-contract failures; `.3` has not been evaluated with a real model.
+contract failures. The [second `.3` diagnostic](evaluation/chat-context/second-stage-results.md)
+found improved draft text generation, but an overwritten goal, failed artifact
+restoration and wrong Calendar button guidance. These remain release blockers.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use

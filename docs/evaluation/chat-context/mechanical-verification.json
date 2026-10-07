@@ -1,5 +1,5 @@
 {
-  "status": "local_integrated_repairs_verified_mechanically_live_diagnostic_incomplete_budget_exhausted",
+  "status": "mechanically_verified_but_both_live_diagnostics_show_release_blocking_behavioral_failures",
   "recorded_at": "2026-10-07T11:43:54.477956+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
@@ -44,7 +44,7 @@
     "estimated_usd_with_10pct_gst_and_failed_attempt_full_reservation": "0.61530194",
     "receipt": "live-model-review.json",
     "details": "approved-evaluation-status.md",
-    "revised_prompt_live_evaluated": false,
+    "revised_prompt_live_evaluated": true,
     "raw_ledger_sha256": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a"
   },
   "checks": {
@@ -112,6 +112,13 @@
       "scope": "Full backend at 744982fa2208d23c15180d9b053adc50caf55a0d with isolated PostgreSQL and fake providers; no skips. Includes all combined button/context/approval and new repair checks.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-model-findings-full-backend.log",
       "log_sha256": "10e92a11ec26d28685e8bc5f53d51cd108e624e3a9ddb4210fca2a3d11acdce1"
+    },
+    {
+      "name": "second_diagnostic_offline_contracts",
+      "result": "16 passed, 1 warning in 2.24s",
+      "scope": "New second-budget fixtures, saved-artifact and goal contracts with AWS blocked; existing guard regressions. No production changes.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-offline-rehearsal.log",
+      "log_sha256": "f2e00e60dad11391f771a333ef9791553c0eac5ffe04ccb68c1f0538b7301413"
     }
   ],
   "previous_runs": [
@@ -245,10 +252,10 @@
     "New-goal email repair explains request_source without forcing continuation of a different retained goal; prompt/tools versioned as .3."
   ],
   "remaining_gates": [
-    "New explicitly approved bounded live evaluation of prompt .3; all original 18 attempts are consumed.",
-    "Complete end-to-end and held-out paraphrase cases, draft quality, Calendar detours and saved-artifact return; current diagnostic has no complete end-to-end case.",
-    "Final release review and explicit publication/deployment authorization.",
-    "Migration h071026e9043 and coordinated API/worker switch; compatibility rollback required after new-format writes."
+    "Fix explicit goal-binding failure before mutating a retained draft; replay observed Casey overwrite.",
+    "Fix saved-draft restoration operation selection and current Calendar control guidance; preserve exact artifact and approval boundaries.",
+    "Further paid execution must obey its existing second-batch identity/deadline and unused allowance; no third run authorized.",
+    "Final review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
   ],
   "known_limits": [
     "Literal retrieval can miss uninspected corrections.",
@@ -282,5 +289,18 @@
     "request_id": "edb45d29-9541-4c41-87ee-5deb5ef6e655",
     "receipt": "approved-preflight.json",
     "details": "approved-evaluation-status.md"
+  },
+  "second_real_model_evaluation": {
+    "status": "behavioral_failures_confirmed",
+    "attempts_used": 9,
+    "unused_attempts": 9,
+    "usage": {
+      "inputTokens": 243954,
+      "outputTokens": 1059
+    },
+    "estimated_usd_with_10pct_gst": "0.30159129",
+    "receipt": "second-model-review.json",
+    "details": "second-stage-results.md",
+    "runtime_changed_after_744982f": false
   }
 }

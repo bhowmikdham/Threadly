@@ -1,7 +1,7 @@
 # Shared chat-context verification
 
 Current prompt: **`contextual-conversation-1.8.9+chat-context.3`**. Earlier snapshots
-remain immutable; the live diagnostic evaluated `.2`, not `.3`. The integrated implementation is committed locally and unpublished.
+remain immutable. Both `.2` and `.3` have now had bounded live diagnostics. The integrated implementation is committed locally and unpublished.
 Backend base: `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. Both include the released voice repair.
 
@@ -15,6 +15,12 @@ remain.** Recall, goal separation and citations had partial successes, but **0/3
 scenarios completed end to end**. See [evaluation status](approved-evaluation-status.md)
 and [machine-readable review](live-model-review.json) for the failures, receipt IDs
 and USD 0.61530194 conservative cost estimate including 10% GST and failed-call reserve.
+
+The separately approved [second diagnostic](second-stage-results.md) evaluated `.3`
+in **9 calls**, about **USD 0.30159 including GST**, leaving nine unused. Draft text
+generation improved, but returning to Casey overwrote Alex's current goal. Calendar
+previews/revision worked with wrong closing-button guidance; saved-draft restoration
+returned status instructions instead of the artifact. These are release blockers.
 
 Final full backend suite at `744982f`: **2,264 passed**, no skips, one Starlette
 warning, using real isolated PostgreSQL and scripted model/fake Google adapters.
@@ -32,7 +38,8 @@ These are mechanical results, not real Google/Bedrock quality evidence.
 The [receipt](mechanical-verification.json) records exact code/test heads, source
 hashes and run boundaries. Previous failures and fixes remain disclosed. Prompt `.3`
 adds new-goal repair guidance and explicit draft-field descriptions after the live
-run; its fresh mechanical checks do not establish improved real-model behavior. The released voice
+run; the second live diagnostic demonstrates specific improvement and the remaining
+goal/restoration/control-guidance defects described above. The released voice
 files remain unchanged. See [combined review](integration-review.md) for the source,
 goal and approval boundaries and remaining architectural/release limits.
 
@@ -45,9 +52,9 @@ python -m pytest -q tests/test_chat_context_evaluation_budget.py tools/evaluate_
 python -m ruff check app tests tools
 ```
 
-The approved live evaluation exhausted its 18-attempt ledger. Further real-model
-evaluation, including `.3`, requires a new bounded proposal and explicit approval.
-Do not reset the existing ledger or treat unused dollars as additional call permission.
+The first live evaluation exhausted its 18-attempt ledger. The second used 9 of its
+separately approved 18 attempts and has stopped. Its persisted deadline must not be
+reset to reuse the remaining allowance. No third run is authorized.
 No production migration, cleanup job, release push, provider write or deployment ran.
 
 Original button commits `53a0d11` (backend) and `fb6d8d5` (frontend) remain preserved

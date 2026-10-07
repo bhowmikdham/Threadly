@@ -9,7 +9,9 @@ reset across retries. This is a diagnostic result, not a release pass.
 The evaluated prompt was `contextual-conversation-1.8.9+chat-context.2` at backend
 checkpoint `4200a91820e8473f49e487caa4774bdaa402624d`; subsequent preflight/credential
 harness changes did not change that prompt, its tools, the model or synthetic cases.
-The separately committed `.3` contract repair has mechanical verification only.
+At completion of this first batch, `.3` had mechanical verification only. The
+subsequent [second-batch results](second-stage-results.md) now record its live failures
+and specific improvements. This first ledger and its original outcomes are unchanged.
 No publication, merge, deployment, real Gmail/Calendar writes or permission changes
 were performed. API/worker/frontend voice fixes remain preserved.
 
@@ -106,7 +108,9 @@ that the real model will follow the revised guidance. The final full backend sui
 at `744982f` passed **2,264 tests with no skips**; 62 focused tests also passed.
 Both runs used isolated PostgreSQL and fake providers.
 
-The next model gate requires **new explicit budget approval**. Evaluate `.3` on
+The next model gate identified after this first batch required new explicit approval.
+That approval was subsequently granted for the separate second batch linked above.
+The original recommendation was to evaluate `.3` on
 held-out paraphrases and completed multi-turn cases, including draft quality,
 source freshness, Calendar detours, saved-artifact return and injected/ambiguous
 instructions. Size the budget for measured recall/repair overhead rather than
