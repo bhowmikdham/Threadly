@@ -1329,3 +1329,86 @@ it("keeps Calendar recovery codes from completed responses", async () => {
     "calendar_coverage_incomplete"
   )
 })
+
+it("only advances the server-identified draft, expires old cards on a new goal, and preserves legacy conservatism", async () => {
+  let active: string | null | undefined = "draft-one"
+  mock((m) =>
+    respond(m, {
+      ...(m.body.expected_version === 0
+        ? {
+            email_draft: {
+              draft_id: "draft-one",
+              recipient: "Alex",
+              subject: "Hello",
+              body: "Hello",
+              unresolved_fields: []
+            }
+          }
+        : {}),
+      ...(active === undefined ? {} : { active_email_draft_id: active })
+    })
+  )
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("Write an email to Alex")
+  })
+  await act(async () => {
+    await result.current.submit("yes please save this draft")
+  })
+  expect(result.current.entries[0].conversationVersion).toBe(2)
+  expect(result.current.canCreateDraft(result.current.entries[0])).toBe(true)
+  active = null
+  await act(async () => {
+    await result.current.submit("Write another email to Priya")
+  })
+  expect(result.current.canCreateDraft(result.current.entries[0])).toBe(false)
+  active = undefined
+  await act(async () => {
+    await result.current.submit("legacy server response")
+  })
+  expect(result.current.entries[0].conversationVersion).toBe(2)
+  expect(result.current.canCreateDraft(result.current.entries[0])).toBe(false)
+})
+
+it("restores the active draft's current version without advancing unrelated history", async () => {
+  ;(chrome.storage.session.get as any).mockResolvedValue({
+    "threadlyConversation:1": { id: "c", version: 3 }
+  })
+  mock(() => ({
+    conversation_id: "c",
+    version: 3,
+    active_email_draft_id: "draft-one",
+    history: [
+      {
+        request_id: "r1",
+        version: 1,
+        user: "Compose",
+        assistant: "Draft",
+        email_draft: {
+          draft_id: "draft-one",
+          recipient: "Alex",
+          subject: "Hello",
+          body: "Hello",
+          unresolved_fields: []
+        }
+      },
+      {
+        request_id: "r2",
+        version: 2,
+        user: "save it",
+        assistant: "Click Create draft"
+      },
+      {
+        request_id: "r3",
+        version: 3,
+        user: "yes",
+        assistant: "Click Create draft"
+      }
+    ]
+  }))
+  const { result } = renderHook(() => useAssistant(user))
+  await waitFor(() => expect(result.current.restoring).toBe(false))
+  expect(result.current.entries[0].conversationVersion).toBe(3)
+  expect(result.current.canCreateDraft(result.current.entries[0])).toBe(true)
+  expect(result.current.entries[1].conversationVersion).toBe(2)
+})
