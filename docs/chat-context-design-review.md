@@ -1,14 +1,18 @@
 # Shared conversation context: implementation and review
 
 Status: locally committed, integrated implementation, prompt
-`contextual-conversation-1.8.9+chat-context.3`. Backend base:
+`contextual-conversation-1.8.9+chat-context.4`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
+The frontend also incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204`,
+preserving open-email following and the newest visible incoming reply target.
 The voice repair remains intact. This document separates implemented mechanics
 from conversational quality. The `.2` diagnostic found partial successes and
 contract failures. The [second `.3` diagnostic](evaluation/chat-context/second-stage-results.md)
 found improved draft text generation, but an overwritten goal, failed artifact
-restoration and wrong Calendar button guidance. These remain release blockers.
+restoration and wrong Calendar button guidance. The [.4 structural corrections](evaluation/chat-context/structural-fixes-review.md)
+reproduce and fix those calls with scripted regressions. `.4` has not had live-model
+evaluation; conversational acceptance remains a release gate.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
@@ -53,6 +57,12 @@ A quote proves authorship, not that the model understood the user's meaning.
   the previous goal. Listing is read-only; selecting one restores focus without
   rerunning or approving it. Cancellation closes only the selected typed goal.
   Closed goals are hidden by default. Saved work is not all automatically active.
+- With multiple retained email goals, continuation must bind an owned email goal
+  ID with the current USER request or explicitly select that goal in this turn.
+  Missing binding is rejected before mutation. Recipient strings do not route work;
+  a deliberate recipient revision stays on the selected goal. This prevents the
+  observed unqualified Casey call from overwriting Alex, but cannot prove that an
+  explicitly chosen goal reflects the user's meaning.
 - Goal sources use stable independent handles when restored; they do not replace
   the browser's explicit email pin. Handles contain identities, not remembered
   Gmail bodies. Source-dependent work requires fresh reads of the relevant scope.
@@ -79,6 +89,11 @@ A quote proves authorship, not that the model understood the user's meaning.
 
 Selecting a past task loads its current artifact rather than regenerating an old
 answer. Historical summaries are remembered outputs, never fresh email evidence.
+The draft review tool also returns that current owned artifact as a card and restores
+focus. It refreshes the revision before reporting save status, keeping an old save
+receipt distinct from the current draft. Returning to the draft needs no Gmail write
+grant. Calendar control guidance uses actual owned action state for recognized
+phrases; standalone social closings stay social. This language guard is bounded.
 Old instructions and citations cannot approve provider writes. Existing exact
 payload approvals, expiry, reconciliation and worker ownership checks remain.
 
@@ -157,6 +172,13 @@ assumption, consent requirement and pass/fail/incomplete review rubric. The earl
 for measured recall, goal and citation successes, draft failures and the conservative
 USD 0.61530194 estimate including GST and a failed-attempt reserve. Further paid
 testing requires new approval. Offline repair tests do not prove model quality.
+
+The second `.3` diagnostic consumed 9 of 18 separately approved calls, costing an
+estimated USD 0.30159129 including 10% GST. Its persisted deadline expired at
+12:22:26.360372 UTC on 2026-10-07; nine calls remain unused and cannot be resumed by
+resetting that window. Both raw ledgers are preserved unchanged. A concrete
+[follow-up proposal](evaluation/chat-context/structural-followup-proposal.md) describes
+another bounded diagnostic; it is not authorized or started.
 
 Results record prompt/tool/model identity, traces, actual token counts, latency,
 clarifications, current goal state and failures. Human semantic review and follow-up

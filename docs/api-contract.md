@@ -1487,7 +1487,13 @@ exchange itself to contain the draft. New goals and superseding tasks/proposals
 disable old text cards. Older clients keep conservative stale-version behavior.
 
 The read-only `review_email_draft` model tool returns actual card controls and
-the current owned source's save receipt status. `email_draft_controls` in model
+the current owned source's save receipt status. In the unpublished shared-context
+release, `presentation: "open"` (default) also returns the existing text editor or
+saved task card; `presentation: "status"` includes save-control guidance. Reopening
+refreshes the owned task's current artifact before checking its save receipt,
+restores backend focus and preserves unrelated goals. It does not regenerate work
+or require Gmail draft-creation permission. Select an older retained goal first
+when it is not the current draft. `email_draft_controls` in model
 context distinguishes account grants from callable actions: chat cannot save,
 send or insert email. Repeated confirmations return guidance; only a succeeded
 receipt confirms Gmail creation. Failed, pending, unknown and older-revision
@@ -1567,7 +1573,7 @@ no additional schema migration.
 
 ## Unpublished shared chat context protocol
 
-The `contextual-conversation-1.8.9+chat-context.3` prototype adds
+The `contextual-conversation-1.8.9+chat-context.4` prototype adds
 `context_memory_version: 1` to turn/replay/restore responses. This means the backend
 owns goal focus: clients omit a task pointer derived merely from the last displayed
 card, and send a context snapshot only for an explicit attach/detach or initial pin.
@@ -1585,3 +1591,17 @@ contain `{field, turn_version, quote}`; generation context citations contain
 chat. Workflow `request_source` is the complete current user turn, separate from
 historical data. These tools do not approve external actions. See the
 [design and compatibility review](chat-context-design-review.md) before deployment.
+
+`prepare_email_draft` continuation accepts an owned `goal_id` with
+`continue_previous: true` and the complete current USER `request_source`.
+When multiple email goals are retained, a continuation without that ID or an
+explicit `select_conversation_goal` in this turn is rejected before draft mutation
+(`email_goal_selection_required`). Recipient text never chooses the target goal.
+An intentional recipient edit remains a revision of the explicitly selected goal.
+Single-goal legacy continuations remain supported; other-chat, other-owner,
+closed and wrong-kind goals cannot be selected as an email target.
+
+Standalone social closings do not repeat Calendar creation instructions.
+Recognized model-generated Calendar control guidance resolves to the current
+owned action card/state, or a missing-details message. This bounded guidance guard
+does not approve, dispatch or retry the action and is not a universal language check.

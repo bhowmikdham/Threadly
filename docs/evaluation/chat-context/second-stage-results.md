@@ -67,6 +67,10 @@ requests against Calendar and email cards separately. These are recommendations;
 **the three newly observed behavioral defects are not fixed by this evidence commit**.
 The `.3` runtime remains unchanged so its receipts stay attributable.
 
+Subsequent work: the [.4 structural corrections](structural-fixes-review.md) now
+replay these exact failures as regressions and fix their backend boundaries. This
+does not change the `.3` results above. `.4` has not been evaluated with a live model.
+
 ## Evidence and validation
 
 The exact second harness and fixtures are committed at `a3dc5fc`; runtime/prompt `.3`

@@ -1,9 +1,9 @@
 {
-  "status": "mechanically_verified_but_both_live_diagnostics_show_release_blocking_behavioral_failures",
-  "recorded_at": "2026-10-07T11:43:54.477956+00:00",
+  "status": "structural_corrections_mechanically_verified_live_semantic_acceptance_pending",
+  "recorded_at": "2026-10-07T13:00:41.791264+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
-  "prompt_release": "contextual-conversation-1.8.9+chat-context.3",
+  "prompt_release": "contextual-conversation-1.8.9+chat-context.4",
   "frontend": {
     "branch": "codex/chat-context-restoration",
     "base_commit": "afa2180fa16b4060587002b6be440ce32573c603",
@@ -13,13 +13,27 @@
       "components/MeetingEmailEvent.css": "3bb5b323241f0396c4a6288482ffd827d4a3a04f36427b63ae02f1501edaaa60",
       "components/MeetingEmailEvent.tsx": "1dc04a02534384e371f24f693171c865a7aa80ef453a2d09bfd17b5a9788a463",
       "lib/meeting-email.ts": "713a7f6fcb20a275481e3a056d0b3a39fc9c28cab0941162251f0c23ebbca320",
-      "lib/use-assistant.ts": "a3fb51e647907c8c2807d77e86d288a311d8cc34ffc2aacd05c47b884650ad6d",
-      "tests/conversation-controller.test.tsx": "248968f3dfe0fc97a71af0c5857e72517619a8f8e8dd6156a243709b0d8ecbd8",
+      "lib/use-assistant.ts": "11ec4f08be64c4911e297d71e77e1bd50915bbf0d3b33c643b48b94ce6d64994",
+      "tests/conversation-controller.test.tsx": "b71e2f79bc1452d7bf47d99d1d435d4109cd847e86084a41a9311f65320b7719",
       "tests/e2e/meeting-email-event.spec.ts": "af59ef524b9ee6ee54156ac01041d37d86f2d41f1d9c95552331e46094f5e48a",
-      "tests/meeting-email-event.test.tsx": "0c076d8a70c66c6298a1c0974db5780d959a8517e96bce15fee65b8eddf60036"
+      "tests/meeting-email-event.test.tsx": "0c076d8a70c66c6298a1c0974db5780d959a8517e96bce15fee65b8eddf60036",
+      "tests/security.test.ts": "ca32c73caf3e60b97e320121aeb3a8494a37a18d0955b4ddc84d317cf0b277b2",
+      "sidepanel.tsx": "4518ab837c047dc56dc436872d92cb0567d4590a76c1fa00648b7c00a49843dd",
+      "components/GmailDraftCard.tsx": "5671311b0aa0f686e1801bc7c3fc2cb0c04ad964ffca2aae6640c789d6dec927",
+      "tests/e2e/extension.spec.ts": "c736248e7b2a104c72e41c301bc043bdfc9871f0d86315804313b5c4d8306633",
+      "lib/gmail-context.ts": "69d6c26a8964762bc8a1d31bded7f6c738f8847d9ed9fcd567a23a799453498e",
+      "lib/context.ts": "3e8d771b2bae21afa0c858eca7257959339f5dd2b9547fa7102490f3e01a69b2",
+      "components/TaskCard.tsx": "e9670afc56688176e4c2b7dcfa06036bfb5d7a7b4a72d6667ee3a01738a74c94",
+      "tests/context.test.ts": "93a394686696de6907bce3216d9a95dbef5f6b64a4a08f062ea3e1748a814b4c",
+      "lib/spoken-reply.ts": "76e2f45897c206aaf49cb587d306c5f3a9378e6642e7dc3bede46625aca58a38",
+      "tests/artifacts.test.tsx": "2514bc8f8767a2ce72d232a658c702730b59a204021211a2e4712bd46693198e",
+      "content.ts": "d176b923d4f9fbc7e8f7b5e3a95d03f60e544e233a91dde6222a263c71e47a12"
     },
-    "code_and_test_head": "73d6e491a82105926b93b22be72aef172b1d5e01",
-    "head_with_evidence": "125666939e1950b529b2fbff4b0b1406466b9ebb"
+    "code_and_test_head": "4e4088b929ebd50184d128d1e63e0c8c07d9b2c3",
+    "head_with_evidence": "8752c3a1d67c76bd616638c906ba1cd3bd7f91e2",
+    "upstream_base_commit": "60a7aa8dd02dd94105b90ae1ee68f742cf23d204",
+    "merge_commit": "d7ab1e05bd80a96ce20756196d951532e855832d",
+    "pr122_preserved": true
   },
   "integrated_with_new_voice_release": true,
   "voice_files_unchanged_from_release_bases": [
@@ -51,9 +65,9 @@
     "ruff": "passed",
     "git_diff_check_backend_and_frontend": "passed",
     "plan_documentation_validator": "passed",
-    "typecheck": "passed, including final browser test extension",
-    "local_and_public_build": "passed",
-    "lint": "ruff passed",
+    "typecheck": "passed after PR122 integration",
+    "local_and_public_build": "passed after PR122 integration; synthetic public origin",
+    "lint": "ruff passed at final runtime",
     "doc_validator": "passed; planning consistency only"
   },
   "runs": [
@@ -119,6 +133,111 @@
       "scope": "New second-budget fixtures, saved-artifact and goal contracts with AWS blocked; existing guard regressions. No production changes.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-offline-rehearsal.log",
       "log_sha256": "f2e00e60dad11391f771a333ef9791553c0eac5ffe04ccb68c1f0538b7301413"
+    },
+    {
+      "name": "second_findings_red",
+      "result": "4 failed in 2.59s",
+      "scope": "Exact observed bad calls before structural corrections; fixture DB pool already corrected.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-findings-red-final.log",
+      "log_sha256": "c03846c76888f2cb3b3f962f492ca6eb8adc40ebeea8dca2f49d5b48e8b48ee9"
+    },
+    {
+      "name": "second_findings_green",
+      "result": "4 passed in 3.24s",
+      "scope": "Same four observed calls after structural corrections.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-findings-green.log",
+      "log_sha256": "f53935cf2edbeb9ee1c10cbc60fab3aec2a9df7efd289a114aa5ec850edb219a"
+    },
+    {
+      "name": "structural_focused",
+      "result": "194 passed, 1 warning in 23.19s",
+      "scope": "Real disposable PostgreSQL, scripted models and fake providers.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-structural-fixes-focused-final.log",
+      "log_sha256": "7ec0553c4e4c246e5d4c34fec350c8447582ac33c77f152a2e8a6c19177acd27"
+    },
+    {
+      "name": "structural_final_invariants",
+      "result": "17 passed, 1 warning in 9.86s",
+      "scope": "Goal scope, recipient changes, exact saved artifact/replay and stale revision; AWS blocked.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-structural-fixes-final-invariants-pass.log",
+      "log_sha256": "1312648ad4cea8b9c9ecee4ea531394619f850a5efd6d4df337ce5c807606dd2"
+    },
+    {
+      "name": "structural_first_full",
+      "result": "2283 passed, 1 warning in 276.53s",
+      "scope": "Full backend at 1bcb9c4; no skips; before final cancellation correction.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-structural-fixes-full-backend.log",
+      "log_sha256": "ea202dcb0ef59f9d35ffef3139a8577f59a3ada17a91123156762ace89d9b4e3"
+    },
+    {
+      "name": "explicit_cancellation_red",
+      "result": "1 failed in 0.93s",
+      "scope": "Legitimate explicitly bound cancellation was rejected by creation validator.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-explicit-cancellation-red.log",
+      "log_sha256": "5f965e5f8826f22880ec219c41d60f3d97b3a98fdb2affe0e8497e15c74718cc"
+    },
+    {
+      "name": "explicit_cancellation_green",
+      "result": "53 passed, 1 warning in 14.60s",
+      "scope": "Cancellation and affected drafting suites after current-provenance-preserving correction.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-explicit-cancellation-green.log",
+      "log_sha256": "a96f80ca050132c219e5b3e0e412eb89a6170b6c56df6cdb9923498dc273fe9c"
+    },
+    {
+      "name": "structural_final_full",
+      "result": "2284 passed, 1 warning in 275.01s",
+      "scope": "Full backend at 398c4acf8de4e878c512836ed8340c133bfe5c13; no skips; isolated PostgreSQL, no live models or providers.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-structural-fixes-final-full-backend.log",
+      "log_sha256": "20633f9ece338fc107af0a19d8e79a4f10d8835c3b964603f605985f2b427bf9"
+    },
+    {
+      "name": "pr122_focused",
+      "result": "81 passed",
+      "scope": "Controller, context and security/source/reply-target checks after integrating upstream 60a7aa8.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-focused.log",
+      "log_sha256": "cdc78291e3ded9ab38633bf28b937dbb5d459bf68901800987e835c9bcf67aa1"
+    },
+    {
+      "name": "pr122_full_unit",
+      "result": "250 passed",
+      "scope": "Full frontend at 4e4088b929ebd50184d128d1e63e0c8c07d9b2c3.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-full-unit.log",
+      "log_sha256": "6fcf876887092f81ea69b63194cd3e6f335c9caea342c051ac2c7ce68d339b47"
+    },
+    {
+      "name": "pr122_typecheck",
+      "result": "passed",
+      "scope": "TypeScript after integration and new controller scenario, before formatting-only test commit.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-typecheck.log",
+      "log_sha256": "3c8307e06e4e8a6d8e516c5f213bc1422ef6a233f6ebfdbf127cbf4a407b6c59"
+    },
+    {
+      "name": "pr122_local_build",
+      "result": "passed",
+      "scope": "Local extension build after initial process sandbox block; no source change for retry.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-local-build-final.log",
+      "log_sha256": "6d35e942961789c879a797ec8ddea6bb79bbf9279e532989440894858493cbdf"
+    },
+    {
+      "name": "pr122_full_browser",
+      "result": "47 passed, 1 skipped in 1.7m",
+      "scope": "Full packaged local extension against mock backend; public-origin case run separately.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-browser.log",
+      "log_sha256": "8860320571e06be0c5366c46b2a33dd12c4f7d715fd1257a33b568589dba1664"
+    },
+    {
+      "name": "pr122_public_build",
+      "result": "passed",
+      "scope": "Synthetic https://api.threadly.example.test origin; no deployment.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-public-build.log",
+      "log_sha256": "c04e751e697b7d71de32d766b89eccb72893053a765e8866c3a48051b99a87a2"
+    },
+    {
+      "name": "pr122_public_browser",
+      "result": "1 passed in 903ms",
+      "scope": "Previously skipped public-origin scenario; permission mocked/denied, no service call.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-public-browser.log",
+      "log_sha256": "519e1d6bf3c53dfb47779d1e7d4191c48df991814b24d97d0bf8e99c49445a03"
     }
   ],
   "previous_runs": [
@@ -211,14 +330,14 @@
     "backend/app/calendar/meeting_email.py": "895f64f91a9ede8950427760a9c4d0e26bd4de334db60beb95f55d340168dc88",
     "backend/app/conversation/budget.py": "4df16539bde7114f9fa724d6b7e4a6703adef1c6c6a15d391efa0d0d511d5b56",
     "backend/app/conversation/citations.py": "0ce9bd4838e063915ae65f34700d5b399107b26e9f607beca972e2fab25ec176",
-    "backend/app/conversation/email_draft.py": "69e8dfecec6a472eb91f80f80ffea2742090993ea0886ead53a56f9bba4ec43f",
-    "backend/app/conversation/engine.py": "fd1e1f50505498befb3b6f53afdaf56be62400dfab274d10d360bc8f085309c7",
-    "backend/app/conversation/goals.py": "eaf5ed7b52a9c7ab1716b6c8cacde296a2cd1e67b09fc648e617478b266d87a9",
+    "backend/app/conversation/email_draft.py": "548293a4ec0c95574a8021379db0ebf76e66a708d71c9dfea9d0435c0f7d1a98",
+    "backend/app/conversation/engine.py": "f9d47c153551c8852a38ba797c8c1b99600b1eec600ce7949b9ccd56cfb054fe",
+    "backend/app/conversation/goals.py": "0c8e944946320cb7d15915b3d8e077675e03b5bcb1355aba0ac0b1046ac6bda0",
     "backend/app/conversation/mail_goal.py": "ace7641b4bbbe8a5a878c7b92c095d993f4fb589a9fac8c2365a56ae2830c7b2",
     "backend/app/conversation/memory.py": "9b4f98fe291b6c585800d0d9ce08a1cba4bbbd950587e022652d803a49ef2479",
-    "backend/app/conversation/prompt.py": "c78057552664f50872822964b40603b58d60e78f76beccb0499fac1c180abd9a",
+    "backend/app/conversation/prompt.py": "75fb622eb16bf76eb36579a868d77a3b40b28d1e74844ec5b3c49b16afbad716",
     "backend/app/conversation/recovery.py": "bdd7a545dd24655af366a9103e9a960bc80e032064cf5e956cd7a3a643dc622e",
-    "backend/app/conversation/runtime.py": "5f0b85d39363e08b816495e92967ec030c7f48b650ebbe821acdfd76405384e7",
+    "backend/app/conversation/runtime.py": "c45c7b1be95b9829b6ba3eec84bfd63f1b647c41874f2a0debb7a0e2a17cda69",
     "backend/app/conversation/service.py": "fe8ebcba312f75946a5ed336e14fdc9a3cc10ede11b6a7f8e46578b0f870efb0",
     "backend/app/conversation/store.py": "5ebae40c04d3cdcc023e17e3bda0f64fdc431b170fb494439e6ce32a8c626ec5",
     "backend/app/conversation/user_intent.py": "99f792a200526368a78f53b78f0c56cf28e7b318081d42ebfc8c8f2d7d7567bd",
@@ -226,10 +345,10 @@
     "backend/app/operations/retention.py": "7cf5da896146de3418e2ac62918c295be78fe126a5ba50271027f77775a85bea",
     "backend/app/schemas/calendar_event.py": "a14e5100113a9e57fa4879e0afa0283644d1ad6eff2034739a2092dbb7d9c6bd",
     "backend/app/schemas/chat_context.py": "ddbdb85860a9d7e7fae7b174eedd230c967017eea003cbab68f325eb0212872e",
-    "backend/app/schemas/conversation.py": "62937398bb2ad2346425e7b13fb76dc9b5d4ca0d438ad360fb7c7be034eaa839",
+    "backend/app/schemas/conversation.py": "14ef1d1cca37e8fc1cff91d781e889c9750e8dbcc05c6270fd3f542d640c794f",
     "backend/app/schemas/meeting_email.py": "eadac114067387e8927f13d879ce0236527c9f562448c0b8208493a2ccd59894",
     "backend/tests/test_assistant_migration.py": "e5edb33003fff41727e98e000bf35f35dbb1e2e42554afc453623af908ab3acd",
-    "backend/tests/test_calendar_conversation_tools.py": "6184f5df6afd2b84829900341319c59a5793e2267ca2510a361c1c64db647af7",
+    "backend/tests/test_calendar_conversation_tools.py": "fafa39bce863de857589d0254170c64a84437e255fd882885c8a9f30e9e47615",
     "backend/tests/test_calendar_field_repair.py": "eac00617d00e455eab59590debbf4a9f739fb555c337368129b12b07c9bd6b99",
     "backend/tests/test_chat_context_continuity.py": "99fa1b70f5540c0a97f48af9d436a378abdf8bec5e4c3e40594bca807b773adc",
     "backend/tests/test_chat_context_evaluation_budget.py": "a593e7eb1a949d210a400cd747e7e214c055953f6faf06778c9704ea624e3168",
@@ -238,7 +357,12 @@
     "backend/tests/test_chat_context_workflows.py": "e0cd58b794bca79288abd4977784021350ed9882abf85976c3e6109f3fde4888",
     "backend/tests/test_meeting_email_event.py": "a44588ebb15648047f8b23db810876b5f6f64f4b1a3821e930511ca769bdaaf8",
     "backend/tests/test_primary_inbox.py": "9959636d18d262074607e3de197fc19c49d2b7ba0342219338ae5d4e4d15e2ac",
-    "backend/tools/evaluate_chat_context.py": "dcde67f6047c5e6b8364f56aebbc0d5e30c9093a310053a28b103f9a66b8491f"
+    "backend/tools/evaluate_chat_context.py": "dcde67f6047c5e6b8364f56aebbc0d5e30c9093a310053a28b103f9a66b8491f",
+    "backend/tests/test_email_draft_followup.py": "81266ec6de907ae4a4e9782a3839d1eff326ae0b94f231ac722dd4ee6d1bee3c",
+    "backend/app/conversation/email_review.py": "59bd61ea79a929344828069420fff749105c0ab3bfcb2f5f22873eb8e23de9c4",
+    "backend/tests/test_chat_context_live_regressions.py": "bb4ecd0ab692ab9ba267e0aff5aa765b3891943934606c1c41cbbb8b4440422f",
+    "backend/tests/test_email_draft_clarification.py": "e6a2c7050e3a3a5dcd05d72f8b809444247f1860a01f20bad9c4231d83990bb5",
+    "backend/app/calendar/conversation_guard.py": "123de4c1dea2dafc09579de12a50881cf1cb4e083b829e686464fb76bb2619b2"
   },
   "review_findings_resolved": [
     "Unversioned legacy turns skipped by recall without inventing citation identity.",
@@ -249,19 +373,25 @@
     "Runtime CountTokens accepts the bare Haiku 4.5 model ID; inference profile remains unchanged.",
     "Persistent locked call ledger covers paid failures and process restarts.",
     "Existing AWS login resolved before strict model dispatch; no credentials retained in evidence.",
-    "New-goal email repair explains request_source without forcing continuation of a different retained goal; prompt/tools versioned as .3."
+    "New-goal email repair explains request_source without forcing continuation of a different retained goal; prompt/tools versioned as .3.",
+    "Multi-draft continuation now requires current-turn owned goal binding; exact Casey overwrite rejected before mutation.",
+    "Review opens the owned current artifact and restores focus before checking the save receipt; stale revisions and replay covered.",
+    "Recognized Calendar control guidance returns actual owned action state; exact closing stays social.",
+    "Explicit cancellation preserves current USER provenance without passing the positive-creation validator; other goals unchanged.",
+    "PR122 frontend 60a7aa8 integrated without conflicts; source following, visible incoming reply target and server-owned focus verified together."
   ],
   "remaining_gates": [
-    "Fix explicit goal-binding failure before mutating a retained draft; replay observed Casey overwrite.",
-    "Fix saved-draft restoration operation selection and current Calendar control guidance; preserve exact artifact and approval boundaries.",
-    "Further paid execution must obey its existing second-batch identity/deadline and unused allowance; no third run authorized.",
-    "Final review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
+    "Live semantic acceptance for .4; explicit IDs cannot prove model relevance and Calendar language recognition is bounded.",
+    "Second batch expired at 2026-10-07T12:22:26.360372Z with 9 attempts unused; no further paid calls authorized. New bounded proposal in structural-followup-proposal.md.",
+    "Final release review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
   ],
   "known_limits": [
     "Literal retrieval can miss uninspected corrections.",
     "Legacy/compound semantic gates retain their existing lexical boundaries.",
     "Character-based production context allocation, not tokenizer allocation.",
-    "Historical citations do not expand deterministic scheduling/source-quoted plan-item schemas."
+    "Historical citations do not expand deterministic scheduling/source-quoted plan-item schemas.",
+    "A model can still explicitly select a semantically wrong owned goal; .4 has no live-model evaluation yet.",
+    "Calendar control-advice recognition is bounded, not a universal natural-language check."
   ],
   "meeting_email_button": {
     "backend_branch": "codex/meeting-email-calendar-preview",
@@ -278,7 +408,7 @@
     "combined_review": "integration-review.md"
   },
   "external_writes_or_deployment": false,
-  "backend_code_and_test_head": "744982fa2208d23c15180d9b053adc50caf55a0d",
+  "backend_code_and_test_head": "398c4acf8de4e878c512836ed8340c133bfe5c13",
   "previous_real_model_evaluation_status": {
     "status": "blocked_before_paid_inference",
     "approved_at": "2026-10-07T10:58:05Z",
@@ -301,6 +431,22 @@
     "estimated_usd_with_10pct_gst": "0.30159129",
     "receipt": "second-model-review.json",
     "details": "second-stage-results.md",
-    "runtime_changed_after_744982f": false
+    "runtime_changed_after_744982f": false,
+    "deadline_utc": "2026-10-07T12:22:26.360372Z",
+    "deadline_expired": true,
+    "ledger_unchanged": true,
+    "unused_attempts_cannot_be_resumed": true
+  },
+  "structural_evidence_bundle": {
+    "path": "structural-fixes-logs.json.gz",
+    "sha256": "48d09b0a61e4c841c68864a26cd8391c8a4df2dde13b800f61c5b61dce20b8ec",
+    "contents": "Synthetic offline red/green/integration/build logs, including unsuccessful fixture/assertion/build attempts."
+  },
+  "candidate_live_model_status": {
+    "release": "contextual-conversation-1.8.9+chat-context.4",
+    "paid_calls": 0,
+    "status": "not_evaluated",
+    "proposal": "structural-followup-proposal.md",
+    "structural_review": "structural-fixes-review.md"
   }
 }
