@@ -1474,3 +1474,58 @@ it("restores a draft editor after its original exchange leaves compact history",
   })
   expect(calls.at(-1).body).not.toHaveProperty("active_task_id")
 })
+
+it("opens a returned saved draft after a Calendar detour without restarting work or approving actions", async () => {
+  const artifact = {
+    artifact_id: "saved-artifact",
+    kind: "draft",
+    revision: 2,
+    payload: {
+      kind: "draft",
+      content: { subject: "Agenda", body: "Thanks for the agenda." }
+    }
+  }
+  const calls = mock((m) => {
+    if (m.path === "/assistant/artifacts/saved-artifact") return artifact
+    if (m.path !== "/assistant/conversation-turns")
+      throw new Error(`Unexpected ${m.path}`)
+    return respond(m, {
+      context_memory_version: 1,
+      ...(m.body.expected_version === 0
+        ? { text: "What time should Focus start?" }
+        : m.body.expected_version === 1
+          ? {
+              text: "Here is your existing draft.",
+              task_id: "saved-task",
+              task: {
+                task_id: "saved-task",
+                state: "succeeded",
+                instruction: "Draft a reply",
+                artifact_id: "saved-artifact"
+              }
+            }
+          : { text: "You're welcome." })
+    })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("Create Focus tomorrow")
+  })
+  await act(async () => {
+    await result.current.submit("Bring back the saved agenda reply draft")
+  })
+  await waitFor(() =>
+    expect(result.current.entries[1].artifacts).toEqual([artifact])
+  )
+  expect(result.current.entries[1].task?.task_id).toBe("saved-task")
+  await act(async () => {
+    await result.current.submit("Thanks")
+  })
+  expect(calls.at(-1).body).not.toHaveProperty("active_task_id")
+  expect(calls.map((call) => call.path)).toEqual([
+    "/assistant/conversation-turns",
+    "/assistant/conversation-turns",
+    "/assistant/artifacts/saved-artifact",
+    "/assistant/conversation-turns"
+  ])
+})
