@@ -97,6 +97,7 @@ async def test_exact_editor_only_creates_draft_and_deduplicates(db_sessionmaker,
     body = request(artifact)
     result = await create(db_sessionmaker, owner, body, provider(calls))
     assert result["state"] == "succeeded" and not result["sending_available"]
+    assert result["source_artifact_id"] == artifact.id and result["source_revision"] == 1
     mime = BytesParser(policy=policy.default).parsebytes(
         base64.urlsafe_b64decode(json.loads(calls[0].content)["message"]["raw"])
     )

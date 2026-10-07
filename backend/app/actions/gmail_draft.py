@@ -34,6 +34,8 @@ def view(row):
         state = "outcome_unknown"
     return {
         "save_id": row.id,
+        "source_artifact_id": row.provenance.get("parent_artifact_id"),
+        "source_revision": row.provenance.get("parent_revision"),
         "state": state,
         "preview": row.payload["preview"],
         "error_code": row.error_code,
