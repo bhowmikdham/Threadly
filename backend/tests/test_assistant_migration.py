@@ -15,8 +15,9 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "c061026e9041"
+HEAD = "g071026e9042"
 NEW_TABLES = {
+    "gmail_draft_saves",
     "mail_sync_jobs",
     "mail_sync_stage",
     "scheduling_proposals",
@@ -126,6 +127,23 @@ def test_migration_installs_and_preserves_existing_mailbox():
             asyncio.run(execute("SELECT version_num FROM alembic_version"))[0]["version_num"]
             == HEAD
         )
+        # A durable receipt is write evidence even when Gmail's response was lost.
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO gmail_draft_saves
+              (id,user_id,source_key,request_id,request_hash,account_version,state,payload,provenance)
+            VALUES ('receipt',91,'task:example','click','hash',1,'outcome_unknown','{}','{}')
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "c061026e9041", fails=True)
+        assert (
+            asyncio.run(execute("SELECT state FROM gmail_draft_saves"))[0]["state"]
+            == "outcome_unknown"
+        )
+        asyncio.run(execute("DELETE FROM gmail_draft_saves", script=True))
         # Exercise new contracts against Alembic-installed tables, not create_all.
         asyncio.run(
             execute(

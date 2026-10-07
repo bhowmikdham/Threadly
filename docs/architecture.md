@@ -779,3 +779,11 @@ already dispatched/unknown action cannot be silently replaced. No provider calls
 run in these transactions. Historical prompt/tool snapshots remain immutable;
 1.8.0 is a new snapshot. Tests use scripted decisions and Google transports and do
 not establish live model language quality or a successful Google event write.
+
+Editable Gmail cards save through `actions.gmail_draft`: existing capability,
+account, source and MIME validation precede a committed immutable draft receipt.
+Only then does a bounded HTTP call invoke Gmail `users.drafts.create`. The request
+never creates a send action or approval. Provider uncertainty is durable and has
+no blind retry path. Read-only receipt refresh survives a closed card or lost
+response. A named-recipient conversation supplies structured generated text;
+the user supplies literal recipient addresses only when choosing Create draft.

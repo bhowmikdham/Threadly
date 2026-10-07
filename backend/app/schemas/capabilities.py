@@ -16,7 +16,7 @@ class GoogleAccountCapability(StrictModel):
 
 class GoogleCapability(StrictModel):
     id: Literal[
-        "gmail_read", "gmail_send", "calendar_read", "calendar_list",
+        "gmail_read", "gmail_send", "gmail_draft", "calendar_read", "calendar_list",
         "calendar_events_read", "calendar_write",
     ]
     implemented: bool

@@ -21,7 +21,18 @@ def model_context(state):
     value = state.get(KEY)
     # Address-bound drafts now belong to active_work and its immutable artifact
     # revision flow. Do not invite the model to regenerate them from old turns.
-    return dict(value) if value and value.get("status") != "workflow" else None
+    if not value or value.get("status") == "workflow":
+        return None
+    result = dict(value)
+    if result.get("status") == "drafted" and "draft" not in result:
+        latest = next(
+            (h["email_draft"] for h in reversed(state.get("history", [])) if h.get("email_draft")),
+            None,
+        )
+        if latest:
+            result["draft"] = {k: latest[k] for k in ("subject", "body", "unresolved_fields")}
+            result["draft"]["sources"] = []
+    return result
 
 
 def ready_route():
@@ -212,6 +223,13 @@ async def prepare(runtime, args):
         goal["draft"] = args.draft.model_dump()
         result = {
             "kind": "message",
+            "email_draft": {
+                "draft_id": runtime.request.request_id,
+                "recipient": values["recipient"],
+                "subject": args.draft.subject,
+                "body": args.draft.body,
+                "unresolved_fields": args.draft.unresolved_fields,
+            },
             "text": "Here’s a draft you can edit. Nothing has been sent.\n\n"
             + "Subject: "
             + args.draft.subject

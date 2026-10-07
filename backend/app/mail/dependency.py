@@ -122,6 +122,11 @@ async def gmail_sources(request: Request, response: Response, owner: CurrentUser
             request.method == "GET" and "/tasks" in request.url.path
         )
         passive = passive or "/conversation" in request.url.path
+        # Draft receipts are durable write evidence, independent of source mail
+        # availability. Refreshing a receipt must never hydrate the old thread.
+        passive = passive or (
+            request.method == "GET" and request.url.path.startswith("/assistant/gmail-drafts/")
+        )
         if not passive:
             identifiers = list(request.path_params.values())
             if request.url.path.endswith(("/inputs", "/scheduling-inputs")) and body.get(

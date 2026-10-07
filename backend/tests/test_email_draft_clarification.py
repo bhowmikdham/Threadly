@@ -298,6 +298,10 @@ async def test_clarification_survives_reload_retry_and_read_only_detour(db_sessi
     assert DRAFT["body"] in result["text"]
     restored = await service.get(1, first.conversation_id, db_sessionmaker)
     assert restored["history"][-1]["assistant"] == result["text"]
+    assert result["email_draft"]["subject"] == DRAFT["subject"]
+    assert result["email_draft"]["recipient"] == "Alex"
+    assert restored["history"][-1]["email_draft"] == result["email_draft"]
+    assert restored["history"][-1]["version"] == result["version"]
     async with db_sessionmaker() as session:
         row = await session.get(Conversation, first.conversation_id)
         assert store.decode(row)[email_draft.KEY]["recipient"] == "Alex"

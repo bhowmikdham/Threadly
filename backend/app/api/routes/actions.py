@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.actions import approval, calendar_preview, email_preview, gmail_sender
+from app.actions import approval, calendar_preview, email_preview, gmail_draft, gmail_sender
 from app.api.deps import CurrentUser
 from app.db.engine import get_session
 from app.mail.dependency import gmail_sources
@@ -17,6 +17,7 @@ from app.schemas.actions import (
     ProposeEmailAction,
 )
 from app.schemas.calendar_action import ProposeCalendarAction
+from app.schemas.gmail_draft import CreateGmailDraft
 
 router = APIRouter(dependencies=[Depends(gmail_sources)])
 DB = Annotated[AsyncSession, Depends(get_session)]
@@ -146,3 +147,23 @@ async def stop_calendar(
     await session.commit()
     response.headers["Cache-Control"] = "no-store"
     return result
+
+
+@router.post("/gmail-drafts")
+async def create_gmail_draft(
+    body: CreateGmailDraft, user_id: CurrentUser, session: DB, response: Response
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await gmail_draft.create(session, user_id, body)
+
+
+@router.get("/gmail-drafts/{kind}/{identifier}")
+async def get_gmail_draft(
+    kind: Literal["task", "conversation"],
+    identifier: str,
+    user_id: CurrentUser,
+    session: DB,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await gmail_draft.lookup(session, user_id, kind, identifier)

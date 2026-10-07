@@ -69,7 +69,7 @@ def reply_headers(metadata, expected_id):
     return ids[0], chain
 
 
-def build(envelope, content, *, sender, now, identifier, reply=None):
+def build(envelope, content, *, sender, now, identifier, reply=None, draft_only=False):
     if any(
         value.get(key)
         for value in (envelope, content)
@@ -97,11 +97,15 @@ def build(envelope, content, *, sender, now, identifier, reply=None):
         raise blocked("draft_content_invalid") from None
     if not draft.recipients.to:
         raise blocked("recipients_required")
-    if draft.unresolved_fields or re.search(r"\[[^\]\n]{1,200}\]|\{\{", draft.subject + draft.body):
+    if not draft_only and (
+        draft.unresolved_fields or re.search(r"\[[^\]\n]{1,200}\]|\{\{", draft.subject + draft.body)
+    ):
         raise blocked("unresolved_fields")
     # Canonical LF body with one terminal newline, shown exactly in the preview.
     body = draft.body.replace("\r\n", "\n").replace("\r", "\n")
-    if not body.endswith("\n"):
+    if draft_only:
+        body = draft.body
+    elif not body.endswith("\n"):
         body += "\n"
     message = EmailMessage(policy=policy.SMTP.clone(max_line_length=78))
     message["From"] = sender
@@ -117,6 +121,10 @@ def build(envelope, content, *, sender, now, identifier, reply=None):
         message["In-Reply-To"] = reply["in_reply_to"]
         message["References"] = " ".join(reply["references"])
     message.set_content(body, subtype="plain", charset="utf-8", cte="base64")
+    if draft_only:
+        # set_content adds a terminal newline; explicit transfer encoding preserves
+        # exactly the user's text, including whitespace and a missing final newline.
+        message.set_payload(base64.b64encode(body.encode("utf-8")).decode("ascii"))
     raw = message.as_bytes()
     if len(raw) > 64000:
         raise blocked("email_too_large")

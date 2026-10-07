@@ -12,6 +12,11 @@ GMAIL_READ_SCOPES = {
     "https://www.googleapis.com/auth/gmail.modify",
     "https://mail.google.com/",
 }
+GMAIL_DRAFT_SCOPES = {
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://mail.google.com/",
+}
 GMAIL_SEND_SCOPES = {
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.modify",
@@ -78,6 +83,14 @@ def build_capabilities(user: User) -> dict[str, Any]:
                 connected=verified_connection,
                 scopes=scopes,
                 required_scopes=GMAIL_READ_SCOPES,
+            ),
+            _capability(
+                "gmail_draft",
+                implemented=True,
+                enabled=True,
+                connected=verified_connection,
+                scopes=scopes,
+                required_scopes=GMAIL_DRAFT_SCOPES,
             ),
             _capability(
                 "gmail_send",

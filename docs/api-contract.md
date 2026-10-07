@@ -1403,3 +1403,49 @@ redundant intent classification. Existing recipient validation, draft review,
 exact-payload approval, disabled-intent controls and Gmail send gates still apply.
 Source-based replies/drafts and compound workflows keep their existing contracts.
 No database migration or external email operation is introduced.
+
+## Editable Gmail draft cards
+
+Conversation responses and saved history now include an optional `email_draft`
+object (`draft_id`, user-sourced `recipient`, `subject`, `body`, `unresolved_fields`)
+for named-recipient drafts. This is generated text, not a Gmail write or address
+resolution. Older clients retain the existing text response. History includes the
+turn's `version` so restored cards cannot submit from a stale chat.
+
+`POST /assistant/gmail-drafts` is a deliberate UI-only draft save. It accepts the
+complete edited `subject`, `body`, `recipients` (To/Cc/Bcc), `unresolved_fields`,
+`request_id`, `expected_revision`, `from_address`, and `account_version`. Bind the
+source using `artifact_id`, or `draft_id` plus `conversation_id`/`expected_version`.
+Chat artifact cards also include their conversation/version. The server verifies
+ownership, current artifact, source bindings, current chat, verified sender and
+connection generation. Names remain editable text until the click; actual Gmail
+creation requires literal addresses. No contact guessing occurs.
+
+`GET /assistant/gmail-drafts/{task|conversation}/{source_id}` returns the saved
+receipt or null. `source_id` is the artifact's task ID or the structured draft ID.
+Both routes return no-store responses. A receipt contains `save_id`, `state`, the
+exact edited `preview`, provider `result` identifiers when confirmed, `error_code`,
+and `sending_available:false`. Possible states: `saving`, `succeeded`, `failed`,
+`outcome_unknown`. Success requires Gmail's draft response and DRAFT label, never
+an Inbox or Sent result. A saving receipt older than 90 seconds reads as unknown.
+
+One immutable receipt per owned source freezes the user-edited content and parent
+provenance before dispatch. Identical retries recover the receipt; changed edits
+or a new request ID cannot create a second copy. Never retry a provider dispatch,
+even after timeout or process death. Unknown outcomes require inspection in Gmail
+Drafts. After creation, edit or delete the draft in Gmail. Closing the card after
+click does not cancel a dispatched save. Edits before click are local to the card.
+The original generated artifact and its revisions remain immutable; this separate
+user-edit receipt records the exact outgoing snapshot and parent revision/hash.
+Changing a reply subject deliberately creates a new unthreaded email.
+
+`gmail_draft` capability accepts already-recorded `gmail.compose`, `gmail.modify`
+or full-mail scope. `gmail.send` alone is insufficient. This feature neither adds
+OAuth scope requests nor enables the send worker. No send approval/job is created;
+Gmail's `users.drafts.create` is the only provider write. MIME uses the shared
+validated builder with draft-only exact plain-text body preservation. Placeholders
+may remain in a Gmail draft for the user to finish before sending.
+
+Migration `g071026e9042` must precede enabling these routes. It adds only the draft
+receipt table and refuses downgrade when receipts exist. No credentials, grants,
+classification, Calendar, Primary Inbox or voice behavior change.

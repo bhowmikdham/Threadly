@@ -54,6 +54,19 @@ def compact(state, *, preserve_receipt_id=None):
     while _plaintext_size(state) > STATE_PLAINTEXT_LIMIT and len(state["history"]) > 1:
         state["history"].pop(0)
 
+    # Structured draft history already retains the current generated text. Drop
+    # only the redundant model-context copy when a long draft needs the space.
+    goal = state.get("email_draft_goal") or {}
+    if _plaintext_size(state) > STATE_PLAINTEXT_LIMIT and goal.get("status") == "drafted":
+        draft = goal.get("draft")
+        if draft and any(
+            h.get("email_draft")
+            and h["email_draft"]["body"] == draft["body"]
+            and h["email_draft"]["subject"] == draft["subject"]
+            for h in state["history"]
+        ):
+            goal.pop("draft", None)
+
     # Pagination is recoverable by repeating a search. Source identity and the
     # exact current receipt/pending result take precedence at the hard boundary.
     if _plaintext_size(state) > STATE_PLAINTEXT_LIMIT:
@@ -263,6 +276,8 @@ async def complete(session, owner, request, lease, state, response):
                 "request_id": request.request_id,
                 "context_references": saved.get("context_references", []),
                 "error_code": saved.get("error_code"),
+                "email_draft": saved.get("email_draft"),
+                "version": row.version + 1,
             }
         ]
     )[-HISTORY_LIMIT:]
