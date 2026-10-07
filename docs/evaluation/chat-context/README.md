@@ -1,32 +1,38 @@
 # Shared chat-context verification
 
 Current prompt: **`contextual-conversation-1.8.9+chat-context.2`**. The `.1` snapshot
-is historical. This isolated implementation is uncommitted and unpublished.
+is historical. The integrated implementation is committed locally and unpublished.
 Backend base: `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. Both include the released voice repair.
 
 The [design review](../../chat-context-design-review.md) describes implemented
 behavior, remaining semantic limits and the coordinated migration requirement.
 The [first-stage proposal](first-stage-proposal.md) pins the deployed model,
-three diagnostic scenarios, hard caps, official pricing and missing authorization.
-**No real-model evaluation has run.**
+three diagnostic scenarios, hard caps and official pricing. The user approved the
+exact scope on 2026-10-07 at 10:58:05 UTC. AWS subsequently rejected CountTokens
+with `ValidationException`; see [evaluation status](approved-evaluation-status.md).
+**No paid inference or semantic model evaluation has run.**
 
-Latest full backend suite: **2,236 passed**, no skips, one Starlette deprecation
+Combined full backend suite: **2,260 passed**, no skips, one Starlette deprecation
 warning, using real isolated PostgreSQL and scripted model/fake Google adapters.
-This includes independent goals, citations, historical clocks, encrypted worker
-context, compaction, retention, source identity, migrations and released voice tests.
-Afterward, only the opt-in evaluation harness and its offline guards changed:
-**12 guard/rehearsal tests passed; the paid test skipped intentionally**.
+The additional combined approval-isolation test passed separately after full-suite
+collection. It proves chat Always can approve its own resumed event without approving
+the separate email-button candidate or changing retained chat goals. Runtime code
+was unchanged between these runs. Earlier evaluation-guard/rehearsal checks had
+12 passes and the intentionally skipped live test; those offline cases are now also
+included in the full combined suite.
 
-Frontend: **235 unit tests passed**, typecheck and local/public builds passed.
-The full local browser suite had **46 passed / 1 skipped**; the skipped packaged
-public-origin case then passed separately against a public-origin build. These
-are mechanical tests, not real Google/Bedrock compatibility evidence.
+Combined frontend: **240 unit tests passed**, typecheck and local/public builds
+passed. Full browser suite: **47 passed / 1 skipped**; the skipped public-origin
+case then passed against its required build. The extended meeting-email browser
+regression also passed with the new context protocol and a follow-up chat turn.
+These are mechanical results, not real Google/Bedrock quality evidence.
 
-The machine-readable [receipt](mechanical-verification.json) records exact bases,
-source hashes and run boundaries. It preserves previous failures and their fixes.
-These are working-tree receipts, not exact committed-head CI or release gates.
-The untouched released voice files are verified against their respective bases.
+The [receipt](mechanical-verification.json) records exact code/test heads, source
+hashes and run boundaries. Previous failures and fixes remain disclosed. Final
+commits after the tested code/test heads update evidence only. The released voice
+files remain unchanged. See [combined review](integration-review.md) for the source,
+goal and approval boundaries and remaining architectural/release limits.
 
 Reproduce from `backend/` using the owned disposable database:
 
@@ -37,12 +43,10 @@ python -m pytest -q tests/test_chat_context_evaluation_budget.py tools/evaluate_
 python -m ruff check app tests tools
 ```
 
-Do not set the live-evaluation opt-in without the explicit approval described in
-its proposal. No production migration, cleanup job, release push, provider write
-or deployment was performed.
+The approved live evaluation stopped at its required CountTokens preflight.
+Do not use a different model/region, an uncounted fallback or larger caps to continue.
+No production migration, cleanup job, release push, provider write or deployment ran.
 
-The meeting-email button is separately implemented on backend commit
-`53a0d11c13cf4806d12cb5380487df5c0e3891d5` and frontend commit
-`fb6d8d5b765ff1bcd5eaee6b2e00ae84d1c28fd8`. Its tests and contract are in each
-branch's `docs/meeting-email-create-event.md`; it is not merged into this tree or
-included in the core full-suite count. Joint integration still needs verification.
+Original button commits `53a0d11` (backend) and `fb6d8d5` (frontend) remain preserved
+on their independent branches. They are integrated into these context stacks as
+`2768f25` and `53e1770`; their tests are included in the combined counts above.

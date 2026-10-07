@@ -1,7 +1,9 @@
 # First-stage model evaluation proposal — not executed
 
-Status: approval proposal only. No CountTokens request or paid inference has run.
-No publication or deployment is included. This replaces the earlier 48-call proposal.
+Status: the user approved this exact scope on 2026-10-07 at 10:58:05 UTC. The
+required CountTokens request then failed with AWS `ValidationException`; no paid
+inference ran. See [execution status](approved-evaluation-status.md). No publication
+or deployment is included. This supersedes the earlier 48-call proposal.
 
 ## Exact model and destination
 
@@ -110,9 +112,9 @@ Any authority/ownership violation is a fail. Mechanical assertions and aggregate
 counts do not replace semantic review. A clean diagnostic still requires held-out
 paraphrases, failure/retry coverage and integration/release gates before deployment.
 
-## Permission that is still missing
+## Approved transmission scope
 
-The eventual approval must expressly cover **sending the repository's internal
+The recorded user approval expressly covers **sending the repository's internal
 system prompt/tool schemas plus synthetic scenario/tool-result text to AWS Bedrock
 CountTokens and Converse in Sydney using the AU profile above**, within this budget.
 It covers no real Gmail/Calendar data, credentials/grants, production settings,
@@ -120,5 +122,9 @@ provider writes, publication or deployment.
 
 Automatic approval review rejected the earlier **CountTokens preflight to AWS
 Bedrock** before execution because explicit authorization to transmit the internal
-prompt and tool schemas was not established. It has not been retried or routed
-through another executor. The opt-in environment string is a guard, not permission.
+prompt and tool schemas was not established. After the user explicitly approved this transmission, the same preflight passed
+automatic review. A local SDK dependency first prevented client construction;
+installing its pinned native dependency locally allowed one AWS CountTokens request.
+That request failed with `ValidationException`, stopping the evaluation before any
+paid call. No alternate executor, model, region or uncounted fallback was used.
+The opt-in environment string is a guard, not permission.

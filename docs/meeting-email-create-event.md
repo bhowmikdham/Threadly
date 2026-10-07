@@ -1,7 +1,9 @@
 # Create an event from an email
 
 Implemented locally on the released backend base `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
-This is an independent change from conversation-context continuity. It is not deployed.
+The original independent change is now integrated locally with conversation-context
+continuity. See [combined review](evaluation/chat-context/integration-review.md).
+It is not deployed.
 
 An email-result card offers **Create event**. Clicking it reads that exact Gmail
 message through the authenticated account, displays a bounded fresh source excerpt,

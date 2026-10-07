@@ -1,6 +1,6 @@
 # Shared conversation context: implementation and review
 
-Status: isolated, uncommitted implementation, prompt
+Status: locally committed, integrated implementation, prompt
 `contextual-conversation-1.8.9+chat-context.2`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
@@ -158,9 +158,8 @@ held-out paraphrases are required before release; a successful diagnostic invoca
 alone is not a pass threshold. Provider failures, retries, account changes and browser
 restoration currently have mechanical tests, not repeated live-model evaluation.
 
-The meeting-email Create event button is separately implemented on backend commit
-`53a0d11c13cf4806d12cb5380487df5c0e3891d5` and frontend commit
-`fb6d8d5b765ff1bcd5eaee6b2e00ae84d1c28fd8`, based on the same released heads. It uses
-a fresh owned email reference, editable manual date/time fields, immutable preview
-and final exact confirmation under Always. Its code and tests remain isolated;
-integration with the context changes has not been tested or published.
+The meeting-email Create event button is integrated into these local stacks while
+its original commits remain preserved. It uses a fresh owned email reference,
+editable manual date/time fields, immutable preview and final exact confirmation
+under Always. See the [combined review](evaluation/chat-context/integration-review.md)
+for commit lineage, approval-isolation evidence and remaining release gates.
