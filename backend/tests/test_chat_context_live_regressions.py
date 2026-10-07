@@ -284,6 +284,35 @@ async def test_explicit_goal_binding_allows_an_intentional_recipient_revision(
     )
 
 
+async def test_explicit_goal_binding_cancels_only_the_requested_draft(prepared, db_sessionmaker):
+    previous, alex_id, casey_id = await alex_and_casey(db_sessionmaker, prepared)
+    async with db_sessionmaker() as db:
+        alex_hash = (
+            await db.get(ConversationGoal, (previous["conversation_id"], alex_id))
+        ).payload_hash
+    text = "Cancel Casey's email"
+    response = await step(
+        db_sessionmaker,
+        previous,
+        text,
+        Model(
+            tool(
+                "prepare_email_draft",
+                goal_id=casey_id,
+                continue_previous=True,
+                request_source=text,
+            )
+        ),
+    )
+    assert response["text"] == "Okay, I won’t continue that draft."
+    async with db_sessionmaker() as db:
+        casey = await db.get(ConversationGoal, (previous["conversation_id"], casey_id))
+        alex = await db.get(ConversationGoal, (previous["conversation_id"], alex_id))
+        assert casey.status == "closed"
+        assert alex.status == "retained" and alex.payload_hash == alex_hash
+        assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0
+
+
 @pytest.mark.parametrize("violation", ["other_chat", "other_owner", "source", "cancel_ambiguous"])
 async def test_goal_binding_rejects_scope_errors_without_mutating_state(
     prepared, db_sessionmaker, violation

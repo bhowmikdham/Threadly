@@ -150,13 +150,20 @@ async def prepare(runtime, args):
     cited = await citations.resolve(runtime, args.citations)
     user_context = list((await citations.resolve(runtime, args.context_citations)).values())
     previous = runtime.state.get(KEY)
+    cancelling = _revokes_compose_request(latest)
     if args.request_source:
         from app.conversation.user_intent import validate
 
-        validate(args.request_source, runtime.request.instruction)
-    if args.continue_previous or _revokes_compose_request(latest):
+        if cancelling:
+            # Declining creation is valid cancellation intent. Still bind it to
+            # this USER turn; the creation-intent validator rejects cancellations.
+            if args.request_source != runtime.request.instruction:
+                raise ValueError("Copy the complete current USER turn as request_source")
+        else:
+            validate(args.request_source, runtime.request.instruction)
+    if args.continue_previous or cancelling:
         previous = await goals.bind_email_continuation(runtime, args)
-    if _revokes_compose_request(latest):
+    if cancelling:
         goals.close(runtime.state, previous)
         runtime.state.pop(KEY, None)
         return {"kind": "message", "text": "Okay, I won’t continue that draft."}
