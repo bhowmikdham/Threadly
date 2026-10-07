@@ -105,10 +105,49 @@ async def context(runtime, session):
     }
 
 
-async def review(runtime):
+async def open_existing(runtime):
+    """Surface the owned current draft as work, without executing or regenerating it."""
+    from app.api.routes.assistant import task_view
+    from app.assistant import draft_review, tasks
+
+    if draft := email_draft.current_text_draft(runtime.state):
+        runtime.state["active_goal"] = "email_draft"
+        runtime.resumed_goal_id = runtime.state[email_draft.KEY].get("goal_id")
+        return {"email_draft": draft}
+    if not runtime.artifact or runtime.artifact.payload.get("kind") != "draft":
+        return {}
+    # The source comes from the server-loaded current artifact, not a model ID.
+    # Recheck ownership/current revision before returning a card, even on replay.
+    async with runtime.factory() as session:
+        task = await tasks.owned_task(session, runtime.owner, runtime.artifact.task_id)
+        if not task.final_artifact_id:
+            return {}
+        artifact = await draft_review.owned_artifact(session, runtime.owner, task.final_artifact_id)
+        if artifact.payload.get("kind") != "draft":
+            return {}
+        active = await task_view(session, task)
+    runtime.state["active_task_id"] = task.id
+    runtime.state.pop("proposal_id", None)
+    runtime.state["active_goal"] = "saved_task"
+    runtime.state["active_goal_id"] = task.id
+    runtime.active, runtime.artifact = active, artifact
+    runtime.resumed_task_id = task.id
+    runtime.resumed_goal_id = task.id
+    return {"task_id": task.id, "task": active}
+
+
+async def review(runtime, *, presentation="status"):
+    opened = await open_existing(runtime)
     async with runtime.factory() as session:
         value = await context(runtime, session)
     runtime.email_draft_review = value
+    if presentation == "open" and opened:
+        return {
+            "kind": "message",
+            "text": "Here is your existing draft.",
+            **opened,
+            "email_draft_review": value,
+        }
     status = value["save_status"]
     if status == "succeeded":
         text = (
@@ -164,7 +203,7 @@ async def review(runtime):
             "Chat replies don’t save or send it. If the card or button is missing or disabled, "
             "update/reload the extension and reopen this chat."
         )
-    return {"kind": "message", "text": text, "email_draft_review": value}
+    return {"kind": "message", "text": text, **opened, "email_draft_review": value}
 
 
 def unsupported_promise(text):

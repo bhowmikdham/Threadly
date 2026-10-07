@@ -236,6 +236,16 @@ class PrepareWorkflow(StrictModel):
 
 
 class PrepareEmailDraft(StrictModel):
+    goal_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=36,
+        description=(
+            "The owned retained email goal to continue or revise. Required with multiple email "
+            "goals unless select_conversation_goal selected it this turn. Never substitute a "
+            "different recipient on the currently focused goal to switch drafts."
+        ),
+    )
     request_source: str = Field(
         default="",
         max_length=4000,
@@ -257,12 +267,17 @@ class PrepareEmailDraft(StrictModel):
 
     @model_validator(mode="after")
     def cited_fields(self):
+        if self.goal_id and not self.continue_previous:
+            raise ValueError("A goal_id selects existing work; use continue_previous=true")
         validate_fields(self.citations, {"recipient", "purpose"})
         return self
 
 
 class ReviewEmailDraft(StrictModel):
-    pass
+    presentation: Literal["open", "status"] = Field(
+        default="open",
+        description="Open returns the existing editable draft; status also explains save controls.",
+    )
 
 
 class AnswerQuestion(StrictModel):
@@ -314,9 +329,11 @@ TOOLS = {
     ),
     "review_email_draft": (
         ReviewEmailDraft,
-        "Read the current email draft's saved status and actual review controls. Use for "
-        "save/send/insert follow-ups, repeated yes after discussing saving, missing cards, "
-        "or draft status. Retains the current draft. Never saves, sends, inserts, approves, "
+        "Open the current existing email draft and return its actual editable card without "
+        "regenerating it. Default presentation=open is for returning to/reviewing the draft; "
+        "presentation=status also explains save/send/insert status and actual controls. "
+        "Select an older goal first if needed. Retains unrelated goals. Never saves, sends, "
+        "inserts, approves, "
         "or changes permissions; Gmail creation still requires the user's card click. Terminal.",
     ),
     "prepare_email_draft": (
@@ -326,7 +343,10 @@ TOOLS = {
         "and purpose/message facts as exact USER wording; leave genuinely missing fields empty. "
         "The backend asks only for missing fields. No subject or exact email address is required. "
         "Use continue_previous=true to answer the pending_email_draft question, repeat an "
-        "unfinished request, or revise its text; supply only newly stated fields. A new goal "
+        "unfinished request, or revise its text; supply only newly stated fields. Bind the "
+        "intended goal_id (or select_conversation_goal this turn) when multiple drafts exist. "
+        "Changing recipient is a revision of that explicit goal, not a switch to another one. "
+        "A new goal "
         "uses false and must not inherit the old recipient/purpose. When recipient and purpose "
         "are known, supply draft with a generated subject, plain-text body, unresolved_fields "
         "and sources=[]; keep unknown facts as visible placeholders. Literal user-addressed "

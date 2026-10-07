@@ -150,14 +150,16 @@ async def prepare(runtime, args):
     cited = await citations.resolve(runtime, args.citations)
     user_context = list((await citations.resolve(runtime, args.context_citations)).values())
     previous = runtime.state.get(KEY)
-    if _revokes_compose_request(latest):
-        goals.close(runtime.state, previous)
-        runtime.state.pop(KEY, None)
-        return {"kind": "message", "text": "Okay, I won’t continue that draft."}
     if args.request_source:
         from app.conversation.user_intent import validate
 
         validate(args.request_source, runtime.request.instruction)
+    if args.continue_previous or _revokes_compose_request(latest):
+        previous = await goals.bind_email_continuation(runtime, args)
+    if _revokes_compose_request(latest):
+        goals.close(runtime.state, previous)
+        runtime.state.pop(KEY, None)
+        return {"kind": "message", "text": "Okay, I won’t continue that draft."}
     if runtime.loaded:
         raise EmailDraftInputError("source_bound_workflow_required")
     if args.continue_previous:

@@ -757,7 +757,7 @@ class Runtime:
         if name == "recall_conversation":
             return await memory.recall(self, args)
         if name == "review_email_draft":
-            return await email_review.review(self)
+            return await email_review.review(self, presentation=args.presentation)
         if name == "prepare_email_draft":
             result = await email_draft.prepare(self, args)
             self.state["active_goal"] = "email_draft"

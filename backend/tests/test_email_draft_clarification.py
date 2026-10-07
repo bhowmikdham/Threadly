@@ -356,10 +356,14 @@ async def test_new_goal_ignores_the_clients_stale_previous_task_pointer(db_sessi
             "instruction": "ask about the presentation requirements",
         }
     )
+    async with db_sessionmaker() as db:
+        retained = store.decode(await db.get(Conversation, new.conversation_id))[email_draft.KEY]
     model = Model(
         tool(
             "prepare_email_draft",
             continue_previous=True,
+            goal_id=retained["goal_id"],
+            request_source=followup.instruction,
             purpose="ask about the presentation requirements",
             draft={**DRAFT, "body": DRAFT["body"].replace("Alex", "Priya")},
         )

@@ -620,6 +620,18 @@ async def run(context, runtime, model=None):
                                         "Use prepare_workflow for a source-based reply/draft. "
                                         "Preserve the read source and the user's goal."
                                         if reason == "source_bound_workflow_required"
+                                        else "Choose the intended owned email goal explicitly. "
+                                        "Pass its goal_id and the complete current USER turn as "
+                                        "request_source, with continue_previous=true, or call "
+                                        "select_conversation_goal before preparing it. Use "
+                                        "list_conversation_goals if needed. Do not switch drafts "
+                                        "by replacing the focused goal's recipient. Ask which "
+                                        "draft if the current request is ambiguous."
+                                        if reason
+                                        in {
+                                            "email_goal_selection_required",
+                                            "email_goal_source_required",
+                                        }
                                         else "Interpret the current USER request. For a new "
                                         "independent email use continue_previous=false and "
                                         "copy the complete current USER turn into request_source. "

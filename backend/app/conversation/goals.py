@@ -193,7 +193,7 @@ async def listing(
     }
 
 
-async def select_goal(runtime, args):
+async def select_goal(runtime, args, *, expected_kind=None):
     from app.api.routes.assistant import task_view
     from app.assistant import command_plans, coordinator, draft_review, tasks
     from app.conversation import email_draft, store
@@ -205,6 +205,8 @@ async def select_goal(runtime, args):
         row = await session.get(ConversationGoal, (chat.id, args.goal_id))
         if row is None or row.status == "closed":
             raise ApiError(404, "conversation_goal_missing", "That goal is no longer available.")
+        if expected_kind is not None and row.kind != expected_kind:
+            raise ApiError(422, "conversation_goal_kind", "Select a goal of the requested kind.")
         payload = json.loads(decrypt_token(row.payload_enc))
         kind = row.kind
     value = payload["value"]
@@ -246,3 +248,44 @@ async def select_goal(runtime, args):
         "email_draft": email_draft.current_text_draft(runtime.state),
         "notice": "Selected retained work. No execution or approval occurred.",
     }
+
+
+async def bind_email_continuation(runtime, args):
+    """Do not let an unqualified continuation choose among independent drafts.
+
+    Explicit selection is scoped to this owned chat and this current USER turn.
+    Recipient strings never act as identity or as an automatic routing heuristic.
+    """
+    from app.conversation import email_draft, store
+    from app.schemas.conversation import SelectConversationGoal
+
+    previous = runtime.state.get(email_draft.KEY)
+    if args.goal_id:
+        if args.request_source != runtime.request.instruction:
+            raise email_draft.EmailDraftInputError("email_goal_source_required")
+        await select_goal(
+            runtime,
+            SelectConversationGoal(goal_id=args.goal_id, source=args.request_source),
+            expected_kind="email_draft",
+        )
+        return runtime.state.get(email_draft.KEY)
+    if not previous or not runtime.factory:
+        return previous
+    if getattr(runtime, "resumed_goal_id", None) == previous.get("goal_id"):
+        return previous
+    async with runtime.factory() as session:
+        chat = await store.owned(session, runtime.owner, runtime.request.conversation_id)
+        ids = (
+            await session.scalars(
+                select(ConversationGoal.goal_id)
+                .where(
+                    ConversationGoal.conversation_id == chat.id,
+                    ConversationGoal.kind == "email_draft",
+                    ConversationGoal.status == "retained",
+                )
+                .limit(2)
+            )
+        ).all()
+    if len(ids) > 1:
+        raise email_draft.EmailDraftInputError("email_goal_selection_required")
+    return previous
