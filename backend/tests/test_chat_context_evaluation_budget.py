@@ -10,6 +10,7 @@ from tests.test_on_demand_gmail import setup  # noqa: F401
 from tools.evaluate_chat_context import (
     APPROVED_MODEL,
     APPROVED_REGION,
+    COUNT_MODEL,
     Budget,
     BudgetExceeded,
     install_dispatch_guard,
@@ -22,8 +23,10 @@ class Raw:
         self.calls = 0
         self.tokens = 10
         self.last = None
+        self.last_count = None
 
     def count_tokens(self, **kwargs):
+        self.last_count = kwargs
         return {"inputTokens": self.tokens}
 
     def converse(self, **kwargs):
@@ -46,6 +49,8 @@ def test_live_harness_caps_every_scenario_and_total_before_inference():
                 client.converse(modelId=APPROVED_MODEL, messages=[])
     assert raw.calls == 18
     assert raw.last["inferenceConfig"]["maxTokens"] == 1800
+    assert raw.last["modelId"] == APPROVED_MODEL
+    assert raw.last_count["modelId"] == COUNT_MODEL
     with pytest.raises(BudgetExceeded, match="18-call"):
         client.converse(modelId=APPROVED_MODEL, messages=[])
     assert raw.calls == 18
@@ -113,6 +118,34 @@ def test_deadline_blocks_new_inference():
     with pytest.raises(BudgetExceeded, match="time budget"):
         budget.client(raw).converse(modelId=APPROVED_MODEL, messages=[])
     assert raw.calls == 0
+
+
+def test_budget_ledger_reserves_before_dispatch_and_survives_restarts(tmp_path):
+    path = tmp_path / "budget.json"
+    budget, raw = Budget(path), Raw()
+    budget.scenario = "long_arbitrary_correction"
+    original = raw.converse
+
+    def observe(**request):
+        saved = json.loads(path.read_text())
+        assert saved["calls"][-1]["outcome"] == "pending"
+        return original(**request)
+
+    raw.converse = observe
+    for _ in range(6):
+        budget.client(raw).converse(modelId=APPROVED_MODEL, messages=[])
+    with pytest.raises(BlockingIOError):
+        Budget(path)
+    budget.close()
+    resumed = Budget(path)
+    resumed.scenario = "long_arbitrary_correction"
+    try:
+        assert len(resumed.calls) == 6
+        with pytest.raises(BudgetExceeded, match="scenario"):
+            resumed.client(raw).converse(modelId=APPROVED_MODEL, messages=[])
+        assert raw.calls == 6
+    finally:
+        resumed.close()
 
 
 def test_global_dispatch_guard_covers_independent_default_clients(monkeypatch):

@@ -36,6 +36,9 @@ APPROVED_MODEL = (
     "au.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
 APPROVED_REGION = "ap-southeast-2"
+# Verified from GetInferenceProfile. Runtime CountTokens accepts this bare ID;
+# the same model's foundation/profile ARN forms return ValidationException.
+COUNT_MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0"
 APPROVAL = "approved-18-calls-internal-prompt-and-synthetic-data"
 
 
@@ -52,6 +55,8 @@ if os.getenv("THREADLY_CONTEXT_EVAL") == APPROVAL:
         raise RuntimeError("Live evaluation requires the explicitly owned disposable test DB")
     if not os.getenv("THREADLY_CONTEXT_EVAL_REPORT"):
         raise RuntimeError("Explicit evidence report destination required")
+    if not os.getenv("THREADLY_CONTEXT_EVAL_LEDGER"):
+        raise RuntimeError("Persistent budget ledger required across evaluation attempts")
 
 
 class BudgetExceeded(ProviderError):
@@ -65,12 +70,54 @@ class Budget:
     max_output = 1800
     max_seconds = 900
 
-    def __init__(self):
+    def __init__(self, ledger_path=None):
         self.calls = []
+        self.preflights = []
         self.lock = threading.Lock()
         self.started = time.monotonic()
         self.scenario = None
         self.halted = False
+        self.ledger = None
+        self.ledger_path = Path(ledger_path) if ledger_path else None
+        if ledger_path:
+            import fcntl
+
+            self.ledger = Path(str(ledger_path) + ".lock").open("a+")
+            try:
+                fcntl.flock(self.ledger, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except Exception:
+                self.ledger.close()
+                raise
+            saved = self.ledger_path.read_text() if self.ledger_path.exists() else None
+            if saved:
+                data = json.loads(saved)
+                if data["inference_model"] != APPROVED_MODEL or data["count_model"] != COUNT_MODEL:
+                    raise BudgetExceeded("Evaluation ledger belongs to another model")
+                self.calls = data["calls"]
+                self.preflights = data["preflights"]
+            elif saved is not None:
+                raise BudgetExceeded("Existing evaluation ledger is empty or damaged")
+
+    def save(self):
+        if self.ledger:
+            temporary = Path(str(self.ledger_path) + ".next")
+            with temporary.open("w") as stream:
+                json.dump(
+                    {
+                        "inference_model": APPROVED_MODEL,
+                        "count_model": COUNT_MODEL,
+                        "calls": self.calls,
+                        "preflights": self.preflights,
+                    },
+                    stream,
+                )
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary.replace(self.ledger_path)
+
+    def close(self):
+        if self.ledger:
+            self.ledger.close()
 
     def client(self, raw):
         budget = self
@@ -94,9 +141,11 @@ class Budget:
                         raise BudgetExceeded(
                             "Caching, guardrails and extra request features blocked"
                         )
+                    preflight = {"scenario": budget.scenario, "model_id": COUNT_MODEL}
+                    budget.preflights.append(preflight)
                     try:
-                        count = raw.count_tokens(
-                            modelId=request["modelId"],
+                        counted = raw.count_tokens(
+                            modelId=COUNT_MODEL,
                             input={
                                 "converse": {
                                     k: request[k]
@@ -108,14 +157,27 @@ class Budget:
                                     if k in request
                                 }
                             },
-                        )["inputTokens"]
-                    except Exception:
+                        )
+                        count = counted["inputTokens"]
+                        preflight.update(
+                            input_tokens=count,
+                            request_id=counted.get("ResponseMetadata", {}).get("RequestId"),
+                        )
+                    except Exception as exc:
+                        response = getattr(exc, "response", {})
+                        preflight.update(
+                            error_type=type(exc).__name__,
+                            error_code=response.get("Error", {}).get("Code"),
+                            request_id=response.get("ResponseMetadata", {}).get("RequestId"),
+                        )
                         budget.halted = True
+                        budget.save()
                         raise BudgetExceeded(
                             "Token preflight unavailable; no paid fallback"
                         ) from None
                     if type(count) is not int or not 0 <= count <= budget.max_input:
                         budget.halted = True
+                        budget.save()
                         raise BudgetExceeded("32000-token input budget exceeded or invalid")
                     if time.monotonic() - budget.started >= budget.max_seconds:
                         raise BudgetExceeded("Time budget exhausted during token preflight")
@@ -132,8 +194,10 @@ class Budget:
                         "max_output_tokens": budget.max_output,
                         "scenario": budget.scenario,
                         "request": json.loads(json.dumps(request)),
+                        "outcome": "pending",
                     }
                     budget.calls.append(receipt)  # Count failures too; no hidden paid retry.
+                    budget.save()  # Reserve before dispatch, including process interruption.
                     started = time.monotonic()
                     try:
                         result = raw.converse(**request)
@@ -142,13 +206,16 @@ class Budget:
                         )
                         receipt["response"] = result.get("output")
                         receipt["request_id"] = result.get("ResponseMetadata", {}).get("RequestId")
+                        receipt["outcome"] = "completed"
                         return result
                     except Exception as exc:
                         budget.halted = True
                         receipt["error_type"] = type(exc).__name__
+                        receipt["outcome"] = "failed"
                         raise
                     finally:
                         receipt["latency_ms"] = round((time.monotonic() - started) * 1000)
+                        budget.save()
 
             def close(self):
                 raw.close()
@@ -360,7 +427,7 @@ async def test_live_context_scenarios(configured, db_sessionmaker, monkeypatch):
         return await original(*args, **kwargs, transport=httpx.MockTransport(calendar_fake))
 
     monkeypatch.setattr(client, "_request", calendar_request)
-    budget = Budget()
+    budget = Budget(os.getenv("THREADLY_CONTEXT_EVAL_LEDGER"))
     install_dispatch_guard(monkeypatch, budget)
     decider = ConversationModel()
     generator = ModelClient(bedrock=BedrockProvider())
@@ -379,6 +446,7 @@ async def test_live_context_scenarios(configured, db_sessionmaker, monkeypatch):
         "region": APPROVED_REGION,
         "scenarios": [],
         "calls": budget.calls,
+        "preflights": budget.preflights,
         "google_calendar_calls": google_calls,
         "human_review_required": True,
     }
@@ -462,4 +530,5 @@ async def test_live_context_scenarios(configured, db_sessionmaker, monkeypatch):
                 )
     finally:
         destination.write_text(json.dumps(report, indent=2, default=str) + "\n")
+        budget.close()
         get_settings.cache_clear()
