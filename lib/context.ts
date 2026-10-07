@@ -1,16 +1,16 @@
 import { api } from "./api"
 import type { Selection, User } from "./types"
 
-export async function activeGmail(user: User): Promise<Selection | null> {
+/** What the active Gmail tab shows, from its DOM; null when it isn't Gmail. */
+export async function observeGmail(): Promise<any | null> {
   const tabs = await chrome.tabs.query({
     active: true,
     lastFocusedWindow: true
   })
   const tab = tabs[0]
   if (!tab?.id || !tab.url?.startsWith("https://mail.google.com/")) return null
-  let observed: any
   try {
-    observed = await chrome.tabs.sendMessage(tab.id, {
+    return await chrome.tabs.sendMessage(tab.id, {
       action: "THREADLY_SELECTION"
     })
   } catch {
@@ -18,6 +18,10 @@ export async function activeGmail(user: User): Promise<Selection | null> {
       "Reload the Gmail tab after installing Threadly, then select the email again."
     )
   }
+}
+export async function activeGmail(user: User): Promise<Selection | null> {
+  const observed = await observeGmail()
+  if (!observed) return null
   if (
     observed.accountEmail &&
     observed.accountEmail.toLowerCase() !== user.email.toLowerCase()
@@ -41,7 +45,10 @@ export async function activeGmail(user: User): Promise<Selection | null> {
     selectedIds,
     targetId: ids.has(observed.selectedMessageId)
       ? observed.selectedMessageId
-      : null
+      : // A one-message thread has only one possible reply target.
+        data.messages.length === 1
+        ? data.messages[0].gmail_msg_id
+        : null
   }
 }
 export async function capture(selection: Selection) {

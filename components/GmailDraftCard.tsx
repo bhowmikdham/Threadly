@@ -9,16 +9,28 @@ export function GmailDraftCard({
   draft,
   user,
   conversation,
-  enabled = true
+  enabled = true,
+  replyThreadId
 }: {
   artifact?: Artifact
   draft?: EmailDraft
   user: User
   conversation?: { id: string; version: number }
   enabled?: boolean
+  /** The Gmail thread this chat is about; Insert targets its reply box. */
+  replyThreadId?: string | null
 }) {
   const content = artifact?.artifact.content || draft
   const envelope = artifact?.draft_envelope
+  const insertThread = (
+    envelope?.reply?.gmail_thread_id ||
+    replyThreadId ||
+    ""
+  ).toLowerCase()
+  // A reply already has its thread and subject, so the card shows only who it's
+  // for and the message, and goes into Gmail with Insert rather than as a draft.
+  const isReply =
+    Boolean(envelope?.reply) || /^re:/i.test(content.subject || "")
   const source = artifact
     ? `task/${artifact.task_id}`
     : `conversation/${draft.draft_id}`
@@ -39,6 +51,7 @@ export function GmailDraftCard({
   const [uncertain, setUncertain] = useState(false)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
+  const [replyOpen, setReplyOpen] = useState(false)
   const live = useRef(false)
   const submitting = useRef(false)
   const attempt = useRef<any>(null)
@@ -89,6 +102,59 @@ export function GmailDraftCard({
       live.current = false
     }
   }, [])
+  // Insert is offered while Gmail shows a reply box on this card's email.
+  useEffect(() => {
+    if (!insertThread || !chrome.tabs?.query) return
+    let active = true
+    const check = async () => {
+      let open = false
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true
+        })
+        if (tab?.id && tab.url?.startsWith("https://mail.google.com/")) {
+          const seen = await chrome.tabs.sendMessage(tab.id, {
+            action: "THREADLY_SELECTION"
+          })
+          open =
+            seen?.replyEditorOpen === true && seen.threadId === insertThread
+        }
+      } catch {
+        open = false
+      }
+      if (active) setReplyOpen(open)
+    }
+    void check()
+    const timer = setInterval(() => void check(), 1000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [insertThread])
+  const insert = async () => {
+    if (submitting.current) return
+    setError("")
+    setNotice("")
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        lastFocusedWindow: true
+      })
+      if (!tab?.id) throw new Error("Open the Gmail tab with this email.")
+      const result = await chrome.tabs.sendMessage(tab.id, {
+        action: "THREADLY_INSERT",
+        threadId: insertThread,
+        body
+      })
+      if (!result?.ok)
+        throw new Error(result?.message || "Could not insert the draft.")
+      if (live.current)
+        setNotice("Added to your Gmail reply. Nothing was sent.")
+    } catch (e) {
+      if (live.current) setError(errorText(e))
+    }
+  }
   const refresh = async () => {
     if (submitting.current) return
     submitting.current = true
@@ -260,6 +326,8 @@ export function GmailDraftCard({
     receipt && artifact && receipt.source_artifact_id !== artifact.artifact_id
   )
   const locked = busy || (Boolean(receipt) && !earlierRevision) || uncertain
+  // Gmail Drafts controls stay for new emails, and for any reply already saved.
+  const drafting = !isReply || Boolean(receipt) || uncertain
   const status = consenting
     ? "Waiting for Google…"
     : creating
@@ -286,19 +354,23 @@ export function GmailDraftCard({
       <header className="gmail-draft-heading">
         <span className="gmail-draft-brand">
           <GmailIcon size={22} />
-          <strong>Email draft</strong>
+          <strong>{isReply ? "Reply" : "Email draft"}</strong>
         </span>
-        <span
-          className={`gmail-draft-status ${receipt?.state === "succeeded" ? "is-saved" : ""}`}
-          role="status">
-          {status}
-        </span>
+        {(!isReply || receipt) && (
+          <span
+            className={`gmail-draft-status ${receipt?.state === "succeeded" ? "is-saved" : ""}`}
+            role="status">
+            {status}
+          </span>
+        )}
       </header>
       <div className="gmail-draft-fields">
-        <p className="gmail-draft-from">
-          <span>From</span>
-          <span>{user.email}</span>
-        </p>
+        {isReply && (
+          <p className="gmail-draft-from">
+            <span>From</span>
+            <span>{user.email}</span>
+          </p>
+        )}
         <label className="gmail-draft-field">
           <span>To</span>
           <input
@@ -310,15 +382,17 @@ export function GmailDraftCard({
             placeholder="Name or email address"
           />
         </label>
-        <button
-          className="text-button gmail-draft-more"
-          type="button"
-          disabled={locked}
-          aria-expanded={more}
-          onClick={() => setMore(!more)}>
-          {more ? "Hide Cc / Bcc" : "Cc / Bcc"}
-        </button>
-        {more && (
+        {!isReply && (
+          <button
+            className="text-button gmail-draft-more"
+            type="button"
+            disabled={locked}
+            aria-expanded={more}
+            onClick={() => setMore(!more)}>
+            {more ? "Hide Cc / Bcc" : "Cc / Bcc"}
+          </button>
+        )}
+        {more && !isReply && (
           <>
             <label className="gmail-draft-field">
               <span>Cc</span>
@@ -342,17 +416,21 @@ export function GmailDraftCard({
             </label>
           </>
         )}
-        <label className="gmail-draft-field gmail-draft-subject">
-          <span>Subject</span>
-          <textarea
-            aria-label="Subject"
-            rows={2}
-            maxLength={998}
-            value={subject}
-            disabled={locked}
-            onChange={(e) => setSubject(e.target.value.replace(/[\r\n]/g, " "))}
-          />
-        </label>
+        {!isReply && (
+          <label className="gmail-draft-field gmail-draft-subject">
+            <span>Subject</span>
+            <textarea
+              aria-label="Subject"
+              rows={2}
+              maxLength={998}
+              value={subject}
+              disabled={locked}
+              onChange={(e) =>
+                setSubject(e.target.value.replace(/[\r\n]/g, " "))
+              }
+            />
+          </label>
+        )}
         <label className="gmail-draft-message">
           <span>Message</span>
           <textarea
@@ -371,32 +449,30 @@ export function GmailDraftCard({
             Before sending, fill in: {content.unresolved_fields.join("; ")}
           </p>
         )}
-        {envelope?.reply && subject !== content.subject && !receipt && (
-          <p className="muted">
-            Changing the subject creates a new email instead of a reply in the
-            original thread.
-          </p>
-        )}
         <p className="gmail-draft-hint">
-          {earlierRevision
-            ? "An earlier revision has a Gmail save attempt. Copy these newer edits into that draft after checking its status."
-            : receipt?.state === "succeeded"
-              ? "Ready for you to review and send in Gmail."
-              : "Edit here, then save to Gmail Drafts. You decide when to send."}
+          {!drafting
+            ? replyOpen
+              ? "Edit here, then Insert it into your Gmail reply. You decide when to send."
+              : "Click Reply in Gmail, then Insert this message. You decide when to send."
+            : earlierRevision
+              ? "An earlier revision has a Gmail save attempt. Copy these newer edits into that draft after checking its status."
+              : receipt?.state === "succeeded"
+                ? "Ready for you to review and send in Gmail."
+                : "Edit here, then save to Gmail Drafts. You decide when to send."}
         </p>
-        {!checking && !capability?.ready && !receipt && (
+        {drafting && !checking && !capability?.ready && !receipt && (
           <p className="warning">
             {permissionHint} You can still edit and copy this email.
           </p>
         )}
-        {!capability?.ready && canRequestDrafts && !receipt && (
+        {drafting && !capability?.ready && canRequestDrafts && !receipt && (
           <p className="gmail-draft-hint">
             Google’s permission includes managing drafts and sending email.
             Threadly uses this feature only to save drafts; you send them
             yourself in Gmail.
           </p>
         )}
-        {!enabled && !receipt && (
+        {drafting && !enabled && !receipt && (
           <p className="muted">
             This chat or draft has changed. Use the latest draft to create it in
             Gmail.
@@ -415,14 +491,18 @@ export function GmailDraftCard({
           </p>
         )}
         <div className="gmail-draft-actions">
-          {!capability?.ready && canRequestDrafts && !receipt && !uncertain && (
-            <button
-              disabled={busy || checking || !enabled}
-              onClick={() => void enableDrafts()}>
-              {consenting ? "Waiting for Google…" : "Enable draft creation"}
-            </button>
-          )}
-          {!receipt && (
+          {drafting &&
+            !capability?.ready &&
+            canRequestDrafts &&
+            !receipt &&
+            !uncertain && (
+              <button
+                disabled={busy || checking || !enabled}
+                onClick={() => void enableDrafts()}>
+                {consenting ? "Waiting for Google…" : "Enable draft creation"}
+              </button>
+            )}
+          {drafting && !receipt && (
             <button
               className="primary"
               disabled={busy || checking || !enabled || !capability?.ready}
@@ -444,13 +524,32 @@ export function GmailDraftCard({
               Open Gmail Drafts
             </a>
           )}
+          {insertThread && (
+            <button
+              className={drafting ? undefined : "primary"}
+              disabled={busy || !replyOpen || !body.trim()}
+              title={
+                replyOpen
+                  ? "Add this message to your Gmail reply"
+                  : "Click Reply in Gmail to insert this message"
+              }
+              onClick={() => void insert()}>
+              <Icon name="edit" size={14} />
+              Insert
+            </button>
+          )}
           <button
             disabled={busy}
             onClick={() =>
               void navigator.clipboard
-                .writeText(`Subject: ${subject}\n\n${body}`)
+                .writeText(isReply ? body : `Subject: ${subject}\n\n${body}`)
                 .then(() => {
-                  if (live.current) setNotice("Copied subject and message.")
+                  if (live.current)
+                    setNotice(
+                      isReply
+                        ? "Copied message."
+                        : "Copied subject and message."
+                    )
                 })
                 .catch((e) => {
                   if (live.current) setError(errorText(e))
@@ -460,6 +559,7 @@ export function GmailDraftCard({
             Copy
           </button>
           {!busy &&
+            drafting &&
             (receipt ||
               uncertain ||
               error ||

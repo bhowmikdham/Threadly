@@ -150,6 +150,7 @@ export function TaskCard({
               version: entry.conversationVersion
             }}
             enabled={Boolean(controller.canCreateDraft?.(entry))}
+            replyThreadId={controller.selection?.thread.thread_id}
           />
         )}
         {entry.calendarAvailability && (

@@ -1,6 +1,10 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { fillReplyEditor, readGmailSelection } from "./lib/gmail-context"
+import {
+  insertIntoReplyEditor,
+  readGmailSelection,
+  targetReplyEditor
+} from "./lib/gmail-context"
 
 export const config: PlasmoCSConfig = { matches: ["https://mail.google.com/*"] }
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
@@ -20,40 +24,28 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
       !request.body.trim() ||
       request.body.length > 20000 ||
       !request.threadId ||
-      selected.threadId !== request.threadId
+      selected.threadId !== String(request.threadId).toLowerCase()
     ) {
       respond({
         ok: false,
         message:
-          "The selected thread changed. Open its reply editor and try again."
+          "The open email changed. Open this email’s reply box and try again."
       })
       return false
     }
-    const containers = Array.from(
-      document.querySelectorAll("[data-legacy-message-id]")
-    ).filter(
-      (el) => el.getAttribute("data-legacy-message-id") === request.messageId
-    )
-    const editors = containers
-      .flatMap((el) =>
-        Array.from(
-          el.querySelectorAll<HTMLElement>(
-            '[contenteditable="true"][role="textbox"]'
-          )
-        )
-      )
-      .filter((el) => el.getClientRects().length)
-    if (editors.length !== 1 || editors[0].innerText.trim()) {
+    const editor = targetReplyEditor(document)
+    if (!editor) {
       respond({
         ok: false,
         message:
-          "Open one empty reply editor on the selected message, or copy the draft instead."
+          "Click into the reply box you want to use, or copy the draft instead."
       })
       return false
     }
-    editors[0].focus()
-    fillReplyEditor(editors[0], request.body)
-    editors[0].dispatchEvent(
+    // Adds text only; anything already in the box stays, and nothing is sent.
+    insertIntoReplyEditor(editor, request.body)
+    editor.focus()
+    editor.dispatchEvent(
       new InputEvent("input", {
         bubbles: true,
         inputType: "insertText",
