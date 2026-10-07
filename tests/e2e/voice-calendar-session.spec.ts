@@ -61,6 +61,7 @@ wav.write("data", 36)
 wav.writeUInt32LE(800, 40)
 
 test.beforeEach(async () => {
+  page = undefined as any
   backend = createMockBackend()
   turns = []
   voiceCalls = []
@@ -159,7 +160,18 @@ test.beforeEach(async () => {
     ]
   })
   const worker =
-    context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"))
+    context
+      .serviceWorkers()
+      .find((w) => w.url().startsWith("chrome-extension://")) ||
+    (await context.waitForEvent("serviceworker", {
+      predicate: (w) => w.url().startsWith("chrome-extension://")
+    }))
+  // Chromium can announce the worker before its extension APIs are exposed.
+  await expect
+    .poll(() =>
+      worker.evaluate(() => Boolean(globalThis.chrome?.storage?.local))
+    )
+    .toBe(true)
   await worker.evaluate(
     async ({ origin, user }) => {
       await chrome.storage.local.set({
@@ -232,18 +244,22 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   releaseSpeech?.()
-  expect(errors).toEqual([])
-  expect(
-    await page.evaluate(() => (window as any).voiceTest.rejections)
-  ).toEqual([])
-  // Neither the worker nor the conversation invokes logout/reconnect/disconnect,
-  // approval, draft-save, or a real provider action in this test.
-  expect(
-    backend.calls.filter((c) => /\/auth\/|\/approve|\/drafts/.test(c.path))
-  ).toEqual([])
-  await context.close()
-  await new Promise<void>((r) => server.close(() => r()))
-  await rm(profile, { recursive: true, force: true })
+  try {
+    expect(errors).toEqual([])
+    if (page && !page.isClosed())
+      expect(
+        await page.evaluate(() => (window as any).voiceTest.rejections)
+      ).toEqual([])
+    // Neither the worker nor the conversation invokes logout/reconnect/disconnect,
+    // approval, draft-save, or a real provider action in this test.
+    expect(
+      backend.calls.filter((c) => /\/auth\/|\/approve|\/drafts/.test(c.path))
+    ).toEqual([])
+  } finally {
+    await context?.close()
+    await new Promise<void>((r) => server?.close(() => r()))
+    if (profile) await rm(profile, { recursive: true, force: true })
+  }
 })
 
 const stored = () =>
