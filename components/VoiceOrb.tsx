@@ -329,6 +329,10 @@ export function VoiceOrb({
   respond: (said: string) => Promise<VoiceReply>
   onClose: (error?: string) => void
 }) {
+  // Recognition lives for the whole voice session, but each turn must use the
+  // latest conversation/task context without restarting the microphone.
+  const callbacks = useRef({ respond, onClose })
+  callbacks.current = { respond, onClose }
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
@@ -348,7 +352,7 @@ export function VoiceOrb({
     if (closed.current) return
     closed.current = true
     stop.current()
-    onClose(error)
+    callbacks.current.onClose(error)
   }
   // Leave room for the docked orb above the conversation.
   useEffect(() => {
@@ -406,7 +410,8 @@ export function VoiceOrb({
       // worked out. The request is sent at the same time.
       move("speaking")
       let ready = false
-      const work = respond(said)
+      const work = callbacks.current
+        .respond(said)
         .then(
           (result) => result,
           () => null

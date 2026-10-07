@@ -50,6 +50,23 @@ const say = (text: string) =>
   )
 
 describe("voice conversation", () => {
+  it("uses the current turn handler after the first reply updates conversation state", async () => {
+    const firstTurn = vi.fn().mockResolvedValue("What should I call the event?")
+    const followUp = vi.fn().mockResolvedValue("Focus is ready to review.")
+    const onClose = vi.fn()
+    const view = render(<VoiceOrb respond={firstTurn} onClose={onClose} />)
+    say("Create me an event at 3 p.m. tomorrow")
+    await act(() => vi.advanceTimersByTimeAsync(1320))
+    view.rerender(<VoiceOrb respond={followUp} onClose={onClose} />)
+    say("Focus")
+    await act(() => vi.advanceTimersByTimeAsync(1320))
+    expect(firstTurn).toHaveBeenCalledTimes(1)
+    expect(followUp).toHaveBeenCalledWith("Focus")
+    expect(recognizer.abort).not.toHaveBeenCalled()
+    expect(screen.getByRole("status").textContent).toBe("Listening…")
+    expect(spoken.at(-1)).toBe("Focus is ready to review.")
+  })
+
   it.each([true, false])(
     "speaks structured reply text and honors showChat=%s",
     async (showChat) => {
