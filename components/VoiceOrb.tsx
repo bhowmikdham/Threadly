@@ -179,7 +179,7 @@ const labels: Record<Phase, string> = {
 // How long a pause ends what the user is saying.
 const PAUSE_MS = 1200
 // Said as soon as the user finishes speaking, while the answer is worked out.
-const ACKNOWLEDGE = "Sure, I can do that."
+const ACKNOWLEDGE = "Let me check that."
 // Talking over Threadly interrupts it. The microphone has to stay above
 // BARGE_LEVEL (0–1) for BARGE_MS, and not within BARGE_GRACE_MS of Threadly
 // starting to speak, so its own voice or a cough doesn't cut it off. If it
