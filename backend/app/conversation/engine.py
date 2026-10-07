@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
+from app.calendar import intent as calendar_intent
 from app.conversation import email_draft, email_review, mail_goal
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
@@ -194,6 +195,12 @@ async def run(context, runtime, model=None):
                     try:
                         if name not in TOOLS:
                             raise ValueError("Unknown tool")
+                        if name == "prepare_calendar_event":
+                            runtime.calendar_event_attempted = True
+                            runtime.calendar_event_new_goal = not values.get(
+                                "continue_previous", False
+                            )
+                            runtime.calendar_event_rejected = False
                         if name == "prepare_email_draft":
                             runtime.email_draft_attempted = True
                         if name in TERMINAL and len(requests) != 1:
@@ -281,15 +288,49 @@ async def run(context, runtime, model=None):
                             "json": {
                                 "error": "calendar_new_goal_required",
                                 "message": (
-                                    "This is a new explicit event-creation directive. Use "
-                                    "continue_previous=false and intent.operation=create. Extract "
-                                    "the complete new title, date, time and other fields from "
-                                    "the current user_turn; do not retain the previous title or "
-                                    "details. Missing fields belong to this new request."
+                                    "Resume only fills missing fields; it cannot replace an "
+                                    "existing event's details. Interpret the USER's goal: "
+                                    "a new event uses continue_previous=false and create intent, "
+                                    "extracting fresh fields without inheritance; a correction "
+                                    "uses revise intent and explicit field changes."
                                 ),
                             }
                         }
                         status = "error"
+                    except calendar_intent.IntentRequired:
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_intent_required",
+                            }
+                        )
+                        result = {
+                            "json": {
+                                "error": "calendar_intent_required",
+                                "message": "Supply intent.operation=create/resume/revise/cancel "
+                                "and "
+                                "intent.source copied from the complete current USER directive. "
+                                "Choose the operation semantically, regardless of word order. "
+                                "Preserve the supplied fields; repair the tool call yourself.",
+                            }
+                        }
+                        status = "error"
+                    except calendar_intent.IntentNotAuthorized:
+                        runtime.calendar_event_rejected = True
+                        trace.append(
+                            {
+                                "tool": name,
+                                "status": "invalid",
+                                "reason": "calendar_intent_not_authorized",
+                            }
+                        )
+                        return {
+                            "kind": "clarification",
+                            "text": "Do you want an event created, or only help with that text?",
+                            "release": RELEASE,
+                            "trace": trace,
+                        }
                     except event_draft.FieldRepairRequired as exc:
                         trace.append(
                             {
@@ -649,6 +690,11 @@ async def run(context, runtime, model=None):
                             }
                         status = "error"
                     except ApiError as exc:
+                        if (
+                            name == "prepare_calendar_event"
+                            and exc.code == "calendar_event_already_dispatched"
+                        ):
+                            runtime.calendar_event_rejected = True
                         trace.append({"tool": name, "status": exc.code})
                         result = {"json": {"error": exc.code, "message": exc.message}}
                         status = "error"
@@ -673,6 +719,9 @@ async def run(context, runtime, model=None):
             "The model is temporarily unavailable. Retry this message.",
         ) from None
     except (ProviderError, TimeoutError):
+        calendar_failure = conversation_guard.exhausted(runtime)
+        if calendar_failure:
+            return {**calendar_failure, "release": RELEASE, "trace": trace}
         if retained := mail_goal.incomplete(runtime) or mail_goal.search_incomplete(runtime):
             return {**retained, "release": RELEASE, "trace": trace}
         raise ApiError(

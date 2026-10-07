@@ -1,0 +1,46 @@
+{
+  "status": "local_verified_not_published",
+  "checked_at": "2026-10-07T04:48:27.217921+00:00",
+  "branch": "codex/calendar-semantic-intent",
+  "base_commit": "bbeec5dcc19046f8acf4fe1781bd17bf8cc1f4e0",
+  "tested_implementation_commit": "d397109626318abade5e76c1740964b479e956af",
+  "release": "contextual-conversation-1.8.8+calendar-intent.1",
+  "event_policy": "direct-calendar-event-1.2.0",
+  "intent_policy": "calendar-semantic-intent-1.0.0",
+  "checks": {
+    "backend_full": {
+      "passed": 2195,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 233.4,
+      "command": "THREADLY_REQUIRE_TEST_DB=1 PYTHONPATH=backend pytest -q backend/tests --tb=short",
+      "database": "isolated PostgreSQL 16; Google adapters mocked"
+    },
+    "lint": {
+      "passed": true,
+      "command": "ruff check backend/app backend/tests"
+    },
+    "diff_check": {
+      "passed": true,
+      "command": "git diff --check"
+    },
+    "model_decisions": {
+      "passed": 9,
+      "total": 9,
+      "record": "live-semantic-intent-2026-10-07.json",
+      "executed_tools": false
+    }
+  },
+  "reconciliation": [
+    "Preserved hands-free mail_goal turn setup, typed search/reply tools, verified receipt cards, continuation and error fallback.",
+    "Preserved adding successful calls to deduplication state only after execution.",
+    "Calendar recovery uses attempted operation state; mail recovery remains unchanged when Calendar has not been attempted."
+  ],
+  "limitations": [
+    "Initial tool selection is model-owned; nine live synthetic decisions are bounded evidence, not a guarantee for every paraphrase.",
+    "Conservative negation, reported/quoted content and instructional-text exclusions can require clarification for mixed requests.",
+    "Existing cancellation, correction, social and status guards remain; this change removes the positive creation grammar.",
+    "No real Google event write, remote push, PR, merge or deployment was performed."
+  ],
+  "next_gate": "Coordinating parent review and explicit publication/release authorization."
+}

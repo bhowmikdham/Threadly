@@ -8,7 +8,7 @@ class CalendarPreparationRequired(ValueError):
     """A Calendar creation turn needs a typed event result, not a prose promise."""
 
 
-class CalendarNewGoalRequired(ValueError):
+class CalendarNewGoalRequired(Exception):
     """A complete new creation directive must not inherit the previous draft."""
 
 
@@ -27,36 +27,8 @@ def social_response(text):
     return None
 
 
-def creation_turn(text):
-    # This recognizes routing, not write authorization. prepare() still performs
-    # the complete literal-source and exact-payload approval checks.
-    from app.calendar.event_creation import creation_request, creation_target
-
-    target = creation_target(text)
-    if not target:
-        return False
-    if creation_request(text):
-        return True
-    clock = re.search(r"\b\d{1,2}(?::[0-5]\d)?\s*(?:[ap]\.?\s*m\.?)?", target)
-    day = re.search(
-        r"\b(?:today|tomorrow|tmrw|tmr|(?:next\s+)?"
-        r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{4}-\d{2}-\d{2})\b",
-        target,
-    )
-    if not clock and not day:
-        return False
-    # Derive candidate spans solely to ask for the proper tool. They never become
-    # event fields or grant permission. The tool must supply independently checked fields.
-    title_first = re.split(r"\s+(?:at|on|tomorrow|today)\b", target, maxsplit=1)[0]
-    time_first = re.split(r"\s+for\s+", target)
-    candidates = [title_first]
-    if len(time_first) >= 2:
-        candidates.append(re.sub(r"[?.!]+$", "", time_first[-1]))
-    candidates.append("")
-    return any(
-        creation_request(text, title, day[0] if day else "", clock[0].strip() if clock else "")
-        for title in candidates
-    )
+def attempted(runtime):
+    return bool(getattr(runtime, "calendar_event_attempted", False))
 
 
 def pending_event(runtime):
@@ -83,13 +55,12 @@ def pending_reply(text, pending):
 
 
 def requires_preparation(runtime):
+    if getattr(runtime, "calendar_event_rejected", False):
+        return False
     request = getattr(runtime, "request", None)
     return bool(
         request
-        and (
-            creation_turn(request.instruction)
-            or pending_reply(request.instruction, pending_event(runtime))
-        )
+        and (attempted(runtime) or pending_reply(request.instruction, pending_event(runtime)))
     )
 
 
@@ -137,10 +108,7 @@ async def respond(runtime, answer):
         for entry in reversed(history):
             if entry.get("calendar_action_id"):
                 break
-            if (
-                creation_turn(entry.get("user", ""))
-                or entry.get("error_code") == "calendar_event_not_prepared"
-            ):
+            if entry.get("error_code") == "calendar_event_not_prepared":
                 action_id = None
                 break
     active_event_context = bool(
@@ -158,7 +126,7 @@ async def respond(runtime, answer):
             "kind": "message",
             "text": "I don't have a confirmed Calendar event for this request yet.",
         }
-    if creation_turn(text) or pending_reply(text, pending):
+    if requires_preparation(runtime):
         raise CalendarPreparationRequired
     # Source-less prose cannot establish a provider-side result. Existing direct
     # actions always use current owned durable state, including queued/unknown/failed.
@@ -182,10 +150,12 @@ async def respond(runtime, answer):
 def exhausted(runtime):
     request = getattr(runtime, "request", None)
     pending = pending_event(runtime)
-    if request and (
-        creation_turn(request.instruction) or pending_reply(request.instruction, pending)
-    ):
-        if pending and pending.get("action_id") and creation_turn(request.instruction):
+    if request and requires_preparation(runtime):
+        if (
+            pending
+            and pending.get("action_id")
+            and getattr(runtime, "calendar_event_new_goal", False)
+        ):
             runtime.state.pop("calendar_event_request", None)
             pending = None
         if pending:

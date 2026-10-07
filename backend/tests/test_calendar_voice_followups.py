@@ -43,6 +43,7 @@ async def test_make_request_cannot_finish_with_unexecuted_retry_promise(
     await ready(db_sessionmaker)
     request = turn("make an event at 5:00 p.m. tomorrow for cricket")
     model = Model(
+        tool("prepare_calendar_event", intent=None),
         tool(
             "respond",
             kind="message",
@@ -52,8 +53,8 @@ async def test_make_request_cannot_finish_with_unexecuted_retry_promise(
         tool("prepare_calendar_event", **CRICKET),
     )
     result = await service.turn(1, request, factory=db_sessionmaker, model=model)
-    assert result["kind"] == "calendar_event" and len(model.contexts) == 2
-    assert result["trace"][0]["reason"] == "calendar_preparation_required"
+    assert result["kind"] == "calendar_event" and len(model.contexts) == 3
+    assert result["trace"][1]["reason"] == "calendar_preparation_required"
 
 
 async def test_gratitude_and_closing_after_single_mocked_write(

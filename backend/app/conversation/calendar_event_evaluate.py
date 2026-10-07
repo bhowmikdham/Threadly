@@ -5,7 +5,8 @@ import asyncio
 import json
 from pathlib import Path
 
-from app.calendar.event_creation import creation_request, source_fields
+from app.calendar.event_creation import source_fields
+from app.calendar.intent import validate_creation, validate_source
 from app.config import get_settings
 from app.conversation import engine
 from app.conversation.evaluate import validate_live_preflight
@@ -75,7 +76,9 @@ class SyntheticRuntime:
                         **args.model_dump(exclude_unset=True),
                     }
                 )
-            assert creation_request(text, args.title, args.date_source, args.time_source)
+            validate_source(args.intent, self.case["text"])
+            if not self.case.get("followup"):
+                validate_creation(text, args.title)
             source_fields(args, text)
             assert args.title == self.case["title"]
             assert args.attendees == self.case.get("guests", [])

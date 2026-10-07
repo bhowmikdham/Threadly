@@ -66,7 +66,6 @@ async def test_time_first_request_keeps_supplied_slots(
             CalendarApprovalSetting(mode=mode, expected_version=0),
             factory=db_sessionmaker,
         )
-    assert conversation_guard.creation_turn(instruction)
     result = await run(
         db_sessionmaker, request, {**ARGS, "title": title, "time_source": clock, "date_source": day}
     )
@@ -112,6 +111,7 @@ async def test_creation_response_requires_an_actual_event_candidate(
         request,
         factory=db_sessionmaker,
         model=Model(
+            tool("prepare_calendar_event", intent=None),
             wrong,
             tool(
                 "prepare_calendar_event",
@@ -121,7 +121,7 @@ async def test_creation_response_requires_an_actual_event_candidate(
     )
     assert result["kind"] == "calendar_event"
     assert result["calendar_action"]["state"] == "proposed"
-    assert result["trace"][0]["reason"] == "calendar_preparation_required"
+    assert result["trace"][1]["reason"] == "calendar_preparation_required"
     assert not any(c.url.path.endswith("/events") for c in configured[0])
 
 
@@ -184,7 +184,8 @@ async def test_exhausted_creation_completes_turn_and_allows_next_read(configured
         request,
         factory=db_sessionmaker,
         model=Model(
-            *[tool("respond", kind="message", text="Done!") for _ in range(engine.MAX_CALLS)]
+            tool("prepare_calendar_event", intent=None),
+            *[tool("respond", kind="message", text="Done!") for _ in range(engine.MAX_CALLS - 1)]
         ),
     )
     assert result["error_code"] == "calendar_event_not_prepared" and result["version"] == 1
@@ -416,7 +417,11 @@ async def test_new_unfinished_event_never_reports_an_older_booking_as_its_succes
             next_request,
             factory=db_sessionmaker,
             model=Model(
-                *[tool("respond", kind="message", text="Done!") for _ in range(engine.MAX_CALLS)]
+                tool("prepare_calendar_event", intent=None),
+                *[
+                    tool("respond", kind="message", text="Done!")
+                    for _ in range(engine.MAX_CALLS - 1)
+                ]
             ),
         )
     status = turn(
@@ -458,6 +463,7 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
         request,
         factory=db_sessionmaker,
         model=Model(
+            tool("prepare_calendar_event", intent=None),
             tool(
                 "find_busy_times",
                 subject="self",
@@ -474,7 +480,7 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
             ),
         ),
     )
-    assert result["trace"][0]["reason"] == "calendar_preparation_required"
+    assert result["trace"][1]["reason"] == "calendar_preparation_required"
     assert result["kind"] == "calendar_event"
     action = result["calendar_action"]
     assert action["state"] == "proposed"

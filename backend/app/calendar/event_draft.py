@@ -143,6 +143,17 @@ def merge(runtime, args, pending):
             supplied[field] = args.model_dump(mode="json")[field]
             supplied[source] = getattr(args, source)
     changes = {}
+    if (
+        pending
+        and args.intent
+        and args.intent.operation == "resume"
+        and any(old.get(field) and field in supplied for field in FIELDS)
+    ):
+        from app.calendar.conversation_guard import CalendarNewGoalRequired
+
+        # Resume fills missing fields; it cannot silently replace a reviewed goal.
+        # Semantic revisions use explicit changes. A new creation starts fresh.
+        raise CalendarNewGoalRequired
     for field in FIELDS:
         if field in supplied:
             changes[field] = {

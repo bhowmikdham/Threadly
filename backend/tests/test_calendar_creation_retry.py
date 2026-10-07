@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.api.errors import ApiError
-from app.calendar import conversation_guard, event_choices, event_creation, event_draft
+from app.calendar import conversation_guard, event_choices, event_creation, event_draft, intent
 from app.conversation import service, store
 from app.db.models import ActionJob, AssistantAction, Conversation
 from app.model_client.conversation import ConversationProviderError
@@ -52,6 +52,7 @@ async def test_ashu_title_followup_throttle_preserves_today_time_ask_and_exact_r
         first_request,
         factory=db_sessionmaker,
         model=Model(
+            tool("prepare_calendar_event", intent=None),
             tool("respond", kind="clarification", text="What would you like to call this event?"),
             tool(
                 "prepare_calendar_event",
@@ -64,7 +65,7 @@ async def test_ashu_title_followup_throttle_preserves_today_time_ask_and_exact_r
         ),
     )
     assert first["kind"] == "clarification"
-    assert first["trace"][0].get("reason") == "calendar_preparation_required"
+    assert first["trace"][1].get("reason") == "calendar_preparation_required"
     request = turn(
         "meeting with Ashu",
         conversation_id=first_request.conversation_id,
@@ -130,6 +131,7 @@ async def test_complete_ashu_title_does_not_require_an_attendee_or_prose_fallbac
         request,
         factory=db_sessionmaker,
         model=Model(
+            tool("prepare_calendar_event", intent=None),
             tool(
                 "respond",
                 kind="message",
@@ -149,7 +151,7 @@ async def test_complete_ashu_title_does_not_require_an_attendee_or_prose_fallbac
             ),
         ),
     )
-    assert result["trace"][0].get("reason") == "calendar_preparation_required"
+    assert result["trace"][1].get("reason") == "calendar_preparation_required"
     action = result["calendar_action"]
     assert action["state"] == "proposed"
     event = action["preview"]["event"]
@@ -175,8 +177,7 @@ async def test_complete_ashu_title_does_not_require_an_attendee_or_prose_fallbac
 )
 def test_help_me_creation_is_routed_to_typed_preparation(prefix):
     instruction = f"{prefix} create an event at 6pm today named meeting with Ashu"
-    assert conversation_guard.creation_turn(instruction)
-    assert event_creation.creation_request(instruction, "meeting with Ashu", "today", "6pm")
+    intent.validate_creation(instruction, "meeting with Ashu")
 
 
 @pytest.mark.parametrize(
@@ -191,5 +192,5 @@ def test_help_me_creation_is_routed_to_typed_preparation(prefix):
     ],
 )
 def test_help_me_prefix_does_not_promote_source_or_content_into_event_authority(instruction):
-    assert not conversation_guard.creation_turn(instruction)
-    assert not event_creation.creation_request(instruction, "meeting with Ashu", "today", "6pm")
+    with pytest.raises(intent.IntentNotAuthorized):
+        intent.validate_creation(instruction, "meeting with Ashu")

@@ -79,7 +79,10 @@ async def prepare_chat(factory, mode="ask"):
 
 
 async def advance(factory, chat, version, instruction, arguments, wrong=None):
-    decisions = ([wrong] if wrong else []) + [tool("prepare_calendar_event", **arguments)]
+    # Repair routing after the model has chosen Calendar; the backend no longer
+    # classifies the user's free text before any model-selected operation.
+    decisions = ([tool("prepare_calendar_event", intent=None), wrong] if wrong else [])
+    decisions += [tool("prepare_calendar_event", **arguments)]
     return await service.turn(
         1,
         turn(instruction, conversation_id=chat, expected_version=version),
@@ -327,6 +330,7 @@ async def test_newly_supplied_relative_date_uses_its_followup_anchor(monkeypatch
             runtime,
             PrepareCalendarEvent(
                 continue_previous=True,
+                intent={"operation": "resume", "source": "tomorrow"},
                 date={"kind": "relative", "offset_days": 1},
                 date_source="tomorrow",
             ),

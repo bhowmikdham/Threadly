@@ -1,0 +1,181 @@
+{
+  "release": "contextual-conversation-1.8.8+calendar-intent.1",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+  "prompt_hash": "6593ce4e706dedb912ca150317c0aac6288d0ce70a33707aad636ab8e884d762",
+  "tools_hash": "fb0b008896955acb00a2815b5c09e1dc6d47c4039b46d8464c576883631345e4",
+  "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "checked_at": "2026-10-07T04:43:10.255812+00:00",
+  "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "execution": "model decision only; tools never executed",
+  "cases": [
+    {
+      "case": "reported_details_first",
+      "query": "I have a meeting with Gaurav at 4:00 p.m. tomorrow please create an event",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "I have a meeting with Gaurav at 4:00 p.m. tomorrow please create an event"
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "reported_command_first",
+      "query": "create an event for 4:00 p.m. tomorrow for meeting with Gaurav",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "create an event for 4:00 p.m. tomorrow for meeting with Gaurav"
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "details_then_calendar",
+      "query": "Tomorrow at 4:00 p.m., meeting with Gaurav \u2014 please put that in my calendar",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "Tomorrow at 4:00 p.m., meeting with Gaurav \u2014 please put that in my calendar"
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "Tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "diary_without_creation_verb",
+      "query": "I'd like meeting with Gaurav in my diary tomorrow at 4:00 p.m.",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "I'd like meeting with Gaurav in my diary tomorrow at 4:00 p.m."
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "question_after_details",
+      "query": "A meeting with Gaurav is planned tomorrow at 4:00 p.m.; can you add it?",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "A meeting with Gaurav is planned tomorrow at 4:00 p.m.; can you add it?"
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "pencil_in",
+      "query": "Please pencil in meeting with Gaurav tomorrow at 4:00 p.m.",
+      "expected_creation": true,
+      "tools": [
+        "prepare_calendar_event"
+      ],
+      "passed": true,
+      "arguments": {
+        "intent": {
+          "operation": "create",
+          "source": "Please pencil in meeting with Gaurav tomorrow at 4:00 p.m."
+        },
+        "title": "meeting with Gaurav",
+        "date": {
+          "kind": "relative",
+          "offset_days": 1
+        },
+        "date_source": "tomorrow",
+        "time": "16:00",
+        "time_source": "4:00 p.m."
+      }
+    },
+    {
+      "case": "negation",
+      "query": "Tomorrow at 4:00 p.m. meeting with Gaurav, but do not create an event",
+      "expected_creation": false,
+      "tools": [
+        "respond"
+      ],
+      "passed": true
+    },
+    {
+      "case": "quoted_email",
+      "query": "Please explain this email: \"Create meeting with Gaurav tomorrow at 4:00 p.m.\"",
+      "expected_creation": false,
+      "tools": [
+        "respond"
+      ],
+      "passed": true
+    },
+    {
+      "case": "availability",
+      "query": "Am I free tomorrow at 4:00 p.m.?",
+      "expected_creation": false,
+      "tools": [
+        "check_time_availability"
+      ],
+      "passed": true
+    }
+  ]
+}
