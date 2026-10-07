@@ -180,6 +180,13 @@ const labels: Record<Phase, string> = {
 const PAUSE_MS = 1200
 // Said as soon as the user finishes speaking, while the answer is worked out.
 const ACKNOWLEDGE = "Sure, I can do that."
+// Talking over Threadly interrupts it. The microphone has to stay above
+// BARGE_LEVEL (0–1) for BARGE_MS, and not within BARGE_GRACE_MS of Threadly
+// starting to speak, so its own voice or a cough doesn't cut it off. If it
+// interrupts itself on laptop speakers, raise BARGE_LEVEL.
+const BARGE_LEVEL = 0.25
+const BARGE_MS = 350
+const BARGE_GRACE_MS = 700
 
 // Threadly's voice. The server voice (ElevenLabs, called by the backend so the
 // key never reaches the extension) is tried first; the browser voice is the
@@ -329,10 +336,12 @@ export function VoiceOrb({
     [docked, setDocked] = useState(false)
   const overlay = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<Phase>("listening")
+  const phaseSince = useRef(performance.now())
   const closed = useRef(false)
   const stop = useRef<() => void>(() => {})
   const move = (next: Phase) => {
     phaseRef.current = next
+    phaseSince.current = performance.now()
     setPhase(next)
   }
   const finish = (error?: string) => {
@@ -370,6 +379,9 @@ export function VoiceOrb({
       stopped = false
     const mic = { level: 0 },
       voice = { level: 0 }
+    // Each request gets a number, so an interrupted one can tell it was
+    // replaced and stop talking.
+    let turn = 0
     const r = new Recognition()
     r.lang = navigator.language
     r.interimResults = true
@@ -384,6 +396,8 @@ export function VoiceOrb({
     }
     const reply = async (said: string) => {
       if (stopped || closed.current) return
+      const mine = ++turn
+      const stale = () => stopped || closed.current || mine !== turn
       try {
         r.stop()
       } catch {}
@@ -400,7 +414,7 @@ export function VoiceOrb({
         .finally(() => (ready = true))
 
       await speak(ACKNOWLEDGE, (value) => (voice.level = value))
-      if (stopped || closed.current) return
+      if (stale()) return
 
       if (!ready) move("thinking")
       const result = await work
@@ -414,11 +428,18 @@ export function VoiceOrb({
         showChat = typeof result === "string" ? false : !!result.showChat
       }
 
-      if (stopped || closed.current) return
+      if (stale()) return
       setDocked(showChat)
       move("speaking")
       await speak(answer, (value) => (voice.level = value))
-      if (!stopped && !closed.current) listen()
+      if (!stale()) listen()
+    }
+    // The user spoke over Threadly: stop talking, drop the rest of that reply
+    // and listen. (The request itself still finishes in the chat.)
+    const interrupt = () => {
+      turn++
+      stopSpeaking()
+      listen()
     }
     r.onresult = (e: any) => {
       if (stopped || closed.current || phaseRef.current !== "listening") return
@@ -455,6 +476,8 @@ export function VoiceOrb({
     }
     // The orb follows the user's voice while listening, Threadly's while
     // speaking, and a soft pulse while thinking.
+    let loud = 0,
+      lastFrame = performance.now()
     const animate = (now: number) => {
       if (stopped) return
       const p = phaseRef.current
@@ -464,6 +487,21 @@ export function VoiceOrb({
           : p === "speaking"
             ? voice.level
             : 0.12 + 0.08 * Math.sin(now / 160)
+      // Watch for the user talking over Threadly.
+      const t = performance.now()
+      const dt = t - lastFrame
+      lastFrame = t
+      if (
+        p !== "listening" &&
+        t - phaseSince.current > BARGE_GRACE_MS &&
+        mic.level > BARGE_LEVEL
+      ) {
+        loud += dt
+        if (loud >= BARGE_MS) {
+          loud = 0
+          interrupt()
+        }
+      } else loud = 0
       frame = requestAnimationFrame(animate)
     }
     frame = requestAnimationFrame(animate)
@@ -495,7 +533,9 @@ export function VoiceOrb({
     // A read-only tap on the microphone measures how loudly the user speaks.
     // If it is refused, the orb still breathes and the conversation carries on.
     void navigator.mediaDevices
-      ?.getUserMedia({ audio: true })
+      ?.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true }
+      })
       .then((s) => {
         if (stopped || closed.current) {
           s.getTracks().forEach((t) => t.stop())
