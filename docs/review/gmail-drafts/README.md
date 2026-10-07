@@ -16,7 +16,7 @@ The original Library reference image could not be materialized after its support
 retry. These are actual built-extension screenshots, not a claim of matching the
 unavailable reference.
 
-Validation: typecheck and changed-file Prettier check pass; all 227 unit tests,
+Validation of the original card: typecheck and changed-file Prettier check pass; all 227 unit tests,
 36 browser tests, and 29 release packaging tests pass. The public-origin browser
 test is validated separately with the packaged HTTPS build. Initial full runs
 exposed inherited voice acknowledgment assertion drift at base 3469b4e, reproduced
@@ -31,7 +31,7 @@ PR supplies verified account/source gates, draft-only Gmail persistence and the
 durable deduplication receipt. No live Gmail write, OAuth grant or deployment was
 performed. Existing grants must include gmail.compose, gmail.modify or full-mail
 access; gmail.send alone does not permit drafts. Initial OAuth still requests
-gmail.readonly and reconnect does not offer draft permission. No live user's
+gmail.readonly. No live user's
 stored grants were inspected. Missing/unverified permission and disconnected
 accounts show explanatory states with Create draft disabled and edit/copy available.
 
@@ -42,3 +42,19 @@ downgrade deliberately refuses to delete any receipt, including uncertain writes
 The UI stays disabled if the paired backend routes/capability are unavailable.
 Receipt recovery keeps the original saved source revision distinct from newer
 generated edits, which remain editable/copyable without creating duplicate drafts.
+
+The separate consent follow-up adds **Enable draft creation** when the paired
+backend advertises gmail_draft as requestable. Before clicking, users see that
+Google's compose permission includes managing drafts and sending email, while
+Threadly uses this feature only to save drafts. The existing bound OAuth/PKCE flow
+preserves editor fields, handles cancellation, refreshes granted capability/account
+version, and requires a new Create draft click. It does not enable sending or
+automatically create any draft. This follow-up has separate release approval;
+no actual Google grant or console/security setting is changed by its tests.
+
+Follow-up verification: 229 unit tests, 37 browser tests and the separately built
+HTTPS public-origin test pass, along with typecheck and formatting. The built
+[320px consent preview](gmail-draft-consent-320.png) was inspected. Browser tests
+mock only Google/provider responses and cover explicit reconnect, cancellation,
+account guard, preserved subject/body, refreshed capability and no save until a
+new click. Existing voice behavior and assertions are unchanged by this follow-up.

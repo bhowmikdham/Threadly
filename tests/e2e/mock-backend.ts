@@ -36,6 +36,8 @@ export type Call = {
 }
 // Switches a test can flip to exercise failure paths.
 export type MockControl = {
+  gmailDraftReady?: boolean
+  draftAccountVersion?: number
   failCalendarChoice?: boolean
   strandedConversation?: {
     id: string
@@ -338,7 +340,27 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
     res.setHeader("Access-Control-Allow-Origin", "*")
     let data: any
     const stranded = control.strandedConversation
-    if (p === "/fixture/named-email-draft") {
+    if (p === "/auth/google/reconnect") {
+      data = {
+        state: "synthetic-bound-state",
+        authorization_url:
+          "https://accounts.google.com/o/oauth2/v2/auth?state=synthetic-bound-state",
+        expires_at: new Date(Date.now() + 600000).toISOString()
+      }
+    } else if (p === "/auth/google/exchange") {
+      control.gmailDraftReady = true
+      control.draftAccountVersion = 3
+      data = {
+        user,
+        jwt:
+          "header." +
+          Buffer.from(
+            JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
+          ).toString("base64url") +
+          ".consent",
+        refresh_token: "synthetic-renewal-token"
+      }
+    } else if (p === "/fixture/named-email-draft") {
       data = {
         kind: "message",
         text: "Here’s a draft you can edit.",
@@ -672,9 +694,15 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         }
     } else if (p === "/assistant/capabilities")
       data = {
-        account: { account_version: 2 },
+        account: { account_version: control.draftAccountVersion || 2 },
+        reconnect: { requestable_capabilities: ["gmail_draft"] },
         capabilities: [
-          { id: "gmail_draft", ready: true },
+          {
+            id: "gmail_draft",
+            ready: control.gmailDraftReady !== false,
+            status:
+              control.gmailDraftReady === false ? "scope_missing" : "ready"
+          },
           { id: "gmail_read", ready: true },
           { id: "calendar_read", ready: control.calendarConnected },
           { id: "calendar_list", ready: control.calendarConnected },

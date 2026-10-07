@@ -35,6 +35,7 @@ export function GmailDraftCard({
   const [checking, setChecking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [consenting, setConsenting] = useState(false)
   const [uncertain, setUncertain] = useState(false)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
@@ -110,6 +111,42 @@ export function GmailDraftCard({
     } finally {
       submitting.current = false
       if (live.current) setBusy(false)
+    }
+  }
+  const enableDrafts = async () => {
+    if (submitting.current || !allowed.current || receipt || uncertain) return
+    submitting.current = true
+    setBusy(true)
+    setConsenting(true)
+    setError("")
+    setNotice("")
+    try {
+      await bridge({
+        type: "LOGIN",
+        capabilities: ["gmail_draft"],
+        expectedUserId: user.id
+      })
+      if (!live.current) return
+      const [caps, saved] = await Promise.all([
+        request("/assistant/capabilities"),
+        request(`/assistant/gmail-drafts/${source}`)
+      ])
+      if (!live.current) return
+      setCapabilities(caps)
+      acceptReceipt(saved)
+      setNotice(
+        caps.capabilities?.some((c: any) => c.id === "gmail_draft" && c.ready)
+          ? "Draft access is ready. Review your edits, then click Create draft."
+          : "Google hasn’t confirmed draft permission. Your edits are preserved."
+      )
+    } catch (e) {
+      if (live.current) setError(errorText(e))
+    } finally {
+      submitting.current = false
+      if (live.current) {
+        setBusy(false)
+        setConsenting(false)
+      }
     }
   }
   const create = async () => {
@@ -208,6 +245,8 @@ export function GmailDraftCard({
   const capability = capabilities?.capabilities?.find(
     (c: any) => c.id === "gmail_draft"
   )
+  const canRequestDrafts =
+    capabilities?.reconnect?.requestable_capabilities?.includes("gmail_draft")
   const permissionHint = !capabilities
     ? "Couldn’t verify Gmail draft access. Refresh status to try again."
     : capability?.status === "reconnect_required"
@@ -221,22 +260,24 @@ export function GmailDraftCard({
     receipt && artifact && receipt.source_artifact_id !== artifact.artifact_id
   )
   const locked = busy || (Boolean(receipt) && !earlierRevision) || uncertain
-  const status = creating
-    ? "Creating draft…"
-    : busy
-      ? "Checking status…"
-      : receipt
-        ? earlierRevision && receipt.state === "succeeded"
-          ? "Earlier revision saved"
-          : {
-              succeeded: "Saved to Gmail Drafts",
-              saving: "Creating draft…",
-              outcome_unknown: "Waiting for confirmation",
-              failed: "Draft wasn’t created"
-            }[receipt.state] || "Check draft status"
-        : uncertain
-          ? "Save not confirmed"
-          : "Not saved to Gmail"
+  const status = consenting
+    ? "Waiting for Google…"
+    : creating
+      ? "Creating draft…"
+      : busy
+        ? "Checking status…"
+        : receipt
+          ? earlierRevision && receipt.state === "succeeded"
+            ? "Earlier revision saved"
+            : {
+                succeeded: "Saved to Gmail Drafts",
+                saving: "Creating draft…",
+                outcome_unknown: "Waiting for confirmation",
+                failed: "Draft wasn’t created"
+              }[receipt.state] || "Check draft status"
+          : uncertain
+            ? "Save not confirmed"
+            : "Not saved to Gmail"
   return (
     <section
       className="gmail-draft-card"
@@ -348,6 +389,13 @@ export function GmailDraftCard({
             {permissionHint} You can still edit and copy this email.
           </p>
         )}
+        {!capability?.ready && canRequestDrafts && !receipt && (
+          <p className="gmail-draft-hint">
+            Google’s permission includes managing drafts and sending email.
+            Threadly uses this feature only to save drafts; you send them
+            yourself in Gmail.
+          </p>
+        )}
         {!enabled && !receipt && (
           <p className="muted">
             This chat or draft has changed. Use the latest draft to create it in
@@ -367,6 +415,13 @@ export function GmailDraftCard({
           </p>
         )}
         <div className="gmail-draft-actions">
+          {!capability?.ready && canRequestDrafts && !receipt && !uncertain && (
+            <button
+              disabled={busy || checking || !enabled}
+              onClick={() => void enableDrafts()}>
+              {consenting ? "Waiting for Google…" : "Enable draft creation"}
+            </button>
+          )}
           {!receipt && (
             <button
               className="primary"
