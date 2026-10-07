@@ -46,3 +46,30 @@ Live Bedrock evaluation and production conversation replay remain unverified.
 No email/Calendar writes, external drafts, approval replay, merge or deployment
 were performed for this fix. Backend draft stacks on Primary Inbox PR #107;
 the extension companion preserves Primary Inbox PR #108 and Calendar PR #104.
+
+## Follow-up continuity (1.8.7)
+
+The Oct 7 incident retained conversation history and the original drafting goal.
+Rejected preparation calls fell back to prose, so no structured draft/card was
+created and the goal remained in clarification. Subsequent prose promised a
+Gmail save despite no conversational write tool. Narrow production inspection
+found zero draft-save or email-send action rows during the incident. Rejected
+tool arguments were not retained, so their exact invalid field cannot be proven.
+The installed extension remains unverified; no card was returned by the backend.
+Private transcript, account details and identifiers are excluded from this repo.
+
+`test_email_draft_followup.py` replays the chain with synthetic identities,
+scripted model decisions, real isolated database state, and `httpx.MockTransport`.
+It covers complete structured drafting, repeated retained fields, invalid tool
+repair, prose fallback rejection, bounded failure/retry, legacy user-turn recovery,
+ambiguous recipients, permissions, missing-card guidance, repeated confirmations,
+new goals, gratitude, compound requests, failed revisions, and success/failed/
+uncertain save receipts. The simulated explicit card click is the only write;
+chat turns create zero action/approval records and no duplicate provider call.
+The frontend tests preserve local edits and verify exact versioned click payloads,
+new-goal invalidation, old-server behavior, and restored-card versions.
+
+`contextual-conversation-1.8.7.json` pins the prompt and tool schemas. The new
+`review_email_draft` tool is read-only; no conversational save authority is added.
+Live Bedrock behavioral evaluation and installed-client verification were not run.
+No real Gmail/Calendar writes, grant changes, merge or deployment are part of this fix.

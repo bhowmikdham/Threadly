@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.api.errors import ApiError
 from app.config import get_settings
-from app.conversation import engine, store
+from app.conversation import email_draft, engine, store
 from app.conversation.runtime import Runtime, proposal_text
 from app.db.engine import get_session_factory
 from app.db.models import Conversation, User
@@ -45,6 +45,9 @@ async def turn(owner, request, *, factory=None, model=None):
         if runtime.search_page is not None:
             response["search"] = runtime.search_page
         response.setdefault("context_references", runtime.turn_source_references)
+        response["active_email_draft_id"] = (response.get("email_draft") or {}).get(
+            "draft_id"
+        ) or email_draft.active_text_id(state)
         response["latency_ms"] = round((time.monotonic() - started) * 1000)
         if getattr(request, "calendar_choice_id", None) and not state.get("pending_result"):
             async with factory.begin() as session:
@@ -130,6 +133,7 @@ async def get(owner, identifier, factory=None):
             "history": state["history"],
             "expires_at": row.expires_at.isoformat(),
             "active_task_id": state.get("active_task_id"),
+            "active_email_draft_id": email_draft.active_text_id(state),
             "active_proposal_id": state.get("proposal_id"),
             "proposal": proposal,
             "calendar_choices": event_choices.public(state),

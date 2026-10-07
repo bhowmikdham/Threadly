@@ -787,3 +787,12 @@ never creates a send action or approval. Provider uncertainty is durable and has
 no blind retry path. Read-only receipt refresh survives a closed card or lost
 response. A named-recipient conversation supplies structured generated text;
 the user supplies literal recipient addresses only when choosing Create draft.
+
+### Email draft follow-up boundary
+
+Conversation release 1.8.7 retains validated compose fields through model-tool
+repair and returns structured draft identity to keep the same editor current
+across follow-ups. The read-only draft review tool reads owned save receipts and
+renders actual card/permission controls. Account draft grants do not grant the
+conversation a write tool. Only the existing explicit UI save freezes and submits
+an exact payload; generic chat confirmations never save, send or approve mail.

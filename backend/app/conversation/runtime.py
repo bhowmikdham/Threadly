@@ -19,7 +19,7 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
-from app.conversation import calendar_context, email_draft, mail_context
+from app.conversation import calendar_context, email_draft, email_review, mail_context
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.mail.inbox_status import check_today
 from app.mail.presentation import clock_context, received_display
@@ -682,6 +682,7 @@ class Runtime:
                     "proposal_id": proposal.id,
                     "proposal": await command_plans.view(session, proposal),
                 }
+            self.email_draft_review = await email_review.context(self, session)
         from app.calendar import event_choices
 
         return {
@@ -693,6 +694,7 @@ class Runtime:
             "remembered_email_sources": mail_context.model_context(self.state),
             "pending_calendar_event": event_choices.model_context(self.state),
             "pending_email_draft": email_draft.model_context(self.state),
+            "email_draft_controls": self.email_draft_review,
             "history_limit": 12,
             "user_turn": self.request.instruction,
             "current_user_goal": (
@@ -719,6 +721,8 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        if name == "review_email_draft":
+            return await email_review.review(self)
         if name == "prepare_email_draft":
             return await email_draft.prepare(self, args)
         if name == "list_calendars":

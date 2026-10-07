@@ -1379,7 +1379,7 @@ remain. The payload is live evidence, not an event preview or permission to crea
 Clients should show it alongside the answer, mark expired evidence as historical, and
 never infer event titles or another person's availability. Older responses without these
 fields remain valid text responses. These card details are not persisted in history.
-# Conversational email drafting clarification (1.8.6)
+# Conversational email drafting clarification (1.8.7)
 
 Standalone composition uses the backend model tool `prepare_email_draft` before
 reserving a durable workflow. It accepts exact user-sourced `recipient` and
@@ -1411,6 +1411,31 @@ object (`draft_id`, user-sourced `recipient`, `subject`, `body`, `unresolved_fie
 for named-recipient drafts. This is generated text, not a Gmail write or address
 resolution. Older clients retain the existing text response. History includes the
 turn's `version` so restored cards cannot submit from a stale chat.
+
+Conversation turn and restore responses also include `active_email_draft_id`
+(or null). Only that matching editor can advance to the latest conversation
+version after a follow-up; its local edits remain intact. The save endpoint
+checks the current structured draft identity rather than requiring the last
+exchange itself to contain the draft. New goals and superseding tasks/proposals
+disable old text cards. Older clients keep conservative stale-version behavior.
+
+The read-only `review_email_draft` model tool returns actual card controls and
+the current owned source's save receipt status. `email_draft_controls` in model
+context distinguishes account grants from callable actions: chat cannot save,
+send or insert email. Repeated confirmations return guidance; only a succeeded
+receipt confirms Gmail creation. Failed, pending, unknown and older-revision
+saves are distinct, and connection-generation fences remain enforced. A
+missing/disabled card prompts extension update/reload guidance without claiming
+to know the installed build. Ambiguous/name-only recipients require an exact
+address at the existing review control, never an inferred address.
+
+Tool repair accepts unchanged retained user fields and preserves newly validated
+fields before asking the model to supply generated text. Errors expose only
+allowlisted reason codes/field names in durable traces. Pending answers cannot
+fall back to a prose-only draft or repeat a question for retained information.
+A bounded exhausted repair retains the goal and reports `email_draft_not_prepared`.
+Historical prose-only drafts can recover message facts from that goal's user
+turns; assistant prose never supplies recipient or purpose authority.
 
 `POST /assistant/gmail-drafts` is a deliberate UI-only draft save. It accepts the
 complete edited `subject`, `body`, `recipients` (To/Cc/Bcc), `unresolved_fields`,

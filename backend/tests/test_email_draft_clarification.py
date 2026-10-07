@@ -228,7 +228,8 @@ async def test_cancellation_and_unrelated_greeting_do_not_resume_drafting():
     assert result["text"] == "You're welcome."
 
 
-async def test_ambiguous_send_question_and_later_send_never_execute():
+@pytest.mark.usefixtures("configured")
+async def test_ambiguous_send_question_and_later_send_never_execute(db_sessionmaker):
     r = runtime("Can you email Alex?")
     result = await engine.run(
         {},
@@ -249,6 +250,7 @@ async def test_ambiguous_send_question_and_later_send_never_execute():
         draft=DRAFT,
     )
     r = runtime("Send it", state)
+    r.factory = db_sessionmaker
     r.capabilities = {"capabilities": [{"id": "gmail_send", "status": "disabled"}]}
     result = await engine.run(
         {},

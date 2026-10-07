@@ -187,11 +187,13 @@ async def create(session, owner, request, *, transport=None):
             ),
             None,
         )
+        from app.conversation.email_draft import current_text_draft
+
         goal = state.get("email_draft_goal") or {}
         if (
             source is None
             or goal.get("status") != "drafted"
-            or source != state["history"][-1].get("email_draft")
+            or source != current_text_draft(state)
         ):
             raise ApiError(
                 409, "draft_source_changed", "Review the latest generated email before saving it."

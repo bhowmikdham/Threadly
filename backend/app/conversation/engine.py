@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
-from app.conversation import email_draft
+from app.conversation import email_draft, email_review
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -24,6 +24,7 @@ TERMINAL = set(CALENDAR_READ_TOOLS) | {
     "prepare_calendar_event",
     "prepare_workflow",
     "prepare_email_draft",
+    "review_email_draft",
     "answer_question",
     "revise_draft",
     "read_calendar",
@@ -84,6 +85,12 @@ class IncorrectCapabilityAdvice(ValueError):
 
 
 async def run(context, runtime, model=None):
+    if email_review.requested(runtime):
+        return {
+            **await email_review.review(runtime),
+            "release": RELEASE,
+            "trace": [{"tool": "review_email_draft", "status": "ok"}],
+        }
     messages = [{"role": "user", "content": [{"text": json.dumps(context)}]}]
     seen, calls, trace = set(), 0, []
     last_verified_evidence = []
@@ -186,6 +193,8 @@ async def run(context, runtime, model=None):
                     try:
                         if name not in TOOLS:
                             raise ValueError("Unknown tool")
+                        if name == "prepare_email_draft":
+                            runtime.email_draft_attempted = True
                         if name in TERMINAL and len(requests) != 1:
                             raise ValueError("Use a terminal tool alone after observations")
                         if name in (
@@ -214,12 +223,21 @@ async def run(context, runtime, model=None):
                             outcome = await conversation_guard.respond(runtime, arguments)
                             if outcome is None:
                                 if (
-                                    arguments.kind != "clarification"
-                                    and hasattr(runtime, "request")
+                                    hasattr(runtime, "request")
                                     and email_draft.requires_preparation(runtime)
+                                    and (
+                                        arguments.kind != "clarification"
+                                        or getattr(runtime, "state", {}).get(email_draft.KEY)
+                                    )
                                 ):
                                     raise email_draft.EmailDraftRequired
-                                outcome = validate_response(arguments, runtime)
+                                if email_review.unsupported_promise(arguments.text) and (
+                                    getattr(runtime, "state", {}).get(email_draft.KEY)
+                                    or getattr(runtime, "artifact", None)
+                                ):
+                                    outcome = await email_review.review(runtime)
+                                else:
+                                    outcome = validate_response(arguments, runtime)
                         else:
                             outcome = await runtime.call(name, arguments)
                         trace.append({"tool": name, "status": outcome.get("error_code", "ok")})
@@ -515,7 +533,54 @@ async def run(context, runtime, model=None):
                         }
                         status = "error"
                     except (ValidationError, ValueError) as exc:
-                        if name == "prepare_calendar_event":
+                        if name == "prepare_email_draft":
+                            reason = (
+                                exc.reason
+                                if isinstance(exc, email_draft.EmailDraftInputError)
+                                else "email_draft_invalid_input"
+                            )
+                            fields = sorted(
+                                {
+                                    str(e["loc"][0])
+                                    for e in (
+                                        exc.errors() if isinstance(exc, ValidationError) else []
+                                    )
+                                    if e["loc"] and e["loc"][0] in TOOLS[name][0].model_fields
+                                }
+                            )
+                            trace.append(
+                                {
+                                    "tool": name,
+                                    "status": "invalid",
+                                    "reason": reason,
+                                    "fields": fields,
+                                }
+                            )
+                            result = {
+                                "json": {
+                                    "error": reason,
+                                    "fields": fields,
+                                    "pending_email_draft": email_draft.model_context(runtime.state),
+                                    "message": (
+                                        "Use prepare_workflow for a source-based reply/draft. "
+                                        "Preserve the read source and the user's goal."
+                                        if reason == "source_bound_workflow_required"
+                                        else "Repair prepare_email_draft, not answer_question. "
+                                        "For the retained goal set continue_previous=true. "
+                                        "Keep existing "
+                                        "recipient/purpose or omit unchanged fields; "
+                                        "copy changes only "
+                                        "from USER text. When both are known include "
+                                        "draft={subject,body,"
+                                        "unresolved_fields:[],sources:[]}. Do not replace "
+                                        "a failed draft "
+                                        "with prose or ask again for retained details. "
+                                        "For saving/status "
+                                        "use review_email_draft; chat cannot save or send."
+                                    ),
+                                }
+                            }
+                        elif name == "prepare_calendar_event":
                             # Pydantic errors contain private input. Keep only allowlisted
                             # field names; never serialize its error text or input values.
                             fields = sorted(
@@ -598,6 +663,20 @@ async def run(context, runtime, model=None):
     calendar_failure = conversation_guard.exhausted(runtime)
     if calendar_failure:
         return {**calendar_failure, "release": RELEASE, "trace": trace}
+    if (
+        getattr(runtime, "email_draft_attempted", False)
+        and getattr(runtime, "state", {}).get(email_draft.KEY)
+        and not getattr(runtime, "loaded", None)
+    ):
+        return {
+            "kind": "message",
+            "text": "I couldn’t finish the draft card yet. "
+            "I’ve kept your supplied details; please ask me to try again. "
+            "This chat turn did not save anything in Gmail or send an email.",
+            "error_code": "email_draft_not_prepared",
+            "release": RELEASE,
+            "trace": trace,
+        }
     # A search can reach the finite tool or transcript budget after returning
     # useful cards. Preserve those bounded results instead of turning a
     # recoverable discovery request into an HTTP error. Never infer a fact from
