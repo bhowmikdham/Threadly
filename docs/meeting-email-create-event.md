@@ -1,6 +1,6 @@
 # Email-card Create event
 
-Independent local implementation on released frontend base
+Integrated local implementation on released frontend base
 `afa2180fa16b4060587002b6be440ce32573c603`. Not published or deployed.
 
 `InboxCards` now offers **Create event** for a selected source email. The new
@@ -20,16 +20,21 @@ unchanged. Existing account/origin-scoped action-reference storage retains only
 the action ID and prevents reopening the email from immediately making another
 candidate after a queued, uncertain or successful result.
 
-The minimal `CalendarEventCard` change is an optional state callback; normal chat
-Calendar behavior is unchanged. This implementation does not modify
-`lib/use-assistant.ts`, conversation restoration, `VoiceOrb.tsx`, backend
-configuration, authentication or provider accounts.
+The minimal `CalendarEventCard` change is an optional state callback. This stack
+also contains the separate backend-owned focus and draft-restoration changes in
+`lib/use-assistant.ts`. The integrated browser regression confirms that the email
+button preserves that protocol. `VoiceOrb.tsx` remains unchanged from the released
+base. No backend configuration, authentication or provider account changes occur.
 
 Verification:
 
-- Full frontend suite: **237 passed**, followed by **5/5** focused component tests
-  after adding the stored-status reopening regression.
-- Typecheck and local extension build passed.
+- Combined full frontend suite: **240 passed**.
+- Typecheck and local/public extension builds passed.
+- Combined full browser suite: **47 passed / 1 skipped**. The packaged public-origin
+  case then passed separately against its required public-origin build.
+- The extended meeting-email browser case passed again with the new context
+  protocol: after confirmation, a follow-up keeps the chat identity/version and
+  omits derived task/pin focus. No second approval occurs.
 - Offline Chromium test passed: real extension → synthetic backend, explicit
   typed source → required fields → invitation selection → preview → edit → new
   preview → final exact confirmation under Always.
@@ -41,3 +46,10 @@ entry to the user and supports one-time timed events. A restored proposed previe
 can be cancelled and reopened to edit. Already-created events are displayed as
 receipts and cannot be edited by this flow. Requires the matching backend change;
 there is no migration or setting change.
+
+Code/test head: `73d6e491a82105926b93b22be72aef172b1d5e01`, branch
+`codex/chat-context-restoration`. Original button commit `fb6d8d5` remains on its
+separate branch; integrated equivalent is `53e1770`. Context restoration commit
+is `34391a2`. Evidence-only commits follow. Backend approval-isolation regression
+and complete source hashes are recorded in the matching backend branch's
+`docs/evaluation/chat-context/` directory. No live-model quality claim is made.
