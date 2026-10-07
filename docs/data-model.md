@@ -5,6 +5,9 @@ It reads account/session state, holds mail and model output in request memory, t
 returns validated labels and source provenance. It does not write Message, Thread,
 ContextSnapshot, job or classification records, nor update `threads.needs_reply`.
 There is no persistent classification cache or saved user override in this slice.
+The reliability update stores only process-local admission counters and monotonic
+attempt timestamps for rate control; it adds no mail/label storage or migration.
+One-hour validity describes transient response lifetime, not a persisted cache.
 
 Shared email context adds no tables or migration. `context_snapshots.payload`
 also supports internal `storage=gmail-context-plan-1.0`: primary thread/version

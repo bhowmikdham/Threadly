@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.classification.contracts import ClassificationResponse, Decision, Evidence
 from app.classification.flows import FLOW_RELEASE, ClassificationFlow, configured_flow
+from app.classification.limits import get_limits
 from app.classification.provider import get_provider
 from app.config import get_settings
 from app.mail import live
@@ -115,6 +116,12 @@ def parse_decision(text, source_ids):
 async def classify(owner, account_version, mailbox_address, thread_id, request):
     live.identifier(thread_id)
     pinned = release()
+    # Reject excess work before fetching Gmail or starting an SDK worker.
+    with get_limits().admission():
+        return await _classify(owner, account_version, mailbox_address, thread_id, request, pinned)
+
+
+async def _classify(owner, account_version, mailbox_address, thread_id, request, pinned):
     source = await live.thread(owner, thread_id)
     source_guard(source, owner, account_version, thread_id)
     # A Gmail draft cannot resolve a prior unanswered request.

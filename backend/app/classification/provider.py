@@ -1,16 +1,51 @@
-"""Bounded Converse/visual Flow calls. No fallback or application retries."""
+"""Bounded read-only inference retries; no model fallback or output repair."""
 
 import asyncio
 import copy
 import json
+import logging
+import random
 import threading
+import time
 from contextlib import suppress
 from functools import lru_cache
 
 from app.api.errors import ApiError
+from app.classification.limits import get_limits
 from app.config import get_settings
 from app.pii.masking import mask_structure
 from app.workflows.bedrock_flows import FlowError, FlowInvoker
+
+log = logging.getLogger("uvicorn.error")
+RETRYABLE_CODES = {"ThrottlingException", "InternalServerException", "ServiceUnavailableException",
+                   "ModelTimeoutException", "ServiceQuotaExceededException"}
+SAFE_CODES = RETRYABLE_CODES | {
+    "AccessDeniedException", "ValidationException", "ResourceNotFoundException",
+    "throttlingException", "internalServerException", "badGatewayException",
+    "serviceQuotaExceededException", "accessDeniedException", "resourceNotFoundException",
+    "validationException", "dependencyFailedException", "EndpointConnectionError",
+    "ConnectTimeoutError", "ReadTimeoutError", "ConnectionClosedError",
+}
+SAFE_OPERATIONS = {"InvokeFlow", "InvokeFlowStream", "GetFlowAlias", "GetFlowVersion",
+                   "GetPrompt", "Converse"}
+
+
+def failure_info(error):
+    if isinstance(error, FlowError):
+        retryable = error.retryable and error.code == "workflow_upstream_unavailable"
+        code, operation = error.provider_code, error.operation
+    else:
+        response = getattr(error, "response", {})
+        detail = response.get("Error", {}) if isinstance(response, dict) else {}
+        code = detail.get("Code") if isinstance(detail, dict) else None
+        code = code or type(error).__name__
+        operation = getattr(error, "operation_name", "unknown")
+        retryable = code in RETRYABLE_CODES or code in {
+            "EndpointConnectionError", "ConnectTimeoutError", "ReadTimeoutError",
+            "ConnectionClosedError",
+        }
+    return retryable, code if code in SAFE_CODES else "unknown", (
+        operation if operation in SAFE_OPERATIONS else "unknown")
 
 
 def runtime_client(region, timeout):
@@ -25,11 +60,36 @@ def runtime_client(region, timeout):
 
 
 class ClassificationProvider:
-    def __init__(self, factory=runtime_client, *, max_concurrency=2, flow_factory=None):
+    def __init__(self, factory=runtime_client, *, max_concurrency=2, flow_factory=None,
+                 limits=None):
         self.factory = factory
         self.flow_factory = flow_factory
+        self.limits = limits
         # Held in the SDK worker, even if its asyncio caller disconnects/cancels.
         self.slots = threading.BoundedSemaphore(max_concurrency)
+
+    def _retry(self, call, stopped, deadline):
+        for attempt in range(1, 4):
+            if stopped.is_set() or time.monotonic() >= deadline:
+                raise ApiError(503, "classification_cancelled", "Classification cancelled.")
+            if self.limits is not None:
+                self.limits.check_rate(consume=True)
+            try:
+                return call()
+            except ApiError:
+                raise
+            except Exception as error:
+                retryable, code, operation = failure_info(error)
+                # Only allowlisted enums; never messages, prompts, IDs or tracebacks.
+                log.warning("classification_provider_failure operation=%s code=%s "
+                            "retryable=%s attempt=%d", operation, code, retryable, attempt)
+                if not retryable or attempt == 3:
+                    raise
+                delay = min(2 ** (attempt - 1) + random.uniform(0, 1),
+                            max(0, deadline - time.monotonic()))
+                if stopped.wait(delay):
+                    raise ApiError(503, "classification_cancelled",
+                                   "Classification cancelled.") from None
 
     def _call(self, system, payload, *, model, region, timeout, stopped, flow=None):
         if stopped.is_set():
@@ -38,6 +98,7 @@ class ClassificationProvider:
             raise ApiError(429, "classification_busy", "Try classification again later.",
                            headers={"Retry-After": "5"})
         client = None
+        deadline = time.monotonic() + timeout
         try:
             if stopped.is_set():
                 raise ApiError(503, "classification_cancelled", "Classification cancelled.")
@@ -58,16 +119,17 @@ class ClassificationProvider:
                 # Input is already masked field-by-field. Calling invoke() would
                 # mask backend dates/source metadata again, corrupting evidence.
                 invoker = FlowInvoker(self.flow_factory, target_verifier=verify_target)
-                return invoker._invoke(flow, serialized, stopped).text
+                return self._retry(lambda: invoker._invoke(flow, serialized, stopped).text,
+                                   stopped, deadline)
             client = self.factory(region, timeout)
-            response = client.converse(
+            response = self._retry(lambda: client.converse(
                 modelId=model,
                 system=[{"text": system}],
                 messages=[{"role": "user", "content": [
                     {"text": serialized}
                 ]}],
                 inferenceConfig={"maxTokens": 1500},
-            )
+            ), stopped, deadline)
             message = response.get("output", {}).get("message", {})
             blocks = message.get("content")
             if (response.get("stopReason") != "end_turn"
@@ -92,11 +154,13 @@ class ClassificationProvider:
                 raise ApiError(502, "classification_output_invalid",
                                "The Flow did not return a complete classification.") from None
             raise ApiError(503, "classification_provider_unavailable",
-                           "Classification Flow unavailable.") from None
+                           "Classification Flow unavailable.",
+                           headers={"Retry-After": "5"}) from None
         except Exception:
             # SDK/transport exceptions can contain prompts and private mail.
             raise ApiError(503, "classification_provider_unavailable",
-                           "Classification provider unavailable.") from None
+                           "Classification provider unavailable.",
+                           headers={"Retry-After": "5"}) from None
         finally:
             if client is not None:
                 with suppress(Exception):
@@ -120,4 +184,5 @@ class ClassificationProvider:
 
 @lru_cache
 def get_provider():
-    return ClassificationProvider(max_concurrency=get_settings().classification_max_concurrency)
+    return ClassificationProvider(max_concurrency=get_settings().classification_max_concurrency,
+                                  limits=get_limits())

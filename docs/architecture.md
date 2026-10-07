@@ -9,7 +9,12 @@ labels and adds independent binary reply. It makes no external writes, restores 
 mailbox import/cache, and changes no existing assistant Flow registry. Disabled by
 default in fresh configuration; the public backend enabled Claude Haiku 4.5 on
 7 October 2026. See the [deployment record](classification/ROLLOUT-2026-10-07.md).
-Nova Micro is retired.
+Nova Micro is retired. The [reliability update](classification/FRONTEND-RELIABILITY-HANDOFF.md)
+adds admission before Gmail reads, a process-local rolling inference-attempt budget
+and bounded retries for transient read-only failures. Gmail 403 reasons distinguish
+throttling from access refusal; raw provider errors never enter logs. Defaults
+remain two active classifications with eight attempts/minute while the applied
+Haiku quota is ten. Validity defaults to one hour; source/session checks remain.
 Classification Flows use a numbered managed CHAT prompt, a numbered Flow version
 and an alias verified before/after invocation. The backend checks the prompt,
 model, graph and role; it does not accept a console-edited replacement release.
