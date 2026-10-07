@@ -288,7 +288,11 @@ export function useAssistant(user: User) {
           message: h.assistant,
           emailDraft: h.email_draft,
           conversationId: value.conversation_id,
-          conversationVersion: h.version,
+          conversationVersion:
+            h.email_draft &&
+            h.email_draft.draft_id === value.active_email_draft_id
+              ? value.version
+              : h.version,
           errorCode: h.error_code,
           calendarActionId: h.calendar_action_id
         }))
@@ -837,6 +841,18 @@ export function useAssistant(user: User) {
     }
     retryTurn.current = null
     setRecovery(null)
+    // A chat follow-up does not discard the active editor or its local edits.
+    // Only the server's current draft identity may advance its review version.
+    if (turn.active_email_draft_id) {
+      setEntries((all) =>
+        all.map((entry) =>
+          entry.conversationId === turn.conversation_id &&
+          entry.emailDraft?.draft_id === turn.active_email_draft_id
+            ? { ...entry, conversationVersion: turn.version }
+            : entry
+        )
+      )
+    }
     update(id, {
       pending: false,
       message: turn.text,

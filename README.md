@@ -221,3 +221,10 @@ named recipient needs a literal address only at save time. Closing the card afte
 click does not cancel the submitted save. Unknown responses freeze the exact
 attempt for safe replay/status recovery; confirmed or uncertain provider receipts
 cannot create another copy. Subsequent edits to a created draft happen in Gmail.
+
+Draft cards stay editable through chat follow-ups when the server returns the
+matching `active_email_draft_id`. The client advances only that card's review
+version and preserves its local edits. A new goal leaves the old card disabled;
+older servers that omit the identity retain conservative version checks.
+Chat confirmations never submit Gmail writes: the user still reviews the exact
+editor and clicks **Create draft**.
