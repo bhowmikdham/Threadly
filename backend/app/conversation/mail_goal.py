@@ -123,7 +123,11 @@ def search_goal(runtime, args):
     # terms are an explicit AND refinement, never an accidental exact phrase.
     query = "" if terms else goal["entity"] or goal["sender_name"] or args.query
     goal.update(
-        assessments={}, pages_read=0, request_id=runtime.request.request_id, search_complete=False
+        assessments={},
+        pages_read=0,
+        request_id=runtime.request.request_id,
+        search_complete=False,
+        sender_identity_count=0,
     )
     runtime.state[KEY] = goal
     if not intent.continue_previous:

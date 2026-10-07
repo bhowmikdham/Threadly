@@ -36,11 +36,14 @@
     "tests/test_handsfree_mail_goals.py::test_legacy_cursor_remains_valid_but_changed_new_filter_is_fenced",
     "tests/test_handsfree_mail_goals.py::test_reply_content_about_cancellation_is_not_a_cancel_command",
     "tests/test_handsfree_mail_goals.py::test_active_mail_goal_requires_the_typed_reply_contract",
-    "tests/test_handsfree_mail_goals.py::test_user_resolves_sender_ambiguity_without_losing_reply_request"
+    "tests/test_handsfree_mail_goals.py::test_user_resolves_sender_ambiguity_without_losing_reply_request",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[summarise the email]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[schedule a meeting]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[list action items]"
   ],
-  "replay_case_count": 30,
+  "replay_case_count": 33,
   "final_focused_suite": {
-    "passed": 299,
+    "passed": 302,
     "failed": 0,
     "skipped": 0
   },
@@ -63,6 +66,11 @@
     "Semantic model decisions and relevance labels are scripted, not live-model quality evidence.",
     "Production failed-turn tool arguments were not persisted.",
     "No installed-client, live Gmail write or live Bedrock acceptance is claimed.",
-    "PR CI and final combined-suite results are recorded in the review handoff."
-  ]
+    "Git push was rejected with HTTP403 for credential identity bdha0006-oss; no PR or exact-head hosted CI yet. Final local combined-suite results are recorded in the review handoff."
+  ],
+  "combined_full_suite_before_final_compound_and_sender_refinement_checks": {
+    "passed": 2172,
+    "failed": 0,
+    "skipped": 0
+  }
 }

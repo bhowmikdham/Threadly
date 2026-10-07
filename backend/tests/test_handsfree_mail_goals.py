@@ -102,7 +102,7 @@ def mailbox(configured, monkeypatch):  # noqa: F811
                     if req.url.params.get("pageToken")
                     else (["b1", "b2", "b3", "b4", "b5"], "page-two")
                 )
-            elif '"Alex Chen"' in q:
+            elif '"Alex Chen"' in q or '"Acme"' in q:
                 ids, more = ["c1", "c2", "c3"], None
             else:
                 raise AssertionError(f"Unexpected bounded query {q}")
@@ -869,6 +869,11 @@ async def test_user_resolves_sender_ambiguity_without_losing_reply_request(
         db_sessionmaker,
         turn,
         choice,
+        tool(
+            "search_mail",
+            query="Acme",
+            goal=goal(choice, sender_name="Acme", continue_previous=True),
+        ),
         tool("read_email", reference="mail-1"),
         tool(
             "prepare_workflow",
@@ -878,7 +883,7 @@ async def test_user_resolves_sender_ambiguity_without_losing_reply_request(
                 "operation": "resolve_target",
                 "source": choice,
                 "continue_previous": True,
-                "target": "reference",
+                "target": "latest_inbound",
             },
         ),
     )
@@ -887,3 +892,18 @@ async def test_user_resolves_sender_ambiguity_without_losing_reply_request(
         task = await db.get(AssistantTask, result["task_id"])
         assert text in task.instruction and choice in task.instruction
         assert task.draft_input["reply_message_id"] == "c1"
+
+
+@pytest.mark.parametrize(
+    "additional", ["summarise the email", "schedule a meeting", "list action items"]
+)
+def test_semantic_reply_still_requires_complete_compound_work(additional):
+    from app.conversation.runtime import authorize_workflow
+
+    with pytest.raises(ValueError, match="complete compound proposal"):
+        authorize_workflow(
+            f"drop me a response and {additional}", "reply", False, semantic_reply=True
+        )
+    authorize_workflow(
+        "drop me a response to his latest email", "reply", False, semantic_reply=True
+    )

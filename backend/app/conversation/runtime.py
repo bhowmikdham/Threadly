@@ -446,12 +446,16 @@ def validate_agenda_request(instruction, period):
         raise ValueError("Use the requested Calendar period")
 
 
-def authorize_workflow(instruction, intent, compound):
+def authorize_workflow(instruction, intent, compound, *, semantic_reply=False):
     """Require a user-authored request for every model-selected workflow class."""
     if intent == "compose" and _revokes_compose_request(instruction.splitlines()[-1]):
         raise ValueError("The user cancelled or declined composing")
     value = _normalise_action_typos(instruction)
     operations = set()
+    # Only the USER-grounded single-reply preflight can supply this semantic
+    # operation. Preserve the existing checks for omitted compound operations.
+    if semantic_reply and intent == "reply" and not compound:
+        operations.add("reply")
     if re.search(r"\b(?:summari[sz]e|summary|recap)\b", value):
         operations.add("summarise")
     if re.search(
@@ -1231,8 +1235,9 @@ class Runtime:
                 "task": view,
             }
         instruction = interpreted or self.authoritative_instruction()
-        if interpreted is None:
-            authorize_workflow(instruction, args.intent, args.compound)
+        authorize_workflow(
+            instruction, args.intent, args.compound, semantic_reply=interpreted is not None
+        )
         validate_workflow_bindings(
             args, set(self.loaded), set(self.recipients), self.recipient_roles
         )
