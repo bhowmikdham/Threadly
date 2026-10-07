@@ -418,8 +418,14 @@ export function VoiceOrb({
         )
         .finally(() => (ready = true))
 
-      await speak(ACKNOWLEDGE, (value) => (voice.level = value))
-      if (stale()) return
+      const IGNORE_PHRASES = ["hello", "hi", "how are you", "thank you", "thanks"]
+      const cleanSaid = said.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
+      const shouldAcknowledge = !IGNORE_PHRASES.includes(cleanSaid);
+
+      if (shouldAcknowledge) {
+        await speak(ACKNOWLEDGE, (value) => (voice.level = value))
+        if (stale()) return
+      }
 
       if (!ready) move("thinking")
       const result = await work
