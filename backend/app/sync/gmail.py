@@ -87,8 +87,9 @@ class GmailClient:
                     content.extend(chunk)
                     if len(content) > 8_000_000:
                         raise GmailError("gmail response exceeds supported size")
-                r = httpx.Response(response.status_code, content=bytes(content),
-                                   headers=response.headers)
+                # aiter_bytes() already decodes Content-Encoding. Copying that
+                # header onto buffered bytes would decompress the body twice.
+                r = httpx.Response(response.status_code, content=bytes(content))
         except httpx.HTTPError as exc:
             raise GmailError("gmail request failed") from exc
         if r.status_code == 401:
@@ -109,7 +110,7 @@ class GmailClient:
             except (ValueError, AttributeError, TypeError):
                 pass
             raise GmailError("gmail api error", r.status_code, reason=reason,
-                             retry_after=retry_after_seconds(r.headers.get("Retry-After")))
+                             retry_after=retry_after_seconds(response.headers.get("Retry-After")))
         try:
             body = r.json()
         except ValueError as exc:
