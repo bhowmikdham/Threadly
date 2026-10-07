@@ -206,7 +206,11 @@ class Respond(StrictModel):
 
 
 class PrepareWorkflow(StrictModel):
-    request_source: str = Field(default="", max_length=4000)
+    request_source: str = Field(
+        default="",
+        max_length=4000,
+        description="Copy the complete current USER turn exactly for this workflow request.",
+    )
     context_citations: list[UserCitation] = Field(default_factory=list, max_length=4)
     intent: Literal["summarise", "reply", "compose", "plan_schedule", "other"]
     reference: str | None = Field(default=None, max_length=40)
@@ -232,12 +236,23 @@ class PrepareWorkflow(StrictModel):
 
 
 class PrepareEmailDraft(StrictModel):
-    request_source: str = Field(default="", max_length=4000)
+    request_source: str = Field(
+        default="",
+        max_length=4000,
+        description="Copy the complete current USER turn exactly, including for a new goal.",
+    )
     context_citations: list[UserCitation] = Field(default_factory=list, max_length=4)
     recipient: str = Field(default="", max_length=500)
     purpose: str = Field(default="", max_length=4000)
     continue_previous: bool = False
-    draft: GeneratedDraft | None = None
+    draft: GeneratedDraft | None = Field(
+        default=None,
+        description=(
+            "Include a generated subject and body in this same call when recipient and purpose "
+            "are known from current or retained USER details. Omit only while a required detail "
+            "is missing. Use unresolved_fields and sources=[]; do not invent unknown facts."
+        ),
+    )
     citations: list[FieldCitation] = Field(default_factory=list, max_length=2)
 
     @model_validator(mode="after")
@@ -306,7 +321,8 @@ TOOLS = {
     ),
     "prepare_email_draft": (
         PrepareEmailDraft,
-        "Prepare a standalone email draft from USER text. Copy recipient (a name is enough) "
+        "Prepare a standalone email draft from USER text. Copy the complete current USER "
+        "turn into request_source. Copy recipient (a name is enough) "
         "and purpose/message facts as exact USER wording; leave genuinely missing fields empty. "
         "The backend asks only for missing fields. No subject or exact email address is required. "
         "Use continue_previous=true to answer the pending_email_draft question, repeat an "

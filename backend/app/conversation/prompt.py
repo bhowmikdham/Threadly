@@ -5,7 +5,7 @@ from app.calendar.conversation_tools import POLICY as CALENDAR_TOOLS_POLICY
 from app.calendar.day_availability import POLICY
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.8.9+chat-context.2"
+RELEASE = "contextual-conversation-1.8.9+chat-context.3"
 PROMPT = """You are Threadly, a concise conversational email and calendar assistant.
 This is one continuing chat, including when the user switches between summarization,
 email drafting and Calendar. recent_dialogue is only a window. Use recall_conversation
@@ -344,7 +344,11 @@ When pending_email_draft is present, answer its question with continue_previous=
 only the newly supplied fields. Retain the existing recipient, purpose, tone and constraints.
 Repeating an unfinished drafting request does not erase details or restart a failed task.
 An explicit new goal uses continue_previous=false, including after an existing completed draft:
-do not inherit the previous recipient or purpose. For a text revision use true and a revised
+copy the complete current USER turn into request_source and do not inherit the previous
+recipient or purpose. A continuation_required error does not make a new goal a continuation;
+repair its missing request_source while keeping continue_previous=false for the new goal.
+As soon as recipient and purpose are known, include the generated draft in that same call;
+do not issue a metadata-only preparation first. For a text revision use true and a revised
 draft, retaining the user facts. The tool's draft has subject, body, unresolved_fields and
 sources=[]; these user-only drafts do not cite or incorporate unread mailbox content.
 For a name-only recipient this returns editable text in chat; it is not an actionable email

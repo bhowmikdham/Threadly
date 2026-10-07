@@ -175,6 +175,51 @@ async def test_two_unfinished_email_goals_can_be_resumed_independently(configure
         assert await db.scalar(select(func.count()).select_from(ConversationGoal)) == 2
 
 
+async def test_live_observed_new_goal_contract_repair_preserves_both_drafts(
+    configured, db_sessionmaker
+):
+    """Replay observed call 8, then inspect guidance before a scripted repair.
+
+    This verifies contract/state behavior, not that the live model follows it.
+    """
+    first = "Can you help with an email for Alex?"
+    result = await service.turn(
+        1,
+        turn(first),
+        factory=db_sessionmaker,
+        model=Model(tool("prepare_email_draft", recipient="Alex", request_source=first)),
+    )
+    second = "Another email for Casey, please."
+    result, observed = await next_turn(
+        db_sessionmaker,
+        result,
+        second,
+        tool("prepare_email_draft", recipient="Casey", purpose="", continue_previous=False),
+        tool(
+            "prepare_email_draft", recipient="Casey", continue_previous=False, request_source=second
+        ),
+    )
+    errors = [
+        block["toolResult"]["content"][0]["json"]
+        for message in observed.messages
+        for block in message["content"]
+        if "toolResult" in block
+    ]
+    assert errors[0]["error"] == "continuation_required"
+    assert "new independent email use continue_previous=false" in errors[0]["message"]
+    assert "complete current USER turn into request_source" in errors[0]["message"]
+    assert result["kind"] == "clarification" and result["text"] == "What would you like to say?"
+    async with db_sessionmaker() as db:
+        state = store.decode(await db.get(Conversation, result["conversation_id"]))
+        assert state["email_draft_goal"]["recipient"] == "Casey"
+        retained = (await db.scalars(select(ConversationGoal))).all()
+        assert len(retained) == 2
+        assert await db.scalar(select(func.count()).select_from(ActionJob)) == 0
+    request = turn(second, conversation_id=result["conversation_id"], expected_version=2)
+    listing = await goals.listing(await _runtime(db_sessionmaker, request, state))
+    assert {item["label"] for item in listing["goals"]} == {"Alex", "Casey"}
+
+
 async def _runtime(factory, request, state):
     from app.conversation.runtime import Runtime
 
