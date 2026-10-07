@@ -64,6 +64,26 @@ export function insertIntoReplyEditor(editor: HTMLElement, body: string) {
     selection.addRange(after)
   }
 }
+/** The signed-in Gmail account, from the account button's label. */
+export function gmailAccountEmail(doc: Document): string | null {
+  return (
+    doc
+      .querySelector('[aria-label*="Google Account:"]')
+      ?.getAttribute("aria-label")
+      ?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null
+  )
+}
+/** Gmail's own theme decides ours: a dark page background means dark mode. */
+export function gmailIsDark(doc: Document) {
+  const [r, g, b] = (
+    getComputedStyle(doc.body).backgroundColor.match(/\d+/g) || [
+      "255",
+      "255",
+      "255"
+    ]
+  ).map(Number)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 96
+}
 /** True when a Gmail URL is showing one email thread rather than a list. */
 export function gmailUrlShowsEmail(href?: string | null): boolean {
   if (!href?.startsWith("https://mail.google.com/")) return false
@@ -100,11 +120,7 @@ export function readGmailSelection(doc: Document, href: string) {
     (expanded.length === 1
       ? gmailId(expanded[0].getAttribute("data-legacy-message-id"))
       : null)
-  const account =
-    doc
-      .querySelector('[aria-label*="Google Account:"]')
-      ?.getAttribute("aria-label")
-      ?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null
+  const account = gmailAccountEmail(doc)
   // Only whether a reply box is showing; its contents are never read.
   // Gmail puts the reply box below the messages, not inside one of them.
   const replyEditorOpen = replyEditors(doc).length > 0
