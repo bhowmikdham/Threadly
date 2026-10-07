@@ -46,7 +46,7 @@ before the code changes. The pydantic models in `backend/app/schemas/` mirror th
 
 Status: v0.1 — W1 endpoints are LIVE: `/auth/google/exchange`, `/auth/refresh`,
 `/healthz`, `/readyz`, `/sync`, `/threads`, `/threads/{id}`, `/threads/{id}/summary` (SSE).
-Still stubbed (501): `/draft*`, `/entities`, `/commitments`, `/voice/*`.
+Still stubbed (501): `/draft*`, `/entities`, `/commitments`.
 
 Inference migration: uncached summaries support `INFERENCE_PROVIDER=bedrock`
 ([ADR 003](decisions/003-bedrock-migration.md)). The initial Bedrock adapter buffers
@@ -352,12 +352,21 @@ endpoints remain pending.
 ### Voice
 | Method | Path                | Body                  | Returns |
 |--------|---------------------|-----------------------|---------|
-| POST   | `/voice/transcribe` | multipart audio       | `{"text": "..."}` |
-| POST   | `/voice/speak`      | `{"text": "..."}`     | audio stream (`audio/mpeg`) |
+| POST   | `/voice/transcribe` | reserved (no audio implementation) | `{"text": ""}` placeholder |
+| POST   | `/voice/speak`      | `{"text": "..."}`     | `{"audio": "<base64 MP3>"}` |
 
 Voice keys never reach the extension; the api proxies ElevenLabs (module 9) and
 masks supported email/phone/card-like identifiers before cloud egress. This seed
 masker is not full anonymisation.
+
+Both routes require a valid Threadly session. `/voice/speak` returns the standard
+error envelope: provider rejection (including provider 401/403/429) is
+`502 voice_provider_error`, timeout is `504 voice_timeout`, and missing server
+configuration or network failure is `503 voice_unavailable`. Provider bodies and
+credentials are never returned. Only Threadly authentication failures return 401;
+a speech failure does not revoke Google access or invalidate the user's session.
+The extension can use browser speech as its fallback while conversation work
+continues independently. Text turns do not call `/voice/speak`.
 
 ## Open questions (settle before W2)
 
