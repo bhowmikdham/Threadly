@@ -227,6 +227,13 @@ async def select(runtime, choice_id):
         ]
         value["arguments"]["calendar_name"] = ""
     from app.calendar.event_creation import prepare
+    from app.calendar.intent import user_directive
     from app.schemas.conversation import PrepareCalendarEvent
 
-    return await prepare(runtime, PrepareCalendarEvent(continue_previous=True))
+    return await prepare(
+        runtime,
+        PrepareCalendarEvent(
+            continue_previous=True,
+            intent={"operation": "resume", "source": user_directive(runtime.request.instruction)},
+        ),
+    )

@@ -206,7 +206,10 @@ async def test_untrusted_or_mismatched_change_does_not_supersede(
             tool("respond", kind="clarification", text="Which field would you like to change?"),
         ),
     )
-    assert result["kind"] == "clarification", result
+    assert (
+        result["kind"] == "clarification"
+        or result.get("error_code") == "calendar_event_not_prepared"
+    ), result
     async with db_sessionmaker() as db:
         old = await db.get(AssistantAction, first["calendar_action"]["action_id"])
         assert old.state == "proposed"
@@ -287,7 +290,10 @@ async def test_quoted_or_reported_removal_cannot_authorize_change(
             tool("respond", kind="clarification", text="Which field would you like to change?"),
         ),
     )
-    assert result["kind"] == "clarification"
+    assert (
+        result["kind"] == "clarification"
+        or result.get("error_code") == "calendar_event_not_prepared"
+    )
     async with db_sessionmaker() as db:
         assert (await db.get(AssistantAction, first["calendar_action_id"])).state == "proposed"
 

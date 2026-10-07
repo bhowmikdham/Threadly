@@ -57,7 +57,23 @@ class Model:
         self.contexts.append(json.loads(messages[0]["content"][0]["text"]))
         if not self.decisions:
             raise ProviderError("Fake exhausted")
-        return self.decisions.pop(0)
+        decision = deepcopy(self.decisions.pop(0))
+        # Calendar fixture calls default to the current typed source contract.
+        # Explicit intent (including None) is preserved for malformed-call tests.
+        for block in decision.get("content", []):
+            call = block.get("toolUse", {})
+            if call.get("name") == "prepare_calendar_event" and "intent" not in call["input"]:
+                from app.calendar.intent import user_directive
+
+                values = call["input"]
+                operation = "create"
+                if values.get("continue_previous"):
+                    operation = "revise" if values.get("changes") else "resume"
+                values["intent"] = {
+                    "operation": operation,
+                    "source": user_directive(self.contexts[-1].get("user_turn", "")),
+                }
+        return decision
 
 
 class Runtime:

@@ -11,7 +11,7 @@ from app.actions import calendar_preview
 from app.actions import service as actions
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import event_choices, event_draft, permissions, service
+from app.calendar import event_choices, event_draft, intent, permissions, service
 from app.calendar.conversation_tools import RequestClarification, duration, literal, resolve_window
 from app.calendar.time_resolution import parse_clock, wall_instants
 from app.capabilities.service import build_capabilities
@@ -27,100 +27,10 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.1.2"
+POLICY = "direct-calendar-event-1.2.0"
 
 
-def user_directive(text):
-    # A model selects the operation semantically. Its quoted evidence must remain
-    # in the user's top-level directive, never a pasted email/label/instruction.
-    return re.split(r"\n|(?<!\d):(?!\d)", text.strip(), maxsplit=1)[0]
-
-
-def creation_target(text):
-    leading = user_directive(text).casefold()
-    leading = leading.replace("craete", "create").replace("creat ", "create ")
-    leading = re.sub(r"\bat(?=\d)", "at ", leading)
-    match = re.search(r"\b(?:create|make|add|book|schedule|reserve|put|block)\s+", leading)
-    if not match:
-        return None
-    # Check the directive, not its title. A small request grammar accepts optional
-    # greetings/auxiliaries in any order; arbitrary reported speech is not authority.
-    prefix = leading[: match.start()]
-    request_words = {
-        "hi",
-        "hello",
-        "hey",
-        "alfred",
-        "threadly",
-        "please",
-        "kindly",
-        "can",
-        "could",
-        "would",
-        "will",
-        "you",
-        "i",
-        "i'd",
-        "want",
-        "need",
-        "like",
-        "to",
-        "help",
-        "helping",
-        "me",
-        "mind",
-        "for",
-        "thanks",
-        "thank",
-    }
-    if re.search(r'["“”`<>]', prefix) or any(
-        word not in request_words for word in re.findall(r"[\w']+", prefix)
-    ):
-        return None
-    return re.sub(r"^(?:(?:me|a|an|the|my|new|single|one-time)\s+)*", "", leading[match.end() :])
-
-
-def creation_request(text, title="", date_source="", time_source=""):
-    target = creation_target(text)
-    if not target:
-        return False
-    leading = re.split(r"\n|(?<!\d):(?!\d)", text.casefold().strip(), maxsplit=1)[0]
-    if re.match(
-        r"(?:calendar\s+)?(?:event|meeting|appointment|call|time block)"
-        r"(?:[?.!]*$|\s+(?:called|named|titled|at|on|for|with|tomorrow|today)\b)",
-        target,
-    ):
-        return True
-    # Shorthand is a bounded scheduling command: a title immediately followed
-    # by its time/date clause. A prose/content object is not event authority,
-    # irrespective of which literal span the model chooses as its title.
-    # Content-like event titles remain available with an explicit "event called".
-    if re.search(
-        r"\b(?:summary|summaries|draft|reply|email|message|explanation|translation|"
-        r"instructions?|sentence|paragraph|essay|document|description|response|story|"
-        r"poem|code|script)\b",
-        target,
-    ):
-        return False
-    # Time-first spoken requests are still literal user-origin scheduling commands.
-    # Match the whole request so pasted prose cannot become an event title.
-    if time_source and date_source:
-        timing = (
-            rf"(?:(?:at|for)\s+)?{re.escape(time_source.casefold())}\s+"
-            rf"(?:(?:on|for)\s+)?{re.escape(date_source.casefold())}"
-        )
-        suffix = rf"\s+for\s+(?:(?:a|an|my)\s+)?{re.escape(title.casefold())}" if title else ""
-        if re.fullmatch(timing + r"[?.!]*", target) or re.fullmatch(
-            timing + suffix + r"[?.!]*", target
-        ):
-            return True
-    return bool(
-        title
-        and (date_source or time_source)
-        and re.match(re.escape(title.casefold()) + r"\s+(?:at|on|tomorrow|today)\b", target)
-        and (not date_source or date_source.casefold() in leading)
-        and (not time_source or time_source.casefold() in leading)
-    )
+user_directive = intent.user_directive
 
 
 def source_fields(args, text, previous_calendar_names=()):
@@ -187,7 +97,7 @@ def source_fields(args, text, previous_calendar_names=()):
 def complete_trailing_title(args, text):
     # Narrow unambiguous form: "make an event at <time> <date> for <title>".
     # Do not infer titles when dates or other fields still follow the marker.
-    if not (args.title and args.date_source and args.time_source and creation_request(text)):
+    if not (args.title and args.date_source and args.time_source):
         return
 
     def normalized(value):
@@ -247,28 +157,24 @@ def resolve_times(args, text, preferences, anchor):
 
 
 async def prepare(runtime, args):
+    intent.validate_source(args.intent, runtime.request.instruction)
     pending = event_choices.pending(runtime.state) if args.continue_previous else None
     if args.continue_previous and not pending:
-        raise RequestClarification("Please repeat the event details for this new request.")
-    # A typed interpretation is still only a proposal. Creation authority is the
-    # original top-level USER directive, independent of model/source text.
-    origin_args = pending["arguments"] if pending else args.model_dump()
-    origin = (pending or {}).get("creation_origin") or {
-        "text": pending["user_text"] if pending else runtime.request.instruction,
-        "title": origin_args.get("title", ""),
-        "date_source": origin_args.get("date_source", ""),
-        "time_source": origin_args.get("time_source", ""),
-    }
-    authority_text = user_directive(origin["text"])
-    if origin.get("title"):
-        authority_text = authority_text.replace(origin["title"], " ")
-    if re.search(r"\b(?:don't|do not|never)\b", authority_text, re.I):
         return {
             "kind": "clarification",
-            "text": "Please confirm whether you want this event created.",
+            "text": "Please repeat the event details for this new request.",
         }
-    if not creation_request(**origin):
-        raise RequestClarification("Tell me the event you want to create.")
+    # The typed operation selects the goal. No second positive language parser
+    # may veto it based on the order of the user's words.
+    origin = (pending or {}).get("creation_origin")
+    if pending:
+        if not origin:
+            # Older owned structured drafts were validated before persistence.
+            # This never reconstructs a goal from assistant prose or email history.
+            origin = {"text": pending["user_text"], "policy": "legacy-stored-calendar-goal"}
+    else:
+        intent.validate_creation(runtime.request.instruction, args.title)
+        origin = {"text": user_directive(runtime.request.instruction), "policy": intent.POLICY}
     if args.intent and args.intent.operation == "cancel":
         if args.intent.source.strip() != user_directive(runtime.request.instruction).strip():
             raise RequestClarification("Please confirm cancellation directly.")

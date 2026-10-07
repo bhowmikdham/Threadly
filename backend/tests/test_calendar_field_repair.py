@@ -157,7 +157,7 @@ async def test_new_cricket_request_repairs_without_reusing_prior_approval(
     )
     result = await service.turn(1, request, factory=db_sessionmaker, model=model)
     assert result["trace"][0]["reason"] == "calendar_new_goal_required"
-    assert result["trace"][1]["reason"] == "calendar_event_invalid_input"
+    assert result["trace"][1]["reason"] == "calendar_title_incomplete"
     new = result["calendar_action"]
     assert new["action_id"] != old["action_id"] and new["state"] == "proposed"
     assert new["preview"]["event"]["summary"] == "cricket"

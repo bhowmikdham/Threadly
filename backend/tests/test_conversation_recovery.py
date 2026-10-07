@@ -195,7 +195,9 @@ async def test_cancellation_fences_late_calendar_candidate_transaction(configure
     runtime = service.Runtime(1, request, state, db_sessionmaker, lease)
     await recovery.recover(1, request.conversation_id, command(request), factory=db_sessionmaker)
     with pytest.raises(ApiError) as error:
-        await event_creation.prepare(runtime, PrepareCalendarEvent(**ARGS))
+        await event_creation.prepare(runtime, PrepareCalendarEvent(
+            **ARGS, intent={"operation": "create", "source": request.instruction}
+        ))
     assert error.value.code == "conversation_lease_lost"
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 0

@@ -1324,7 +1324,7 @@ that result. Ask/Always and all existing request/account/version fences remain.
 ### Calendar draft continuation contract (conversation 1.8.0)
 
 `prepare_calendar_event` retains the existing fields and `continue_previous` flag.
-Its optional `intent` is `{operation: create|resume|revise|cancel, source: string}`;
+Its model-call `intent` is `{operation: create|resume|revise|cancel, source: string}`;
 source quotes the complete top-level user directive. It is an interpretation, never
 an approval or Google grant. New explicit creation supersedes an undispatched old
 candidate. Availability/email detours retain the unfinished goal for its original
@@ -1349,6 +1349,22 @@ Changed existing details invalidate old calendar choice handles; filling a missi
 field preserves an explicitly chosen destination, rechecked against current ACLs
 and preference/account versions. Published response shapes and picker endpoints
 are unchanged. No migration, OAuth scope or production setting is required.
+
+Direct-event policy 1.2.0 requires typed intent on every model call. The model
+selects the operation semantically; the backend does not reclassify creation using
+a verb/prefix or title/date word-order grammar. Details-first requests and diary
+paraphrases use the same path. The source must match the complete current top-level
+user directive. Quoted/reported source, explicit negation, hypotheticals and
+content-generation instructions are conservatively excluded from creation authority.
+Ambiguous mixed source/instruction text may therefore require clarification.
+
+`resume` fills missing fields without replacing known ones. Replacements require
+`revise` and explicit changes; `create` starts with fresh fields and approval state.
+Existing owned structured drafts and picker clicks retain their continuation path.
+Once the model attempts Calendar preparation, turn-local state requires a typed
+result or an honest bounded failure, rather than re-parsing the user's sentence.
+Initial tool selection remains the model's responsibility. This contract is not
+an approval, and all existing account/capability and exact-payload write checks remain.
 
 
 ### Calendar voice follow-ups (conversation 1.8.2)

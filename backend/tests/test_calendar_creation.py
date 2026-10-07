@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from app.actions import calendar_worker
 from app.api.errors import ApiError
-from app.calendar import client, event_creation, permissions
+from app.calendar import client, event_creation, intent, permissions
 from app.config import get_settings
 from app.conversation import service, store
 from app.db.models import (
@@ -118,6 +118,12 @@ def turn(instruction="Create Focus at 2pm tmrw", **values):
 
 
 async def run(factory, request, args=ARGS):
+    if not args.get("intent"):
+        args = {**args, "intent": {
+            "operation": ("revise" if args.get("changes") else "resume")
+            if args.get("continue_previous") else "create",
+            "source": intent.user_directive(request.instruction),
+        }}
     return await service.turn(
         1, request, factory=factory, model=Model(tool("prepare_calendar_event", **args))
     )
@@ -336,7 +342,8 @@ async def test_crash_after_candidate_replays_without_duplicate(
     ],
 )
 def test_read_and_quoted_instructions_are_not_creation_intent(text):
-    assert not event_creation.creation_request(text)
+    with pytest.raises(intent.IntentNotAuthorized):
+        intent.validate_creation(text)
 
 
 @pytest.mark.parametrize(
@@ -406,7 +413,8 @@ async def test_pasted_creation_instructions_cannot_authorize_always_mode(
         CalendarApprovalSetting(mode="always", expected_version=0),
         factory=db_sessionmaker,
     )
-    assert not event_creation.creation_request(instruction, "Focus", "tmrw", "2pm")
+    with pytest.raises(intent.IntentNotAuthorized):
+        intent.validate_creation(instruction, "Focus")
     result = await service.turn(
         1,
         request,
@@ -432,8 +440,8 @@ async def test_pasted_creation_instructions_cannot_authorize_always_mode(
         "Create an event:\nFocus at 2pm tmrw",
     ],
 )
-def test_creation_authority_binds_to_the_leading_request(instruction):
-    assert event_creation.creation_request(instruction, "Focus", "tmrw", "2pm")
+def test_user_creation_sources_have_no_authority_exclusions(instruction):
+    intent.validate_creation(instruction, "Focus")
 
 
 @pytest.mark.parametrize(
@@ -486,4 +494,4 @@ async def test_non_calendar_object_cannot_be_promoted_by_model_title(
     ],
 )
 def test_clear_event_requests_allow_content_like_titles(instruction, title):
-    assert event_creation.creation_request(instruction, title, "tmrw", "2pm")
+    intent.validate_creation(instruction, title)

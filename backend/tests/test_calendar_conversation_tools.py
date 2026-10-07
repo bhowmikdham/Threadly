@@ -532,7 +532,7 @@ def test_committed_release_matches_current_prompt_and_tools():
 
     root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
     saved = json.loads(
-        (root.parent / "handsfree-mail/contextual-conversation-1.8.8.json").read_text()
+        (root / "contextual-conversation-1.8.8+calendar-intent.1.json").read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
     old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())

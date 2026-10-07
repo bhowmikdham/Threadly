@@ -769,8 +769,13 @@ arguments and per-field user request/source provenance. Replacement and clearing
 operate on fields rather than appending old user text. Resolved dates are pinned
 to civil dates. Read-only detours preserve the draft; expiry, explicit cancellation,
 new creation goals and account fences bound its lifetime. Semantic tool intent is
-kept separate from the leading-user-directive authority check and immutable action
-approval. Content words in titles do not determine operation type.
+kept separate from user-source provenance checks and immutable action approval.
+Direct-event policy 1.2.0 removes the positive phrase-order parser: the model's
+required typed operation selects creation, and the backend checks the exact current
+user source, disqualifying source/negation boundaries, literal fields, ownership,
+capability and approval. Attempted Calendar preparation drives response recovery.
+Resume cannot replace known fields; explicit typed revisions can. Content words in
+explicitly named titles do not determine operation type.
 
 A completed preparation retains a reference to its action for correction/replay.
 It exposes no stale picker. Corrections take the existing account→task→action locks,
