@@ -47,11 +47,6 @@
     "failed": 0,
     "skipped": 0
   },
-  "initial_full_suite_before_final_cursor_and_resolution_checks": {
-    "passed": 2168,
-    "failed": 0,
-    "skipped": 0
-  },
   "checks": {
     "ruff": "passed",
     "versioned_prompt_snapshot": "passed",
@@ -66,11 +61,13 @@
     "Semantic model decisions and relevance labels are scripted, not live-model quality evidence.",
     "Production failed-turn tool arguments were not persisted.",
     "No installed-client, live Gmail write or live Bedrock acceptance is claimed.",
-    "Git push was rejected with HTTP403 for credential identity bdha0006-oss; no PR or exact-head hosted CI yet. Final local combined-suite results are recorded in the review handoff."
+    "Check PR #117 for exact-head hosted CI and review status."
   ],
-  "combined_full_suite_before_final_compound_and_sender_refinement_checks": {
-    "passed": 2172,
+  "code_verified_head": "0792b66f9d6e7fdd618c5792a7240747307a4438",
+  "final_full_suite": {
+    "passed": 2175,
     "failed": 0,
     "skipped": 0
-  }
+  },
+  "pull_request": "https://github.com/bhowmikdham/Threadly/pull/117"
 }
