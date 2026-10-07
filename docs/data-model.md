@@ -622,3 +622,14 @@ evidence replaces obsolete values; prior quoted/provider text is not reconstruct
 as authority. Legacy structured pending drafts remain readable. Unstructured old
 creation chats require clarification rather than guessing an old relative date.
 No relational schema change is introduced.
+
+### Gmail draft save receipts
+
+`gmail_draft_saves` (migration `g071026e9042`) stores one user-clicked outgoing
+snapshot per `(user_id, source_key)` and deduplicates `(user_id, request_id)`.
+It retains verified account generation, immutable validated MIME/preview, source
+artifact revision/hash or conversation draft/version provenance, provider result
+IDs, and `saving|succeeded|failed|outcome_unknown` state. These generated/user-edited
+payloads are distinct from original mailbox bodies. Account deletion cascades;
+receipt history otherwise remains durable so retries cannot duplicate writes.
+The table is never read by the send worker and grants no send authority.

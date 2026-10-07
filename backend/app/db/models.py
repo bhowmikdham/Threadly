@@ -517,6 +517,31 @@ class AssistantAction(TimestampMixin, Base):
     error_code: Mapped[str | None] = mapped_column(String(64))
 
 
+class GmailDraftSave(TimestampMixin, Base):
+    """One frozen, user-clicked save per source. Never consumed by send workers."""
+
+    __tablename__ = "gmail_draft_saves"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source_key", name="uq_gmail_draft_source"),
+        UniqueConstraint("user_id", "request_id", name="uq_gmail_draft_request"),
+        CheckConstraint(
+            "state IN ('saving','succeeded','failed','outcome_unknown')",
+            name="ck_gmail_draft_state",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    source_key: Mapped[str] = mapped_column(String(100))
+    request_id: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    account_version: Mapped[int] = mapped_column()
+    state: Mapped[str] = mapped_column(String(24))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    provenance: Mapped[dict] = mapped_column(JSONB)
+    result: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+
+
 class ActionApproval(Base):
     __tablename__ = "action_approvals"
     __table_args__ = (

@@ -35,9 +35,10 @@ class ReconnectIn(BeginIn):
             "calendar_read",
             "calendar_events_read",
             "gmail_send",
+            "gmail_draft",
             "calendar_write",
         ]
-    ] = Field(default_factory=list, max_length=5)
+    ] = Field(default_factory=list, max_length=6)
 
 
 class BeginOut(BaseModel):
@@ -90,6 +91,7 @@ async def google_reconnect(body: ReconnectIn, authenticated: CurrentSession, ses
         calendar_read="calendar_read" in body.capabilities,
         calendar_events_read="calendar_events_read" in body.capabilities,
         gmail_send="gmail_send" in body.capabilities,
+        gmail_draft="gmail_draft" in body.capabilities,
         calendar_write="calendar_write" in body.capabilities,
     )
     await session.commit()

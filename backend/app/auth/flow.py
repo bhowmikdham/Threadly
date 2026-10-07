@@ -55,8 +55,11 @@ async def begin(
     calendar_read=False,
     calendar_events_read=False,
     gmail_send=False,
+    gmail_draft=False,
     calendar_write=False,
 ):
+    if gmail_draft and user_id is None:
+        raise ApiError(400, "draft_login_required", "Sign in before enabling Gmail drafts.")
     if (calendar_read or calendar_events_read) and user_id is None:
         raise ApiError(400, "calendar_login_required", "Sign in before connecting Calendar.")
     if user_id is not None and (
@@ -78,6 +81,8 @@ async def begin(
         scopes = scopes + [CALENDAR_EVENTS_READ_SCOPE]
     if gmail_send:
         scopes = scopes + ["https://www.googleapis.com/auth/gmail.send"]
+    if gmail_draft:
+        scopes = scopes + ["https://www.googleapis.com/auth/gmail.compose"]
     if calendar_write:
         scopes = scopes + ["https://www.googleapis.com/auth/calendar.events"]
     if not settings.google_client_id or not settings.google_client_secret:
