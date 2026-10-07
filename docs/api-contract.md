@@ -1406,9 +1406,12 @@ never infer event titles or another person's availability. Older responses witho
 fields remain valid text responses. These card details are not persisted in history.
 # Conversational email drafting clarification (1.8.7)
 
-Standalone composition uses the backend model tool `prepare_email_draft` before
-reserving a durable workflow. It accepts exact user-sourced `recipient` and
-`purpose`, `continue_previous`, and optional generated `draft` text. Missing fields
+Standalone composition uses `start_email_draft` for new work and
+`continue_email_draft` for an existing owned goal before reserving a durable
+workflow (split in the unpublished `chat-context.5` contract). Both accept exact
+user-sourced `recipient` and `purpose`, the complete current `request_source`, and
+optional generated `draft` text. Continuation requires `goal_id`; starting accepts
+no identity or continuation flag. Missing fields
 return a normal `kind=clarification` conversation response without a task or
 preparation acknowledgment. The backend asks only for the recipient, purpose, or
 both; no subject or exact mailbox is required just to write text.
@@ -1573,7 +1576,7 @@ no additional schema migration.
 
 ## Unpublished shared chat context protocol
 
-The `contextual-conversation-1.8.9+chat-context.4` prototype adds
+The `contextual-conversation-1.8.9+chat-context.5` prototype adds
 `context_memory_version: 1` to turn/replay/restore responses. This means the backend
 owns goal focus: clients omit a task pointer derived merely from the last displayed
 card, and send a context snapshot only for an explicit attach/detach or initial pin.
@@ -1592,14 +1595,25 @@ chat. Workflow `request_source` is the complete current user turn, separate from
 historical data. These tools do not approve external actions. See the
 [design and compatibility review](chat-context-design-review.md) before deployment.
 
-`prepare_email_draft` continuation accepts an owned `goal_id` with
-`continue_previous: true` and the complete current USER `request_source`.
-When multiple email goals are retained, a continuation without that ID or an
-explicit `select_conversation_goal` in this turn is rejected before draft mutation
-(`email_goal_selection_required`). Recipient text never chooses the target goal.
+`start_email_draft` allocates an independent goal without accepting an existing
+identity. `continue_email_draft` requires an owned `goal_id` and the complete
+current USER `request_source`. Missing or invalid identity is rejected before
+draft mutation (`email_goal_selection_required` / `conversation_goal_missing`).
+Recipient text never chooses the target goal.
 An intentional recipient edit remains a revision of the explicitly selected goal.
-Single-goal legacy continuations remain supported; other-chat, other-owner,
+The legacy internal/replay `prepare_email_draft` shape is accepted but is no longer
+advertised to the model. An explicit boolean `continue_previous:false` discards any
+stale ID and allocates new work without inheriting fields. An ID with an omitted
+operation fails with `email_goal_operation_required`. Legacy continuation still
+requires explicit binding when multiple goals exist. Other-chat, other-owner,
 closed and wrong-kind goals cannot be selected as an email target.
+
+Repair observations preserve the requested operation and give reason-specific
+instructions. Two occurrences of the same email-tool error, or three email-tool
+errors in total, end the turn with the existing `email_draft_not_prepared` message.
+This bounds invalid-call loops while retaining validated details; it does not prove
+that a model chose the semantically correct goal. No new retry UI or HTTP endpoint
+is introduced.
 
 Standalone social closings do not repeat Calendar creation instructions.
 Recognized model-generated Calendar control guidance resolves to the current

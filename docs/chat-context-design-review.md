@@ -1,11 +1,12 @@
 # Shared conversation context: implementation and review
 
 Status: locally committed, integrated implementation, prompt
-`contextual-conversation-1.8.9+chat-context.4`. Backend base:
+`contextual-conversation-1.8.9+chat-context.5`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
-The frontend also incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204`,
-preserving open-email following and the newest visible incoming reply target.
+The frontend incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and
+PR126 at `1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`, preserving open-email following,
+the newest visible incoming reply target and the inbox classification badges.
 The voice repair remains intact. This document separates implemented mechanics
 from conversational quality. The `.2` diagnostic found partial successes and
 contract failures. The [second `.3` diagnostic](evaluation/chat-context/second-stage-results.md)
@@ -13,7 +14,9 @@ found improved draft text generation, but an overwritten goal, failed artifact
 restoration and wrong Calendar button guidance. The [.4 structural corrections](evaluation/chat-context/structural-fixes-review.md)
 reproduce and fix those calls with scripted regressions. The [.4 live resumption](evaluation/chat-context/second-resumption-results.md)
 passed saved restoration but found a new-goal schema/repair loop; Calendar coverage
-was partial. Conversational acceptance remains a release gate.
+was partial. The [.5 offline correction](evaluation/chat-context/email-operation-repair.md)
+separates new and continuing email operations and bounds reason-specific repair.
+No live model has evaluated `.5`; conversational acceptance remains a release gate.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
@@ -64,6 +67,12 @@ A quote proves authorship, not that the model understood the user's meaning.
   a deliberate recipient revision stays on the selected goal. This prevents the
   observed unqualified Casey call from overwriting Alex, but cannot prove that an
   explicitly chosen goal reflects the user's meaning.
+- The advertised email tools make operation and identity independent: a new email
+  uses `start_email_draft` without an ID; an answer/revision uses
+  `continue_email_draft` with an owned ID. The legacy explicit-new shape ignores a
+  stale ID without reading or mutating that goal. Repair instructions do not turn
+  new requests into continuation because old work is present. Two identical errors
+  or three different errors end the invalid-call loop using the existing response.
 - Goal sources use stable independent handles when restored; they do not replace
   the browser's explicit email pin. Handles contain identities, not remembered
   Gmail bodies. Source-dependent work requires fresh reads of the relevant scope.

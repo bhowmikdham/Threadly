@@ -1,15 +1,25 @@
 # Shared chat-context verification
 
-Current prompt: **`contextual-conversation-1.8.9+chat-context.4`**. Earlier snapshots
-remain immutable. `.2`, `.3` and `.4` have had bounded live diagnostics. The [.4
-resumption](second-resumption-results.md) passed saved-draft restoration but found
-a new-goal repair loop; Calendar coverage was partial. The implementation remains
-locally committed and unpublished, with behavioral release gates open.
-Backend base: `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
-`afa2180fa16b4060587002b6be440ce32573c603`. Both include the released voice repair.
-The frontend now also includes upstream PR122 at
-`60a7aa8dd02dd94105b90ae1ee68f742cf23d204`; the reconciled integration/test head is
-`4e4088b929ebd50184d128d1e63e0c8c07d9b2c3`.
+Current prompt: **`contextual-conversation-1.8.9+chat-context.5`**. Earlier snapshots
+remain immutable. The [.4 resumption](second-resumption-results.md) passed saved-draft
+restoration but found a new-goal repair loop; Calendar coverage was partial. The
+[.5 offline correction](email-operation-repair.md) separates new-email and continuation
+tools, preserves operation during repair, and bounds invalid repeats. It has **no
+live model evaluation**. Both paid allowances are exhausted. The implementation
+remains locally committed and unpublished, with behavioral release gates open.
+
+Backend runtime/test head: `7fb055f409c46479bc1cd1194aa870ff93ccf187`, based on
+released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
+Frontend runtime/test head: `277be033ee5d7276517adde1ab9acd1886810602`, with evidence
+head `357c06565ee61403dacf4df2f5e7ecdd3052aca3`. It includes released voice repair,
+PR122 `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and PR126
+`1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`. PR125/127 were inspected but not adopted.
+
+Current checks: **2,300 backend tests passed, no skips**, **254 frontend unit tests
+passed**, TypeScript, Ruff, both builds, **50 local browser tests plus one separately
+run public-origin browser test**. The exact recorded new-Casey call now returns a
+normal missing-purpose clarification in one scripted call, with Alex unchanged.
+These are deterministic/runtime checks, not proof of live semantic quality.
 
 The [design review](../../chat-context-design-review.md) describes implemented
 behavior, remaining semantic limits and the coordinated migration requirement.
@@ -28,17 +38,17 @@ generation improved, but returning to Casey overwrote Alex's current goal. Calen
 previews/revision worked with wrong closing-button guidance; saved-draft restoration
 returned status instructions instead of the artifact. The [.4 corrections](structural-fixes-review.md)
 add explicit goal binding, current-artifact restoration and action-state guidance.
-The exact bad calls now pass scripted regressions; live semantic acceptance remains
-a release gate.
+Those bad calls pass scripted regressions; the later `.4` resumption found the
+new-operation repair loop described above. Live semantic acceptance remains a gate.
 
-Final full backend suite at `398c4ac`: **2,284 passed**, no skips, one Starlette
+Previous full backend suite at `398c4ac`: **2,284 passed**, no skips, one Starlette
 warning, using real isolated PostgreSQL and scripted model/fake Google adapters.
 Earlier full runs at `744982f` (2,264) and `1bcb9c4` (2,283) remain recorded. This includes the
 combined approval-isolation regression: chat Always can approve its own resumed
 event without approving the separate email-button candidate or changing retained
 chat goals. Earlier full and focused results remain in the mechanical receipt.
 
-Current frontend after PR122: **250 unit tests passed**, **81 focused context/source/controller
+Previous frontend after PR122: **250 unit tests passed**, **81 focused context/source/controller
 tests passed**, and typecheck passed. A new integration test verifies automatic
 following before chat, stable source after chat, newest visible incoming reply
 target and New chat behavior alongside server-owned focus. Reconciled local/public builds
