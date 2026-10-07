@@ -1,9 +1,9 @@
 {
-  "status": "locally_committed_integrated_mechanical_checks_passed_model_evaluation_blocked_at_preflight",
-  "recorded_at": "2026-10-07T11:07:19.206893+00:00",
+  "status": "local_integrated_repairs_verified_mechanically_live_diagnostic_incomplete_budget_exhausted",
+  "recorded_at": "2026-10-07T11:43:54.477956+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
-  "prompt_release": "contextual-conversation-1.8.9+chat-context.2",
+  "prompt_release": "contextual-conversation-1.8.9+chat-context.3",
   "frontend": {
     "branch": "codex/chat-context-restoration",
     "base_commit": "afa2180fa16b4060587002b6be440ce32573c603",
@@ -29,15 +29,23 @@
   ],
   "providers": "Scripted models, fake Google adapters and isolated PostgreSQL on 127.0.0.1:55439",
   "real_model_evaluation": {
-    "status": "blocked_before_paid_inference",
+    "status": "budget_exhausted_with_partial_successes_and_incomplete_end_to_end_cases",
+    "evaluated_release": "contextual-conversation-1.8.9+chat-context.2",
     "approved_at": "2026-10-07T10:58:05Z",
-    "paid_calls_used": 0,
-    "approved_paid_calls_remaining": 18,
-    "inference_cost_usd": 0,
-    "preflight_error": "ValidationException",
-    "request_id": "edb45d29-9541-4c41-87ee-5deb5ef6e655",
-    "receipt": "approved-preflight.json",
-    "details": "approved-evaluation-status.md"
+    "paid_calls_used": 18,
+    "approved_paid_calls_remaining": 0,
+    "completed": 17,
+    "failed": 1,
+    "usage_completed": {
+      "inputTokens": 460564,
+      "outputTokens": 1390
+    },
+    "estimated_completed_usd_with_10pct_gst": "0.56569194",
+    "estimated_usd_with_10pct_gst_and_failed_attempt_full_reservation": "0.61530194",
+    "receipt": "live-model-review.json",
+    "details": "approved-evaluation-status.md",
+    "revised_prompt_live_evaluated": false,
+    "raw_ledger_sha256": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a"
   },
   "checks": {
     "ruff": "passed",
@@ -90,6 +98,20 @@
       "scope": "Required packaged public-origin case passed after public build.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-combined-public-browser.log",
       "log_sha256": "3dfd36e38566c4195cc5c6d5fd5e11cb5a57044f4a2aa78ab2a07d9cecba3755"
+    },
+    {
+      "name": "model_findings_targeted",
+      "result": "62 passed, 1 warning in 8.74s",
+      "scope": "Observed new-goal repair/state regression, draft follow-ups and evaluation guard using separate disposable local PostgreSQL; no real model calls.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-model-findings-targeted.log",
+      "log_sha256": "36fdf306a69a8d82582c5ef74c53fdfc6092472115e3c01bca05f149783f6b04"
+    },
+    {
+      "name": "model_findings_full_backend",
+      "result": "2264 passed, 1 warning in 300.67s",
+      "scope": "Full backend at 744982fa2208d23c15180d9b053adc50caf55a0d with isolated PostgreSQL and fake providers; no skips. Includes all combined button/context/approval and new repair checks.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-model-findings-full-backend.log",
+      "log_sha256": "10e92a11ec26d28685e8bc5f53d51cd108e624e3a9ddb4210fca2a3d11acdce1"
     }
   ],
   "previous_runs": [
@@ -183,11 +205,11 @@
     "backend/app/conversation/budget.py": "4df16539bde7114f9fa724d6b7e4a6703adef1c6c6a15d391efa0d0d511d5b56",
     "backend/app/conversation/citations.py": "0ce9bd4838e063915ae65f34700d5b399107b26e9f607beca972e2fab25ec176",
     "backend/app/conversation/email_draft.py": "69e8dfecec6a472eb91f80f80ffea2742090993ea0886ead53a56f9bba4ec43f",
-    "backend/app/conversation/engine.py": "c9e7876c61a834d880c6ab7a5804be9a42664f4a52a5a96626cfa0affe444a19",
+    "backend/app/conversation/engine.py": "fd1e1f50505498befb3b6f53afdaf56be62400dfab274d10d360bc8f085309c7",
     "backend/app/conversation/goals.py": "eaf5ed7b52a9c7ab1716b6c8cacde296a2cd1e67b09fc648e617478b266d87a9",
     "backend/app/conversation/mail_goal.py": "ace7641b4bbbe8a5a878c7b92c095d993f4fb589a9fac8c2365a56ae2830c7b2",
     "backend/app/conversation/memory.py": "9b4f98fe291b6c585800d0d9ce08a1cba4bbbd950587e022652d803a49ef2479",
-    "backend/app/conversation/prompt.py": "2be7f4a8ba9e36ef097d197d85652331a0074ebacc631f5faafad68152b7bd27",
+    "backend/app/conversation/prompt.py": "c78057552664f50872822964b40603b58d60e78f76beccb0499fac1c180abd9a",
     "backend/app/conversation/recovery.py": "bdd7a545dd24655af366a9103e9a960bc80e032064cf5e956cd7a3a643dc622e",
     "backend/app/conversation/runtime.py": "5f0b85d39363e08b816495e92967ec030c7f48b650ebbe821acdfd76405384e7",
     "backend/app/conversation/service.py": "fe8ebcba312f75946a5ed336e14fdc9a3cc10ede11b6a7f8e46578b0f870efb0",
@@ -197,31 +219,35 @@
     "backend/app/operations/retention.py": "7cf5da896146de3418e2ac62918c295be78fe126a5ba50271027f77775a85bea",
     "backend/app/schemas/calendar_event.py": "a14e5100113a9e57fa4879e0afa0283644d1ad6eff2034739a2092dbb7d9c6bd",
     "backend/app/schemas/chat_context.py": "ddbdb85860a9d7e7fae7b174eedd230c967017eea003cbab68f325eb0212872e",
-    "backend/app/schemas/conversation.py": "28ede898e62b43facefbb4f0f4092fa70eec4ce980b088d589ec160bc733d514",
+    "backend/app/schemas/conversation.py": "62937398bb2ad2346425e7b13fb76dc9b5d4ca0d438ad360fb7c7be034eaa839",
     "backend/app/schemas/meeting_email.py": "eadac114067387e8927f13d879ce0236527c9f562448c0b8208493a2ccd59894",
     "backend/tests/test_assistant_migration.py": "e5edb33003fff41727e98e000bf35f35dbb1e2e42554afc453623af908ab3acd",
-    "backend/tests/test_calendar_conversation_tools.py": "891f1e6d95fcab613fe30b1452d0a54a8a004c9c8504295923d2582a5c905386",
+    "backend/tests/test_calendar_conversation_tools.py": "6184f5df6afd2b84829900341319c59a5793e2267ca2510a361c1c64db647af7",
     "backend/tests/test_calendar_field_repair.py": "eac00617d00e455eab59590debbf4a9f739fb555c337368129b12b07c9bd6b99",
     "backend/tests/test_chat_context_continuity.py": "99fa1b70f5540c0a97f48af9d436a378abdf8bec5e4c3e40594bca807b773adc",
-    "backend/tests/test_chat_context_evaluation_budget.py": "c072ed15f88f1fee9be3aadeed27cbdafa2eb37398ab6338c6a0936c9886eb75",
+    "backend/tests/test_chat_context_evaluation_budget.py": "a593e7eb1a949d210a400cd747e7e214c055953f6faf06778c9704ea624e3168",
     "backend/tests/test_chat_context_meeting_email.py": "b42a105ab3e465f9bc45d40bab19fca7e6177df1c6ef8dcfe03718a2711801b0",
-    "backend/tests/test_chat_context_sources_goals.py": "597af8007aa4da0649f12b2c1e1853bf8154a44929c20645b050744bf0f1f5e1",
+    "backend/tests/test_chat_context_sources_goals.py": "d4aea6bfbb4507cff395d8279f45c2ac094631175b87cee2146cd41ea68fabba",
     "backend/tests/test_chat_context_workflows.py": "e0cd58b794bca79288abd4977784021350ed9882abf85976c3e6109f3fde4888",
     "backend/tests/test_meeting_email_event.py": "a44588ebb15648047f8b23db810876b5f6f64f4b1a3821e930511ca769bdaaf8",
     "backend/tests/test_primary_inbox.py": "9959636d18d262074607e3de197fc19c49d2b7ba0342219338ae5d4e4d15e2ac",
-    "backend/tools/evaluate_chat_context.py": "405a50acc4b003303de20f9cef872f3c423069db8e0f405132ad8c06bb6c7d8d"
+    "backend/tools/evaluate_chat_context.py": "dcde67f6047c5e6b8364f56aebbc0d5e30c9093a310053a28b103f9a66b8491f"
   },
   "review_findings_resolved": [
     "Unversioned legacy turns skipped by recall without inventing citation identity.",
     "Stable goal source handles prevent repeated restoration from consuming new source slots.",
     "Migration refuses downgrade with retained goals as well as exchanges.",
     "Auxiliary/default model clients now share the evaluation AWS dispatch budget.",
-    "Final full suite fixed only the inbox clock-test fixture for the new goal lookup."
+    "Final full suite fixed only the inbox clock-test fixture for the new goal lookup.",
+    "Runtime CountTokens accepts the bare Haiku 4.5 model ID; inference profile remains unchanged.",
+    "Persistent locked call ledger covers paid failures and process restarts.",
+    "Existing AWS login resolved before strict model dispatch; no credentials retained in evidence.",
+    "New-goal email repair explains request_source without forcing continuation of a different retained goal; prompt/tools versioned as .3."
   ],
   "remaining_gates": [
-    "Resolve CountTokens ValidationException without bypassing the cap; altered target/transmission requires permission.",
-    "Complete approved synthetic diagnostic and human semantic review; no model-quality outcomes exist yet.",
-    "Held-out paraphrases, final release review and explicit publication/deployment authorization.",
+    "New explicitly approved bounded live evaluation of prompt .3; all original 18 attempts are consumed.",
+    "Complete end-to-end and held-out paraphrase cases, draft quality, Calendar detours and saved-artifact return; current diagnostic has no complete end-to-end case.",
+    "Final release review and explicit publication/deployment authorization.",
     "Migration h071026e9043 and coordinated API/worker switch; compatibility rollback required after new-format writes."
   ],
   "known_limits": [
@@ -245,5 +271,16 @@
     "combined_review": "integration-review.md"
   },
   "external_writes_or_deployment": false,
-  "backend_code_and_test_head": "4ae5f730dfb197acaa2b31af35624203ad202356"
+  "backend_code_and_test_head": "744982fa2208d23c15180d9b053adc50caf55a0d",
+  "previous_real_model_evaluation_status": {
+    "status": "blocked_before_paid_inference",
+    "approved_at": "2026-10-07T10:58:05Z",
+    "paid_calls_used": 0,
+    "approved_paid_calls_remaining": 18,
+    "inference_cost_usd": 0,
+    "preflight_error": "ValidationException",
+    "request_id": "edb45d29-9541-4c41-87ee-5deb5ef6e655",
+    "receipt": "approved-preflight.json",
+    "details": "approved-evaluation-status.md"
+  }
 }

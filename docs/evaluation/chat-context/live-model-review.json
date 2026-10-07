@@ -1,0 +1,535 @@
+{
+  "recorded_at": "2026-10-07T11:40:06.146687+00:00",
+  "status": "budget_exhausted_with_partial_successes_and_incomplete_end_to_end_cases",
+  "evaluated_release": "contextual-conversation-1.8.9+chat-context.2",
+  "evaluated_prompt_hash": "709e54825fd673707dbd407609feaa36fc901de671661111e9c6272f6a8d5b92",
+  "evaluated_tools_hash": "9d611b454709adfc068f5a35cde1eff5619ff0ddd5126e965cb5c29e98fd4e78",
+  "inference_model": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "count_model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+  "region": "ap-southeast-2",
+  "paid_attempts": 18,
+  "completed": 17,
+  "failed": 1,
+  "remaining": 0,
+  "completed_end_to_end_cases": 0,
+  "calls_by_case": {
+    "long_arbitrary_correction": 6,
+    "two_unfinished_drafts": 6,
+    "source_summary_draft_calendar_return": 6
+  },
+  "usage_completed": {
+    "inputTokens": 460564,
+    "outputTokens": 1390
+  },
+  "estimated_completed_usd_before_tax": "0.5142654",
+  "estimated_completed_usd_with_10pct_gst": "0.56569194",
+  "estimated_usd_with_10pct_gst_and_failed_attempt_full_reservation": "0.61530194",
+  "cost_status": "calculated_public_price_estimate_not_reconciled_invoice",
+  "raw_ledger_sha256": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a",
+  "initial_report_sha256": "ebf4296281bec6e38a6985a8e54d51bc2ba3b9e80a167d84c1e2963eb672c548",
+  "raw_ledger_local_path": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-approved-budget-ledger.json",
+  "no_provider_writes": true,
+  "retry_action_jobs": 0,
+  "repair_commit": "744982f",
+  "revised_prompt": "contextual-conversation-1.8.9+chat-context.3",
+  "revised_prompt_live_evaluated": false,
+  "calls": [
+    {
+      "attempt": 1,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "3596c69f-d651-4506-8f3c-3705d6c728cb",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26943,
+        "outputTokens": 59,
+        "totalTokens": 27002,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26960,
+      "latency_ms": 1576,
+      "tools": [
+        {
+          "toolUseId": "tooluse_4ANlPnFtyEBw3uqZVn9RyA",
+          "name": "recall_conversation",
+          "input": {
+            "query": "Lumen kit delivery",
+            "limit": 4
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "e9445064-f185-4833-92a3-9d6635e60fd0",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 28137,
+        "outputTokens": 78,
+        "totalTokens": 28215,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 28186,
+      "latency_ms": 1575,
+      "tools": [
+        {
+          "toolUseId": "tooluse_CzjnBXbtUw72o8ooRZ6S5G",
+          "name": "recall_conversation",
+          "input": {
+            "limit": 4,
+            "before_version": 30,
+            "query": "Lumen kit delivery"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "fddb0ba0-eaaf-48eb-ac41-0c1596e4a9e7",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 29192,
+        "outputTokens": 40,
+        "totalTokens": 29232,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 29273,
+      "latency_ms": 1351,
+      "tools": [
+        {
+          "toolUseId": "tooluse_urmh16hqV9MZXuPi0ciFY3",
+          "name": "recall_conversation",
+          "input": {
+            "versions": [
+              30
+            ]
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 4,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "1b85129d-95d4-4646-9c8c-c22d94b3c80e",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 29478,
+        "outputTokens": 81,
+        "totalTokens": 29559,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 29591,
+      "latency_ms": 1951,
+      "tools": [
+        {
+          "toolUseId": "tooluse_eWZ7l4KhyLNzClaxCo03Uq",
+          "name": "respond",
+          "input": {
+            "kind": "message",
+            "text": "For Project Lumen, you said the kit colour is violet and the delivery gate is South (corrected from North in turn 30)."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 5,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "c021e281-aeb1-4813-a897-77deef311986",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 27053,
+        "outputTokens": 87,
+        "totalTokens": 27140,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 27070,
+      "latency_ms": 1803,
+      "tools": [
+        {
+          "toolUseId": "tooluse_42b7rkXwOHeWQQ9m7pLpDv",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Alex",
+            "purpose": "cover those arrangements",
+            "request_source": "An email for Alex would help; cover those arrangements."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 6,
+      "scenario": "long_arbitrary_correction",
+      "outcome": "completed",
+      "request_id": "26beeaba-b447-4efc-a557-c518aea1e911",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 27414,
+        "outputTokens": 60,
+        "totalTokens": 27474,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 27463,
+      "latency_ms": 1518,
+      "tools": [
+        {
+          "toolUseId": "tooluse_Se5FXVhcQIq98QzGeapsDk",
+          "name": "recall_conversation",
+          "input": {
+            "query": "Lumen kit delivery arrangements",
+            "limit": 4
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 7,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "092ce7bf-7f04-46bc-9cce-842a8d9ae436",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26077,
+        "outputTokens": 82,
+        "totalTokens": 26159,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26094,
+      "latency_ms": 2964,
+      "tools": [
+        {
+          "toolUseId": "tooluse_rTdlAulZ6c4cHvaIKwrCo3",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Alex",
+            "purpose": "",
+            "request_source": "Can you help with an email for Alex?"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 8,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "dfb93c01-ad96-4210-ab11-21ab2e10cbfd",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26462,
+        "outputTokens": 74,
+        "totalTokens": 26536,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26479,
+      "latency_ms": 1529,
+      "tools": [
+        {
+          "toolUseId": "tooluse_PdToTvIlsHM5RXIpj96RWA",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Casey",
+            "purpose": "",
+            "continue_previous": false
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 9,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "939e5863-b19a-4637-b503-0dc10f1439bc",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26832,
+        "outputTokens": 74,
+        "totalTokens": 26906,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26881,
+      "latency_ms": 1265,
+      "tools": [
+        {
+          "toolUseId": "tooluse_89uqzEQusek5KxmmD5LJSg",
+          "name": "prepare_email_draft",
+          "input": {
+            "continue_previous": true,
+            "recipient": "Casey",
+            "purpose": ""
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 10,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "09340bad-2940-4501-a728-dc5f7203ac49",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 27206,
+        "outputTokens": 98,
+        "totalTokens": 27304,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 27287,
+      "latency_ms": 1551,
+      "tools": [
+        {
+          "toolUseId": "tooluse_cJZtwp8VuTzXlvtuHSr57M",
+          "name": "prepare_email_draft",
+          "input": {
+            "continue_previous": false,
+            "recipient": "Casey",
+            "purpose": "",
+            "request_source": "Another email for Casey, please."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 11,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "f24add70-b8f1-4f8e-b6b5-2ee1d6cf2c53",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26695,
+        "outputTokens": 94,
+        "totalTokens": 26789,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26712,
+      "latency_ms": 2094,
+      "tools": [
+        {
+          "toolUseId": "tooluse_IwesKhz5ctUTzG2tUJw00S",
+          "name": "select_conversation_goal",
+          "input": {
+            "goal_id": "3a42a6fe-578b-4812-843d-898c854d8ab9",
+            "source": "Back to Alex: ask whether the sapphire crate has arrived."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 12,
+      "scenario": "two_unfinished_drafts",
+      "outcome": "completed",
+      "request_id": "2c879e5c-99a1-4581-809a-70ba72a65ae9",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 27023,
+        "outputTokens": 85,
+        "totalTokens": 27108,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 27072,
+      "latency_ms": 1425,
+      "tools": [
+        {
+          "toolUseId": "tooluse_H6YSBjIfrL0mmo0ovSs0xv",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Alex",
+            "purpose": "ask whether the sapphire crate has arrived",
+            "continue_previous": true
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 13,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "completed",
+      "request_id": "c99ccb68-e027-408c-bde2-dfde5164ceb9",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26090,
+        "outputTokens": 57,
+        "totalTokens": 26147,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26107,
+      "latency_ms": 1386,
+      "tools": [
+        {
+          "toolUseId": "tooluse_0m06nzfSdOKJAmIQ6OnQKt",
+          "name": "read_email",
+          "input": {
+            "reference": "selected",
+            "scope": "selected_message"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 14,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "completed",
+      "request_id": "1c939372-f048-414c-a6ea-a4f60ccce8b7",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26462,
+        "outputTokens": 110,
+        "totalTokens": 26572,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26511,
+      "latency_ms": 1789,
+      "tools": [
+        {
+          "toolUseId": "tooluse_dNYTZJHI7uGkSzZWKZqk84",
+          "name": "respond",
+          "input": {
+            "kind": "message",
+            "text": "The selected email is from <EMAIL_3>, sent on 20 Sep 2026 with the subject \"Agenda\". The message asks you to review a revised agenda by Friday. It arrived on 21 Sep 2026 at 11:00 PM UTC."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 15,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "completed",
+      "request_id": "30c46303-941c-43d2-bd11-a6dbff133c20",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26671,
+        "outputTokens": 126,
+        "totalTokens": 26797,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26752,
+      "latency_ms": 1651,
+      "tools": [
+        {
+          "toolUseId": "tooluse_spS8gcmHBiAfrqTGLuQgh0",
+          "name": "respond",
+          "input": {
+            "kind": "message",
+            "text": "The selected email is from <EMAIL_3>, sent on 20 Sep 2026 with the subject \"Agenda\". The message asks you to \"review the revised agenda by Friday.\"",
+            "evidence": [
+              {
+                "reference": "selected",
+                "quote": "Please review the revised agenda by Friday."
+              }
+            ]
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 16,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "failed",
+      "request_id": null,
+      "error_type": "ThrottlingException",
+      "usage": null,
+      "input_token_preflight": 26338,
+      "latency_ms": 219,
+      "tools": []
+    },
+    {
+      "attempt": 17,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "completed",
+      "request_id": "d45578c4-a3e8-4bd9-85f9-1131a4d28b71",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26321,
+        "outputTokens": 128,
+        "totalTokens": 26449,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26338,
+      "latency_ms": 2086,
+      "tools": [
+        {
+          "toolUseId": "tooluse_NOjYWaHSnNwTRVSuGAdGEo",
+          "name": "prepare_workflow",
+          "input": {
+            "intent": "reply",
+            "preparation_intent": {
+              "operation": "reply",
+              "source": "Write a reply thanking them for the agenda.",
+              "target": "reference"
+            },
+            "reference": "context-1",
+            "source_scope": "thread"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 18,
+      "scenario": "source_summary_draft_calendar_return",
+      "outcome": "completed",
+      "request_id": "be55d769-7d3d-4f3b-8c95-bc1898fd569e",
+      "error_type": null,
+      "usage": {
+        "inputTokens": 26508,
+        "outputTokens": 57,
+        "totalTokens": 26565,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "input_token_preflight": 26557,
+      "latency_ms": 1278,
+      "tools": [
+        {
+          "toolUseId": "tooluse_pfEdodVoGL528sXtBKmTMS",
+          "name": "read_email",
+          "input": {
+            "reference": "context-1",
+            "scope": "thread"
+          },
+          "type": "tool_use"
+        }
+      ]
+    }
+  ],
+  "evidence_sha256": {
+    "live-model-ledger.json.gz": "839bb6ccbe8ca0c494c7cf8011350a13d6c76118154f46eb8e6f12dfda358639",
+    "live-scenarios.json": "fd6c397a55d43b29c7d844ed75b64be2c24f70e822cdd95f9275933caae6cf2c",
+    "live-retry.json": "046fd0c0f5fff742fd1ea690e9bf091829620ef1777bf2e0f9ee2083db013d33",
+    "count-token-resolution.json": "70c4dcfc748dfe21e3121fcb48d2903e2f2f937cab0005f0fe622337bca234c8"
+  }
+}

@@ -2,8 +2,9 @@
 
 The context stack and meeting-email button are integrated locally. Nothing is
 published, merged into release branches or deployed. The original button commits
-remain preserved on their independent branches. The user approved the bounded evaluation. Its required CountTokens request then
-failed with AWS `ValidationException`; paid inference remains unstarted.
+remain preserved on their independent branches. The approved diagnostic consumed
+18 attempts (17 completed, one throttled), with partial recall/goal/citation successes
+but no end-to-end scenario completion. See [actual outcomes](approved-evaluation-status.md).
 
 ## Commit lineage
 
@@ -21,9 +22,10 @@ Frontend branch `codex/chat-context-restoration`:
 - Meeting-email editor: `53e1770`, cherry-picked from preserved `fb6d8d5`.
 - Combined browser regression: `73d6e491a82105926b93b22be72aef172b1d5e01`.
 
-Evidence-only commits follow these code/test heads. The machine-readable receipt
-pins tested file hashes and explicitly distinguishes the full suites from later
-focused test extensions.
+Later commits `e3c297d` and `dfb32f9` repair supported token counting, durable call
+accounting and credential setup. `744982f` repairs new-email-goal feedback and versions
+the prompt/tools as `.3`; it has no live-model evaluation. The machine-readable receipt
+pins test heads, source hashes and the boundaries of full versus focused checks.
 
 ## Ownership, provenance and approvals
 
@@ -71,8 +73,9 @@ must not equate an incomplete search with absence of a fact.
 
 Verified citations establish ownership, authorship and original clock provenance;
 they do not prove semantic relevance, correct pronoun resolution or current consent.
-A later correction can conflict with an earlier valid quote. Model-driven evaluation
-of those choices remains unperformed. Some legacy/compound intent gates retain
+A later correction can conflict with an earlier valid quote. The diagnostic correctly
+handled one synthetic later correction and one explicit goal return; broader semantic
+reliability remains unproven. Some legacy/compound intent gates retain
 lexical rules, and production context budgeting uses characters rather than token
 counts. Historical citations do not expand deterministic scheduling or source-quoted
 plan-item validators. There is no cross-chat memory or full archived-transcript UI.
@@ -82,10 +85,10 @@ arbitrary meeting details, create recurring/all-day events or edit existing even
 Its source must remain accessible during review. Fake-provider tests do not certify
 live Google account compatibility.
 
-The next gate is resolving the required token-count preflight failure without
-changing the approved scope or bypassing the token cap. The approved small synthetic
-Bedrock diagnostic, human semantic review and held-out paraphrases remain undone.
-A clean diagnostic is not a release pass. Before any future publication/deployment,
+The preflight issue is resolved and the initial diagnostic is reviewed. Its failures
+require a newly approved, adequately bounded live evaluation of `.3`, including held-out
+paraphrases, completed drafts and saved-artifact restoration. All 18 attempts are used.
+A future clean diagnostic is still not a release pass. Before any future publication/deployment,
 review the final changes and perform the required release checks. Migration
 `h071026e9043` is additive but old backend writers cannot safely preserve new-format
 goals/timezones. API and workers must switch together after draining work; rollback

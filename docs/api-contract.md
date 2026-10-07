@@ -1567,7 +1567,7 @@ no additional schema migration.
 
 ## Unpublished shared chat context protocol
 
-The `contextual-conversation-1.8.9+chat-context.2` prototype adds
+The `contextual-conversation-1.8.9+chat-context.3` prototype adds
 `context_memory_version: 1` to turn/replay/restore responses. This means the backend
 owns goal focus: clients omit a task pointer derived merely from the last displayed
 card, and send a context snapshot only for an explicit attach/detach or initial pin.

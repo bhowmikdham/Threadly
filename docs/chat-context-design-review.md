@@ -1,11 +1,12 @@
 # Shared conversation context: implementation and review
 
 Status: locally committed, integrated implementation, prompt
-`contextual-conversation-1.8.9+chat-context.2`. Backend base:
+`contextual-conversation-1.8.9+chat-context.3`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
 The voice repair remains intact. This document separates implemented mechanics
-from conversational quality, which requires a real-model evaluation.
+from conversational quality. The `.2` diagnostic found partial successes and
+contract failures; `.3` has not been evaluated with a real model.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
@@ -141,7 +142,8 @@ quoted/negated commands. It supplies no prescribed tool calls or expected answer
 to the model. Rubrics are recorded only for review. Google reads are fake, unknown
 Calendar operations and mutations are blocked, and no action worker is run.
 
-**No real-model run has been performed.** The revised first stage selects three
+**The first-stage real-model run consumed all 18 attempts, with 17 responses and
+one throttle. None of its three scenarios completed end to end.** It selected three
 families (long-history correction, independent drafts and source/workflow detour),
 with six attempts per family and eighteen total. Each attempt is bounded to 32,000
 counted input and 1,800 output tokens; the shared AWS dispatch guard covers auxiliary
@@ -149,8 +151,10 @@ and worker model paths too. Failed preflight stops before paid inference. See th
 [concrete proposal](evaluation/chat-context/first-stage-proposal.md) for the verified
 production model, official prices, calculated USD 0.81180 metered maximum, tax
 assumption, consent requirement and pass/fail/incomplete review rubric. The earlier
-48-call proposal is superseded. Offline tests validate the guard and a scripted
-harness rehearsal, not model quality.
+48-call proposal is superseded. See [actual outcomes](evaluation/chat-context/approved-evaluation-status.md)
+for measured recall, goal and citation successes, draft failures and the conservative
+USD 0.61530194 estimate including GST and a failed-attempt reserve. Further paid
+testing requires new approval. Offline repair tests do not prove model quality.
 
 Results record prompt/tool/model identity, traces, actual token counts, latency,
 clarifications, current goal state and failures. Human semantic review and follow-up

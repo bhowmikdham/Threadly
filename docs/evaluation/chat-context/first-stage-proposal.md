@@ -1,9 +1,10 @@
-# First-stage model evaluation proposal — not executed
+# First-stage model evaluation scope — historical approval, now exhausted
 
-Status: the user approved this exact scope on 2026-10-07 at 10:58:05 UTC. The
-required CountTokens request then failed with AWS `ValidationException`; no paid
-inference ran. See [execution status](approved-evaluation-status.md). No publication
-or deployment is included. This supersedes the earlier 48-call proposal.
+Status: approved on 2026-10-07 at 10:58:05 UTC, then executed after recovering
+the CountTokens identifier issue. All 18 attempts are used; none remain. See
+[execution status](approved-evaluation-status.md) for actual outcomes and costs.
+This records the historical scope, not permission for a new run or revised prompt.
+No publication or deployment is included. It supersedes the earlier 48-call proposal.
 
 ## Exact model and destination
 
@@ -51,10 +52,11 @@ establish release readiness or a statistical success rate.
   worker generation can be truncated and that is reported, not silently retried.
 - No new call starts after 15 minutes. A call already in flight has bounded SDK
   timeouts (5-second connection and 45-second read); this is not instant cancellation.
-- CountTokens must succeed on the approved profile before each paid attempt. An
-  unsupported profile, oversized input or access error stops without a paid fallback,
-  model substitution, new permission grant or cap increase. The roughly 90,000-character
-  prompt/tool package has not been token-counted; viability under 32,000 is unproven.
+- CountTokens must succeed before each paid attempt. The approved recovery used
+  the same underlying model's bare ID after AWS rejected the profile and foundation
+  ARN forms; inference retained the original profile. Oversized input or access
+  error stops without paid fallback, model substitution, new grants or cap increase.
+  The complete preflight payload measured 24,643 tokens; every inference was counted.
 - A shared botocore dispatch guard covers coordinator, auxiliary/default clients and
   workers. Other AWS APIs, models/regions, streaming/InvokeModel/Flows, caching,
   guardrails, priority tier and extra request features are rejected. No separate
@@ -125,6 +127,10 @@ Bedrock** before execution because explicit authorization to transmit the intern
 prompt and tool schemas was not established. After the user explicitly approved this transmission, the same preflight passed
 automatic review. A local SDK dependency first prevented client construction;
 installing its pinned native dependency locally allowed one AWS CountTokens request.
-That request failed with `ValidationException`, stopping the evaluation before any
-paid call. No alternate executor, model, region or uncounted fallback was used.
+That initial request failed with `ValidationException`, stopping before inference.
+The approved diagnostic recovery subsequently found the supported bare counting ID
+and ran within the original 18-call ledger. An expired login was renewed with the
+user's participation. No alternate executor, inference model, region or uncounted
+fallback was used. See the execution report for failures and the per-invocation
+deadline limitation across recovery attempts.
 The opt-in environment string is a guard, not permission.

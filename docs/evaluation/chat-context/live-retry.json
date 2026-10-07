@@ -1,0 +1,49 @@
+{
+  "scenario": "source_summary_draft_calendar_return",
+  "retry_of_request": "dc38c498-d2cf-4c87-b5c5-efc793438f4c",
+  "request": {
+    "instruction": "Write a reply thanking them for the agenda.",
+    "timezone": "UTC",
+    "conversation_id": "0a841b8e-15a8-4ed9-b3e9-3d025281fe7f",
+    "request_id": "dc38c498-d2cf-4c87-b5c5-efc793438f4c",
+    "expected_version": 1,
+    "context_snapshot_id": null,
+    "active_task_id": null
+  },
+  "model_id": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "calls_before": 16,
+  "google_reads": [
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/me/threads/abc123"
+    }
+  ],
+  "response": {
+    "kind": "message",
+    "error_code": "mail_reply_not_prepared",
+    "text": "I couldn\u2019t finish preparing that reply. I\u2019ve kept your request and source references; ask me to try again. This chat turn did not save anything in Gmail or send an email.",
+    "evidence": [],
+    "release": "contextual-conversation-1.8.9+chat-context.2",
+    "trace": [
+      {
+        "tool": "prepare_workflow",
+        "status": "invalid",
+        "reason": "reply_source_unread"
+      },
+      {
+        "tool": "read_email",
+        "status": "ok"
+      }
+    ],
+    "context_references": [
+      "context-1"
+    ],
+    "context_memory_version": 1,
+    "active_email_draft_id": null,
+    "latency_ms": 4489,
+    "conversation_id": "0a841b8e-15a8-4ed9-b3e9-3d025281fe7f",
+    "version": 2
+  },
+  "calls_after": 18,
+  "action_jobs": 0
+}
