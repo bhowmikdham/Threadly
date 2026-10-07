@@ -19,7 +19,7 @@ import {
   schedulingReadiness,
   type PreferencesState
 } from "./lib/scheduling-readiness"
-import { hasChoices, spokenReply } from "./lib/spoken-reply"
+import { CALENDAR_VOICE_REPLY, hasChoices, spokenReply } from "./lib/spoken-reply"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -407,6 +407,8 @@ function Assistant({
       const entry = entriesNow.current
         .slice(before)
         .find((e) => e.instruction === said)
+      if (entry?.calendarActionId && !entry.pending && !entry.error)
+  return CALENDAR_VOICE_REPLY
       const reply = spokenReply(entry)
       if (reply) return { text: reply, showChat: hasChoices(entry) }
     }
