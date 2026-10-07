@@ -64,7 +64,7 @@ describe("voice conversation", () => {
       say("Check my inbox")
       await act(() => vi.advanceTimersByTimeAsync(1320))
       expect(spoken).toEqual([
-        "Sure, I can do that.",
+        "Let me check that.",
         "The email is in the chat."
       ])
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
@@ -94,9 +94,9 @@ describe("voice conversation", () => {
     await act(() => vi.advanceTimersByTimeAsync(1320))
     expect(container.querySelector(".voice-overlay.docked")).toBeNull()
     expect(spoken).toEqual([
-      "Sure, I can do that.",
+      "Let me check that.",
       "Choose an email.",
-      "Sure, I can do that.",
+      "Let me check that.",
       "You're welcome."
     ])
   })
@@ -109,7 +109,7 @@ describe("voice conversation", () => {
     expect(screen.queryByText("What's new in my inbox")).toBeNull()
     await act(() => vi.advanceTimersByTimeAsync(1300))
     expect(respond).toHaveBeenCalledWith("What's new in my inbox")
-    expect(spoken).toEqual(["Sure, I can do that.", "You have two new emails."])
+    expect(spoken).toEqual(["Let me check that.", "You have two new emails."])
     await act(() => vi.advanceTimersByTimeAsync(20))
     expect(screen.getByRole("status").textContent).toBe("Listening…")
     expect(recognizer.start).toHaveBeenCalledTimes(2)
@@ -140,7 +140,7 @@ describe("voice conversation", () => {
     await act(() => vi.advanceTimersByTimeAsync(1300))
     expect(respond).toHaveBeenCalledTimes(1)
     await act(async () => answer("Here it is."))
-    expect(spoken).toEqual(["Sure, I can do that.", "Here it is."])
+    expect(spoken).toEqual(["Let me check that.", "Here it is."])
   })
   it("the close button ends the conversation and stops speaking", () => {
     const onClose = vi.fn()

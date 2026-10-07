@@ -833,7 +833,7 @@ test("voice mode is a spoken back-and-forth that also lands in the chat", async 
   })
   await expect
     .poll(() => page.evaluate(() => (window as any).spoken))
-    .toEqual(["Sure, I can do that.", "Hey! What can I help you with?"])
+    .toEqual(["Let me check that.", "Hey! What can I help you with?"])
   await expect(dialog).not.toHaveClass(/\bdocked\b/)
   await expect(dialog.getByRole("status")).toHaveText("Listening…")
   await page.getByRole("button", { name: "Close voice conversation" }).click()
