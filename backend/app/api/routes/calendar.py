@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser
 from app.api.routes.auth import no_store
-from app.calendar import agenda, negotiations, service, slots
+from app.calendar import agenda, meeting_email, negotiations, service, slots
 from app.mail.dependency import gmail_sources
 from app.schemas.calendar import (
     AgendaOut,
@@ -17,6 +17,7 @@ from app.schemas.calendar import (
     PreferencesOut,
     SavePreferences,
 )
+from app.schemas.meeting_email import PrepareMeetingEmail, PreviewMeetingEmail
 from app.schemas.negotiations import (
     CloseNegotiation,
     CreateNegotiation,
@@ -29,6 +30,16 @@ from app.schemas.negotiations import (
 from app.schemas.slots import SlotRequest, SlotRequestOut
 
 router = APIRouter(dependencies=[Depends(no_store), Depends(gmail_sources)])
+
+
+@router.post("/meeting-email/draft")
+async def prepare_meeting_email(body: PrepareMeetingEmail, user_id: CurrentUser):
+    return await meeting_email.prepare(user_id, body)
+
+
+@router.post("/meeting-email/previews", status_code=201)
+async def preview_meeting_email(body: PreviewMeetingEmail, user_id: CurrentUser):
+    return await meeting_email.preview(user_id, body)
 
 
 @router.get("/calendars", response_model=CalendarListOut)
