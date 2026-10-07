@@ -633,3 +633,12 @@ IDs, and `saving|succeeded|failed|outcome_unknown` state. These generated/user-e
 payloads are distinct from original mailbox bodies. Account deletion cascades;
 receipt history otherwise remains durable so retries cannot duplicate writes.
 The table is never read by the send worker and grants no send authority.
+
+### Conversational draft continuity (1.8.7)
+
+Encrypted `email_draft_goal` additionally retains `origin_request_id` and, after
+text generation, `draft_id`. These identify user-only recovery context and the
+current structured editor. No migration is required. Conversation history may
+include read-only `email_draft_review` receipt/status guidance; it is not write
+authority. Source/account ownership and frozen Gmail draft-save receipts are
+unchanged.

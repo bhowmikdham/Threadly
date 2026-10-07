@@ -17,18 +17,51 @@ class EmailDraftRequired(ValueError):
     """Repair a premature workflow call through the compose clarification tool."""
 
 
+class EmailDraftInputError(ValueError):
+    """Allowlisted repair reason; never contains user text."""
+
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(
+            {
+                "user_field_required": "Copy fields from USER text",
+                "source_bound_workflow_required": "Use the source-bound workflow for read email",
+            }.get(reason, reason)
+        )
+
+
+def current_text_draft(state):
+    goal = state.get(KEY) or {}
+    if goal.get("status") != "drafted" or state.get("active_task_id") or state.get("proposal_id"):
+        return None
+    for entry in reversed(state.get("history", [])):
+        draft = entry.get("email_draft")
+        if draft and (not goal.get("draft_id") or draft["draft_id"] == goal["draft_id"]):
+            return draft
+    return None
+
+
+def active_text_id(state):
+    draft = current_text_draft(state)
+    return draft["draft_id"] if draft else None
+
+
 def model_context(state):
     value = state.get(KEY)
     # Address-bound drafts now belong to active_work and its immutable artifact
     # revision flow. Do not invite the model to regenerate them from old turns.
-    if not value or value.get("status") == "workflow":
+    if (
+        not value
+        or value.get("status") == "workflow"
+        or (
+            value.get("status") == "drafted"
+            and (state.get("active_task_id") or state.get("proposal_id"))
+        )
+    ):
         return None
     result = dict(value)
     if result.get("status") == "drafted" and "draft" not in result:
-        latest = next(
-            (h["email_draft"] for h in reversed(state.get("history", [])) if h.get("email_draft")),
-            None,
-        )
+        latest = current_text_draft(state)
         if latest:
             result["draft"] = {k: latest[k] for k in ("subject", "body", "unresolved_fields")}
             result["draft"]["sources"] = []
@@ -76,7 +109,22 @@ def requires_preparation(runtime):
     if getattr(runtime, "loaded", None):
         return False
     latest = runtime.request.instruction
-    return is_compose(latest) and not re.match(r"\s*(?:should|would)\s+(?:i|we)\b", latest, re.I)
+    if is_compose(latest) and not re.match(r"\s*(?:should|would)\s+(?:i|we)\b", latest, re.I):
+        return True
+    from app.conversation.runtime import _revokes_compose_request, _starts_independent_request
+
+    goal = runtime.state.get(KEY) or {}
+    if goal.get("status") != "clarification" or _revokes_compose_request(latest):
+        return False
+    if getattr(runtime, "email_draft_attempted", False):
+        return True
+    # Short answers to the retained question must establish structured state.
+    # Independent questions and social detours may still use ordinary responses.
+    return not (
+        _starts_independent_request(latest)
+        or re.fullmatch(r"\s*(?:hi|hello|hey|thanks|thank you|ok|okay)[.! ]*", latest, re.I)
+        or re.match(r"\s*(?:what|why|how|can|could|would|is|are|do|does|am)\b", latest, re.I)
+    )
 
 
 def _quoted(value, instruction):
@@ -97,10 +145,10 @@ async def prepare(runtime, args):
         runtime.state.pop(KEY, None)
         return {"kind": "message", "text": "Okay, I won’t continue that draft."}
     if runtime.loaded:
-        raise ValueError("Use the source-bound workflow for a draft based on read email")
+        raise EmailDraftInputError("source_bound_workflow_required")
     if args.continue_previous:
         if not previous:
-            raise ValueError("No pending email draft; use the current user goal")
+            raise EmailDraftInputError("no_pending_draft")
         if previous["status"] == "workflow":
             raise ApiError(
                 422,
@@ -118,21 +166,41 @@ async def prepare(runtime, args):
         if latest not in instruction.split("\nUser follow-up: "):
             instruction += "\nUser follow-up: " + latest
         values = {field: previous[field] for field in ("recipient", "purpose")}
-        source = latest
+        # Repeating retained USER fields in a full tool object is harmless. Also
+        # allow recovery of an earlier user answer after a rejected draft call;
+        # assistant prose is never a source of recipient/purpose authority.
+        history = runtime.state.get("history", [])
+        start = next(
+            (
+                i
+                for i, h in enumerate(history)
+                if (
+                    previous.get("origin_request_id")
+                    and h.get("request_id") == previous["origin_request_id"]
+                )
+                or h.get("user") == previous["instruction"].split("\nUser follow-up: ")[0]
+            ),
+            None,
+        )
+        source = (
+            "\n".join([instruction] + [h.get("user", "") for h in history[start:]])
+            if start is not None
+            else instruction
+        )
     else:
         instruction = runtime.authoritative_instruction()
         if not is_compose(instruction):
-            raise ValueError("The user did not request email composition")
+            raise EmailDraftInputError("continuation_required" if previous else "compose_required")
         values = {"recipient": "", "purpose": ""}
         source = instruction
     if len(instruction) > 8000:
         return {"kind": "clarification", "text": "What should this email say, in a few sentences?"}
     for field in values:
         supplied = getattr(args, field).strip()
-        if not _quoted(supplied, source):
-            raise ValueError(
-                "Copy recipient and purpose from USER text, never source or assistant text"
-            )
+        retained = args.continue_previous and supplied == previous[field]
+        field_source = latest if args.continue_previous and field == "recipient" else source
+        if not retained and not _quoted(supplied, field_source):
+            raise EmailDraftInputError("user_field_required")
         if supplied:
             values[field] = supplied
     recipient_instruction = (
@@ -153,6 +221,11 @@ async def prepare(runtime, args):
         "instruction": instruction,
         "recipient_instruction": recipient_instruction,
         "status": "clarification",
+        "origin_request_id": (
+            previous.get("origin_request_id")
+            if args.continue_previous
+            else runtime.request.request_id
+        ),
         "superseded_task_id": (
             previous.get("superseded_task_id")
             if args.continue_previous and previous
@@ -215,12 +288,17 @@ async def prepare(runtime, args):
             )
         )
     else:
+        # Preserve validated details even when generation needs a repair. A failed
+        # text payload must not make the next turn ask for the message again.
+        if not (args.continue_previous and previous.get("status") == "drafted"):
+            runtime.state[KEY] = goal
         if args.draft is None:
-            raise ValueError("Generate a subject and body now; a name suffices for text drafting")
+            raise EmailDraftInputError("draft_text_required")
         if args.draft.sources:
             raise ValueError("A user-only text draft has no source message numbers")
         goal["status"] = "drafted"
         goal["draft"] = args.draft.model_dump()
+        goal["draft_id"] = runtime.request.request_id
         result = {
             "kind": "message",
             "email_draft": {

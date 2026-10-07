@@ -277,6 +277,7 @@ async def complete(session, owner, request, lease, state, response):
                 "context_references": saved.get("context_references", []),
                 "error_code": saved.get("error_code"),
                 "email_draft": saved.get("email_draft"),
+                "email_draft_review": saved.get("email_draft_review"),
                 "version": row.version + 1,
             }
         ]

@@ -181,6 +181,10 @@ class PrepareEmailDraft(StrictModel):
     draft: GeneratedDraft | None = None
 
 
+class ReviewEmailDraft(StrictModel):
+    pass
+
+
 class AnswerQuestion(StrictModel):
     answer: ClarificationAnswer
 
@@ -191,6 +195,13 @@ class ReviseDraft(StrictModel):
 
 
 TOOLS = {
+    "review_email_draft": (
+        ReviewEmailDraft,
+        "Read the current email draft's saved status and actual review controls. Use for "
+        "save/send/insert follow-ups, repeated yes after discussing saving, missing cards, "
+        "or draft status. Retains the current draft. Never saves, sends, inserts, approves, "
+        "or changes permissions; Gmail creation still requires the user's card click. Terminal.",
+    ),
     "prepare_email_draft": (
         PrepareEmailDraft,
         "Prepare a standalone email draft from USER text. Copy recipient (a name is enough) "
