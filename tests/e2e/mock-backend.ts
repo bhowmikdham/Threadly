@@ -356,6 +356,7 @@ export function createMockBackend(verify: Verify = () => {}): MockBackend {
         : "conversation/" + body.draft_id
       data = draftSaves.get(source) || {
         save_id: "draft-save-1",
+        source_artifact_id: body.artifact_id || null,
         state: "succeeded",
         preview: {
           from_address: body.from_address,

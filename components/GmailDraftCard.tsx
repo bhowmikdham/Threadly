@@ -53,7 +53,10 @@ export function GmailDraftCard({
     })
   const acceptReceipt = (value: any) => {
     setReceipt(value)
-    if (value) {
+    if (
+      value &&
+      (!artifact || value.source_artifact_id === artifact.artifact_id)
+    ) {
       setTo(value.preview.to.join(", "))
       setCc(value.preview.cc.join(", "))
       setBcc(value.preview.bcc.join(", "))
@@ -205,18 +208,32 @@ export function GmailDraftCard({
   const capability = capabilities?.capabilities?.find(
     (c: any) => c.id === "gmail_draft"
   )
-  const locked = busy || Boolean(receipt) || uncertain
+  const permissionHint = !capabilities
+    ? "Couldn’t verify Gmail draft access. Refresh status to try again."
+    : capability?.status === "reconnect_required"
+      ? "Your Google connection needs attention before you can create a Gmail draft."
+      : capability?.status === "scope_missing"
+        ? "This connection doesn’t have Gmail draft access. Additional Google permission is needed to save drafts."
+        : capability?.status === "scope_unknown"
+          ? "Gmail draft permission hasn’t been verified for this connection."
+          : "Creating Gmail drafts isn’t available for this connection."
+  const earlierRevision = Boolean(
+    receipt && artifact && receipt.source_artifact_id !== artifact.artifact_id
+  )
+  const locked = busy || (Boolean(receipt) && !earlierRevision) || uncertain
   const status = creating
     ? "Creating draft…"
     : busy
       ? "Checking status…"
       : receipt
-        ? {
-            succeeded: "Saved to Gmail Drafts",
-            saving: "Creating draft…",
-            outcome_unknown: "Waiting for confirmation",
-            failed: "Draft wasn’t created"
-          }[receipt.state] || "Check draft status"
+        ? earlierRevision && receipt.state === "succeeded"
+          ? "Earlier revision saved"
+          : {
+              succeeded: "Saved to Gmail Drafts",
+              saving: "Creating draft…",
+              outcome_unknown: "Waiting for confirmation",
+              failed: "Draft wasn’t created"
+            }[receipt.state] || "Check draft status"
         : uncertain
           ? "Save not confirmed"
           : "Not saved to Gmail"
@@ -320,14 +337,15 @@ export function GmailDraftCard({
           </p>
         )}
         <p className="gmail-draft-hint">
-          {receipt?.state === "succeeded"
-            ? "Ready for you to review and send in Gmail."
-            : "Edit here, then save to Gmail Drafts. You decide when to send."}
+          {earlierRevision
+            ? "An earlier revision has a Gmail save attempt. Copy these newer edits into that draft after checking its status."
+            : receipt?.state === "succeeded"
+              ? "Ready for you to review and send in Gmail."
+              : "Edit here, then save to Gmail Drafts. You decide when to send."}
         </p>
         {!checking && !capability?.ready && !receipt && (
           <p className="warning">
-            This connection doesn’t have Gmail draft access. You can still edit
-            and copy this email.
+            {permissionHint} You can still edit and copy this email.
           </p>
         )}
         {!enabled && !receipt && (

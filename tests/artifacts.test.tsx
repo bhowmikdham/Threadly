@@ -36,7 +36,7 @@ const caps = {
     { id: "gmail_send", ready: false }
   ]
 }
-function mockApi(fn: (m: any) => any = () => null, capabilities = caps) {
+function mockApi(fn: (m: any) => any = () => null, capabilities: any = caps) {
   const calls: any[] = []
   vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (m: any) => {
     calls.push(m)
@@ -49,6 +49,7 @@ function mockApi(fn: (m: any) => any = () => null, capabilities = caps) {
 }
 const saved = (m: any, state = "succeeded") => ({
   save_id: "save-1",
+  source_artifact_id: m.body.artifact_id,
   state,
   preview: { ...m.body, ...m.body.recipients }
 })
@@ -184,6 +185,7 @@ describe("editable Gmail draft card", () => {
   it("restores a submitted draft without creating a new one", async () => {
     const receipt = {
       state: "succeeded",
+      source_artifact_id: "a1",
       preview: {
         to: ["saved@example.test"],
         cc: [],
@@ -237,7 +239,7 @@ describe("editable Gmail draft card", () => {
     const calls = mockApi(() => null, {
       ...caps,
       capabilities: [
-        { id: "gmail_draft", ready: false },
+        { id: "gmail_draft", ready: false, status: "scope_missing" },
         { id: "gmail_send", ready: true }
       ]
     })
@@ -289,6 +291,43 @@ describe("editable Gmail draft card", () => {
     resolve(null)
     await Promise.resolve()
     expect(calls.every((m) => m.method === "GET")).toBe(true)
+  })
+  it("never overwrites a newer generated revision with an older saved snapshot", async () => {
+    mockApi(() => ({
+      state: "succeeded",
+      source_artifact_id: "a1",
+      preview: {
+        to: ["old@example.test"],
+        cc: [],
+        bcc: [],
+        subject: "Old subject",
+        body: "Old saved text"
+      }
+    }))
+    render(
+      card({
+        artifact: {
+          ...draft,
+          artifact_id: "a2",
+          revision: 2,
+          artifact: {
+            ...draft.artifact,
+            content: {
+              ...draft.artifact.content,
+              body: "New generated revision"
+            }
+          }
+        }
+      })
+    )
+    await screen.findByText("Earlier revision saved")
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).value
+    ).toBe("New generated revision")
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).disabled
+    ).toBe(false)
+    expect(screen.queryByRole("button", { name: "Create draft" })).toBeNull()
   })
   it("renders grounded answers as text", () => {
     const a: any = {
