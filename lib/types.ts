@@ -121,7 +121,15 @@ export interface CalendarChoices {
   choices: { choice_id: string; label: string; access: "editable" }[]
   expires_at: string
 }
+export interface EmailDraft {
+  draft_id: string
+  recipient: string
+  subject: string
+  body: string
+  unresolved_fields: string[]
+}
 export interface Entry {
+  emailDraft?: EmailDraft
   calendarAvailability?: CalendarAvailability
   conversationId?: string
   calendarChoices?: CalendarChoices

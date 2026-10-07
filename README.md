@@ -204,3 +204,20 @@ Release check (does not contact Google):
 PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au npm run build
 PLASMO_PUBLIC_THREADLY_BACKEND_ORIGIN=https://api.threadly.au npx playwright test tests/e2e/public-origin.spec.ts
 ```
+
+### Editable Gmail draft cards
+
+Generated named-recipient drafts and durable draft artifacts share the Gmail card.
+To/Cc/Bcc, subject and message remain editable until **Create draft** is clicked.
+The submitted body is the current editor value, including whitespace. The card
+calls only the draft-save endpoint, never send approval. Confirmed results offer
+**Open Gmail Drafts** so the user can review and send there.
+
+This UI requires the backend's `gmail_draft` capability and `/assistant/gmail-drafts`
+API (including its receipt migration). It reads current save status before enabling
+creation and binds writes to the displayed user, account, source revision and chat
+version. Missing access keeps copy/edit usable; no OAuth grant is initiated. A
+named recipient needs a literal address only at save time. Closing the card after
+click does not cancel the submitted save. Unknown responses freeze the exact
+attempt for safe replay/status recovery; confirmed or uncertain provider receipts
+cannot create another copy. Subsequent edits to a created draft happen in Gmail.

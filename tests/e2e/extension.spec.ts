@@ -601,7 +601,7 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await page.getByRole("button", { name: "Send request", exact: true }).click()
   // The attached email already fixes the reply target and sender, so the
   // request continues without asking.
-  await expect(page.locator(".draft-body")).toBeVisible()
+  await expect(page.locator(".gmail-draft-message textarea")).toBeVisible()
   await expect(
     page.getByText("Which message are you replying to?")
   ).toHaveCount(0)
@@ -619,11 +619,22 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await expect(
     page.getByText("Thank you for the update. The total should be $9.80.")
   ).toBeVisible()
-  await page
-    .getByRole("button", { name: "Review outgoing email" })
-    .last()
+  const editor = page.getByLabel("Email draft").last()
+  await editor.getByLabel("Subject", { exact: true }).fill("My edited subject")
+  await editor
+    .getByLabel("Message", { exact: true })
+    .fill("My exact edited body")
+  await editor
+    .getByRole("button", { name: "Create draft", exact: true })
     .click()
-  await expect(page.getByText("Exact outgoing email")).toBeVisible()
+  await expect(editor.getByText("Saved to Gmail Drafts")).toBeVisible()
+  const savedDraft = calls
+    .filter((c) => c.path === "/assistant/gmail-drafts")
+    .at(-1)
+  expect(savedDraft.body).toMatchObject({
+    subject: "My edited subject",
+    body: "My exact edited body"
+  })
   await expect(
     page.getByRole("button", { name: "Approve and send" })
   ).toHaveCount(0)
@@ -647,9 +658,13 @@ test("real extension bridge: selected summary, answer and edited reply without s
     .click()
   await page.getByRole("button", { name: "Recent chats", exact: true }).click()
   await page.getByRole("button", { name: /The total should be/ }).click()
-  await expect(page.getByText("Exact outgoing email")).toBeVisible()
-  expect(calls.filter((c) => c.path.endsWith("/actions"))).toHaveLength(1)
-  expect(calls.some((c) => c.path === "/assistant/actions/action-1")).toBe(true)
+  await expect(page.getByText("Saved to Gmail Drafts")).toBeVisible()
+  expect(
+    calls.filter((c) => c.path === "/assistant/gmail-drafts")
+  ).toHaveLength(1)
+  expect(
+    calls.some((c) => c.path.includes("/assistant/gmail-drafts/task/"))
+  ).toBe(true)
   await page.screenshot({
     animations: "disabled",
     path: path.join("test-results", "extension-preview.png"),
@@ -681,7 +696,7 @@ test("a new-email recipient is answered in chat and the panel fits narrow light 
   ).length
   await page.getByLabel("Your request").fill("alex@example.test")
   await page.getByLabel("Your request").press("Enter")
-  await expect(page.locator(".draft-body")).toBeVisible()
+  await expect(page.locator(".gmail-draft-message textarea")).toBeVisible()
   expect(
     calls.filter((c) => c.path === "/assistant/conversation-turns")
   ).toHaveLength(count + 1)
@@ -818,7 +833,7 @@ test("voice mode is a spoken back-and-forth that also lands in the chat", async 
   })
   await expect
     .poll(() => page.evaluate(() => (window as any).spoken))
-    .toEqual(["Sure, I can do that.", "Hey! What can I help you with?"])
+    .toEqual(["Let me check that.", "Hey! What can I help you with?"])
   await expect(dialog).not.toHaveClass(/\bdocked\b/)
   await expect(dialog.getByRole("status")).toHaveText("Listening…")
   await page.getByRole("button", { name: "Close voice conversation" }).click()

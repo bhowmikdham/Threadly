@@ -9,6 +9,7 @@ import { AssistantText } from "./AssistantText"
 import { CalendarAvailabilityCard } from "./CalendarAvailabilityCard"
 import { CalendarChoiceCard } from "./CalendarChoiceCard"
 import { CalendarEventCard } from "./CalendarEventCard"
+import { GmailDraftCard } from "./GmailDraftCard"
 import { Icon } from "./Icon"
 import { InboxCards, VISIBLE_MAIL_BATCH } from "./InboxCards"
 
@@ -121,6 +122,7 @@ export function TaskCard({
       )}
       <div className="assistant-message">
         {entry.message &&
+          !entry.emailDraft &&
           !entry.calendarActionId &&
           (!p || p.state === "proposed" || p.state === "consumed") && (
             <AssistantText text={entry.message} />
@@ -137,6 +139,18 @@ export function TaskCard({
           <button onClick={() => controller.retry(entry)}>
             Retry response
           </button>
+        )}
+        {entry.emailDraft && (
+          <GmailDraftCard
+            key={entry.emailDraft.draft_id}
+            draft={entry.emailDraft}
+            user={controller.user}
+            conversation={{
+              id: entry.conversationId,
+              version: entry.conversationVersion
+            }}
+            enabled={Boolean(controller.canCreateDraft?.(entry))}
+          />
         )}
         {entry.calendarAvailability && (
           <CalendarAvailabilityCard
@@ -329,6 +343,16 @@ export function TaskCard({
             value={a}
             replace={(r) => controller.replace(entry.id, r)}
             report={controller.setError}
+            draftContext={{
+              user: controller.user,
+              conversation: entry.conversationId
+                ? {
+                    id: entry.conversationId,
+                    version: entry.conversationVersion
+                  }
+                : undefined,
+              enabled: Boolean(controller.canCreateDraft?.(entry))
+            }}
           />
         ))}
         {!entry.pending &&

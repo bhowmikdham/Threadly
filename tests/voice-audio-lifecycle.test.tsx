@@ -237,7 +237,7 @@ describe("VoiceOrb audio resource lifecycle", () => {
       act(() => oldResult({ results: [[{ transcript: "Summarise this" }]] }))
       await act(() => vi.advanceTimersByTimeAsync(1300))
       expect(speak.mock.calls.map(([utterance]) => utterance.text)).toEqual([
-        "Sure, I can do that."
+        "Let me check that."
       ])
       const acknowledgment = speak.mock.calls[0][0]
       const cancellations = vi.mocked(window.speechSynthesis.cancel).mock.calls
