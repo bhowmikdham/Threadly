@@ -1,0 +1,45 @@
+.meeting-email-event {
+  padding: 0 14px 12px;
+}
+.meeting-email-event form {
+  display: grid;
+  gap: 10px;
+}
+.meeting-email-event fieldset {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+}
+.meeting-email-event label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.meeting-email-event input,
+.meeting-email-event select,
+.meeting-email-event textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.meeting-email-event .check {
+  display: flex;
+  align-items: flex-start;
+}
+.meeting-email-event .check input {
+  width: auto;
+}
+.meeting-email-event details {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.meeting-email-event summary {
+  cursor: pointer;
+}
+.meeting-email-source {
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow: auto;
+}

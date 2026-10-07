@@ -9,6 +9,7 @@ import {
 } from "../lib/mail-display"
 import type { Entry, InboxResult } from "../lib/types"
 import { GmailIcon, Icon } from "./Icon"
+import { MeetingEmailEvent } from "./MeetingEmailEvent"
 
 export const VISIBLE_MAIL_BATCH = 5
 
@@ -177,6 +178,19 @@ export function InboxCards({
                   <Icon name="external" size={14} />
                 </button>
               </div>
+              <MeetingEmailEvent
+                source={{
+                  kind: "gmail_message",
+                  thread_id: mail.thread_id,
+                  message_id: mail.message_id
+                }}
+                disabled={
+                  controller.busy ||
+                  controller.restoring ||
+                  controller.restoreFailed ||
+                  controller.contextLocked
+                }
+              />
             </article>
           )
         })}
