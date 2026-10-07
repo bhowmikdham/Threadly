@@ -1412,3 +1412,65 @@ it("restores the active draft's current version without advancing unrelated hist
   expect(result.current.canCreateDraft(result.current.entries[0])).toBe(true)
   expect(result.current.entries[1].conversationVersion).toBe(2)
 })
+
+it("keeps backend goal focus instead of resending the last task card", async () => {
+  let first = true
+  const calls = mock((m) => {
+    const task = first
+      ? { task_id: "old-task", state: "needs_clarification" }
+      : undefined
+    first = false
+    return respond(m, { context_memory_version: 1, task })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("Draft a message")
+  })
+  await act(async () => {
+    await result.current.submit("Return to the earlier event")
+  })
+  expect(calls[1].body).not.toHaveProperty("active_task_id")
+  expect(calls[1].body.instruction).toBe("Return to the earlier event")
+})
+
+it("restores a draft editor after its original exchange leaves compact history", async () => {
+  ;(chrome.storage.session.get as any).mockResolvedValue({
+    "threadlyConversation:1": { id: "c", version: 20 }
+  })
+  const draft = {
+    draft_id: "retained",
+    recipient: "Alex",
+    subject: "Mosaic",
+    body: "Thursday works",
+    unresolved_fields: []
+  }
+  const calls = mock((m) =>
+    m.path === "/assistant/conversations/c"
+      ? {
+          conversation_id: "c",
+          version: 20,
+          context_memory_version: 1,
+          history: [
+            {
+              request_id: "recent",
+              version: 20,
+              user: "Thanks",
+              assistant: "Welcome"
+            }
+          ],
+          active_email_draft_id: "retained",
+          active_email_draft: draft
+        }
+      : respond(m, { context_memory_version: 1 })
+  )
+  const { result } = renderHook(() => useAssistant(user))
+  await waitFor(() => expect(result.current.restoring).toBe(false))
+  const restored = result.current.entries.find((entry) => entry.emailDraft)
+  expect(restored.emailDraft).toEqual(draft)
+  expect(restored.conversationVersion).toBe(20)
+  expect(result.current.canCreateDraft(restored)).toBe(true)
+  await act(async () => {
+    await result.current.submit("Return to Alex's message")
+  })
+  expect(calls.at(-1).body).not.toHaveProperty("active_task_id")
+})

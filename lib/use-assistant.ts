@@ -120,6 +120,7 @@ export function useAssistant(user: User) {
     polling = useRef(new Set<string>()),
     submitting = useRef(false),
     conversation = useRef({ id: requestId(), version: 0 }),
+    serverOwnsFocus = useRef(false),
     retryTurn = useRef<PendingTurn | null>(null),
     contextCleared = useRef(false),
     contextRevision = useRef(0),
@@ -271,6 +272,7 @@ export function useAssistant(user: User) {
           id: value.conversation_id,
           version: Math.max(saved.version || 0, value.version)
         }
+        serverOwnsFocus.current = value.context_memory_version === 1
         // A detached pin is a local choice until the next turn commits an
         // explicit null. Keep it detached across side-panel reopen, but let a
         // newer server conversation version take precedence.
@@ -296,6 +298,21 @@ export function useAssistant(user: User) {
           errorCode: h.error_code,
           calendarActionId: h.calendar_action_id
         }))
+        // A current draft can outlive the compact transcript window.
+        if (
+          value.active_email_draft &&
+          !restoredEntries.some(
+            (entry) =>
+              entry.emailDraft?.draft_id === value.active_email_draft.draft_id
+          )
+        )
+          restoredEntries.push({
+            id: `restored-draft-${value.active_email_draft.draft_id}`,
+            instruction: "",
+            emailDraft: value.active_email_draft,
+            conversationId: value.conversation_id,
+            conversationVersion: value.version
+          })
         if (value.calendar_choices) {
           restoredEntries.push({
             id: `calendar-choices-${value.conversation_id}-${value.version}`,
@@ -759,10 +776,14 @@ export function useAssistant(user: User) {
           request_id: id,
           instruction,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          ...(contextId || contextCleared.current
+          ...((contextId || contextCleared.current) &&
+          (!serverOwnsFocus.current ||
+            conversation.current.version === 0 ||
+            selectionOverride.current ||
+            contextCleared.current)
             ? { context_snapshot_id: contextId }
             : {}),
-          ...(activeProposal
+          ...(serverOwnsFocus.current || activeProposal
             ? {}
             : { active_task_id: lastWork?.task?.task_id || null })
         }
@@ -835,6 +856,7 @@ export function useAssistant(user: User) {
     await completeTurn(id, turn)
   }
   const completeTurn = async (id: string, turn: any) => {
+    serverOwnsFocus.current = turn.context_memory_version === 1
     conversation.current = {
       id: turn.conversation_id,
       version: Math.max(conversation.current.version, turn.version)
@@ -1135,6 +1157,7 @@ export function useAssistant(user: User) {
         storageError = `The chat was deleted on the server, but browser storage could not be cleared. ${errorText(e)}`
       }
       conversation.current = { id: requestId(), version: 0 }
+      serverOwnsFocus.current = false
       retryTurn.current = null
       setRecovery(null)
       contextRevision.current += 1
@@ -1280,6 +1303,7 @@ export function useAssistant(user: User) {
       setContextBlocked(false)
       setError("")
       conversation.current = { id: requestId(), version: 0 }
+      serverOwnsFocus.current = false
       retryTurn.current = null
       setRecovery(null)
       contextRevision.current += 1
@@ -1446,6 +1470,7 @@ export function useAssistant(user: User) {
           submitting.current = false
         }
         conversation.current = { id: requestId(), version: 0 }
+        serverOwnsFocus.current = false
         retryTurn.current = null
         setRecovery(null)
         contextRevision.current += 1
