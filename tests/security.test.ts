@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { addresses } from "../lib/api"
 import {
-  fillReplyEditor,
+  insertIntoReplyEditor,
   gmailId,
   readGmailSelection
 } from "../lib/gmail-context"
@@ -156,17 +156,45 @@ describe("selected Gmail references", () => {
     expect(s.replyEditorOpen).toBe(true)
     expect(JSON.stringify(s)).not.toContain("PRIVATE_DRAFT")
   })
-  it("inserts a reply as plain text lines, keeping its paragraphs", () => {
+  it("finds Gmail's reply box below the messages, outside any message", () => {
+    document.body.innerHTML =
+      '<main role="main"><h2 class="hP">Receipt</h2><div data-legacy-thread-id="abcdef"><div data-legacy-message-id="abcd1"></div></div><div class="reply"><div contenteditable="true" role="textbox"></div></div></main>'
+    const editor = document.querySelector<HTMLElement>('[role="textbox"]')!
+    editor.getClientRects = () => [{}] as any
+    expect(
+      readGmailSelection(document, "https://mail.google.com/#inbox/abcdef")
+        .replyEditorOpen
+    ).toBe(true)
+  })
+  it("inserts plain text above the signature and keeps it", () => {
     const editor = document.createElement("div")
-    fillReplyEditor(
+    editor.innerHTML =
+      '<div><br></div><div class="gmail_signature">Anansh Pahwa</div>'
+    document.body.replaceChildren(editor)
+    document.getSelection()!.removeAllRanges()
+    insertIntoReplyEditor(
       editor,
-      "Hi Bhowmik,\n\nSounds good. <img src=x onerror=alert(1)>\n\nCheers"
+      "Hi Bhowmik,\n\nSounds good. <img src=x onerror=alert(1)>"
     )
-    expect(editor.querySelectorAll("br")).toHaveLength(4)
     expect(editor.querySelector("img")).toBeNull()
-    expect(editor.textContent).toBe(
-      "Hi Bhowmik,Sounds good. <img src=x onerror=alert(1)>Cheers"
+    expect(editor.querySelector(".gmail_signature")!.textContent).toBe(
+      "Anansh Pahwa"
     )
+    expect(editor.textContent).toBe(
+      "Hi Bhowmik,Sounds good. <img src=x onerror=alert(1)>Anansh Pahwa"
+    )
+  })
+  it("inserts at the cursor without removing text already typed", () => {
+    const editor = document.createElement("div")
+    editor.innerHTML = "<div>Thanks!</div>"
+    document.body.replaceChildren(editor)
+    const range = document.createRange()
+    range.setStart(editor.firstChild!.firstChild!, 6)
+    range.collapse(true)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+    insertIntoReplyEditor(editor, " a lot")
+    expect(editor.textContent).toBe("Thanks a lot!")
   })
   it("requires explicit target when multiple messages are expanded", () => {
     document.body.innerHTML =

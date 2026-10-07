@@ -619,22 +619,20 @@ test("real extension bridge: selected summary, answer and edited reply without s
   await expect(
     page.getByText("Thank you for the update. The total should be $9.80.")
   ).toBeVisible()
+  // A reply card is only From, To and Message; it goes into Gmail with Insert.
   const editor = page.getByLabel("Email draft").last()
-  await editor.getByLabel("Subject", { exact: true }).fill("My edited subject")
+  await expect(editor.getByLabel("Subject", { exact: true })).toHaveCount(0)
+  await expect(
+    editor.getByRole("button", { name: "Create draft", exact: true })
+  ).toHaveCount(0)
   await editor
     .getByLabel("Message", { exact: true })
     .fill("My exact edited body")
-  await editor
-    .getByRole("button", { name: "Create draft", exact: true })
-    .click()
-  await expect(editor.getByText("Saved to Gmail Drafts")).toBeVisible()
-  const savedDraft = calls
-    .filter((c) => c.path === "/assistant/gmail-drafts")
-    .at(-1)
-  expect(savedDraft.body).toMatchObject({
-    subject: "My edited subject",
-    body: "My exact edited body"
-  })
+  // No Gmail reply box is open in this harness, so Insert waits for one.
+  await expect(
+    editor.getByRole("button", { name: "Insert", exact: true })
+  ).toBeDisabled()
+  await expect(editor.getByText(/Click Reply in Gmail/)).toBeVisible()
   await expect(
     page.getByRole("button", { name: "Approve and send" })
   ).toHaveCount(0)
@@ -658,10 +656,12 @@ test("real extension bridge: selected summary, answer and edited reply without s
     .click()
   await page.getByRole("button", { name: "Recent chats", exact: true }).click()
   await page.getByRole("button", { name: /The total should be/ }).click()
-  await expect(page.getByText("Saved to Gmail Drafts")).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Insert", exact: true }).last()
+  ).toBeVisible()
   expect(
     calls.filter((c) => c.path === "/assistant/gmail-drafts")
-  ).toHaveLength(1)
+  ).toHaveLength(0)
   expect(
     calls.some((c) => c.path.includes("/assistant/gmail-drafts/task/"))
   ).toBe(true)

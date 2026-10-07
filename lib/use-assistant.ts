@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { api, errorText, requestId } from "./api"
 import { calendarAvailability } from "./calendar-availability"
-import { activeGmail, capture } from "./context"
+import { activeGmail, capture, observeGmail } from "./context"
+import { gmailId } from "./gmail-context"
 import type {
   Artifact,
   EmailDraft,
@@ -127,6 +128,12 @@ export function useAssistant(user: User) {
     selectionOverride = useRef<SelectionReference | null>(null),
     pinnedCapture = useRef<{ selection: Selection; id: string } | null>(null),
     storageQueue = useRef<Promise<void>>(Promise.resolve())
+  const [openElsewhere, setOpenElsewhere] = useState<string | null>(null)
+  const entriesNow = useRef(entries),
+    selectionNow = useRef(selection),
+    followRun = useRef(0)
+  entriesNow.current = entries
+  selectionNow.current = selection
   const storageKey = `threadlyConversation:${user.id}`
   const unresolvedTurn = () => Boolean(retryTurn.current || recovery)
   const offerRecovery = (value: any) => {
@@ -576,7 +583,7 @@ export function useAssistant(user: User) {
       polling.current.delete(initial.task_id)
     }
   }
-  const selectActive = async (quiet = false) => {
+  const selectActive = async (quiet = false, follow = false) => {
     if (unresolvedTurn()) {
       if (!quiet)
         setError(
@@ -584,12 +591,18 @@ export function useAssistant(user: User) {
         )
       return
     }
-    if (quiet && (await chrome.storage.session?.get(storageKey))?.[storageKey])
+    if (
+      quiet &&
+      !follow &&
+      (await chrome.storage.session?.get(storageKey))?.[storageKey]
+    )
       return
     setBusy(true)
     setError("")
     try {
       const s = await activeGmail(user)
+      // Following stops the moment a message is sent; that chat keeps its email.
+      if (follow && (entriesNow.current.length || submitting.current)) return
       if (mounted.current) {
         if (s) {
           setSelection(s)
@@ -608,6 +621,43 @@ export function useAssistant(user: User) {
     } finally {
       if (mounted.current) setBusy(false)
     }
+  }
+  // Until the first message, the attached email follows whatever Gmail shows.
+  // Afterwards the chat keeps its email and only notes that another is open.
+  const followActive = async (showsEmail: boolean) => {
+    const run = ++followRun.current
+    if (restoring || unresolvedTurn() || submitting.current) return
+    let observed: any
+    try {
+      observed = await observeGmail()
+    } catch {
+      return
+    }
+    if (!observed || run !== followRun.current || !mounted.current) return
+    const open = gmailId(observed.threadId)
+    const current = selectionNow.current?.thread.thread_id.toLowerCase()
+    if (entriesNow.current.length) {
+      setOpenElsewhere(
+        open && current && open !== current
+          ? observed.subject || "another email"
+          : null
+      )
+      return
+    }
+    setOpenElsewhere(null)
+    if (!showsEmail) {
+      if (selectionNow.current && !submitting.current) {
+        contextRevision.current += 1
+        selectionOverride.current = null
+        pinnedCapture.current = null
+        setSelection(null)
+        void forgetConversation().catch(() => undefined)
+      }
+      return
+    }
+    // Gmail can change the URL before it renders the thread; a later check retries.
+    if (!open || open === current) return
+    await selectActive(true, true)
   }
   const selectThread = async (id: string) => {
     if (unresolvedTurn()) {
@@ -1440,6 +1490,8 @@ export function useAssistant(user: User) {
     error,
     setError,
     selectActive,
+    followActive,
+    openElsewhere: entries.length ? openElsewhere : null,
     selectThread,
     chooseEmail,
     canPage,

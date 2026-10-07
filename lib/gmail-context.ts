@@ -3,14 +3,66 @@ export function gmailId(value?: string | null): string | null {
   if (!value) return null
   return /^[a-f0-9]{1,32}$/i.test(value) ? value.toLowerCase() : null
 }
-/** Put a draft into a reply editor as plain text, one line break per newline. */
-export function fillReplyEditor(editor: HTMLElement, body: string) {
-  const nodes: Node[] = []
+const lines = (doc: Document, body: string) => {
+  const fragment = doc.createDocumentFragment()
   body.split("\n").forEach((line, i) => {
-    if (i) nodes.push(editor.ownerDocument.createElement("br"))
-    if (line) nodes.push(editor.ownerDocument.createTextNode(line))
+    if (i) fragment.append(doc.createElement("br"))
+    if (line) fragment.append(doc.createTextNode(line))
   })
-  editor.replaceChildren(...nodes)
+  return fragment
+}
+// Gmail adds these to a reply on its own; inserted text never goes inside them.
+const GMAIL_KEPT = ".gmail_signature, .gmail_signature_prefix, .gmail_quote"
+/** Visible reply boxes in the open thread; compose windows sit outside it. */
+export function replyEditors(doc: Document): HTMLElement[] {
+  const heading = doc.querySelector("h2.hP")
+  const main =
+    heading?.closest('[role="main"]') || doc.querySelector('[role="main"]')
+  return Array.from(
+    (main || doc).querySelectorAll<HTMLElement>(
+      '[contenteditable="true"][role="textbox"]'
+    )
+  ).filter((el) => el.getClientRects().length > 0)
+}
+/** The reply box holding the user's cursor, else the only one open. */
+export function targetReplyEditor(doc: Document): HTMLElement | null {
+  const editors = replyEditors(doc)
+  const range = doc.getSelection()?.rangeCount
+    ? doc.getSelection()!.getRangeAt(0)
+    : null
+  return (
+    (range && editors.find((el) => el.contains(range.startContainer))) ||
+    (editors.length === 1 ? editors[0] : null)
+  )
+}
+/**
+ * Add a draft to a reply box as plain text without removing anything: at the
+ * user's cursor, or above the signature and quoted text when there is none.
+ */
+export function insertIntoReplyEditor(editor: HTMLElement, body: string) {
+  const doc = editor.ownerDocument
+  const fragment = lines(doc, body)
+  const last = fragment.lastChild
+  const selection = doc.getSelection()
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+  const start = range?.startContainer
+  const startElement =
+    start?.nodeType === Node.ELEMENT_NODE
+      ? (start as Element)
+      : start?.parentElement
+  const atCursor =
+    range && editor.contains(start) && !startElement?.closest(GMAIL_KEPT)
+  if (atCursor) {
+    range.deleteContents()
+    range.insertNode(fragment)
+  } else editor.insertBefore(fragment, editor.firstChild)
+  if (last && selection) {
+    const after = doc.createRange()
+    after.setStartAfter(last)
+    after.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(after)
+  }
 }
 /** True when a Gmail URL is showing one email thread rather than a list. */
 export function gmailUrlShowsEmail(href?: string | null): boolean {
@@ -54,11 +106,8 @@ export function readGmailSelection(doc: Document, href: string) {
       ?.getAttribute("aria-label")
       ?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null
   // Only whether a reply box is showing; its contents are never read.
-  const replyEditorOpen = rows.some((r) =>
-    Array.from(
-      r.querySelectorAll('[contenteditable="true"][role="textbox"]')
-    ).some((el) => el.getClientRects().length > 0)
-  )
+  // Gmail puts the reply box below the messages, not inside one of them.
+  const replyEditorOpen = replyEditors(doc).length > 0
   return {
     threadId,
     messageIds,

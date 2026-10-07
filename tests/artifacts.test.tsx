@@ -451,3 +451,69 @@ describe("editable Gmail draft card", () => {
     expect(container.querySelector("img")).toBeNull()
   })
 })
+describe("reply card", () => {
+  const reply: any = {
+    draft_id: "d1",
+    recipient: "alex@example.test",
+    subject: "Re: test",
+    body: "Thanks, Alex.",
+    unresolved_fields: []
+  }
+  it("shows only From, To and Message, and inserts into the open Gmail reply", async () => {
+    mockApi()
+    vi.mocked(chrome.tabs.query).mockResolvedValue([
+      { id: 7, url: "https://mail.google.com/mail/u/0/#inbox/abc" }
+    ] as any)
+    const sent: any[] = []
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_id, m: any) => {
+      sent.push(m)
+      return m.action === "THREADLY_INSERT"
+        ? { ok: true }
+        : { threadId: "abc123", replyEditorOpen: true }
+    })
+    render(<GmailDraftCard draft={reply} user={user} replyThreadId="ABC123" />)
+    expect(screen.getByText("From")).toBeTruthy()
+    expect(screen.getByLabelText("To")).toBeTruthy()
+    expect(screen.getByLabelText("Message")).toBeTruthy()
+    expect(screen.queryByLabelText("Subject")).toBeNull()
+    expect(screen.queryByText("Cc / Bcc")).toBeNull()
+    expect(screen.queryByText("Create draft")).toBeNull()
+    const insert = screen.getByRole("button", { name: "Insert" })
+    await waitFor(() =>
+      expect((insert as HTMLButtonElement).disabled).toBe(false)
+    )
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Thanks a lot, Alex." }
+    })
+    fireEvent.click(insert)
+    await screen.findByText("Added to your Gmail reply. Nothing was sent.")
+    expect(sent.find((m) => m.action === "THREADLY_INSERT")).toEqual({
+      action: "THREADLY_INSERT",
+      threadId: "abc123",
+      body: "Thanks a lot, Alex."
+    })
+  })
+  it("keeps Insert off until Gmail shows a reply box on that email", async () => {
+    mockApi()
+    vi.mocked(chrome.tabs.query).mockResolvedValue([
+      { id: 7, url: "https://mail.google.com/mail/u/0/#inbox/abc" }
+    ] as any)
+    vi.mocked(chrome.tabs.sendMessage).mockResolvedValue({
+      threadId: "other1",
+      replyEditorOpen: true
+    } as any)
+    render(<GmailDraftCard draft={reply} user={user} replyThreadId="abc123" />)
+    await screen.findByText(/Click Reply in Gmail, then Insert/)
+    expect(
+      (screen.getByRole("button", { name: "Insert" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true)
+  })
+  it("a new email keeps To, Subject and Message without From", () => {
+    mockApi()
+    render(card())
+    expect(screen.queryByText("From")).toBeNull()
+    expect(screen.getByLabelText("Subject")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Insert" })).toBeNull()
+  })
+})
