@@ -14,6 +14,7 @@ from tools.evaluate_chat_context import (
     Budget,
     BudgetExceeded,
     install_dispatch_guard,
+    prepare_runtime_clients,
     scenarios,
 )
 
@@ -188,6 +189,43 @@ def test_global_dispatch_guard_covers_independent_default_clients(monkeypatch):
     with pytest.raises(BudgetExceeded):
         BaseClient._make_api_call(retrying, "Converse", {"modelId": APPROVED_MODEL})
     assert len(dispatched) == 6
+    assert len(budget.blocked_operations) == 5
+
+
+def test_existing_credentials_are_frozen_before_guarded_model_clients(monkeypatch):
+    import boto3
+
+    from app.model_client import bedrock, conversation
+
+    events = []
+    frozen = SimpleNamespace(access_key="synthetic", secret_key="synthetic", token="synthetic")
+
+    def freeze():
+        events.append("freeze")
+        return frozen
+
+    def client(service, **kwargs):
+        events.append("client")
+        assert service == "bedrock-runtime"
+        assert kwargs["region_name"] == APPROVED_REGION
+        assert kwargs["aws_access_key_id"] == frozen.access_key
+        assert kwargs["aws_secret_access_key"] == frozen.secret_key
+        assert kwargs["aws_session_token"] == frozen.token
+        assert kwargs["config"].retries["total_max_attempts"] == 1
+        return object()
+
+    monkeypatch.setattr(
+        boto3,
+        "Session",
+        lambda: SimpleNamespace(
+            get_credentials=lambda: SimpleNamespace(get_frozen_credentials=freeze),
+            client=client,
+        ),
+    )
+    prepare_runtime_clients(monkeypatch)
+    assert events == ["freeze"]
+    assert bedrock._runtime_client() is not conversation.ConversationModel().factory()
+    assert events == ["freeze", "client", "client"]
 
 
 async def test_harness_report_rehearsal_uses_scripted_model_only(

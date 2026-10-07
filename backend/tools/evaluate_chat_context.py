@@ -73,6 +73,7 @@ class Budget:
     def __init__(self, ledger_path=None):
         self.calls = []
         self.preflights = []
+        self.blocked_operations = []
         self.lock = threading.Lock()
         self.started = time.monotonic()
         self.scenario = None
@@ -95,6 +96,7 @@ class Budget:
                     raise BudgetExceeded("Evaluation ledger belongs to another model")
                 self.calls = data["calls"]
                 self.preflights = data["preflights"]
+                self.blocked_operations = data.get("blocked_operations", [])
             elif saved is not None:
                 raise BudgetExceeded("Existing evaluation ledger is empty or damaged")
 
@@ -108,6 +110,7 @@ class Budget:
                         "count_model": COUNT_MODEL,
                         "calls": self.calls,
                         "preflights": self.preflights,
+                        "blocked_operations": self.blocked_operations,
                     },
                     stream,
                 )
@@ -223,6 +226,40 @@ class Budget:
         return Guarded()
 
 
+def prepare_runtime_clients(monkeypatch):
+    """Resolve the existing login before guarding dispatch; keep secrets in memory.
+
+    The signin credential provider may refresh via its own AWS operation. Freeze
+    its normal result before installing the Bedrock-only hook, so signing cannot
+    trigger that unrelated operation inside a counted request. No grants or
+    credential configuration change, and every model call still passes the hook.
+    """
+    import boto3
+    from botocore.config import Config
+
+    from app.model_client import bedrock, conversation
+
+    session = boto3.Session()
+    credentials = session.get_credentials().get_frozen_credentials()
+
+    def factory():
+        return session.client(
+            "bedrock-runtime",
+            region_name=APPROVED_REGION,
+            aws_access_key_id=credentials.access_key,
+            aws_secret_access_key=credentials.secret_key,
+            aws_session_token=credentials.token,
+            config=Config(
+                connect_timeout=5,
+                read_timeout=45,
+                retries={"mode": "standard", "total_max_attempts": 1},
+            ),
+        )
+
+    monkeypatch.setattr(bedrock, "_runtime_client", factory)
+    monkeypatch.setattr(conversation, "_runtime_client", factory)
+
+
 def install_dispatch_guard(monkeypatch, budget):
     """Catch coordinator, auxiliary and worker calls, including default clients.
 
@@ -241,6 +278,15 @@ def install_dispatch_guard(monkeypatch, budget):
             or operation != "Converse"
             or client.meta.config.retries.get("total_max_attempts") != 1
         ):
+            budget.blocked_operations.append(
+                {
+                    "service": client.meta.service_model.service_name,
+                    "operation": operation,
+                    "region": client.meta.region_name,
+                    "retries": client.meta.config.retries,
+                }
+            )
+            budget.save()
             raise BudgetExceeded("Unbudgeted AWS operation, region or retry policy")
 
         class Raw:
@@ -428,6 +474,8 @@ async def test_live_context_scenarios(configured, db_sessionmaker, monkeypatch):
 
     monkeypatch.setattr(client, "_request", calendar_request)
     budget = Budget(os.getenv("THREADLY_CONTEXT_EVAL_LEDGER"))
+    if os.getenv("THREADLY_CONTEXT_EVAL") == APPROVAL:
+        prepare_runtime_clients(monkeypatch)
     install_dispatch_guard(monkeypatch, budget)
     decider = ConversationModel()
     generator = ModelClient(bedrock=BedrockProvider())
