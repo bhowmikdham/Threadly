@@ -1,14 +1,14 @@
 {
-  "release": "contextual-conversation-1.8.7+calendar-intent.1",
+  "release": "contextual-conversation-1.8.8+calendar-intent.1",
   "day_availability_policy": "calendar-day-answer-2.0.0",
   "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
-  "prompt_hash": "0c68fcc4fd2a7f603eea818ba8ae9ff9437b2fd3d018c9282b78d9cd0e936065",
-  "tools_hash": "d35ab0a152cf3b146f66d0601a6424693a42d412755055ad2007bb182f05aa7d",
+  "prompt_hash": "6593ce4e706dedb912ca150317c0aac6288d0ce70a33707aad636ab8e884d762",
+  "tools_hash": "fb0b008896955acb00a2815b5c09e1dc6d47c4039b46d8464c576883631345e4",
   "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
   "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
   "max_calls": 8,
   "timeout_seconds": 120,
-  "checked_at": "2026-10-07T04:38:49.926159+00:00",
+  "checked_at": "2026-10-07T04:43:10.255812+00:00",
   "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
   "execution": "model decision only; tools never executed",
   "cases": [
