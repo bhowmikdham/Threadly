@@ -16,13 +16,13 @@ The original Library reference image could not be materialized after its support
 retry. These are actual built-extension screenshots, not a claim of matching the
 unavailable reference.
 
-Validation: typecheck and changed-file Prettier check pass; 207 non-voice unit tests,
-33 non-voice browser tests, and 29 release packaging tests pass. The public-origin
-browser test is validated separately with the packaged HTTPS build. Full unit and
-browser runs expose the inherited voice acknowledgment mismatch at base 3469b4e:
-source says “Let me check that.” while tests expect “Sure, I can do that.” Seven
-unit failures reproduce in an untouched baseline checkout; the full browser suite
-has the corresponding one voice failure. Voice source/tests remain unchanged.
+Validation: typecheck and changed-file Prettier check pass; all 227 unit tests,
+36 browser tests, and 29 release packaging tests pass. The public-origin browser
+test is validated separately with the packaged HTTPS build. Initial full runs
+exposed inherited voice acknowledgment assertion drift at base 3469b4e, reproduced
+in an untouched baseline checkout. With explicit user approval, a separate test-only
+commit updates the expected wording to “Let me check that.” All sequence,
+cancellation and stale-audio checks remain; voice runtime code is unchanged.
 
 Provider writes are mocked. Tests cover exact editor values, recipient validation,
 Cc/Bcc, keyboard activation, duplicate clicks, saved-result recovery, missing draft
@@ -30,4 +30,15 @@ permission, stale-chat disablement, unmount, and long subject/body overflow. Bac
 PR supplies verified account/source gates, draft-only Gmail persistence and the
 durable deduplication receipt. No live Gmail write, OAuth grant or deployment was
 performed. Existing grants must include gmail.compose, gmail.modify or full-mail
-access; gmail.send alone does not permit drafts.
+access; gmail.send alone does not permit drafts. Initial OAuth still requests
+gmail.readonly and reconnect does not offer draft permission. No live user's
+stored grants were inspected. Missing/unverified permission and disconnected
+accounts show explanatory states with Create draft disabled and edit/copy available.
+
+The backend migration g071026e9042 follows c061026e9041 and adds only
+gmail_draft_saves. Apply it before enabling this UI. Older application code can
+coexist with this additive table. Retain the table on application rollback:
+downgrade deliberately refuses to delete any receipt, including uncertain writes.
+The UI stays disabled if the paired backend routes/capability are unavailable.
+Receipt recovery keeps the original saved source revision distinct from newer
+generated edits, which remain editable/copyable without creating duplicate drafts.
