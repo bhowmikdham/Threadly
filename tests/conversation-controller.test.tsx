@@ -1529,3 +1529,103 @@ it("opens a returned saved draft after a Calendar detour without restarting work
     "/assistant/conversation-turns"
   ])
 })
+
+it("follows the open email before chat, pins its visible reply target, and preserves server focus after a switch", async () => {
+  const firstId = "abcdef123456aa",
+    secondId = "abcdef123456bb"
+  let openId = firstId
+  const source = (id: string) => ({
+    thread: {
+      thread_id: id,
+      subject: id === firstId ? "First email" : "Second email",
+      version: 1
+    },
+    messages: [
+      {
+        gmail_msg_id: `${id}-old`,
+        is_from_user: false,
+        received_at: "2026-10-07T01:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-new`,
+        is_from_user: false,
+        received_at: "2026-10-07T02:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-mine`,
+        is_from_user: true,
+        received_at: "2026-10-07T03:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-hidden`,
+        is_from_user: false,
+        received_at: "2026-10-07T04:00:00Z"
+      }
+    ]
+  })
+  vi.mocked(chrome.tabs.query).mockResolvedValue([
+    { id: 1, url: "https://mail.google.com/mail/u/0/" }
+  ] as any)
+  vi.mocked(chrome.tabs.sendMessage).mockImplementation(async () => ({
+    accountEmail: user.email,
+    threadId: openId,
+    subject: source(openId).thread.subject,
+    messageIds: [`${openId}-old`, `${openId}-new`, `${openId}-mine`],
+    selectedMessageId: null
+  }))
+  const calls = mock((m) => {
+    if (m.path.startsWith("/threads/")) return source(m.path.split("/").at(-1))
+    if (m.path === "/assistant/context-snapshots")
+      return { context_snapshot_id: `context-${m.body.thread_id}` }
+    return respond(m, { context_memory_version: 1 })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await waitFor(() => expect(result.current.restoring).toBe(false))
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(result.current.selection?.thread.thread_id).toBe(firstId)
+  openId = secondId
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(result.current.selection?.thread.thread_id).toBe(secondId)
+  expect(result.current.selection?.targetId).toBe(`${secondId}-new`)
+  await act(async () => {
+    await result.current.submit("Draft a reply")
+  })
+  const capture = calls.find((m) => m.path === "/assistant/context-snapshots")
+  expect(capture.body).toMatchObject({
+    thread_id: secondId,
+    ui_map: { selected_message_ids: [`${secondId}-new`] }
+  })
+  expect(capture.body.ui_map.visible_message_ids).not.toContain(
+    `${secondId}-hidden`
+  )
+  openId = firstId
+  const beforeObservation = calls.length
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(calls).toHaveLength(beforeObservation)
+  expect(result.current.openElsewhere).toBe("First email")
+  expect(result.current.selection?.thread.thread_id).toBe(secondId)
+  await act(async () => {
+    await result.current.submit("Return to the earlier event")
+  })
+  const turns = calls.filter((m) => m.path === "/assistant/conversation-turns")
+  expect(turns[1].body).not.toHaveProperty("active_task_id")
+  expect(turns[1].body).not.toHaveProperty("context_snapshot_id")
+  await act(async () => {
+    await result.current.newChat()
+  })
+  expect(result.current.entries).toEqual([])
+  expect(result.current.openElsewhere).toBeNull()
+  expect(result.current.selection?.thread.thread_id).toBe(firstId)
+  await act(async () => {
+    await result.current.submit("Summarise this email")
+  })
+  const last = calls.at(-1).body
+  expect(last.conversation_id).not.toBe(turns[0].body.conversation_id)
+  expect(last.context_snapshot_id).toBe(`context-${firstId}`)
+})
