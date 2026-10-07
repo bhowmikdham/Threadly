@@ -76,6 +76,112 @@ async function ready() {
 }
 
 describe("editable Gmail draft card", () => {
+  it("requests draft consent explicitly, keeps all edits and waits for a new save click", async () => {
+    const calls: any[] = []
+    let granted = false
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (m: any) => {
+      calls.push(m)
+      if (m.type === "LOGIN") granted = true
+      return {
+        ok: true,
+        data:
+          m.path === "/assistant/capabilities"
+            ? {
+                ...caps,
+                account: { account_version: granted ? 5 : 4 },
+                capabilities: [
+                  {
+                    id: "gmail_draft",
+                    ready: granted,
+                    status: granted ? "ready" : "scope_missing"
+                  }
+                ],
+                reconnect: { requestable_capabilities: ["gmail_draft"] }
+              }
+            : m.method === "POST"
+              ? saved(m)
+              : null
+      } as any
+    })
+    render(card())
+    await screen.findByRole("button", { name: "Enable draft creation" })
+    expect(
+      screen.getByText(
+        /Google’s permission includes managing drafts and sending email/
+      )
+    ).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Subject"), {
+      target: { value: "My edited subject" }
+    })
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "My exact unsaved edits  " }
+    })
+    fireEvent.change(screen.getByLabelText("To"), {
+      target: { value: "different@example.test" }
+    })
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enable draft creation" })
+    )
+    await screen.findByText(/Draft access is ready/)
+    expect(calls.filter((m) => m.type === "LOGIN")).toEqual([
+      expect.objectContaining({
+        capabilities: ["gmail_draft"],
+        expectedUserId: user.id
+      })
+    ])
+    expect(calls.filter((m) => m.method === "POST")).toHaveLength(0)
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).value
+    ).toBe("My exact unsaved edits  ")
+    fireEvent.click(screen.getByRole("button", { name: "Create draft" }))
+    await screen.findByText("Saved to Gmail Drafts")
+    expect(calls.find((m) => m.method === "POST").body).toMatchObject({
+      subject: "My edited subject",
+      body: "My exact unsaved edits  ",
+      account_version: 5,
+      recipients: { to: ["different@example.test"] }
+    })
+  })
+  it("keeps text editable after cancelled consent and never saves automatically", async () => {
+    const calls: any[] = []
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (m: any) => {
+      calls.push(m)
+      if (m.type === "LOGIN")
+        return {
+          ok: false,
+          error: { message: "Sign-in was cancelled." }
+        } as any
+      return {
+        ok: true,
+        data:
+          m.path === "/assistant/capabilities"
+            ? {
+                ...caps,
+                capabilities: [
+                  { id: "gmail_draft", ready: false, status: "scope_missing" }
+                ],
+                reconnect: { requestable_capabilities: ["gmail_draft"] }
+              }
+            : null
+      } as any
+    })
+    render(card())
+    await screen.findByRole("button", { name: "Enable draft creation" })
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Keep this text" }
+    })
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enable draft creation" })
+    )
+    await screen.findByText("Sign-in was cancelled.")
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).value
+    ).toBe("Keep this text")
+    expect(
+      (screen.getByLabelText("Message") as HTMLTextAreaElement).disabled
+    ).toBe(false)
+    expect(calls.filter((m) => m.method === "POST")).toHaveLength(0)
+  })
   it("saves exactly the edited subject, body and all recipients only after a click", async () => {
     const calls = mockApi((m) => (m.method === "POST" ? saved(m) : null))
     render(card())

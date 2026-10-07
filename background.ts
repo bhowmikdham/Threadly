@@ -223,7 +223,7 @@ async function discardSession(expected: Session, generation: number) {
   })
 }
 
-async function login(capabilities?: string[]) {
+async function login(capabilities?: string[], expectedUserId?: number) {
   if (signingIn || signingOut)
     throw new Error("A sign-in or sign-out is already in progress.")
   signingIn = true
@@ -241,6 +241,8 @@ async function login(capabilities?: string[]) {
       )
     )
     const old = capabilities ? await activeSession() : null
+    if (expectedUserId !== undefined && old?.user.id !== expectedUserId)
+      throw new Error("Your account changed. Reload before connecting Google.")
     const start = await transport(
       origin,
       capabilities ? "/auth/google/reconnect" : "/auth/google/begin",
@@ -308,7 +310,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         }
       }
       case "LOGIN":
-        return login(message.capabilities)
+        return login(message.capabilities, message.expectedUserId)
       case "DISCONNECT_GOOGLE": {
         if (signingIn || signingOut)
           throw new Error("Finish the current sign-in or sign-out first.")
