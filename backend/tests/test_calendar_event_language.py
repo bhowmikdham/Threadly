@@ -2,13 +2,13 @@
 
 # ruff: noqa: F811
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
 
-from app.calendar import conversation_guard, event_choices, event_creation, permissions
+from app.calendar import conversation_guard, event_choices, event_creation, event_draft, permissions
 from app.calendar.time_resolution import parse_clock
 from app.conversation import engine, service
 from app.db.models import ActionJob, AssistantAction, Conversation
@@ -446,14 +446,24 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
 ):
     from app.conversation import store
 
+    # Proposal expiry uses PostgreSQL's real clock. Keep this midnight scenario
+    # ahead of that clock instead of letting a fixed historical event expire.
+    melbourne = ZoneInfo("Australia/Melbourne")
+    async with db_sessionmaker() as db:
+        database_now = await db.scalar(select(func.clock_timestamp()))
+    local_day = database_now.astimezone(melbourne).date() + timedelta(days=1)
+    local_midnight = datetime.combine(local_day, datetime.min.time(), tzinfo=melbourne)
+    anchor = (local_midnight + timedelta(minutes=17)).astimezone(UTC)
+    assert anchor.date() < local_day
+
     class Frozen(datetime):
         @classmethod
         def now(cls, tz=None):
-            value = cls(2026, 10, 5, 13, 17, tzinfo=UTC)
-            return value.astimezone(tz) if tz else value.replace(tzinfo=None)
+            return anchor.astimezone(tz) if tz else anchor.replace(tzinfo=None)
 
     monkeypatch.setattr(store, "datetime", Frozen)
     monkeypatch.setattr(event_creation, "datetime", Frozen)
+    monkeypatch.setattr(event_draft, "datetime", Frozen)
     monkeypatch.setattr(event_choices, "datetime", Frozen)
     monkeypatch.setattr(conversation_guard, "datetime", Frozen)
     await ready(db_sessionmaker)
@@ -481,7 +491,7 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
         ),
     )
     assert result["trace"][1]["reason"] == "calendar_preparation_required"
-    assert result["kind"] == "calendar_event"
+    assert result["kind"] == "calendar_event", result["trace"]
     action = result["calendar_action"]
     assert action["state"] == "proposed"
     event = action["preview"]["event"]
@@ -489,7 +499,7 @@ async def test_reported_kelly_request_after_melbourne_midnight_is_not_a_calendar
     local_start = datetime.fromisoformat(event["start"]["dateTime"]).astimezone(
         ZoneInfo("Australia/Melbourne")
     )
-    assert local_start == datetime(2026, 10, 7, 16, tzinfo=ZoneInfo("Australia/Melbourne"))
+    assert local_start == local_midnight + timedelta(days=1, hours=16)
     assert event["attendees"] == []
     async with db_sessionmaker() as db:
         saved = await db.get(AssistantAction, result["calendar_action_id"])
