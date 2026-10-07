@@ -60,5 +60,8 @@ export function spokenReply(entry: Entry | undefined): string | null {
  * cards show in the chat, exactly as they would for a typed request.
  */
 export function hasChoices(entry: Entry | undefined): boolean {
+  if (entry?.calendarActionId && !entry.pending && !entry.error) {
+    return true
+  }
   return (entry?.inbox?.results.length ?? 0) > 1
 }
