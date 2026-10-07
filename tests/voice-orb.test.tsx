@@ -113,7 +113,6 @@ describe("voice conversation", () => {
     expect(spoken).toEqual([
       "Let me check that.",
       "Choose an email.",
-      "Let me check that.",
       "You're welcome."
     ])
   })
