@@ -13,25 +13,29 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
 from app.calendar import intent as calendar_intent
-from app.conversation import budget, email_draft, email_review, mail_goal
+from app.conversation import budget, email_draft, email_repair, email_review, mail_goal
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS
-from app.schemas.conversation import TOOLS, PrepareWorkflow, Respond, tool_config
+from app.schemas.conversation import EMAIL_DRAFT_TOOLS, TOOLS, PrepareWorkflow, Respond, tool_config
 
-TERMINAL = set(CALENDAR_READ_TOOLS) | {
-    "respond",
-    "prepare_calendar_event",
-    "prepare_workflow",
-    "prepare_email_draft",
-    "review_email_draft",
-    "answer_question",
-    "revise_draft",
-    "read_calendar",
-    "check_day_availability",
-    "retry_calendar_read",
-}
+TERMINAL = (
+    set(CALENDAR_READ_TOOLS)
+    | EMAIL_DRAFT_TOOLS
+    | {
+        "respond",
+        "prepare_calendar_event",
+        "prepare_workflow",
+        "prepare_email_draft",
+        "review_email_draft",
+        "answer_question",
+        "revise_draft",
+        "read_calendar",
+        "check_day_availability",
+        "retry_calendar_read",
+    }
+)
 MAX_CALLS = 8
 RETRYABLE_PROVIDER_CODES = frozenset(
     {
@@ -95,6 +99,7 @@ async def run(context, runtime, model=None):
         }
     messages = [{"role": "user", "content": [{"text": json.dumps(budget.fit(context))}]}]
     seen, calls, trace = set(), 0, []
+    email_errors = {}
     last_verified_evidence = []
     try:
         async with asyncio.timeout(120) as turn_timeout:
@@ -201,7 +206,7 @@ async def run(context, runtime, model=None):
                                 "continue_previous", False
                             )
                             runtime.calendar_event_rejected = False
-                        if name == "prepare_email_draft":
+                        if name in EMAIL_DRAFT_TOOLS:
                             runtime.email_draft_attempted = True
                         if name in TERMINAL and len(requests) != 1:
                             raise ValueError("Use a terminal tool alone after observations")
@@ -478,7 +483,9 @@ async def run(context, runtime, model=None):
                         result = {
                             "json": {
                                 "error": "email_draft_required",
-                                "message": "Use prepare_email_draft for standalone composition. "
+                                "message": "Use start_email_draft for new composition or "
+                                "continue_email_draft with the owned goal_id "
+                                "for an answer/revision. "
                                 "Copy recipient and purpose from USER text, retaining pending "
                                 "fields on follow-ups. Leave missing fields empty; do not ask "
                                 "for a subject or exact address just to compose. When both "
@@ -588,75 +595,25 @@ async def run(context, runtime, model=None):
                         }
                         status = "error"
                     except (ValidationError, ValueError) as exc:
-                        if name == "prepare_email_draft":
-                            reason = (
-                                exc.reason
-                                if isinstance(exc, email_draft.EmailDraftInputError)
-                                else "email_draft_invalid_input"
-                            )
-                            fields = sorted(
-                                {
-                                    str(e["loc"][0])
-                                    for e in (
-                                        exc.errors() if isinstance(exc, ValidationError) else []
-                                    )
-                                    if e["loc"] and e["loc"][0] in TOOLS[name][0].model_fields
-                                }
-                            )
+                        if name in EMAIL_DRAFT_TOOLS:
+                            repair = email_repair.observation(runtime, name, values, exc)
+                            reason = repair["error"]
                             trace.append(
                                 {
                                     "tool": name,
                                     "status": "invalid",
                                     "reason": reason,
-                                    "fields": fields,
+                                    "fields": repair["fields"],
                                 }
                             )
-                            result = {
-                                "json": {
-                                    "error": reason,
-                                    "fields": fields,
-                                    "pending_email_draft": email_draft.model_context(runtime.state),
-                                    "message": (
-                                        "Use prepare_workflow for a source-based reply/draft. "
-                                        "Preserve the read source and the user's goal."
-                                        if reason == "source_bound_workflow_required"
-                                        else "Choose the intended owned email goal explicitly. "
-                                        "Pass its goal_id and the complete current USER turn as "
-                                        "request_source, with continue_previous=true, or call "
-                                        "select_conversation_goal before preparing it. Use "
-                                        "list_conversation_goals if needed. Do not switch drafts "
-                                        "by replacing the focused goal's recipient. Ask which "
-                                        "draft if the current request is ambiguous."
-                                        if reason
-                                        in {
-                                            "email_goal_selection_required",
-                                            "email_goal_source_required",
-                                        }
-                                        else "Interpret the current USER request. For a new "
-                                        "independent email use continue_previous=false and "
-                                        "copy the complete current USER turn into request_source. "
-                                        "Do not inherit the old recipient or purpose. Only an "
-                                        "answer or revision to the retained goal uses "
-                                        "continue_previous=true. If recipient and purpose are "
-                                        "known, include draft={subject,body,unresolved_fields:[],"
-                                        "sources:[]}; otherwise leave genuinely missing "
-                                        "fields empty."
-                                        if reason in {"continuation_required", "compose_required"}
-                                        else "Repair prepare_email_draft, not answer_question. "
-                                        "For the retained goal set continue_previous=true. "
-                                        "Keep existing "
-                                        "recipient/purpose or omit unchanged fields; "
-                                        "copy changes only "
-                                        "from USER text. When both are known include "
-                                        "draft={subject,body,"
-                                        "unresolved_fields:[],sources:[]}. Do not replace "
-                                        "a failed draft "
-                                        "with prose or ask again for retained details. "
-                                        "For saving/status "
-                                        "use review_email_draft; chat cannot save or send."
-                                    ),
+                            email_errors[reason] = email_errors.get(reason, 0) + 1
+                            if email_errors[reason] >= 2 or sum(email_errors.values()) >= 3:
+                                return {
+                                    **email_repair.exhausted(),
+                                    "release": RELEASE,
+                                    "trace": trace,
                                 }
-                            }
+                            result = {"json": repair}
                         elif name == "prepare_calendar_event":
                             # Pydantic errors contain private input. Keep only allowlisted
                             # field names; never serialize its error text or input values.
@@ -712,14 +669,26 @@ async def run(context, runtime, model=None):
                             }
                         status = "error"
                     except ApiError as exc:
+                        if name in EMAIL_DRAFT_TOOLS:
+                            email_errors[exc.code] = email_errors.get(exc.code, 0) + 1
+                            trace.append({"tool": name, "status": "invalid", "reason": exc.code})
+                            if email_errors[exc.code] >= 2 or sum(email_errors.values()) >= 3:
+                                return {
+                                    **email_repair.exhausted(),
+                                    "release": RELEASE,
+                                    "trace": trace,
+                                }
+                            result = {"json": email_repair.observation(runtime, name, values, exc)}
+                            status = "error"
+                        else:
+                            trace.append({"tool": name, "status": exc.code})
+                            result = {"json": {"error": exc.code, "message": exc.message}}
+                            status = "error"
                         if (
                             name == "prepare_calendar_event"
                             and exc.code == "calendar_event_already_dispatched"
                         ):
                             runtime.calendar_event_rejected = True
-                        trace.append({"tool": name, "status": exc.code})
-                        result = {"json": {"error": exc.code, "message": exc.message}}
-                        status = "error"
                     results.append(
                         {
                             "toolResult": {

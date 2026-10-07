@@ -3,6 +3,7 @@
 from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.assistant.drafting import GeneratedDraft
 from app.mail.presentation import has_visible_text
@@ -235,17 +236,7 @@ class PrepareWorkflow(StrictModel):
         return self
 
 
-class PrepareEmailDraft(StrictModel):
-    goal_id: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=36,
-        description=(
-            "The owned retained email goal to continue or revise. Required with multiple email "
-            "goals unless select_conversation_goal selected it this turn. Never substitute a "
-            "different recipient on the currently focused goal to switch drafts."
-        ),
-    )
+class EmailDraftFields(StrictModel):
     request_source: str = Field(
         default="",
         max_length=4000,
@@ -254,7 +245,6 @@ class PrepareEmailDraft(StrictModel):
     context_citations: list[UserCitation] = Field(default_factory=list, max_length=4)
     recipient: str = Field(default="", max_length=500)
     purpose: str = Field(default="", max_length=4000)
-    continue_previous: bool = False
     draft: GeneratedDraft | None = Field(
         default=None,
         description=(
@@ -267,10 +257,50 @@ class PrepareEmailDraft(StrictModel):
 
     @model_validator(mode="after")
     def cited_fields(self):
-        if self.goal_id and not self.continue_previous:
-            raise ValueError("A goal_id selects existing work; use continue_previous=true")
         validate_fields(self.citations, {"recipient", "purpose"})
         return self
+
+
+class StartEmailDraft(EmailDraftFields):
+    request_source: str = Field(
+        min_length=1, max_length=4000, description="Copy the complete current USER turn exactly."
+    )
+
+
+class ContinueEmailDraft(StartEmailDraft):
+    goal_id: str = Field(
+        min_length=1,
+        max_length=36,
+        description="The owned retained email goal to answer or revise; never a recipient name.",
+    )
+
+
+class PrepareEmailDraft(EmailDraftFields):
+    """Legacy internal/replay shape; no longer advertised to the model."""
+
+    goal_id: str | None = Field(default=None, min_length=1, max_length=36)
+    continue_previous: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_start_identity(cls, values):
+        # An explicitly new operation allocates a new server identity. A stale
+        # client/model ID has no meaning here and must never select existing work.
+        if isinstance(values, dict) and values.get("continue_previous") is False:
+            return {**values, "goal_id": None}
+        return values
+
+    @model_validator(mode="after")
+    def legacy_operation(self):
+        if self.goal_id and not self.continue_previous:
+            raise PydanticCustomError(
+                "email_goal_operation_required",
+                "Choose start_email_draft for new work or continue_email_draft for retained work",
+            )
+        return self
+
+
+EMAIL_DRAFT_TOOLS = {"prepare_email_draft", "start_email_draft", "continue_email_draft"}
 
 
 class ReviewEmailDraft(StrictModel):
@@ -290,6 +320,25 @@ class ReviseDraft(StrictModel):
 
 
 TOOLS = {
+    "start_email_draft": (
+        StartEmailDraft,
+        "Start a NEW independent standalone email. No existing goal ID or continuation flag. "
+        "The backend allocates its identity and retains other drafts unchanged. Copy recipient "
+        "and purpose from USER text; leave missing details empty. A name suffices; the backend "
+        "asks only what is missing. When both are known include generated subject/body in draft "
+        "with unresolved_fields and sources=[]. No Gmail save/send or approval. Terminal.",
+    ),
+    "continue_email_draft": (
+        ContinueEmailDraft,
+        "Answer, revise or cancel the specified owned retained standalone email goal. Requires "
+        "its goal_id and complete current USER request_source, with no continuation flag. "
+        "Use list_conversation_goals if needed; ask if the target is ambiguous. Supply only "
+        "new USER details; retain existing recipient/purpose. When both are known include "
+        "draft subject/body, unresolved_fields and sources=[]. An intentional recipient change "
+        "revises this goal; starting another email uses start_email_draft. Saved source-based "
+        "artifacts use revise_draft/review_email_draft instead. "
+        "No execution or approval. Terminal.",
+    ),
     "list_conversation_goals": (
         ListConversationGoals,
         "List retained goals in this owned chat, including older unfinished work. "
@@ -456,7 +505,7 @@ TOOLS = {
         PrepareWorkflow,
         (
             "Prepare a summary, draft, plan or scheduling proposal using existing "
-            "workflows. Standalone composition first uses prepare_email_draft to collect its "
+            "workflows. Standalone composition uses start_email_draft or continue_email_draft for "
             "recipient and purpose. Use intent=plan_schedule for email-based or compound "
             "scheduling. "
             "Standalone events use prepare_calendar_event. "
@@ -529,5 +578,6 @@ def tool_config():
                 }
             }
             for name, (schema, description) in TOOLS.items()
+            if name != "prepare_email_draft"
         ]
     }

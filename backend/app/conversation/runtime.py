@@ -758,7 +758,15 @@ class Runtime:
             return await memory.recall(self, args)
         if name == "review_email_draft":
             return await email_review.review(self, presentation=args.presentation)
-        if name == "prepare_email_draft":
+        if name in {"prepare_email_draft", "start_email_draft", "continue_email_draft"}:
+            if name == "start_email_draft" and _revokes_compose_request(self.request.instruction):
+                raise email_draft.EmailDraftInputError("cancel_requires_email_goal")
+            if name != "prepare_email_draft":
+                from app.schemas.conversation import PrepareEmailDraft
+
+                args = PrepareEmailDraft(
+                    **args.model_dump(), continue_previous=name == "continue_email_draft"
+                )
             result = await email_draft.prepare(self, args)
             self.state["active_goal"] = "email_draft"
             return result

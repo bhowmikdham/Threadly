@@ -10,6 +10,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from app.assistant import inbox_chat
@@ -27,6 +28,7 @@ from app.conversation.runtime import (
     validate_workflow_bindings,
 )
 from app.mail.presentation import clock_context, received_display
+from app.schemas.conversation import EMAIL_DRAFT_TOOLS, PrepareEmailDraft
 from app.schemas.inbox_chat import InboxFilters
 
 RECEIPT = "GYG order 2241 confirmed. This is an automated receipt. No reply is required."
@@ -398,6 +400,8 @@ class FixtureRuntime:
             if draft_state is not None
             else {"history": deepcopy(case.get("history", []))}
         )
+        self.state = self.draft_state
+        self.request = SimpleNamespace(instruction=turn, request_id=str(uuid4()))
         history = self.draft_state["history"]
         user_text = "\n".join([entry.get("user", "") for entry in history] + [turn])
         self.user_text = user_text
@@ -613,11 +617,24 @@ class FixtureRuntime:
 
     async def call(self, name, args):
         self.calls.append({"name": name, "input": args.model_dump()})
-        if name == "prepare_email_draft":
+        if name in EMAIL_DRAFT_TOOLS:
             # Run the production field/state validator; only task reservation is
             # replaced with the fixture workflow, which cannot touch Gmail or DB.
+            if name != "prepare_email_draft":
+                args = PrepareEmailDraft(
+                    **args.model_dump(), continue_previous=name == "continue_email_draft"
+                )
+            previous = self.draft_state.get(email_draft.KEY)
+            if args.goal_id:
+                # This historical fixture has only one retained goal. Database
+                # ownership/multi-goal behavior is tested through the real service.
+                if not previous or args.goal_id != previous.get("goal_id"):
+                    raise email_draft.EmailDraftInputError("conversation_goal_missing")
+                args = args.model_copy(update={"goal_id": None})
             runtime = SimpleNamespace(
-                request=SimpleNamespace(instruction=self.turn),
+                request=self.request,
+                factory=None,
+                resumed_goal_id=(previous or {}).get("goal_id") if args.continue_previous else None,
                 state=self.draft_state,
                 loaded=self.evidence,
                 authoritative_instruction=lambda: self.instruction,
@@ -630,7 +647,10 @@ class FixtureRuntime:
                 return await self.call("prepare_workflow", arguments)
 
             runtime.workflow = workflow
-            return await email_draft.prepare(runtime, args)
+            result = await email_draft.prepare(runtime, args)
+            if goal := self.draft_state.get(email_draft.KEY):
+                goal.setdefault("goal_id", str(uuid4()))
+            return result
         if name == "find_free_times":
             from app.calendar import conversation_tools as calendar_tools
 
@@ -1019,6 +1039,9 @@ def grade(case, response, calls, search_page=None):
 
     failures = []
     names = [call["name"] for call in calls]
+    if set(names) & EMAIL_DRAFT_TOOLS:
+        # Historical cases name the compose category using the legacy tool.
+        names.append("prepare_email_draft")
     text = response.get("text", "")
     if response.get("kind") not in case["kinds"]:
         failures.append("unexpected_outcome_kind")

@@ -26,6 +26,8 @@ class EmailDraftInputError(ValueError):
             {
                 "user_field_required": "Copy fields from USER text",
                 "source_bound_workflow_required": "Use the source-bound workflow for read email",
+                "new_email_requires_start": "A new compose request must use start_email_draft "
+                "for the new email",
             }.get(reason, reason)
         )
 
@@ -161,6 +163,15 @@ async def prepare(runtime, args):
                 raise ValueError("Copy the complete current USER turn as request_source")
         else:
             validate(args.request_source, runtime.request.instruction)
+    if (
+        args.continue_previous
+        and not cancelling
+        and re.search(
+            r"\b(?:new|another|different)\s+(?:email|e-mail|message|draft)\b", latest, re.I
+        )
+    ):
+        # Reject the operation before selecting a retained goal or changing focus.
+        raise EmailDraftInputError("new_email_requires_start")
     if args.continue_previous or cancelling:
         previous = await goals.bind_email_continuation(runtime, args)
     if cancelling:
@@ -177,14 +188,18 @@ async def prepare(runtime, args):
                 422,
                 "draft_artifact_required",
                 "Use active_work and revise_draft for the existing saved draft. "
-                "A new email goal uses continue_previous=false.",
+                "A new email goal uses start_email_draft.",
             )
-        if re.search(
-            r"\b(?:new|another|different)\s+(?:email|e-mail|message|draft)\b", latest, re.I
+        if (
+            previous["status"] != "clarification"
+            and is_compose(latest)
+            and not args.goal_id
+            and not (
+                previous.get("goal_id")
+                and getattr(runtime, "resumed_goal_id", None) == previous["goal_id"]
+            )
         ):
-            raise ValueError("Start the new email with continue_previous=false")
-        if previous["status"] != "clarification" and is_compose(latest):
-            raise ValueError("A new compose request must not reuse the completed draft's fields")
+            raise EmailDraftInputError("new_email_requires_start")
         instruction = previous["instruction"]
         if latest not in instruction.split("\nUser follow-up: "):
             instruction += "\nUser follow-up: " + latest

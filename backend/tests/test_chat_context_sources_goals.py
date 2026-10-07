@@ -206,7 +206,7 @@ async def test_live_observed_new_goal_contract_repair_preserves_both_drafts(
         if "toolResult" in block
     ]
     assert errors[0]["error"] == "continuation_required"
-    assert "new independent email use continue_previous=false" in errors[0]["message"]
+    assert "Use start_email_draft for this new independent email" in errors[0]["message"]
     assert "complete current USER turn into request_source" in errors[0]["message"]
     assert result["kind"] == "clarification" and result["text"] == "What would you like to say?"
     async with db_sessionmaker() as db:
