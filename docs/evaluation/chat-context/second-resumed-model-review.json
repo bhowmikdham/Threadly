@@ -1,0 +1,246 @@
+{
+  "recorded_at": "2026-10-07T13:41:19.481650+00:00",
+  "status": "completed_allowance_exhausted_with_drafting_failure_and_partial_calendar_coverage",
+  "approval_message": "Sentinel_06ff4ac627b48191bc8af71e1651a557",
+  "approved_at": "2026-10-07T13:24:28Z",
+  "release": "contextual-conversation-1.8.9+chat-context.4",
+  "prompt_hash": "9de33f3534b9332fe2fba22e1341ec369b01f4fe7e2afb0190f68758ee66b669",
+  "tools_hash": "31c04e749e051f77dfb1304fadd9733718c9e4bd71b8a16c61b6e709e82e0bc4",
+  "harness_head": "669400dd47b13b8650dd827a1857189d3c9cb776",
+  "application_runtime_head": "398c4acf8de4e878c512836ed8340c133bfe5c13",
+  "frontend_head": "8752c3a1d67c76bd616638c906ba1cd3bd7f91e2",
+  "segment": {
+    "segment": "second-budget-resume-context-4-20261007T132428Z",
+    "approval_message": "Sentinel_06ff4ac627b48191bc8af71e1651a557",
+    "approved_at": "2026-10-07T13:24:28Z",
+    "release": "contextual-conversation-1.8.9+chat-context.4",
+    "assets": {
+      "release": "contextual-conversation-1.8.9+chat-context.4",
+      "day_availability_policy": "calendar-day-answer-2.0.0",
+      "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+      "prompt_hash": "9de33f3534b9332fe2fba22e1341ec369b01f4fe7e2afb0190f68758ee66b669",
+      "tools_hash": "31c04e749e051f77dfb1304fadd9733718c9e4bd71b8a16c61b6e709e82e0bc4",
+      "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+      "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+      "max_calls": 8,
+      "timeout_seconds": 120
+    },
+    "prior_attempts": 9,
+    "prior_cost_including_gst": "0.30159129",
+    "original_ledger_sha256": "63efbe33d018c1cdaa9f3c9c6b79d417e67a2197954a5e0ef08c56e62b9d6393",
+    "maximum_cumulative_attempts": 18,
+    "maximum_cumulative_cost_including_gst": "1.00",
+    "planned_new_calls": {
+      "goals": 4,
+      "saved_artifact": 2,
+      "calendar": 3
+    },
+    "started_unix": 1791380150.6206012,
+    "deadline_unix": 1791381050.6206012
+  },
+  "window_started_at": "2026-10-07T13:35:50.620601+00:00",
+  "window_deadline": "2026-10-07T13:50:50.620601+00:00",
+  "finished_at": "2026-10-07T13:37:25.135438+00:00",
+  "stopped_because": "cumulative_18_attempt_cap_exhausted_before_deadline",
+  "new_attempts": 9,
+  "new_provider_completed": 9,
+  "new_provider_failures": 0,
+  "cumulative_second_attempts": 18,
+  "remaining_attempts": 0,
+  "new_usage": {
+    "inputTokens": 252426,
+    "outputTokens": 1079
+  },
+  "cumulative_second_usage": {
+    "inputTokens": 496380,
+    "outputTokens": 2138
+  },
+  "new_estimated_usd_before_tax": "0.2836031",
+  "new_estimated_usd_with_10pct_gst": "0.31196341",
+  "cumulative_second_estimated_usd_with_10pct_gst": "0.6135547",
+  "unspent_second_usd_cap": "0.3864453",
+  "unspent_dollars_do_not_grant_more_attempts": true,
+  "calls_by_case": {
+    "resume4.corrected_draft_completion": 6,
+    "resume4.saved_draft_resumption": 2,
+    "resume4.calendar_preview_revision": 1
+  },
+  "score": {
+    "independent_drafts": "fail_new_goal_schema_repair_loop; return_to_Alex_and_Casey_not_reached",
+    "saved_draft_restoration": "pass_exact_existing_task_artifact_and_focus_with_Calendar_retained",
+    "calendar": "initial_preview_pass; revision_and_closing_incomplete_due_global_cap"
+  },
+  "original_nine_receipts_and_preflights_unchanged": true,
+  "first_ledger_sha256_unchanged": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a",
+  "original_second_ledger_sha256": "63efbe33d018c1cdaa9f3c9c6b79d417e67a2197954a5e0ef08c56e62b9d6393",
+  "cumulative_ledger_sha256": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
+  "provider_writes": 0,
+  "approved_actions": 0,
+  "action_jobs": 0,
+  "task_count": 2,
+  "failed_draft_final_state": {
+    "conversation_id": "6f95f836-c19e-4264-866f-1bb641d7298e",
+    "version": 1,
+    "goal_count": 1,
+    "recipient": "Alex",
+    "purpose": "",
+    "goal_id": "519ec1e0-38c9-4d6c-b9aa-5f1853da4d77"
+  },
+  "saved_artifact_checks": {
+    "task_id": "ab9c64f9-c936-4dbd-9d76-ff494ac17088",
+    "artifact_id": "6fcfd7b3-d599-41d2-8c36-ef359433bc33",
+    "same_content": true,
+    "active_goal": "saved_task",
+    "retained_calendar_title": "Focus"
+  },
+  "calls": [
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:35:50.662104+00:00",
+      "finished_at": "2026-10-07T13:35:53.325497+00:00",
+      "request_id": "143380f8-7d33-46aa-a8e8-7e5307a1e00f",
+      "usage": {
+        "inputTokens": 26987,
+        "outputTokens": 143,
+        "totalTokens": 27130,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 2284
+    },
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:36:01.371127+00:00",
+      "finished_at": "2026-10-07T13:36:03.443704+00:00",
+      "request_id": "61241dfa-9a1e-4a6d-871b-f7a7106f6ba1",
+      "usage": {
+        "inputTokens": 27436,
+        "outputTokens": 128,
+        "totalTokens": 27564,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1596
+    },
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:36:11.497654+00:00",
+      "finished_at": "2026-10-07T13:36:13.790479+00:00",
+      "request_id": "24c7e530-4ac4-45e2-a532-6347a4ea6916",
+      "usage": {
+        "inputTokens": 27870,
+        "outputTokens": 179,
+        "totalTokens": 28049,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1844
+    },
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:36:21.839060+00:00",
+      "finished_at": "2026-10-07T13:36:23.750767+00:00",
+      "request_id": "5389d916-91e2-4645-9597-ea6619aeec7d",
+      "usage": {
+        "inputTokens": 28359,
+        "outputTokens": 90,
+        "totalTokens": 28449,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1465
+    },
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:36:31.805990+00:00",
+      "finished_at": "2026-10-07T13:36:34.082700+00:00",
+      "request_id": "9a02f227-d251-4b1d-8537-2c92c6967c15",
+      "usage": {
+        "inputTokens": 28693,
+        "outputTokens": 83,
+        "totalTokens": 28776,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1797
+    },
+    {
+      "scenario": "resume4.corrected_draft_completion",
+      "started_at": "2026-10-07T13:36:42.157510+00:00",
+      "finished_at": "2026-10-07T13:36:44.362302+00:00",
+      "request_id": "367a437b-073e-4845-a806-0a97ec909d1a",
+      "usage": {
+        "inputTokens": 29082,
+        "outputTokens": 143,
+        "totalTokens": 29225,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1629
+    },
+    {
+      "scenario": "resume4.saved_draft_resumption",
+      "started_at": "2026-10-07T13:37:00.510381+00:00",
+      "finished_at": "2026-10-07T13:37:03.085872+00:00",
+      "request_id": "17b28dc1-9f94-45db-965b-8431e2654cc4",
+      "usage": {
+        "inputTokens": 27883,
+        "outputTokens": 91,
+        "totalTokens": 27974,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 2166
+    },
+    {
+      "scenario": "resume4.saved_draft_resumption",
+      "started_at": "2026-10-07T13:37:11.144659+00:00",
+      "finished_at": "2026-10-07T13:37:13.046233+00:00",
+      "request_id": "3a6dc2f7-3a14-4046-b412-a9e146860c22",
+      "usage": {
+        "inputTokens": 29522,
+        "outputTokens": 40,
+        "totalTokens": 29562,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1403
+    },
+    {
+      "scenario": "resume4.calendar_preview_revision",
+      "started_at": "2026-10-07T13:37:21.175957+00:00",
+      "finished_at": "2026-10-07T13:37:25.016413+00:00",
+      "request_id": "4c5bd295-de2e-4569-9b13-07ea243d0029",
+      "usage": {
+        "inputTokens": 26594,
+        "outputTokens": 182,
+        "totalTokens": 26776,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 3360
+    }
+  ],
+  "combined_with_first_budget": {
+    "attempts": 36,
+    "completed": 35,
+    "failed": 1,
+    "estimated_completed_usd_with_10pct_gst": "1.17924664",
+    "estimated_with_first_failed_reserve_usd_including_gst": "1.22885664"
+  },
+  "limitations": [
+    "No held-out paraphrases.",
+    "Saved draft generation used scripted setup; pass is restoration, not end-to-end source/generation quality.",
+    "A passed harness test records execution/isolation, not behavioral acceptance.",
+    "No new runtime fix or paid call after this result."
+  ]
+}

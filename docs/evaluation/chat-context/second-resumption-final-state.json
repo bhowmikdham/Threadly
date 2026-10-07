@@ -1,0 +1,66 @@
+{
+  "conversation_id": "6f95f836-c19e-4264-866f-1bb641d7298e",
+  "version": 1,
+  "current_email_goal": {
+    "recipient": "Alex",
+    "purpose": "",
+    "instruction": "Can you help with an email for Alex?",
+    "semantic_request": true,
+    "recipient_instruction": "Can you help with an email for Alex?",
+    "status": "clarification",
+    "field_provenance": {},
+    "user_context": [],
+    "origin_request_id": "23c91249-6e83-4d33-9008-9b6e0d38fbf2",
+    "superseded_task_id": null,
+    "recipient_roles": {
+      "to": [],
+      "cc": [],
+      "bcc": []
+    },
+    "goal_id": "519ec1e0-38c9-4d6c-b9aa-5f1853da4d77"
+  },
+  "goals": [
+    {
+      "id": "519ec1e0-38c9-4d6c-b9aa-5f1853da4d77",
+      "status": "retained",
+      "kind": "email_draft",
+      "payload_hash": "67d42c34630a9bd844d5e0dfa623ffb64a83e9e423eeb4e2d184884943eac103",
+      "payload": {
+        "value": {
+          "recipient": "Alex",
+          "purpose": "",
+          "instruction": "Can you help with an email for Alex?",
+          "semantic_request": true,
+          "recipient_instruction": "Can you help with an email for Alex?",
+          "status": "clarification",
+          "field_provenance": {},
+          "user_context": [],
+          "origin_request_id": "23c91249-6e83-4d33-9008-9b6e0d38fbf2",
+          "superseded_task_id": null,
+          "recipient_roles": {
+            "to": [],
+            "cc": [],
+            "bcc": []
+          },
+          "goal_id": "519ec1e0-38c9-4d6c-b9aa-5f1853da4d77"
+        },
+        "label": "Alex",
+        "references": {}
+      }
+    }
+  ],
+  "action_jobs": 0,
+  "approved_actions": 0,
+  "tasks": [
+    {
+      "id": "ab9c64f9-c936-4dbd-9d76-ff494ac17088",
+      "state": "succeeded",
+      "artifact_id": "6fcfd7b3-d599-41d2-8c36-ef359433bc33"
+    },
+    {
+      "id": "9e19e6df-6b37-57e9-a6b4-62959830dc64",
+      "state": "succeeded",
+      "artifact_id": "79074a94-cfb5-5dd2-b582-3d083783278a"
+    }
+  ]
+}

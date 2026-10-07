@@ -1,5 +1,10 @@
 # Proposed live check of structural corrections — not authorized
 
+Superseded: the user instead approved using the nine remaining calls of the
+existing second budget. See [approved resumption](approved-second-budget-resumption.md)
+and [actual results](second-resumption-results.md). This additional-budget proposal
+was never executed; the second budget is now exhausted.
+
 This is a new bounded diagnostic, not a restart of the expired second batch.
 Do not run it until separately approved. First complete the full mechanical gate
 for backend `398c4acf8de4e878c512836ed8340c133bfe5c13` and record the final clean

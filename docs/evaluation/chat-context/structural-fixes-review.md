@@ -98,13 +98,16 @@ retrieval and compact context limits remain as previously documented.
 
 ## Budget and next gate
 
-`.4` has not been sent to Bedrock. The second ledger remains **9/18 attempts**,
+At the correction checkpoint, `.4` had not been sent to Bedrock. The ledger was **9/18 attempts**,
 **243,954 input / 1,059 output tokens**, **USD 0.30159129 including 10% GST**.
 Its 12:22:26.360372 UTC deadline expired while offline fixes were in progress;
 the nine unused attempts remain unused. The first exhausted ledger is also unchanged.
 
-The [follow-up proposal](structural-followup-proposal.md) is a concrete new diagnostic
-for approval, not an extension/reset of the second batch. Live semantic acceptance,
+The user subsequently approved a new time window to use those nine remaining
+calls within the existing second allocation. The [resumption results](second-resumption-results.md)
+show saved restoration passing, a new-goal repair loop failing, and partial Calendar
+coverage. The second ledger is now 18/18, with USD 0.61355470 including GST; its
+original receipts are preserved. No third allocation was used. Live semantic acceptance,
 final release review and separate publication/deployment authorization remain gates.
 Migration `h071026e9043` still requires coordinated API/worker rollout; no migration
 or deployment was performed here.

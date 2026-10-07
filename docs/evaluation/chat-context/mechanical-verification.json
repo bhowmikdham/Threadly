@@ -1,6 +1,6 @@
 {
-  "status": "structural_corrections_mechanically_verified_live_semantic_acceptance_pending",
-  "recorded_at": "2026-10-07T13:00:41.791264+00:00",
+  "status": "mechanical_gates_pass_but_context4_live_new_goal_repair_failure_and_partial_calendar_coverage",
+  "recorded_at": "2026-10-07T13:43:58.987767+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
   "prompt_release": "contextual-conversation-1.8.9+chat-context.4",
@@ -238,6 +238,20 @@
       "scope": "Previously skipped public-origin scenario; permission mocked/denied, no service call.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr122-public-browser.log",
       "log_sha256": "519e1d6bf3c53dfb47779d1e7d4191c48df991814b24d97d0bf8e99c49445a03"
+    },
+    {
+      "name": "second_budget_resumption_offline_guards",
+      "result": "21 passed, 1 warning in 1.83s",
+      "scope": "No real AWS calls. New segment preserves original nine receipts, cumulative cap, restart deadline and failed attempts; existing guard/fixture checks included.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-resume-offline-guards.log",
+      "log_sha256": "8f48c4794488512edc2d625d6d0e8b3189fecf1639b42a3fee0a7b07207484d2"
+    },
+    {
+      "name": "second_budget_resumption_execution",
+      "result": "1 passed, 1 warning in 96.08s",
+      "scope": "Harness execution/isolation only; NOT behavioral acceptance. Nine real provider responses: goal case6, restored draft2, Calendar1.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-resumed-model-run.log",
+      "log_sha256": "ba0d1a00b9c85b68f6b880ebed6c35115d9bc9faf926fbdc7302de9bbb226724"
     }
   ],
   "previous_runs": [
@@ -362,7 +376,9 @@
     "backend/app/conversation/email_review.py": "59bd61ea79a929344828069420fff749105c0ab3bfcb2f5f22873eb8e23de9c4",
     "backend/tests/test_chat_context_live_regressions.py": "bb4ecd0ab692ab9ba267e0aff5aa765b3891943934606c1c41cbbb8b4440422f",
     "backend/tests/test_email_draft_clarification.py": "e6a2c7050e3a3a5dcd05d72f8b809444247f1860a01f20bad9c4231d83990bb5",
-    "backend/app/calendar/conversation_guard.py": "123de4c1dea2dafc09579de12a50881cf1cb4e083b829e686464fb76bb2619b2"
+    "backend/app/calendar/conversation_guard.py": "123de4c1dea2dafc09579de12a50881cf1cb4e083b829e686464fb76bb2619b2",
+    "backend/tools/resume_chat_context_evaluation.py": "d6fe6204fbfb32f692978365bf3b39a1006941ec70d674521f26d993e290e28c",
+    "backend/tests/test_chat_context_resume_budget.py": "5d8538aaa18c49c5e4f18467981e1726d362edb0c5e70ce893173cab5df56597"
   },
   "review_findings_resolved": [
     "Unversioned legacy turns skipped by recall without inventing citation identity.",
@@ -381,8 +397,8 @@
     "PR122 frontend 60a7aa8 integrated without conflicts; source following, visible incoming reply target and server-owned focus verified together."
   ],
   "remaining_gates": [
-    "Live semantic acceptance for .4; explicit IDs cannot prove model relevance and Calendar language recognition is bounded.",
-    "Second batch expired at 2026-10-07T12:22:26.360372Z with 9 attempts unused; no further paid calls authorized. New bounded proposal in structural-followup-proposal.md.",
+    "Correct the .4 new-goal schema/repair loop, preserving current operation and goal ownership; replay exact live trace before another live diagnostic.",
+    "Live two-draft completion and Calendar revision/closing acceptance remain unverified for .4. Both paid allocations are exhausted; further calls require new explicit authorization.",
     "Final release review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
   ],
   "known_limits": [
@@ -420,7 +436,19 @@
     "receipt": "approved-preflight.json",
     "details": "approved-evaluation-status.md"
   },
-  "second_real_model_evaluation": {
+  "structural_evidence_bundle": {
+    "path": "structural-fixes-logs.json.gz",
+    "sha256": "48d09b0a61e4c841c68864a26cd8391c8a4df2dde13b800f61c5b61dce20b8ec",
+    "contents": "Synthetic offline red/green/integration/build logs, including unsuccessful fixture/assertion/build attempts."
+  },
+  "candidate_live_model_status": {
+    "release": "contextual-conversation-1.8.9+chat-context.4",
+    "paid_calls": 9,
+    "status": "saved_restoration_pass_new_goal_repair_failure_calendar_partial",
+    "details": "second-resumption-results.md",
+    "third_budget_proposal": "superseded_never_executed"
+  },
+  "second_real_model_initial_segment": {
     "status": "behavioral_failures_confirmed",
     "attempts_used": 9,
     "unused_attempts": 9,
@@ -437,16 +465,24 @@
     "ledger_unchanged": true,
     "unused_attempts_cannot_be_resumed": true
   },
-  "structural_evidence_bundle": {
-    "path": "structural-fixes-logs.json.gz",
-    "sha256": "48d09b0a61e4c841c68864a26cd8391c8a4df2dde13b800f61c5b61dce20b8ec",
-    "contents": "Synthetic offline red/green/integration/build logs, including unsuccessful fixture/assertion/build attempts."
+  "second_real_model_evaluation": {
+    "status": "allowance_exhausted_with_remaining_behavioral_failure",
+    "attempts_used": 18,
+    "unused_attempts": 0,
+    "initial_segment_attempts": 9,
+    "resumed_segment_attempts": 9,
+    "estimated_usd_with_10pct_gst": "0.61355470",
+    "usage": {
+      "inputTokens": 496380,
+      "outputTokens": 2138
+    },
+    "initial_segment_receipt": "second-model-review.json",
+    "resumed_segment_receipt": "second-resumed-model-review.json",
+    "details": "second-resumption-results.md",
+    "original_receipts_and_identity_preserved": true,
+    "cumulative_ledger_sha256": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
+    "first_ledger_unchanged": true
   },
-  "candidate_live_model_status": {
-    "release": "contextual-conversation-1.8.9+chat-context.4",
-    "paid_calls": 0,
-    "status": "not_evaluated",
-    "proposal": "structural-followup-proposal.md",
-    "structural_review": "structural-fixes-review.md"
-  }
+  "resumption_harness_head": "669400dd47b13b8650dd827a1857189d3c9cb776",
+  "application_runtime_unchanged_after_structural_full_suite": true
 }

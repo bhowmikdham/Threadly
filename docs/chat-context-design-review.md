@@ -11,8 +11,9 @@ from conversational quality. The `.2` diagnostic found partial successes and
 contract failures. The [second `.3` diagnostic](evaluation/chat-context/second-stage-results.md)
 found improved draft text generation, but an overwritten goal, failed artifact
 restoration and wrong Calendar button guidance. The [.4 structural corrections](evaluation/chat-context/structural-fixes-review.md)
-reproduce and fix those calls with scripted regressions. `.4` has not had live-model
-evaluation; conversational acceptance remains a release gate.
+reproduce and fix those calls with scripted regressions. The [.4 live resumption](evaluation/chat-context/second-resumption-results.md)
+passed saved restoration but found a new-goal schema/repair loop; Calendar coverage
+was partial. Conversational acceptance remains a release gate.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
@@ -176,9 +177,11 @@ testing requires new approval. Offline repair tests do not prove model quality.
 The second `.3` diagnostic consumed 9 of 18 separately approved calls, costing an
 estimated USD 0.30159129 including 10% GST. Its persisted deadline expired at
 12:22:26.360372 UTC on 2026-10-07; nine calls remain unused and cannot be resumed by
-resetting that window. Both raw ledgers are preserved unchanged. A concrete
-[follow-up proposal](evaluation/chat-context/structural-followup-proposal.md) describes
-another bounded diagnostic; it is not authorized or started.
+resetting that window without approval. The user later explicitly approved a new
+window for those remaining calls within the same second budget. That resumption
+used all nine: 18/18 cumulative second attempts, USD 0.61355470 including GST.
+Original receipts are preserved and the first ledger is unchanged. The separate
+additional-budget proposal was superseded, not executed.
 
 Results record prompt/tool/model identity, traces, actual token counts, latency,
 clarifications, current goal state and failures. Human semantic review and follow-up

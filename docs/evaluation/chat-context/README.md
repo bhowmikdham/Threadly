@@ -1,8 +1,10 @@
 # Shared chat-context verification
 
 Current prompt: **`contextual-conversation-1.8.9+chat-context.4`**. Earlier snapshots
-remain immutable. `.2` and `.3` had bounded live diagnostics; `.4` has only offline
-verification. The integrated implementation is committed locally and unpublished.
+remain immutable. `.2`, `.3` and `.4` have had bounded live diagnostics. The [.4
+resumption](second-resumption-results.md) passed saved-draft restoration but found
+a new-goal repair loop; Calendar coverage was partial. The implementation remains
+locally committed and unpublished, with behavioral release gates open.
 Backend base: `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. Both include the released voice repair.
 The frontend now also includes upstream PR122 at
@@ -63,11 +65,13 @@ python -m pytest -q tests/test_chat_context_evaluation_budget.py tools/evaluate_
 python -m ruff check app tests tools
 ```
 
-The first live evaluation exhausted its 18-attempt ledger. The second used 9 of its
-separately approved 18 attempts; its deadline expired at 12:22:26.360372 UTC on
-2026-10-07. Neither ledger changed during the fixes. The nine unused calls remain
-unused; the window must not be reset. A concrete [follow-up proposal](structural-followup-proposal.md)
-is ready for separate approval. No third run is authorized or started.
+The first live evaluation exhausted its 18-attempt ledger. After the second used
+nine calls, its harness safety window ended during offline fixes. The user then
+explicitly approved resuming its remaining nine calls in a new window on 2026-10-07
+at 13:24:28 UTC. This [resumption](second-resumption-results.md) consumed them:
+**18/18 cumulative second-budget calls, zero remaining, USD 0.61355470 including GST**.
+The original nine receipts and first ledger remain intact. This was no third budget;
+the separate [proposal](structural-followup-proposal.md) was superseded and never executed.
 No production migration, cleanup job, release push, provider write or deployment ran.
 
 Original button commits `53a0d11` (backend) and `fb6d8d5` (frontend) remain preserved
