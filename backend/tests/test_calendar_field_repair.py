@@ -118,7 +118,11 @@ async def test_unrepaired_fields_exhaust_budget_without_candidate(configured, db
     assert "Calendar read" not in result["text"]
     async with db_sessionmaker() as db:
         state = store.decode(await db.get(Conversation, request.conversation_id))
-        assert "calendar_event_request" not in state
+        pending = state["calendar_event_request"]
+        assert pending["arguments"]["title"] == ""
+        assert pending["arguments"]["time"] == "19:00"
+        assert pending["arguments"]["date"] == {"kind": "relative", "offset_days": 1, "days": 1}
+        assert "invented-" not in str(pending)
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 0
     assert configured[0] == []
 
@@ -162,7 +166,9 @@ async def test_new_cricket_request_repairs_without_reusing_prior_approval(
     assert new["action_id"] != old["action_id"] and new["state"] == "proposed"
     assert new["preview"]["event"]["summary"] == "cricket"
     async with db_sessionmaker() as db:
-        assert (await db.get(AssistantAction, old["action_id"])).state == "superseded"
+        # A new independent event retains the prior event's own approval. It
+        # must not borrow that approval or silently cancel the other goal.
+        assert (await db.get(AssistantAction, old["action_id"])).state == "approved"
         assert (
             await db.scalar(
                 select(func.count())

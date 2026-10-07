@@ -38,6 +38,12 @@ def current_text_draft(state):
         draft = entry.get("email_draft")
         if draft and (not goal.get("draft_id") or draft["draft_id"] == goal["draft_id"]):
             return draft
+    if goal.get("draft_id") and goal.get("draft"):
+        return {
+            "draft_id": goal["draft_id"],
+            "recipient": goal["recipient"],
+            **{key: goal["draft"][key] for key in ("subject", "body", "unresolved_fields")},
+        }
     return None
 
 
@@ -134,16 +140,24 @@ def _quoted(value, instruction):
 
 
 async def prepare(runtime, args):
+    from app.conversation import citations, goals
     from app.conversation.runtime import (
         _revokes_compose_request,
         user_recipient_roles,
     )
 
     latest = runtime.request.instruction.strip()
+    cited = await citations.resolve(runtime, args.citations)
+    user_context = list((await citations.resolve(runtime, args.context_citations)).values())
     previous = runtime.state.get(KEY)
     if _revokes_compose_request(latest):
+        goals.close(runtime.state, previous)
         runtime.state.pop(KEY, None)
         return {"kind": "message", "text": "Okay, I won’t continue that draft."}
+    if args.request_source:
+        from app.conversation.user_intent import validate
+
+        validate(args.request_source, runtime.request.instruction)
     if runtime.loaded:
         raise EmailDraftInputError("source_bound_workflow_required")
     if args.continue_previous:
@@ -189,7 +203,7 @@ async def prepare(runtime, args):
         )
     else:
         instruction = runtime.authoritative_instruction()
-        if not is_compose(instruction):
+        if not args.request_source and not is_compose(instruction):
             raise EmailDraftInputError("continuation_required" if previous else "compose_required")
         values = {"recipient": "", "purpose": ""}
         source = instruction
@@ -199,6 +213,7 @@ async def prepare(runtime, args):
         supplied = getattr(args, field).strip()
         retained = args.continue_previous and supplied == previous[field]
         field_source = latest if args.continue_previous and field == "recipient" else source
+        field_source = cited.get(field, {}).get("source", field_source)
         if not retained and not _quoted(supplied, field_source):
             raise EmailDraftInputError("user_field_required")
         if supplied:
@@ -216,11 +231,37 @@ async def prepare(runtime, args):
         # An updated name cannot silently inherit the previous person's address.
         # Keep recipient authority with the USER turn that supplied that recipient.
         recipient_instruction = latest
+    if "recipient" in cited:
+        # Only the proposed recipient is bound, never unrelated roles or commands
+        # that happen to occur in the older quote. The new goal still needs its
+        # own current compose request above.
+        recipient_instruction = values["recipient"]
     goal = {
         **values,
+        **(
+            {"goal_id": previous["goal_id"]}
+            if args.continue_previous and previous.get("goal_id")
+            else {}
+        ),
         "instruction": instruction,
+        "semantic_request": bool(args.request_source)
+        or bool(args.continue_previous and previous.get("semantic_request")),
         "recipient_instruction": recipient_instruction,
         "status": "clarification",
+        "field_provenance": {
+            **(
+                {
+                    k: v
+                    for k, v in (previous or {}).get("field_provenance", {}).items()
+                    if not getattr(args, k).strip() or getattr(args, k).strip() == previous[k]
+                }
+                if args.continue_previous
+                else {}
+            ),
+            **cited,
+        },
+        "user_context": user_context
+        or ((previous or {}).get("user_context", []) if args.continue_previous else []),
         "origin_request_id": (
             previous.get("origin_request_id")
             if args.continue_previous
@@ -278,15 +319,20 @@ async def prepare(runtime, args):
             role: {ref for ref, address in recipients.items() if address in addresses}
             for role, addresses in roles.items()
         }
+        runtime.verified_user_context = (
+            list(goal["field_provenance"].values()) + goal["user_context"]
+        )
         runtime.email_draft_prepared = True
         goal["status"] = "workflow"
         runtime.state[KEY] = goal
         result = await runtime.workflow(
             PrepareWorkflow(
                 intent="compose",
+                request_source=runtime.request.instruction if goal["semantic_request"] else "",
                 **{role + "_refs": sorted(refs) for role, refs in runtime.recipient_roles.items()},
             )
         )
+        goal["task_id"] = result["task_id"]
     else:
         # Preserve validated details even when generation needs a repair. A failed
         # text payload must not make the next turn ask for the message again.

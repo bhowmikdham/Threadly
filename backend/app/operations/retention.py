@@ -1,15 +1,16 @@
 """Conservative explicit cleanup. Dry-run by default; no action/task deletion.
 
-Only orphaned captures, expired unconsumed proposals/OAuth state and staging from
-terminal sync jobs are eligible. Retain task/artifact/action recovery and audit
-records until a separately approved account-deletion policy covers them.
+Only orphaned captures, expired chats and unconsumed proposals/OAuth state, and
+staging from terminal sync jobs are eligible. Chat deletion cascades to its turn
+archive. Retain task/artifact/action recovery and audit records until a separately
+approved account-deletion policy covers them.
 """
 
 import asyncio
 import json
 from datetime import timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 
 from app.db.engine import get_session_factory
 from app.db.models import (
@@ -17,6 +18,7 @@ from app.db.models import (
     AssistantTask,
     CommandPlan,
     ContextSnapshot,
+    Conversation,
     GoogleOAuthSession,
     MailSyncJob,
     MailSyncStage,
@@ -29,13 +31,31 @@ async def cleanup(factory, *, apply=False, days=7, limit=100):
     if not 1 <= days <= 365 or not 1 <= limit <= 1000:
         raise ValueError("Invalid retention bounds")
     async with factory.begin() as session:
-        cutoff = await session.scalar(select(func.clock_timestamp())) - timedelta(days=days)
+        now = await session.scalar(select(func.clock_timestamp()))
+        cutoff = now - timedelta(days=days)
         result = {
             "mode": "apply" if apply else "dry_run",
             "days": days,
             "limit_per_table": limit,
             "counts": {},
         }
+        # Expired chats are already inaccessible. The FK cascades only their encrypted
+        # exchange archive; task, artifact and action audit/recovery records stay intact.
+        chats = (
+            await session.scalars(
+                select(Conversation.id)
+                .where(
+                    Conversation.expires_at < cutoff,
+                    or_(Conversation.lease_until.is_(None), Conversation.lease_until <= now),
+                )
+                .order_by(Conversation.expires_at, Conversation.id)
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+            )
+        ).all()
+        result["counts"]["expired_conversations"] = len(chats)
+        if apply and chats:
+            await session.execute(delete(Conversation).where(Conversation.id.in_(chats)))
         # Unconsumed proposals have no task pointer or action authority. Keep consumed
         # ones for provenance even when old. Expired planning reservations are safe too.
         for model in (CommandPlan, SchedulingProposal):

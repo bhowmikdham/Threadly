@@ -38,6 +38,24 @@ async def turn(owner, request, *, factory=None, model=None):
         else:
             context = await runtime.context()
             response = await engine.run(context, runtime, model)
+        if (
+            getattr(runtime, "resumed_task_id", None) == state.get("active_task_id")
+            and getattr(runtime, "resumed_task_id", None)
+            and response["kind"] in {"message", "clarification"}
+        ):
+            # The existing client uses the latest task card as its next-turn pointer.
+            # Surface the selected saved task so it cannot resend the previous one.
+            response.setdefault("task_id", runtime.resumed_task_id)
+            response.setdefault("task", runtime.active)
+        if getattr(runtime, "resumed_proposal", None) and response["kind"] in {
+            "message",
+            "clarification",
+        }:
+            response["proposal_id"] = state["proposal_id"]
+            response["proposal"] = runtime.resumed_proposal
+        if getattr(runtime, "resumed_goal_id", None) and response["kind"] == "message":
+            if draft := email_draft.current_text_draft(state):
+                response.setdefault("email_draft", draft)
         from app.calendar import event_choices
 
         if choices := event_choices.public(state):
@@ -45,6 +63,7 @@ async def turn(owner, request, *, factory=None, model=None):
         if runtime.search_page is not None:
             response["search"] = runtime.search_page
         response.setdefault("context_references", runtime.turn_source_references)
+        response["context_memory_version"] = 1
         response["active_email_draft_id"] = (response.get("email_draft") or {}).get(
             "draft_id"
         ) or email_draft.active_text_id(state)
@@ -67,6 +86,7 @@ async def hydrate_response(owner, saved, factory):
     from app.db.models import ContextSnapshot
 
     result = dict(saved)
+    result["context_memory_version"] = 1
     async with factory() as session:
         if saved.get("calendar_action_id"):
             from app.calendar.event_creation import response
@@ -129,11 +149,14 @@ async def get(owner, identifier, factory=None):
             proposal = await command_plans.view(session, active)
         return {
             "conversation_id": row.id,
+            "context_memory_version": 1,
             "version": row.version,
             "history": state["history"],
             "expires_at": row.expires_at.isoformat(),
             "active_task_id": state.get("active_task_id"),
             "active_email_draft_id": email_draft.active_text_id(state),
+            "active_email_draft": email_draft.current_text_draft(state),
+            "active_goal_id": state.get("active_goal_id"),
             "active_proposal_id": state.get("proposal_id"),
             "proposal": proposal,
             "calendar_choices": event_choices.public(state),

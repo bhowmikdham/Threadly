@@ -1564,3 +1564,24 @@ refreshes capabilities/account version after callback, and waits for a separate
 Create draft click. OAuth completion never calls the draft-save endpoint. The
 follow-up is a separate release requiring its own deployment approval and introduces
 no additional schema migration.
+
+## Unpublished shared chat context protocol
+
+The `contextual-conversation-1.8.9+chat-context.2` prototype adds
+`context_memory_version: 1` to turn/replay/restore responses. This means the backend
+owns goal focus: clients omit a task pointer derived merely from the last displayed
+card, and send a context snapshot only for an explicit attach/detach or initial pin.
+Older responses retain legacy client behavior. Exact pending retry bodies remain
+immutable regardless of protocol negotiation.
+
+Restore responses include `active_email_draft` (the current text draft or null)
+and `active_goal_id`, independently of compact history. If its original exchange
+was evicted, the client restores that draft as an editor at the current chat version.
+
+Internal model tools add bounded `recall_conversation`, `list_conversation_goals`,
+`select_conversation_goal` and saved-task resumption. Calendar/email field citations
+contain `{field, turn_version, quote}`; generation context citations contain
+`{turn_version, quote}`. Quotes must match exact USER text in this owned, unexpired
+chat. Workflow `request_source` is the complete current user turn, separate from
+historical data. These tools do not approve external actions. See the
+[design and compatibility review](chat-context-design-review.md) before deployment.

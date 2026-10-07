@@ -1,0 +1,175 @@
+{
+  "status": "uncommitted_unpublished_implementation_model_evaluation_pending",
+  "recorded_at": "2026-10-07T10:48:31.880584+00:00",
+  "branch": "codex/chat-context-continuity",
+  "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
+  "prompt_release": "contextual-conversation-1.8.9+chat-context.2",
+  "frontend": {
+    "branch": "codex/chat-context-restoration",
+    "base_commit": "afa2180fa16b4060587002b6be440ce32573c603",
+    "runtime_and_test_sha256": {
+      "lib/use-assistant.ts": "a3fb51e647907c8c2807d77e86d288a311d8cc34ffc2aacd05c47b884650ad6d",
+      "tests/conversation-controller.test.tsx": "248968f3dfe0fc97a71af0c5857e72517619a8f8e8dd6156a243709b0d8ecbd8"
+    }
+  },
+  "integrated_with_new_voice_release": true,
+  "voice_files_unchanged_from_release_bases": [
+    "backend/app/api/routes/voice.py",
+    "backend/tests/test_voice.py",
+    "components/VoiceOrb.tsx"
+  ],
+  "providers": "Scripted models, fake Google adapters and isolated PostgreSQL on 127.0.0.1:55439",
+  "real_model_evaluation": "not_run; CountTokens preflight denied before execution; no retry",
+  "checks": {
+    "ruff": "passed",
+    "git_diff_check_backend_and_frontend": "passed",
+    "plan_documentation_validator": "passed",
+    "typecheck": "passed",
+    "local_and_public_build": "passed"
+  },
+  "runs": [
+    {
+      "name": "full_backend_final_runtime",
+      "result": "2236 passed, 1 warning in 345.49s",
+      "scope": "All backend tests. Afterwards only opt-in evaluation harness/offline tests/docs changed; runtime unchanged.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-full-suite-final-review.log",
+      "log_sha256": "a6c3d058e0e064598383506865eb23ad17b7034ac69ecf6ea2d8ee373ab62d48"
+    },
+    {
+      "name": "offline_evaluation_guard_and_rehearsal",
+      "result": "12 passed, 1 skipped, 1 warning in 1.23s",
+      "scope": "Final harness guards and real-DB scripted report rehearsal. Paid test intentionally skipped. No AWS client or CountTokens call in rehearsal.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-evaluation-guard-final.log",
+      "log_sha256": "d0137e6dce9f6a02894fbc03a5f2c00f2890fa0f071b95ea09cef49eb9e15ba0"
+    },
+    {
+      "name": "frontend_full_unit",
+      "result": "235 passed",
+      "scope": "Final frontend runtime, including continuity protocol/restoration tests.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-frontend-final-unit.log",
+      "log_sha256": "772e4174b3e9122d96a5893f591d7525f2250f496af2bcd8f8944f47d336ce14"
+    },
+    {
+      "name": "frontend_full_browser",
+      "result": "46 passed, 1 skipped",
+      "scope": "Full local-build suite; public-origin package case skipped, then verified separately.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-frontend-final-browser.log",
+      "log_sha256": "d743c6f0fc46603e28476ef7a8c93168d8c454ad6af8ec22d91781777d96a14d"
+    },
+    {
+      "name": "frontend_public_origin_browser",
+      "result": "1 passed",
+      "scope": "Previously skipped public-origin package case; offline sign-in permission denial.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-frontend-public-browser.log",
+      "log_sha256": "65b5047fe5ac90aab02f543c0f4ee633bbc7b00f478484e329f715c92be8434e"
+    }
+  ],
+  "previous_runs": [
+    {
+      "name": "initial_full_suite",
+      "scope": "Before snapshot and long-draft compaction fixes",
+      "result": "2 failed, 2205 passed, 1 warning in 274.05s (0:04:34)",
+      "evidence_log": "chat-context-full-suite.log"
+    },
+    {
+      "name": "post_fix_targeted",
+      "scope": "After snapshot, draft-compaction and bounded source-handle fixes",
+      "result": "125 passed, 1 warning in 31.64s",
+      "evidence_log": "chat-context-post-suite-fixes.log"
+    },
+    {
+      "name": "full_suite",
+      "scope": "Before the final narrow legacy selected-source backfill correction",
+      "result": "2208 passed, 1 warning in 380.06s (0:06:20)",
+      "evidence_log": "chat-context-full-suite-final.log"
+    },
+    {
+      "name": "final_provenance_targeted",
+      "scope": "Final runtime: conversation, recovery, archive, workflow, mail context and Gmail drafts",
+      "result": "154 passed, 1 warning in 31.44s",
+      "evidence_log": "chat-context-provenance-final.log"
+    },
+    {
+      "name": "migration",
+      "scope": "Disposable-schema upgrade/downgrade guards and cross-workflow regression",
+      "result": "3 passed, 1 warning in 9.44s",
+      "evidence_log": "chat-context-workflow-migration-tests.log"
+    },
+    {
+      "name": "phase2_full_before_fixture_fix",
+      "result": "2231 passed, 1 failed",
+      "cause": "Old inbox clock Session stub lacked new goals lookup; isolated test fixture patched; production inbox code untouched.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-full-suite-phase2.log"
+    }
+  ],
+  "runtime_and_test_sha256": {
+    "backend/alembic/versions/h071026e9043_conversation_exchanges.py": "4ccf267426797174addd3414e6c5361e907c25d536cb13a18e0c690a7699cbe0",
+    "backend/app/assistant/coordinator.py": "ddc6ae7fc171ad530c4efd2ac282073490c57346619aefef07a8be831b5b7fd7",
+    "backend/app/assistant/steps.py": "84e860c5e0838b547173b0adfa25eb4117714325c3d110ea5807300b6290b820",
+    "backend/app/assistant/tasks.py": "ff204ec7af6a26f06a3891a6e194288ce4390e48521f58c92bcdd92a530a5147",
+    "backend/app/assistant/user_context.py": "7b65918f28094f08bc4b63350a286f4f68e6814ac777c0c866e66aad259568e6",
+    "backend/app/assistant/worker.py": "f33721de83e220680423fc4b99a254e93a4625c7dc839b6fe732680a08d0f714",
+    "backend/app/assistant/workflows.py": "7351fba65707bb854b6bc318b659e9d6d2a348c8555833f22996bbc0734bf962",
+    "backend/app/calendar/event_choices.py": "2ae40c3d428a83e34f62b5aeef821f8873ac6a51b53e597eddeffb74a820e5bb",
+    "backend/app/calendar/event_creation.py": "813aa3781694284c9c1d73cd2420b203a25591c41f30c3a1c5448f6181bd7e78",
+    "backend/app/calendar/event_draft.py": "04b7692463e3263793f8592652ffbcc5a78cd7ae5ca7a78028928d29f07b768e",
+    "backend/app/calendar/event_timezone.py": "60c0bba8ee4b05cab23c4147156ca92bee185b93afd0759ca8eef77755558e7a",
+    "backend/app/conversation/budget.py": "4df16539bde7114f9fa724d6b7e4a6703adef1c6c6a15d391efa0d0d511d5b56",
+    "backend/app/conversation/citations.py": "0ce9bd4838e063915ae65f34700d5b399107b26e9f607beca972e2fab25ec176",
+    "backend/app/conversation/email_draft.py": "69e8dfecec6a472eb91f80f80ffea2742090993ea0886ead53a56f9bba4ec43f",
+    "backend/app/conversation/engine.py": "c9e7876c61a834d880c6ab7a5804be9a42664f4a52a5a96626cfa0affe444a19",
+    "backend/app/conversation/goals.py": "eaf5ed7b52a9c7ab1716b6c8cacde296a2cd1e67b09fc648e617478b266d87a9",
+    "backend/app/conversation/mail_goal.py": "ace7641b4bbbe8a5a878c7b92c095d993f4fb589a9fac8c2365a56ae2830c7b2",
+    "backend/app/conversation/memory.py": "9b4f98fe291b6c585800d0d9ce08a1cba4bbbd950587e022652d803a49ef2479",
+    "backend/app/conversation/prompt.py": "2be7f4a8ba9e36ef097d197d85652331a0074ebacc631f5faafad68152b7bd27",
+    "backend/app/conversation/recovery.py": "bdd7a545dd24655af366a9103e9a960bc80e032064cf5e956cd7a3a643dc622e",
+    "backend/app/conversation/runtime.py": "5f0b85d39363e08b816495e92967ec030c7f48b650ebbe821acdfd76405384e7",
+    "backend/app/conversation/service.py": "fe8ebcba312f75946a5ed336e14fdc9a3cc10ede11b6a7f8e46578b0f870efb0",
+    "backend/app/conversation/store.py": "5ebae40c04d3cdcc023e17e3bda0f64fdc431b170fb494439e6ce32a8c626ec5",
+    "backend/app/conversation/user_intent.py": "99f792a200526368a78f53b78f0c56cf28e7b318081d42ebfc8c8f2d7d7567bd",
+    "backend/app/db/models.py": "86031c0362fb70827b66070cacf6cd45afc773959d52687f7e71338c2bd9238d",
+    "backend/app/operations/retention.py": "7cf5da896146de3418e2ac62918c295be78fe126a5ba50271027f77775a85bea",
+    "backend/app/schemas/calendar_event.py": "a14e5100113a9e57fa4879e0afa0283644d1ad6eff2034739a2092dbb7d9c6bd",
+    "backend/app/schemas/chat_context.py": "ddbdb85860a9d7e7fae7b174eedd230c967017eea003cbab68f325eb0212872e",
+    "backend/app/schemas/conversation.py": "28ede898e62b43facefbb4f0f4092fa70eec4ce980b088d589ec160bc733d514",
+    "backend/tests/test_assistant_migration.py": "e5edb33003fff41727e98e000bf35f35dbb1e2e42554afc453623af908ab3acd",
+    "backend/tests/test_calendar_conversation_tools.py": "891f1e6d95fcab613fe30b1452d0a54a8a004c9c8504295923d2582a5c905386",
+    "backend/tests/test_calendar_field_repair.py": "eac00617d00e455eab59590debbf4a9f739fb555c337368129b12b07c9bd6b99",
+    "backend/tests/test_chat_context_continuity.py": "99fa1b70f5540c0a97f48af9d436a378abdf8bec5e4c3e40594bca807b773adc",
+    "backend/tests/test_chat_context_evaluation_budget.py": "c072ed15f88f1fee9be3aadeed27cbdafa2eb37398ab6338c6a0936c9886eb75",
+    "backend/tests/test_chat_context_sources_goals.py": "597af8007aa4da0649f12b2c1e1853bf8154a44929c20645b050744bf0f1f5e1",
+    "backend/tests/test_chat_context_workflows.py": "e0cd58b794bca79288abd4977784021350ed9882abf85976c3e6109f3fde4888",
+    "backend/tests/test_primary_inbox.py": "9959636d18d262074607e3de197fc19c49d2b7ba0342219338ae5d4e4d15e2ac",
+    "backend/tools/evaluate_chat_context.py": "405a50acc4b003303de20f9cef872f3c423069db8e0f405132ad8c06bb6c7d8d"
+  },
+  "review_findings_resolved": [
+    "Unversioned legacy turns skipped by recall without inventing citation identity.",
+    "Stable goal source handles prevent repeated restoration from consuming new source slots.",
+    "Migration refuses downgrade with retained goals as well as exchanges.",
+    "Auxiliary/default model clients now share the evaluation AWS dispatch budget.",
+    "Final full suite fixed only the inbox clock-test fixture for the new goal lookup."
+  ],
+  "remaining_gates": [
+    "Explicit internal-prompt/schema egress and paid-inference approval for the proposed small diagnostic.",
+    "Actual semantic model evaluation, followed by held-out paraphrases and complete release gates.",
+    "Joint integration of separately committed meeting-email button and context work.",
+    "Additive migration h071026e9043 and coordinated API/worker switch; old binary writers unsupported after new-format writes."
+  ],
+  "known_limits": [
+    "Literal retrieval can miss uninspected corrections.",
+    "Legacy/compound semantic gates retain their existing lexical boundaries.",
+    "Character-based production context allocation, not tokenizer allocation.",
+    "Historical citations do not expand deterministic scheduling/source-quoted plan-item schemas."
+  ],
+  "meeting_email_button": {
+    "backend_branch": "codex/meeting-email-calendar-preview",
+    "backend_commit": "53a0d11c13cf4806d12cb5380487df5c0e3891d5",
+    "frontend_branch": "codex/meeting-email-create-event",
+    "frontend_commit": "fb6d8d5b765ff1bcd5eaee6b2e00ae84d1c28fd8",
+    "separate_clean_worktrees": true,
+    "cherry_pick_patch_check_against_core_worktrees": "both passed; no changes applied",
+    "agent_reported_checks": "14 focused backend + 129 regressions; 237 frontend + 5 final focused; typecheck/build/browser acceptance passed",
+    "combined_runtime_tested": false
+  },
+  "external_writes_or_deployment": false
+}

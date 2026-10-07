@@ -106,9 +106,11 @@ async def reserve(session, owner, request, *, provenance=None):
         raise ApiError(422, "calendar_preferences_required", "Select saved Calendar preferences.")
     now = await session.scalar(select(func.clock_timestamp()))
     identifier = str(uuid4())
+    from app.assistant.user_context import protect
+
     manifest = {
         **release(),
-        **({"conversation": provenance} if provenance is not None else {}),
+        **({"conversation": protect(provenance)} if provenance is not None else {}),
         "binding": binding,
         "compound_execution": {
             template: command_plans.execution_release(context, template)

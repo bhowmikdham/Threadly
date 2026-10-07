@@ -13,7 +13,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
 from app.calendar import intent as calendar_intent
-from app.conversation import email_draft, email_review, mail_goal
+from app.conversation import budget, email_draft, email_review, mail_goal
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -93,7 +93,7 @@ async def run(context, runtime, model=None):
             "release": RELEASE,
             "trace": [{"tool": "review_email_draft", "status": "ok"}],
         }
-    messages = [{"role": "user", "content": [{"text": json.dumps(context)}]}]
+    messages = [{"role": "user", "content": [{"text": json.dumps(budget.fit(context))}]}]
     seen, calls, trace = set(), 0, []
     last_verified_evidence = []
     try:

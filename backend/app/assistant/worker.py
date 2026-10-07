@@ -23,6 +23,7 @@ from app.assistant import (
 )
 from app.assistant.summary import make_artifact, make_prompt, release_manifest
 from app.assistant.tasks import claim_next, finish, save_route
+from app.assistant.user_context import augment
 from app.db.engine import get_engine, get_session_factory
 from app.model_client.client import get_model_client
 from app.model_client.providers import ProviderError
@@ -213,6 +214,7 @@ async def _run_once(factory=None, model=None, flow_invoker=None) -> bool:
                                 ui_routing.SUMMARY_REQUEST if binding else claim.instruction,
                             )
                         )
+                    prompt = augment(prompt, claim)
                     operation = "draft_reply" if mode == "reply" else "draft_new"
                     if not is_draft:
                         operation = "summarise_thread"

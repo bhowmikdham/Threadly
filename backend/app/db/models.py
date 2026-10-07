@@ -1132,3 +1132,39 @@ class Conversation(TimestampMixin, Base):
     calendar_approval_mode: Mapped[str] = mapped_column(String(16), server_default="ask")
     calendar_approval_version: Mapped[int] = mapped_column(server_default="0")
     calendar_approval_session_version: Mapped[int | None]
+
+
+class ConversationExchange(Base):
+    """Encrypted chat turns, independent of the bounded active-context window."""
+
+    __tablename__ = "conversation_exchanges"
+    __table_args__ = (
+        CheckConstraint("version > 0", name="ck_conversation_exchange_version"),
+        UniqueConstraint("conversation_id", "request_id", name="uq_conversation_exchange_request"),
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(36))
+    payload_enc: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class ConversationGoal(Base):
+    """Latest owned tool state for one goal; independent from focus and prompt cache."""
+
+    __tablename__ = "conversation_goals"
+    __table_args__ = (
+        CheckConstraint("updated_version > 0", name="ck_conversation_goal_version"),
+        CheckConstraint("status IN ('retained','closed')", name="ck_conversation_goal_status"),
+        Index("ix_conversation_goals_recent", "conversation_id", "updated_version"),
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    goal_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16))
+    updated_version: Mapped[int]
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    payload_enc: Mapped[bytes] = mapped_column(LargeBinary)

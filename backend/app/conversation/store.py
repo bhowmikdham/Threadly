@@ -11,7 +11,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.auth.crypto import decrypt_token, encrypt_token
 from app.config import get_settings
-from app.conversation import calendar_context
+from app.conversation import calendar_context, goals, memory
 from app.db.models import Conversation, User
 
 TTL = timedelta(days=7)
@@ -32,6 +32,20 @@ def _plaintext_size(state):
 
 def compact(state, *, preserve_receipt_id=None):
     """Deterministically fit durable state while retaining current recovery data."""
+    # Older compact states kept the draft only in history. Promote it before
+    # evicting that window, so an unrelated detour cannot erase the active draft.
+    goal = state.get("email_draft_goal") or {}
+    if goal.get("status") == "drafted" and not goal.get("draft"):
+        for entry in reversed(state.get("history", [])):
+            draft = entry.get("email_draft")
+            if draft and (not goal.get("draft_id") or draft["draft_id"] == goal["draft_id"]):
+                goal["draft"] = {
+                    key: draft[key] for key in ("subject", "body", "unresolved_fields")
+                }
+                goal["draft"]["sources"] = []
+                goal.setdefault("draft_id", draft["draft_id"])
+                goal.setdefault("recipient", draft["recipient"])
+                break
     state["history"] = state.get("history", [])[-HISTORY_LIMIT:]
     state["receipts"] = state.get("receipts", [])[-HISTORY_LIMIT:]
 
@@ -54,18 +68,16 @@ def compact(state, *, preserve_receipt_id=None):
     while _plaintext_size(state) > STATE_PLAINTEXT_LIMIT and len(state["history"]) > 1:
         state["history"].pop(0)
 
-    # Structured draft history already retains the current generated text. Drop
-    # only the redundant model-context copy when a long draft needs the space.
-    goal = state.get("email_draft_goal") or {}
+    # Keep the UI's current history draft and exact receipt. A duplicate goal
+    # copy can be reconstructed above while that history entry still exists.
     if _plaintext_size(state) > STATE_PLAINTEXT_LIMIT and goal.get("status") == "drafted":
         draft = goal.get("draft")
         if draft and any(
-            h.get("email_draft")
-            and h["email_draft"]["body"] == draft["body"]
-            and h["email_draft"]["subject"] == draft["subject"]
-            for h in state["history"]
+            (entry.get("email_draft") or {}).get("body") == draft.get("body")
+            and (entry.get("email_draft") or {}).get("subject") == draft.get("subject")
+            for entry in state["history"]
         ):
-            goal.pop("draft", None)
+            goal.pop("draft")
 
     # Pagination is recoverable by repeating a search. Source identity and the
     # exact current receipt/pending result take precedence at the hard boundary.
@@ -224,6 +236,9 @@ async def claim(session, owner, request):
     # Pin relative Calendar dates before any model/provider work, including crash retries.
     if row.pending_request_id != request.request_id or "calendar_read_anchor" not in state:
         state["calendar_read_anchor"] = now.isoformat()
+        state["pending_turn_clock"] = {"recorded_at": now.isoformat(), "timezone": request.timezone}
+    await memory.persist_state(session, row.id, state)
+    await goals.persist(session, row, state, row.version)
     compact(state)
     row.state_enc = encode(state)
     row.pending_request_id, row.pending_hash = request.request_id, hashed
@@ -254,34 +269,34 @@ async def complete(session, owner, request, lease, state, response):
         }
     }
     saved.update(conversation_id=row.id, version=row.version + 1)
-    state["history"] = (
-        state["history"]
-        + [
-            {
-                "user": request.instruction,
-                "assistant": saved.get("text", ""),
-                "kind": saved["kind"],
-                "source": (
-                    "calendar_tools"
-                    if "calendar_tools" in response
-                    else "calendar_agenda"
-                    if "agenda" in response
-                    else "calendar_availability"
-                    if "calendar_availability" in response
-                    else None
-                ),
-                "task_id": saved.get("task_id"),
-                "proposal_id": saved.get("proposal_id"),
-                "calendar_action_id": saved.get("calendar_action_id"),
-                "request_id": request.request_id,
-                "context_references": saved.get("context_references", []),
-                "error_code": saved.get("error_code"),
-                "email_draft": saved.get("email_draft"),
-                "email_draft_review": saved.get("email_draft_review"),
-                "version": row.version + 1,
-            }
-        ]
-    )[-HISTORY_LIMIT:]
+    state["history"] = state["history"] + [
+        {
+            "user": request.instruction,
+            "assistant": saved.get("text", ""),
+            "kind": saved["kind"],
+            "source": (
+                "calendar_tools"
+                if "calendar_tools" in response
+                else "calendar_agenda"
+                if "agenda" in response
+                else "calendar_availability"
+                if "calendar_availability" in response
+                else None
+            ),
+            "task_id": saved.get("task_id"),
+            "proposal_id": saved.get("proposal_id"),
+            "calendar_action_id": saved.get("calendar_action_id"),
+            "request_id": request.request_id,
+            "context_references": saved.get("context_references", []),
+            "error_code": saved.get("error_code"),
+            "email_draft": saved.get("email_draft"),
+            "email_draft_review": saved.get("email_draft_review"),
+            "version": row.version + 1,
+            **state.get("pending_turn_clock", {}),
+        }
+    ]
+    await memory.persist_state(session, row.id, state, current_request_id=request.request_id)
+    await goals.persist(session, row, state, row.version + 1)
     state["receipts"] = (
         state.get("receipts", [])
         + [
@@ -293,6 +308,7 @@ async def complete(session, owner, request, lease, state, response):
         ]
     )[-HISTORY_LIMIT:]
     state.pop("pending_result", None)
+    state.pop("pending_turn_clock", None)
     # A new topic closes the active Calendar request. Retrying a read stamps the
     # same request context with this turn ID without retaining old provider facts.
     if state.get("calendar_read_request", {}).get("last_request_id") != request.request_id:
@@ -354,5 +370,6 @@ async def checkpoint(session, owner, request, lease, state, response):
             "proposal",
         }
     }
+    await goals.persist(session, row, state, row.version + 1)
     compact(state)
     row.state_enc = encode(state)

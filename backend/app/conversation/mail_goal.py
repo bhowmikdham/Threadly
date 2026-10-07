@@ -40,7 +40,15 @@ def literal(value, source):
 def begin_turn(runtime):
     state = getattr(runtime, "state", {})
     request = getattr(runtime, "request", None)
-    if state.get(REPLY) and request and DECLINED.search(request.instruction):
+    if (
+        state.get(REPLY)
+        and request
+        and DECLINED.search(request.instruction)
+        and state.get("active_goal") in {None, "reply", "email_draft"}
+    ):
+        from app.conversation import goals
+
+        goals.close(state, state.get(REPLY))
         state.pop(REPLY, None)
 
 
@@ -319,6 +327,11 @@ def prepare_reply(runtime, args):
         raise MailRepair("reply_goal_limit", "Start a concise new reply request.")
     runtime.mail_reply_attempted = True
     runtime.state[REPLY] = {
+        **(
+            {"goal_id": previous["goal_id"]}
+            if intent.continue_previous and previous and previous.get("goal_id")
+            else {}
+        ),
         "instruction": instruction,
         "reference": args.reference,
         "target": intent.target,

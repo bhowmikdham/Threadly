@@ -15,8 +15,10 @@ from tests.conftest import needs_pg
 
 pytestmark = needs_pg
 BASELINE = "26902c33da74"
-HEAD = "g071026e9042"
+HEAD = "h071026e9043"
 NEW_TABLES = {
+    "conversation_exchanges",
+    "conversation_goals",
     "gmail_draft_saves",
     "mail_sync_jobs",
     "mail_sync_stage",
@@ -96,6 +98,54 @@ def test_migration_installs_and_preserves_existing_mailbox():
         tables = asyncio.run(execute("SELECT tablename FROM pg_tables WHERE schemaname='public'"))
         assert NEW_TABLES <= {row["tablename"] for row in tables}
         migrate("check")
+        migrate("downgrade", "g071026e9042")
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO users (id,google_sub,email)
+              VALUES (92,'archive-upgrade','archive@example.test');
+            INSERT INTO conversations (id,user_id,account_version,state_enc,expires_at,version)
+              VALUES ('archive-upgrade',92,1,decode('010203','hex'),now()+interval '1 day',1);
+        """,
+                script=True,
+            )
+        )
+        migrate("upgrade", "head")
+        assert (
+            bytes(
+                asyncio.run(
+                    execute("SELECT state_enc FROM conversations WHERE id='archive-upgrade'")
+                )[0]["state_enc"]
+            )
+            == b"\x01\x02\x03"
+        )
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO conversation_exchanges(conversation_id,version,request_id,payload_enc)
+              VALUES ('archive-upgrade',1,'archived-request',decode('040506','hex'));
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "g071026e9042", fails=True)
+        asyncio.run(execute("DELETE FROM conversation_exchanges", script=True))
+        asyncio.run(
+            execute(
+                """
+            INSERT INTO conversation_goals
+              (conversation_id,goal_id,kind,status,updated_version,payload_hash,payload_enc)
+              VALUES ('archive-upgrade','retained-goal','email_draft','retained',1,
+                      'hash',decode('070809','hex'));
+        """,
+                script=True,
+            )
+        )
+        migrate("downgrade", "g071026e9042", fails=True)
+        asyncio.run(execute("DELETE FROM conversations WHERE id='archive-upgrade'", script=True))
+        assert not asyncio.run(execute("SELECT * FROM conversation_goals"))
+        assert not asyncio.run(execute("SELECT * FROM conversation_exchanges"))
+        asyncio.run(execute("DELETE FROM users WHERE id=92", script=True))
         migrate("downgrade", BASELINE)
         asyncio.run(
             execute(

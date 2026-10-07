@@ -24,6 +24,7 @@ class EventFieldChange(StrictModel):
         "title",
         "date",
         "time",
+        "timezone",
         "duration_phrase",
         "calendar_name",
         "location",
