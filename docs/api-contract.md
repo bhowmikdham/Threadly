@@ -1404,6 +1404,48 @@ exact-payload approval, disabled-intent controls and Gmail send gates still appl
 Source-based replies/drafts and compound workflows keep their existing contracts.
 No database migration or external email operation is introduced.
 
+## Hands-free retrieval and reply preparation (conversation 1.8.8)
+
+The conversation HTTP envelope is unchanged. Model `search_mail` adds optional
+`goal` (complete current USER `source`, `continue_previous`, literal `entity` and
+`sender_name`, `purpose: discovery|receipt|application`, and `latest`) and up to
+four literal `query_terms`. Terms are separately quoted and combined with AND;
+without them, entity discovery uses one quoted entity phrase. Continuations
+retain purpose, latest ordering, sender/date/folder scope and date anchor. A new
+goal is required to change scope. Search filters additionally expose
+`query_terms`, `sender_name`, and `inbound_only`; existing callers remain valid.
+
+`respond.mail_assessments` binds candidate reference, relevance disposition and
+an exact visible quote from that candidate's read message. Receipt/application
+answers require assessments; when none is verified and another page exists, the
+backend requests one further bounded result page. Only relevant cards accompany
+the answer. Coverage adds `relevance_checked` and `excluded_candidates`; named
+sender searches add `sender_identity_count` within the checked candidates.
+The model's semantic assessment is not proof of receipt status/application
+outcome; no result means only no verified item within the checked scope.
+
+`prepare_workflow.preparation_intent` accepts single reply preparation only:
+`operation: reply|resolve_target`, full current USER `source`, `continue_previous`, and
+`target: reference|latest_inbound`. The backend checks retained source identity,
+actual inbound sender, ambiguity, latest candidate and a current scope read
+before creating the existing reply task. It never derives an outgoing recipient
+from mail content; the worker's typed recipient clarification still applies.
+Answering that question reloads its owned effective source capture outside the
+DB transaction. Repeating a prepared goal returns the existing task.
+An explicit USER answer to a target clarification uses `resolve_target` with
+`continue_previous: true`; it keeps the original reply request while binding the
+selected current reference. A plain retry cannot switch its message identity.
+Unused new search filters preserve the signed scope of unexpired legacy cursors.
+
+Rejected mail tools return bounded repair codes rather than generic invalid
+arguments (including unread source/scope, changed/stale/ambiguous target, missing
+assessment and paging requirements). Eight-call exhaustion or provider failure
+after preparation returns `error_code: mail_reply_not_prepared` with retained
+USER goal/source; incomplete goal search returns `mail_search_incomplete` with
+unchecked cards omitted. Neither is an external-write receipt. A successfully
+read observation still cannot be repeated indefinitely, while a rejected tool
+can be repaired and retried. No save/send/Calendar permission is introduced.
+
 ## Editable Gmail draft cards
 
 Conversation responses and saved history now include an optional `email_draft`

@@ -11,6 +11,7 @@ from app.schemas.calendar_event import CalendarIntent, EventFieldChange
 from app.schemas.calendar_tools import CALENDAR_READ_TOOLS, WINDOW_HELP, CalendarWindow, DateMeaning
 from app.schemas.continuation import ClarificationAnswer
 from app.schemas.inbox_chat import InboxChatRequest
+from app.schemas.mail_goal import MailAssessment, MailGoal, ReplyPreparation
 
 
 class ConversationTurn(InboxChatRequest):
@@ -100,6 +101,8 @@ class SearchMail(StrictModel):
     limit: int = Field(default=5, ge=1, le=5)
     selection: Literal["recent_matches", "latest_message"] = "recent_matches"
     inbox_category: Literal["primary", "all"] = "primary"
+    goal: MailGoal | None = None
+    query_terms: list[str] = Field(default_factory=list, max_length=4)
 
 
 class MoreMail(StrictModel):
@@ -149,6 +152,7 @@ class Respond(StrictModel):
     kind: Literal["message", "recommendation", "clarification"]
     text: str = Field(min_length=1, max_length=4000)
     evidence: list[Evidence] = Field(default_factory=list, max_length=5)
+    mail_assessments: list[MailAssessment] = Field(default_factory=list, max_length=25)
 
 
 class PrepareWorkflow(StrictModel):
@@ -162,6 +166,7 @@ class PrepareWorkflow(StrictModel):
     to_refs: list[str] = Field(default_factory=list, max_length=20)
     cc_refs: list[str] = Field(default_factory=list, max_length=20)
     bcc_refs: list[str] = Field(default_factory=list, max_length=20)
+    preparation_intent: ReplyPreparation | None = None
 
     @model_validator(mode="after")
     def distinct_context(self):
@@ -252,6 +257,11 @@ TOOLS = {
             "latest_message without date_phrase also checks today's arrivals in the same "
             "scope; use today_check to state verified no arrivals today, or uncertainty. "
             "Default coverage is the past year. No mailbox import."
+            " Supply goal with the complete current USER source, entity, purpose "
+            "(discovery/receipt/application), sender_name when requested, and latest. "
+            "Use goal.continue_previous=true for a refinement; keep the pending purpose "
+            "and ordering. Optional query_terms are distinct literal USER fragments "
+            "combined with AND; no synonyms or operators."
         ),
     ),
     "more_mail": (
@@ -326,6 +336,14 @@ TOOLS = {
             "for multiple dependent operations. Never "
             "sends mail or books events. Terminal for this turn; execution status "
             "arrives later."
+            " For a single reply draft supply preparation_intent with operation='reply', "
+            "source equal to the complete current USER directive, and target='reference' "
+            "or 'latest_inbound'. Interpret preparation semantically. Mere retrieval or "
+            "mail instructions do not request a draft. Retry pending_mail_reply with "
+            "continue_previous=true and the same target. Read the source again first."
+            " If the USER answers a target clarification, use operation='resolve_target' "
+            "with continue_previous=true and their explicitly selected reference. "
+            "A plain retry cannot resolve ambiguity or select another message."
         ),
     ),
     "answer_question": (
@@ -352,6 +370,10 @@ TOOLS = {
             "are not citation evidence. Greeting and conversational answers "
             "need no evidence. A "
             "no-action recommendation is success."
+            " For a receipt/application goal include mail_assessments for each read "
+            "candidate: reference, relevant/irrelevant/uncertain disposition, exact content "
+            "quote. Relevance is to the requested document/outcome, not keyword presence. "
+            "Cite only relevant matches; the backend aligns displayed cards."
         ),
     ),
 }

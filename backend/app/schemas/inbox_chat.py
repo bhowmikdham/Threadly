@@ -39,6 +39,9 @@ class InboxFilters(MailSearchRequest):
     timezone: str = Field(default="UTC", max_length=80)
     cursor: None = None
     inbox_category: Literal["primary", "all"] = "all"
+    query_terms: list[str] = Field(default_factory=list, max_length=4)
+    sender_name: str = Field(default="", max_length=200)
+    inbound_only: bool = False
 
     timezone_exists = field_validator("timezone")(InboxChatRequest.timezone_exists.__func__)
 

@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
-from app.conversation import email_draft, email_review
+from app.conversation import email_draft, email_review, mail_goal
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -85,6 +85,7 @@ class IncorrectCapabilityAdvice(ValueError):
 
 
 async def run(context, runtime, model=None):
+    mail_goal.begin_turn(runtime)
     if email_review.requested(runtime):
         return {
             **await email_review.review(runtime),
@@ -217,8 +218,6 @@ async def run(context, runtime, model=None):
                         # A rejected terminal response is not an observation. Let
                         # the model retry it and receive the actual validation
                         # reason, even when it repeats the same proposed text.
-                        if name != "respond":
-                            seen.add(key)
                         if name == "respond":
                             outcome = await conversation_guard.respond(runtime, arguments)
                             if outcome is None:
@@ -237,9 +236,14 @@ async def run(context, runtime, model=None):
                                 ):
                                     outcome = await email_review.review(runtime)
                                 else:
-                                    outcome = validate_response(arguments, runtime)
+                                    mail_goal.require_prepared_reply(runtime, arguments)
+                                    bounded = mail_goal.finish_search(runtime, arguments)
+                                    outcome = bounded or validate_response(arguments, runtime)
+                                    mail_goal.align_cards(runtime)
                         else:
                             outcome = await runtime.call(name, arguments)
+                        if name != "respond":
+                            seen.add(key)
                         trace.append({"tool": name, "status": outcome.get("error_code", "ok")})
                         if name in TERMINAL:
                             return {**outcome, "release": RELEASE, "trace": trace}
@@ -532,6 +536,16 @@ async def run(context, runtime, model=None):
                             }
                         }
                         status = "error"
+                    except mail_goal.MailRepair as exc:
+                        trace.append({"tool": name, "status": "invalid", "reason": exc.code})
+                        result = {
+                            "json": {
+                                "error": exc.code,
+                                "message": exc.message,
+                                "references": exc.references,
+                            }
+                        }
+                        status = "error"
                     except (ValidationError, ValueError) as exc:
                         if name == "prepare_email_draft":
                             reason = (
@@ -651,18 +665,24 @@ async def run(context, runtime, model=None):
                 if len(json.dumps(messages)) > 85000:
                     break
     except ConversationProviderError:
+        if retained := mail_goal.incomplete(runtime) or mail_goal.search_incomplete(runtime):
+            return {**retained, "release": RELEASE, "trace": trace}
         raise ApiError(
             503,
             "conversation_provider_unavailable",
             "The model is temporarily unavailable. Retry this message.",
         ) from None
     except (ProviderError, TimeoutError):
+        if retained := mail_goal.incomplete(runtime) or mail_goal.search_incomplete(runtime):
+            return {**retained, "release": RELEASE, "trace": trace}
         raise ApiError(
             503, "conversation_unavailable", "I couldn’t finish that response. Retry this message."
         ) from None
     calendar_failure = conversation_guard.exhausted(runtime)
     if calendar_failure:
         return {**calendar_failure, "release": RELEASE, "trace": trace}
+    if retained := mail_goal.incomplete(runtime) or mail_goal.search_incomplete(runtime):
+        return {**retained, "release": RELEASE, "trace": trace}
     if (
         getattr(runtime, "email_draft_attempted", False)
         and getattr(runtime, "state", {}).get(email_draft.KEY)
@@ -882,7 +902,9 @@ def _uninspected_newer_results(answer, runtime):
     # For a latest request, even an unranked answer about an older hit can
     # distract from an unread newer order. A follow-up that itself ranks a
     # searched item needs the same inspection regardless of the current turn.
-    asks_for_latest = bool(re.search(r"\b(?:latest|newest|most\s+recent)\b", instruction, re.I))
+    asks_for_latest = bool(
+        re.search(r"\b(?:latest|newest|most\s+recent)\b", instruction, re.I)
+    ) or bool(getattr(runtime, "state", {}).get(mail_goal.KEY, {}).get("latest"))
     if not asks_for_latest and not _asserts_inbox_rank(answer.text):
         return []
     cited = {citation.reference for citation in answer.evidence}

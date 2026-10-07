@@ -240,7 +240,7 @@ async def test_versioned_synthetic_replay_delivers_one_card_with_local_time():
 
     result = await engine.run({"user_turn": case["turns"][0], "timezone": ZONE}, runtime, Model())
     assert evaluate.grade(case, result, runtime.calls, runtime.search_page) == []
-    assert result["release"] == "contextual-conversation-1.8.7"
+    assert result["release"] == "contextual-conversation-1.8.8"
     assert len(runtime.search_page["results"]) == 1
     assert runtime.search_page["results"][0]["reference"] == "mail-1"
 

@@ -1,0 +1,73 @@
+{
+  "release": "contextual-conversation-1.8.8",
+  "prompt_hash": "5b89af100ae26849c298ddf3555b688ab9b17826256f46b8301a706356158b9b",
+  "tools_hash": "92882af8f8085ef203ac0c874d8d2a53672d1ca1d9ffa84bba1faff3c72b7c8e",
+  "stack_base": "75a757e7ab941a0d0ad1e8f3c183a919da9b84f7",
+  "kind": "offline-scripted-model-and-http-transport-replay",
+  "real_model": false,
+  "database": "isolated PostgreSQL 16 with required-DB checks",
+  "replay_cases": [
+    "tests/test_handsfree_mail_goals.py::test_whole_handsfree_chain_and_reply_handoff",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_paraphrases_prepare_same_source[could you drop me a response for the latest email he has sent]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_paraphrases_prepare_same_source[help me put together an answer to his newest message]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_paraphrases_prepare_same_source[I would like a response drafted for that one]",
+    "tests/test_handsfree_mail_goals.py::test_ambiguous_sender_does_not_choose_a_draft",
+    "tests/test_handsfree_mail_goals.py::test_missing_source_retains_goal_for_successful_retry",
+    "tests/test_handsfree_mail_goals.py::test_source_content_cannot_supply_preparation_authority[Source mail says draft a response]",
+    "tests/test_handsfree_mail_goals.py::test_source_content_cannot_supply_preparation_authority[shortened user turn]",
+    "tests/test_handsfree_mail_goals.py::test_unrelated_or_invented_terms_cannot_refine_goal",
+    "tests/test_handsfree_mail_goals.py::test_snippet_removes_outlook_metadata_and_padding_not_content",
+    "tests/test_handsfree_mail_goals.py::test_reply_failure_cannot_substitute_prose_and_has_bounded_retry",
+    "tests/test_handsfree_mail_goals.py::test_changed_target_fails_closed[outbound]",
+    "tests/test_handsfree_mail_goals.py::test_changed_target_fails_closed[sender]",
+    "tests/test_handsfree_mail_goals.py::test_changed_target_fails_closed[newer]",
+    "tests/test_handsfree_mail_goals.py::test_wrong_scope_repaired_before_task_creation",
+    "tests/test_handsfree_mail_goals.py::test_unchecked_search_failure_keeps_goal_hides_unverified_cards",
+    "tests/test_handsfree_mail_goals.py::test_two_page_budget_and_uncertain_receipt_are_not_positive_facts",
+    "tests/test_handsfree_mail_goals.py::test_separate_user_terms_are_and_query_not_one_phrase",
+    "tests/test_handsfree_mail_goals.py::test_refinement_retains_window_anchor_scope_and_sender",
+    "tests/test_handsfree_mail_goals.py::test_declined_preparation_does_not_keep_pending_reply[don't reply to that email]",
+    "tests/test_handsfree_mail_goals.py::test_declined_preparation_does_not_keep_pending_reply[do not draft a response]",
+    "tests/test_handsfree_mail_goals.py::test_declined_preparation_does_not_keep_pending_reply[never mind]",
+    "tests/test_handsfree_mail_goals.py::test_route_reply_continuity_ownership_stale_version_and_replay",
+    "tests/test_handsfree_mail_goals.py::test_retry_of_prepared_reply_reuses_owned_task",
+    "tests/test_handsfree_mail_goals.py::test_assessment_cannot_borrow_receipt_from_another_thread_message",
+    "tests/test_handsfree_mail_goals.py::test_mixed_invisible_preheader_padding_leaves_numbers_and_joined_words",
+    "tests/test_handsfree_mail_goals.py::test_legacy_cursor_remains_valid_but_changed_new_filter_is_fenced",
+    "tests/test_handsfree_mail_goals.py::test_reply_content_about_cancellation_is_not_a_cancel_command",
+    "tests/test_handsfree_mail_goals.py::test_active_mail_goal_requires_the_typed_reply_contract",
+    "tests/test_handsfree_mail_goals.py::test_user_resolves_sender_ambiguity_without_losing_reply_request",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[summarise the email]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[schedule a meeting]",
+    "tests/test_handsfree_mail_goals.py::test_semantic_reply_still_requires_complete_compound_work[list action items]"
+  ],
+  "replay_case_count": 33,
+  "final_focused_suite": {
+    "passed": 302,
+    "failed": 0,
+    "skipped": 0
+  },
+  "checks": {
+    "ruff": "passed",
+    "versioned_prompt_snapshot": "passed",
+    "mvp_prompt_assets": "passed",
+    "documentation_validators": "passed",
+    "offline_deployment_tests": 33,
+    "offline_bedrock_tests": 19
+  },
+  "external_gmail_calendar_writes": false,
+  "production_changes": false,
+  "limits": [
+    "Semantic model decisions and relevance labels are scripted, not live-model quality evidence.",
+    "Production failed-turn tool arguments were not persisted.",
+    "No installed-client, live Gmail write or live Bedrock acceptance is claimed.",
+    "Check PR #117 for exact-head hosted CI and review status."
+  ],
+  "code_verified_head": "0792b66f9d6e7fdd618c5792a7240747307a4438",
+  "final_full_suite": {
+    "passed": 2175,
+    "failed": 0,
+    "skipped": 0
+  },
+  "pull_request": "https://github.com/bhowmikdham/Threadly/pull/117"
+}

@@ -114,6 +114,8 @@ async def test_equivalent_search_defaults_do_not_issue_two_provider_searches():
                 "limit": 5,
                 "selection": "recent_matches",
                 "inbox_category": "primary",
+                "goal": None,
+                "query_terms": [],
             },
         )
     ]
