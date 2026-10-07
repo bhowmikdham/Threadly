@@ -33,7 +33,13 @@ export async function activeGmail(user: User): Promise<Selection | null> {
   const data = await api(`/threads/${encodeURIComponent(observed.threadId)}`)
   const ids = new Set(data.messages.map((m) => m.gmail_msg_id))
   const selectedIds = observed.messageIds.filter((id) => ids.has(id))
-  // Never replace unresolved DOM ordinals with the last message or silently guess a reply target.
+  const time = (m: any) => Date.parse(m.received_at || m.sent_at || "") || 0
+  // When Gmail doesn't say which message is open, reply the way Gmail's own
+  // Reply button does: to the newest message on screen from someone else.
+  const newestFromOthers = data.messages
+    .filter((m) => !m.is_from_user && selectedIds.includes(m.gmail_msg_id))
+    .sort((a, b) => time(a) - time(b))
+    .at(-1)?.gmail_msg_id
   return {
     ...data,
     messages: [
@@ -45,10 +51,9 @@ export async function activeGmail(user: User): Promise<Selection | null> {
     selectedIds,
     targetId: ids.has(observed.selectedMessageId)
       ? observed.selectedMessageId
-      : // A one-message thread has only one possible reply target.
-        data.messages.length === 1
-        ? data.messages[0].gmail_msg_id
-        : null
+      : newestFromOthers ||
+        // A one-message thread has only one possible reply target.
+        (data.messages.length === 1 ? data.messages[0].gmail_msg_id : null)
   }
 }
 export async function capture(selection: Selection) {

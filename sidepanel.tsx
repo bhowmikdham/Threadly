@@ -287,12 +287,28 @@ function Assistant({
   useEffect(() => {
     void c.selectActive(true)
   }, [])
+  const controller = useRef(c)
+  controller.current = c
   // "Ask about the open email" only makes sense while Gmail is showing an email.
+  // The same signal moves the attached email along until the first message.
   useEffect(() => {
+    let timers: ReturnType<typeof setTimeout>[] = []
+    const follow = (showsEmail: boolean) => {
+      timers.forEach(clearTimeout)
+      // Gmail updates the URL before the thread is on screen.
+      timers = [0, 400, 1200, 2500].map((ms) =>
+        setTimeout(() => void controller.current.followActive(showsEmail), ms)
+      )
+    }
     const check = () =>
       void chrome.tabs
         ?.query({ active: true, lastFocusedWindow: true })
-        .then((tabs) => setOpenEmail(gmailUrlShowsEmail(tabs[0]?.url)))
+        .then((tabs) => {
+          const url = tabs[0]?.url
+          const showsEmail = gmailUrlShowsEmail(url)
+          setOpenEmail(showsEmail)
+          if (url?.startsWith("https://mail.google.com/")) follow(showsEmail)
+        })
         .catch(() => setOpenEmail(false))
     const changed = (_id: number, info: { url?: string }) => {
       if (info.url) check()
@@ -302,6 +318,7 @@ function Assistant({
     chrome.tabs?.onUpdated?.addListener(changed)
     chrome.windows?.onFocusChanged?.addListener(check)
     return () => {
+      timers.forEach(clearTimeout)
       chrome.tabs?.onActivated?.removeListener(check)
       chrome.tabs?.onUpdated?.removeListener(changed)
       chrome.windows?.onFocusChanged?.removeListener(check)
@@ -802,6 +819,19 @@ function Assistant({
           <p className="pending-context-note" role="status">
             The unfinished request still includes its original email. Retry it
             or start a new conversation before changing the source.
+          </p>
+        )}
+        {c.openElsewhere && !c.pendingUsesHiddenEmail && (
+          <p className="pending-context-note" role="status">
+            You’ve opened a different email. This chat stays on “
+            {c.selection?.thread.subject || "its email"}”. Start a new chat to
+            continue on the open one.
+            <button
+              type="button"
+              disabled={inputBusy}
+              onClick={() => void newChat()}>
+              New chat
+            </button>
           </p>
         )}
         {contextOpen && c.selection && (
