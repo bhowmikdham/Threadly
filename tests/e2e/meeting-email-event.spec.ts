@@ -44,6 +44,7 @@ test.beforeEach(async () => {
       data = {
         conversation_id: body.conversation_id,
         version: body.expected_version + 1,
+        context_memory_version: 1,
         kind: "message",
         text: "Here is the meeting email.",
         search: {
@@ -224,4 +225,15 @@ test("email button → editable preview → edit → explicit confirmation under
       /\/auth\/(google|logout|disconnect)/.test(c.path)
     )
   ).toEqual([])
+  await page.getByLabel("Your request").fill("Return to my earlier work")
+  await page.getByRole("button", { name: "Send request" }).click()
+  await expect
+    .poll(() => calls.filter((c) => c.path === "/assistant/conversation-turns").length)
+    .toBe(2)
+  const turns = calls.filter((c) => c.path === "/assistant/conversation-turns")
+  expect(turns[1].body.conversation_id).toBe(turns[0].body.conversation_id)
+  expect(turns[1].body.expected_version).toBe(1)
+  expect(turns[1].body).not.toHaveProperty("active_task_id")
+  expect(turns[1].body).not.toHaveProperty("context_snapshot_id")
+  expect(calls.filter((c) => c.path.endsWith("/approve"))).toHaveLength(1)
 })
