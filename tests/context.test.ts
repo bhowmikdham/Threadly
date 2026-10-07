@@ -76,6 +76,68 @@ describe("reference-only source capture", () => {
   })
 })
 
+describe("reply target when Gmail doesn't mark the open message", () => {
+  const thread: any = {
+    thread: { thread_id: "thread1", subject: "Discovery Meeting", version: 1 },
+    messages: [
+      {
+        gmail_msg_id: "m1",
+        is_from_user: true,
+        received_at: "2026-08-27T01:05:00Z"
+      },
+      {
+        gmail_msg_id: "m2",
+        is_from_user: false,
+        received_at: "2026-08-27T01:08:00Z"
+      },
+      {
+        gmail_msg_id: "m3",
+        is_from_user: true,
+        received_at: "2026-08-27T01:09:00Z"
+      },
+      {
+        gmail_msg_id: "m4",
+        is_from_user: false,
+        received_at: "2026-08-27T01:10:00Z"
+      },
+      {
+        gmail_msg_id: "m5",
+        is_from_user: true,
+        received_at: "2026-08-27T01:11:00Z"
+      }
+    ]
+  }
+  const open = async (messages: any[], messageIds: string[]) => {
+    vi.mocked(chrome.tabs.query).mockResolvedValue([
+      { id: 1, url: "https://mail.google.com/mail/u/0/" }
+    ] as any)
+    vi.mocked(chrome.tabs.sendMessage).mockResolvedValue({
+      accountEmail: "owner@example.test",
+      threadId: "thread1",
+      messageIds,
+      selectedMessageId: null
+    } as any)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: { ...thread, messages }
+    } as any)
+    return activeGmail({ id: 1, email: "owner@example.test", name: null })
+  }
+  it("replies to the newest message from someone else, like Gmail's Reply", async () => {
+    const s = await open(thread.messages, ["m1", "m2", "m3", "m4", "m5"])
+    expect(s.targetId).toBe("m4")
+  })
+  it("only picks a message that is on screen", async () => {
+    const s = await open(thread.messages, ["m1", "m2", "m3"])
+    expect(s.targetId).toBe("m2")
+  })
+  it("still asks when every message is from the user", async () => {
+    const mine = thread.messages.filter((m) => m.is_from_user)
+    const s = await open(mine, ["m1", "m3", "m5"])
+    expect(s.targetId).toBeNull()
+  })
+})
+
 describe("open-email detection from the Gmail URL", async () => {
   const { gmailUrlShowsEmail } = await import("../lib/gmail-context")
   it("is true only when a single thread is open", () => {
