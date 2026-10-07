@@ -65,14 +65,33 @@ test.beforeAll(async () => {
     ]
   })
   const worker =
-    context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"))
+    context
+      .serviceWorkers()
+      .find((item) => item.url().startsWith("chrome-extension://")) ||
+    (await context.waitForEvent("serviceworker", {
+      predicate: (item) => item.url().startsWith("chrome-extension://")
+    }))
+  page = await context.newPage()
+  await page.goto(
+    `chrome-extension://${new URL(worker.url()).host}/sidepanel.html`
+  )
+  // Extension-page APIs and the existing startup barrier must be ready before
+  // seeding. A newly announced service worker may not expose storage APIs yet.
+  await expect
+    .poll(() =>
+      page.evaluate(() => typeof globalThis.chrome?.storage?.local?.set)
+    )
+    .toBe("function")
+  await page.evaluate(() =>
+    chrome.runtime.sendMessage({ channel: "threadly", type: "STATUS" })
+  )
   const jwt =
     "fixture." +
     Buffer.from(
       JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })
     ).toString("base64url") +
     ".local"
-  await worker.evaluate(
+  await page.evaluate(
     async ({ origin, jwt, user }) => {
       await chrome.storage.local.set({
         backendOrigin: origin,
@@ -81,10 +100,7 @@ test.beforeAll(async () => {
     },
     { origin, jwt, user }
   )
-  page = await context.newPage()
-  await page.goto(
-    `chrome-extension://${new URL(worker.url()).host}/sidepanel.html`
-  )
+  await page.reload()
 })
 test.beforeEach(async () => {
   overrides = { "/assistant/capabilities": { data: capabilities() } }
