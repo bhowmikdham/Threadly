@@ -44,6 +44,7 @@ class ReconnectCapability(StrictModel):
             "calendar_read",
             "calendar_events_read",
             "gmail_send",
+            "gmail_draft",
             "calendar_write",
         ]
     ]
