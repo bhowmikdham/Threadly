@@ -283,15 +283,107 @@ async function login(capabilities?: string[], expectedUserId?: number) {
     signingIn = false
   }
 }
-chrome.runtime.onMessage.addListener((message, sender, respond) => {
+// Inbox badges: the server runs at most two classifications per process, so
+// every Gmail tab shares these two slots.
+let classifying = 0
+const classifyWaiting: (() => void)[] = []
+// Signing out, from wherever, forgets kept badge results.
+chrome.storage.onChanged.addListener((changes, area) => {
   if (
-    message?.type === "OPEN_SIDE_PANEL" &&
+    area !== "local" ||
+    !changes.threadlySession ||
+    changes.threadlySession.newValue
+  )
+    return
+  void chrome.storage.session
+    .get()
+    .then((all) =>
+      chrome.storage.session.remove(
+        Object.keys(all).filter((k) => k.startsWith("classification:"))
+      )
+    )
+})
+async function keepClassification(key: string, data: any) {
+  const all = await chrome.storage.session.get()
+  const expired = Object.keys(all).filter(
+    (k) =>
+      k.startsWith("classification:") &&
+      !(Date.parse(all[k]?.valid_until) > Date.now())
+  )
+  if (expired.length) await chrome.storage.session.remove(expired)
+  await chrome.storage.session.set({ [key]: data })
+}
+async function classifyThread(message: any) {
+  const threadId = String(message.threadId || "")
+  const timeZone = String(message.timeZone || "UTC")
+  const lastMessageId = String(message.lastMessageId || "")
+  if (
+    !/^[a-f0-9]{1,32}$/.test(threadId) ||
+    !/^[a-f0-9]{0,32}$/.test(lastMessageId) ||
+    !/^[A-Za-z0-9_+\-/]{1,64}$/.test(timeZone)
+  )
+    return { ok: false, code: "invalid_request" }
+  await storageReady
+  let s: Session
+  try {
+    s = await activeSession()
+  } catch {
+    return { ok: false, code: "login_required" }
+  }
+  // Badges are only for the Gmail account Threadly is connected to.
+  if (
+    typeof message.accountEmail !== "string" ||
+    message.accountEmail.toLowerCase() !== s.user.email.toLowerCase()
+  )
+    return { ok: false, code: "account_mismatch" }
+  // Kept for this browser session until valid_until, so reopening Gmail
+  // reuses results. Labels and IDs only; a new message changes the key.
+  const key = `classification:${s.user.id}:${threadId}:${lastMessageId}:${timeZone}`
+  const kept = (await chrome.storage.session.get(key))[key]
+  if (kept && Date.parse(kept.valid_until) > Date.now())
+    return { ok: true, data: kept }
+  if (classifying >= 2)
+    await new Promise<void>((resolve) => classifyWaiting.push(resolve))
+  classifying += 1
+  try {
+    const data = await transport(
+      s.origin,
+      `/threads/${threadId}/classification`,
+      "POST",
+      { time_zone: timeZone },
+      s.jwt,
+      60000
+    )
+    if (
+      data?.thread_id === threadId &&
+      Date.parse(data.valid_until) > Date.now()
+    )
+      await keepClassification(key, data)
+    return { ok: true, data }
+  } catch (error) {
+    return {
+      ok: false,
+      code: error.code || "connection_failed",
+      status: error.status
+    }
+  } finally {
+    classifying -= 1
+    classifyWaiting.shift()?.()
+  }
+}
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  const fromGmail =
     sender.id === chrome.runtime.id &&
-    sender.tab?.id &&
-    sender.tab.url?.startsWith("https://mail.google.com/")
-  ) {
+    Boolean(sender.tab?.id) &&
+    Boolean(sender.tab.url?.startsWith("https://mail.google.com/"))
+  if (message?.type === "OPEN_SIDE_PANEL" && fromGmail) {
     void chrome.sidePanel.open({ tabId: sender.tab.id })
     return false
+  }
+  // Gmail pages may ask for one thing only: a thread's badges.
+  if (message?.type === "THREADLY_CLASSIFY" && fromGmail) {
+    void classifyThread(message).then(respond)
+    return true
   }
   if (
     message?.channel !== "threadly" ||
