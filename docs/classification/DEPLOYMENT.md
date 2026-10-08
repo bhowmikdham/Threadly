@@ -22,7 +22,8 @@ recreate only `api`, `assistant-worker` and `action-worker` with `--no-deps` usi
 the existing public HTTPS/launch Compose overlays. Verify the Caddy container and
 its website/download mounts remain unchanged. Running the full public-launch
 helper would also replace website/proxy assets and is outside this service's scope.
-The [initial rollout record](ROLLOUT-2026-10-07.md) includes the actual outcome.
+See the [initial rollout](ROLLOUT-2026-10-07.md) and the subsequent
+[reliability rollout](ROLLOUT-2026-10-08.md) for actual outcomes.
 
 The existing private release receipt contains `haiku.target.json` and
 `haiku.caller-policy.json`. Attach the latter as the separate named inline policy
@@ -39,7 +40,8 @@ CLASSIFICATION_ENABLED=false
 CLASSIFICATION_TRANSPORT=bedrock_flow
 CLASSIFICATION_FLOW_MANIFEST=<single-line JSON from haiku.target.json>
 CLASSIFICATION_MAX_CONCURRENCY=2
-CLASSIFICATION_VALID_SECONDS=300
+CLASSIFICATION_REQUESTS_PER_MINUTE=8
+CLASSIFICATION_VALID_SECONDS=3600
 GMAIL_SOURCE_MODE=on_demand
 BEDROCK_REGION=ap-southeast-2
 BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED=true
@@ -67,14 +69,24 @@ Converse comparison setting is not used by deployed classification.
    Exercise concurrent requests, check bounded rejection and inspect operational
    logs. Save a release receipt and give the frontend team the API handoff.
 
-The current EC2 API is one process, so its limit of two active classification
-model calls is also this deployment's classification limit. It does not govern
+The current EC2 API is one process. Classification admission begins before Gmail
+reads and is limited to two active requests; the SDK worker separately retains
+its slot through cancellation. The rolling budget defaults to eight inference
+attempts/minute, including retries, against the observed applied quota of ten.
+This leaves limited headroom for other model consumers. Keep concurrency at two
+until AWS confirms a higher applied request quota. It does not govern
 other assistant model calls. There is no distributed limiter, deduplication or
 cache; reassess the limit before increasing API workers/replicas. The frontend
-must avoid repeated rendering-triggered requests and respect 429/Retry-After.
+must avoid repeated rendering-triggered requests and respect the actual variable
+429/Retry-After. See [integration changes](FRONTEND-RELIABILITY-HANDOFF.md).
+After a quota increase, choose a classification request budget below the shared
+quota, then test concurrency four with synthetic and authorized live traffic.
+Do not increase workers or concurrency to work around a requests/minute quota.
 
 Operational log entries contain `classification_request`, outcome, sanitized error
-code and duration in milliseconds. They omit labels and email content. Review
+code and duration in milliseconds. Provider failure entries include allowlisted
+operation/code enums and retry counts; Gmail reads include allowlisted reasons.
+They omit labels, raw provider messages and email content. Review
 these alongside Bedrock invocation/throttling/token metrics in the source region;
 the initial synthetic score is not a production accuracy or cost estimate.
 Broader human-labelled evaluation remains ongoing product quality work.

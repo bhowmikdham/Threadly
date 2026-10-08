@@ -131,6 +131,7 @@ async def test_source_refs_map_back_and_owner_roles_preserved(pipeline):
     assert result.evidence.category == ["def456"]
     assert result.source_message_ids == ["def456"]
     assert result.persisted is False
+    assert (result.valid_until - result.evaluated_at).total_seconds() == 3600
     assert len(reads) == 2
     message = provider.calls[0]["messages"][0]
     assert message["to"] == ["ME"] and message["from"] == ["person1"]

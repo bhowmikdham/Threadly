@@ -6,6 +6,11 @@ doc's non-negotiable. Batched detail fetches keep the backfill reasonable.
 
 import asyncio
 import base64
+import logging
+import math
+import random
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -13,12 +18,40 @@ import httpx
 BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
 _PAGE_SIZE = 100
 _DETAIL_CONCURRENCY = 8
+log = logging.getLogger("uvicorn.error")
+RATE_REASONS = {"rateLimitExceeded", "userRateLimitExceeded"}
+SAFE_REASONS = RATE_REASONS | {"dailyLimitExceeded", "domainPolicy", "forbidden",
+                               "insufficientPermissions", "authError", "backendError"}
+
+
+def retry_after_seconds(value):
+    try:
+        seconds = float(value)
+        if not math.isfinite(seconds):
+            return None
+    except (ValueError, TypeError):
+        try:
+            seconds = (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return None
+    return max(1, math.ceil(seconds))
 
 
 class GmailError(Exception):
-    def __init__(self, message: str, status: int | None = None):
+    def __init__(self, message: str, status: int | None = None, *, reason="unknown",
+                 retry_after=None):
         super().__init__(message)
         self.status = status
+        self.reason = reason
+        self.retry_after = retry_after
+
+    @property
+    def rate_limited(self):
+        return self.status == 429 or (self.status == 403 and self.reason in RATE_REASONS)
+
+    @property
+    def retryable(self):
+        return self.rate_limited or self.status in {500, 502, 503, 504}
 
 
 class GmailClient:
@@ -30,6 +63,23 @@ class GmailClient:
         return httpx.AsyncClient(timeout=30, transport=self._transport, headers=self._headers)
 
     async def _get(self, client: httpx.AsyncClient, url: str, params: dict) -> dict:
+        # GET-only retries: Gmail writes have separate reconciliation rules.
+        for attempt in range(1, 4):
+            try:
+                return await self._get_once(client, url, params)
+            except GmailError as error:
+                log.warning("gmail_read_failure status=%s reason=%s retryable=%s attempt=%d",
+                            error.status, error.reason, error.retryable, attempt)
+                if not error.retryable or attempt == 3:
+                    raise
+                delay = max(2 ** (attempt - 1) + random.uniform(0, 1),
+                            error.retry_after or 0)
+                # Long provider cooldowns belong to the caller, not a held HTTP request.
+                if delay > 5:
+                    raise
+                await asyncio.sleep(delay)
+
+    async def _get_once(self, client: httpx.AsyncClient, url: str, params: dict) -> dict:
         try:
             async with client.stream("GET", url, params=params) as response:
                 content = bytearray()
@@ -37,6 +87,8 @@ class GmailClient:
                     content.extend(chunk)
                     if len(content) > 8_000_000:
                         raise GmailError("gmail response exceeds supported size")
+                # aiter_bytes() already decodes Content-Encoding. Copying that
+                # header onto buffered bytes would decompress the body twice.
                 r = httpx.Response(response.status_code, content=bytes(content))
         except httpx.HTTPError as exc:
             raise GmailError("gmail request failed") from exc
@@ -45,7 +97,20 @@ class GmailClient:
         if r.status_code == 404:
             raise GmailError("not found", 404)
         if r.status_code != 200:
-            raise GmailError("gmail api error", r.status_code)
+            reason = "unknown"
+            try:
+                error = r.json().get("error", {})
+                reasons = {item.get("reason") for item in error.get("errors", [])
+                           if isinstance(item, dict) and isinstance(item.get("reason"), str)}
+                # Mixed or unknown reasons must not turn permission errors into retries.
+                if reasons and reasons <= RATE_REASONS:
+                    reason = sorted(reasons)[0]
+                elif len(reasons) == 1 and next(iter(reasons)) in SAFE_REASONS:
+                    reason = next(iter(reasons))
+            except (ValueError, AttributeError, TypeError):
+                pass
+            raise GmailError("gmail api error", r.status_code, reason=reason,
+                             retry_after=retry_after_seconds(response.headers.get("Retry-After")))
         try:
             body = r.json()
         except ValueError as exc:

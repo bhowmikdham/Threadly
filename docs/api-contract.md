@@ -18,6 +18,11 @@ backend-only. Nova Micro is retired. See [Flow setup and evidence](classificatio
 The public backend enabled this service on 7 October 2026 after bounded live
 integration checks. See [deployment evidence and quality limits](classification/ROLLOUT-2026-10-07.md).
 Frontend request scheduling and badge rendering belong to the frontend team.
+The reliability update defaults results to one-hour validity and adds variable
+`Retry-After` on 429 `classification_busy`, 429 `gmail_rate_limited` and
+503 `gmail_quota_exceeded`. Provider 503s include a retry delay after bounded
+backend retries. See the [frontend reliability handoff](classification/FRONTEND-RELIABILITY-HANDOFF.md)
+for integration requirements and deployment status.
 
 Conversation release 1.7.0 preserves direct Calendar creation and extends internal
 `read_email.scope` and
