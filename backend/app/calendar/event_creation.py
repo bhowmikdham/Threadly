@@ -342,6 +342,9 @@ async def prepare(runtime, args):
         and args.timezone_source in field_citations["time"]["source"]
     ):
         field_citations["timezone"] = field_citations["time"]
+    timezone_supplied = bool(args.timezone) or any(
+        change.field == "timezone" and change.operation == "replace" for change in args.changes
+    )
     try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
         await validate_date(runtime, args, saved, pending)
@@ -367,7 +370,7 @@ async def prepare(runtime, args):
         return {"kind": "clarification", "text": str(error)}
     saved["creation_origin"] = origin
     if source_binding and source_binding.get("timezone_required"):
-        if args.timezone:
+        if args.timezone and timezone_supplied:
             source_binding["timezone_required"] = False
         else:
             source_question = (

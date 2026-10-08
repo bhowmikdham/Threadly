@@ -56,3 +56,12 @@ The initial complete suite had 2,470 passes and one existing feedback assertion
 failure: a user-only schema error mentioned email reading. Feedback now mentions
 email source repair only when the rejected call actually supplied that envelope.
 Final exact-commit validation is recorded with the task's evidence bundle.
+
+The second review identified two continuation regressions. Against clean commit
+`6da4c4a`, three exact multi-turn cases fail: a later location edit repeats source
+08:30 after the user chose 09:00; a later title edit restores a user-cleared
+location; and a shorter fresh source envelope clears unresolved CST. All three
+pass after protecting retained user provenance and carrying timezone clarification
+forward. The focused source/approval/field-repair set passes 53 tests. The 6da4c4a
+full suite passed 2,482 tests, but does not validate these subsequent fixes; the
+final commit must pass its own full suite before the patch is reported verified.

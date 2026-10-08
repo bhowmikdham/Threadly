@@ -226,3 +226,102 @@ async def test_explicit_user_timezone_correction_overrides_source(inspection, db
     assert (
         revised["calendar_action"]["preview"]["event"]["start"]["timeZone"] == "Australia/Melbourne"
     )
+
+
+@pytest.mark.parametrize("correction", ["time", "clear_location"])
+async def test_later_source_envelope_cannot_undo_user_replacement_or_clear(
+    inspection, db_sessionmaker, correction
+):
+    _, fields, _ = inspection
+    request, result = await prepare(db_sessionmaker, fields)
+    if correction == "time":
+        text = "Move it to 9am"
+        change = {"field": "time", "operation": "replace", "value": "09:00", "source": "9am"}
+        later_field = "time"
+        later_values = {"time": fields["time"], "time_source": fields["time_source"]}
+    else:
+        text = "Clear the location"
+        change = {"field": "location", "operation": "clear", "source": "Clear the location"}
+        later_field = "location"
+        later_values = {"location": fields["location"]}
+    request, result = await follow(
+        db_sessionmaker,
+        request,
+        result,
+        text,
+        tool(
+            "prepare_calendar_event",
+            continue_previous=True,
+            intent={"operation": "revise", "source": text},
+            changes=[change],
+        ),
+    )
+    assert result["kind"] == "calendar_event", result
+    if correction == "time":
+        text = "Move it to Room B"
+        revision = {
+            "field": "location",
+            "operation": "replace",
+            "value": "Room B",
+            "source": "Room B",
+        }
+    else:
+        text = "Rename it Visit"
+        revision = {"field": "title", "operation": "replace", "value": "Visit", "source": "Visit"}
+    _, revised = await follow(
+        db_sessionmaker,
+        request,
+        result,
+        text,
+        tool("read_email", reference="selected", scope="selected_message"),
+        tool(
+            "prepare_calendar_event",
+            continue_previous=True,
+            intent={"operation": "revise", "source": text},
+            changes=[revision],
+            **later_values,
+            email_source={
+                **fields["email_source"],
+                "fields": [
+                    item
+                    for item in fields["email_source"]["fields"]
+                    if item["field"] == later_field
+                ],
+            },
+        ),
+    )
+    assert revised["kind"] == "calendar_event", revised
+    event = revised["calendar_action"]["preview"]["event"]
+    if correction == "time":
+        assert event["location"] == "Room B"
+        start = datetime.fromisoformat(event["start"]["dateTime"]).astimezone(
+            ZoneInfo("Australia/Melbourne")
+        )
+        assert (start.hour, start.minute) == (9, 0)
+    else:
+        assert event["summary"] == "Visit"
+        assert event["location"] == ""
+
+
+async def test_shorter_source_envelope_does_not_clear_unresolved_timezone(
+    inspection, db_sessionmaker
+):
+    configured, fields, quote = inspection
+    quote = quote.replace("8:30 AM", "8:30 AM CST")
+    configured[0].text = quote
+    fields["email_source"]["event_quote"] = quote
+    request, result = await prepare(db_sessionmaker, fields)
+    assert result["kind"] == "clarification" and "timezone" in result["text"]
+    shortened = {**fields["email_source"], "event_quote": quote.split(" 8:30")[0], "fields": []}
+    request, result = await follow(
+        db_sessionmaker,
+        request,
+        result,
+        "Use the email details",
+        tool("read_email", reference="selected", scope="selected_message"),
+        tool("prepare_calendar_event", continue_previous=True, email_source=shortened),
+    )
+    assert result["kind"] == "clarification" and "timezone" in result["text"], result
+    async with db_sessionmaker() as db:
+        state = store.decode(await db.get(Conversation, request.conversation_id))
+        assert state["calendar_event_request"]["email_source"]["timezone_required"]

@@ -126,10 +126,20 @@ async def resolve(runtime, args, pending):
         )
     citations = {}
     repair = None
+    retained_user_fields = {
+        field
+        for field, provenance in (pending or {}).get("field_provenance", {}).items()
+        if provenance.get("kind") != "email"
+    }
     user_fields = {item.field for item in args.citations} | {item.field for item in args.changes}
     for item in envelope.fields:
         if item.field in user_fields:
             raise ValueError("User corrections take precedence; do not cite email for that field")
+        if item.field in retained_user_fields:
+            # Re-reading mail cannot undo a user replacement or explicit clear.
+            # Empty legacy deltas preserve the retained value and its provenance.
+            omitted.add(item.field)
+            continue
         if not normalized(item.quote) or normalized(item.quote) not in normalized(
             envelope.event_quote
         ):
@@ -171,7 +181,7 @@ async def resolve(runtime, args, pending):
             != "email"
         )
     )
-    timezone_required = False
+    timezone_required = bool((previous or {}).get("timezone_required"))
     if not user_zone and envelope.ambiguity != "multiple_events":
         from app.calendar import event_timezone
 
@@ -187,6 +197,7 @@ async def resolve(runtime, args, pending):
             timezone_required = True
         else:
             if args.timezone:
+                timezone_required = False
                 citations["timezone"] = {
                     "kind": "email",
                     "source": event_text,
