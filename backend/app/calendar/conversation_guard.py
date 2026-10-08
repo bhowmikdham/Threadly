@@ -119,13 +119,10 @@ async def respond(runtime, answer):
         pending or (action_id and history and history[-1].get("calendar_action_id") == action_id)
     )
     if status_question(text, active_event_context):
-        if action_id:
-            from app.calendar.event_creation import response
+        if action_id or pending:
+            from app.conversation.goal_review import calendar_status
 
-            async with runtime.factory() as session:
-                return await response(session, runtime.owner, action_id)
-        if pending:
-            pending["last_request_id"] = request.request_id
+            return await calendar_status(runtime)
         return {
             "kind": "message",
             "text": "I don't have a confirmed Calendar event for this request yet.",
@@ -149,10 +146,9 @@ async def respond(runtime, answer):
     )
     if calendar_guidance:
         if action_id:
-            from app.calendar.event_creation import response
+            from app.conversation.goal_review import calendar_status
 
-            async with runtime.factory() as session:
-                return await response(session, runtime.owner, action_id)
+            return await calendar_status(runtime)
         return {
             "kind": "message",
             "text": "This event still needs details before it can be reviewed.",
@@ -168,10 +164,9 @@ async def respond(runtime, answer):
         re.I,
     ):
         if action_id:
-            from app.calendar.event_creation import response
+            from app.conversation.goal_review import calendar_status
 
-            async with runtime.factory() as session:
-                return await response(session, runtime.owner, action_id)
+            return await calendar_status(runtime)
         return {"kind": "message", "text": "I haven't confirmed that an event was created."}
     return None
 

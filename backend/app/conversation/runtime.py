@@ -24,6 +24,7 @@ from app.conversation import (
     calendar_context,
     email_draft,
     email_review,
+    goal_review,
     goals,
     mail_context,
     mail_goal,
@@ -780,6 +781,8 @@ class Runtime:
             return await memory.recall(self, args)
         if name == "review_email_draft":
             return await email_review.review(self, presentation=args.presentation)
+        if name == "review_conversation_goal":
+            return await goal_review.review(self, **args.model_dump())
         if name in {"prepare_email_draft", "start_email_draft", "continue_email_draft"}:
             if name == "start_email_draft" and _revokes_compose_request(self.request.instruction):
                 raise email_draft.EmailDraftInputError("cancel_requires_email_goal")

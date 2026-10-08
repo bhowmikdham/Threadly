@@ -39,7 +39,8 @@ async def turn(owner, request, *, factory=None, model=None):
             context = await runtime.context()
             response = await engine.run(context, runtime, model)
         if (
-            getattr(runtime, "resumed_task_id", None) == state.get("active_task_id")
+            not getattr(runtime, "reviewed_goal_kind", None)
+            and getattr(runtime, "resumed_task_id", None) == state.get("active_task_id")
             and getattr(runtime, "resumed_task_id", None)
             and response["kind"] in {"message", "clarification"}
         ):
@@ -47,18 +48,29 @@ async def turn(owner, request, *, factory=None, model=None):
             # Surface the selected saved task so it cannot resend the previous one.
             response.setdefault("task_id", runtime.resumed_task_id)
             response.setdefault("task", runtime.active)
-        if getattr(runtime, "resumed_proposal", None) and response["kind"] in {
-            "message",
-            "clarification",
-        }:
+        if (
+            not getattr(runtime, "reviewed_goal_kind", None)
+            and getattr(runtime, "resumed_proposal", None)
+            and response["kind"]
+            in {
+                "message",
+                "clarification",
+            }
+        ):
             response["proposal_id"] = state["proposal_id"]
             response["proposal"] = runtime.resumed_proposal
-        if getattr(runtime, "resumed_goal_id", None) and response["kind"] == "message":
+        if (
+            not getattr(runtime, "reviewed_goal_kind", None)
+            and getattr(runtime, "resumed_goal_id", None)
+            and response["kind"] == "message"
+        ):
             if draft := email_draft.current_text_draft(state):
                 response.setdefault("email_draft", draft)
         from app.calendar import event_choices
 
-        if choices := event_choices.public(state):
+        if (choices := event_choices.public(state)) and getattr(
+            runtime, "reviewed_goal_kind", None
+        ) in {None, "calendar_event"}:
             response.setdefault("calendar_choices", choices)
         if runtime.search_page is not None:
             response["search"] = runtime.search_page
@@ -98,7 +110,10 @@ async def hydrate_response(owner, saved, factory):
             )
         if saved.get("proposal_id"):
             row = await coordinator.owned(session, owner, saved["proposal_id"])
-            if row.state == "planning":
+            review_only = any(
+                t.get("tool") == "review_conversation_goal" for t in saved.get("trace", [])
+            )
+            if row.state == "planning" and not review_only:
                 source = (
                     await session.get(ContextSnapshot, row.context_snapshot_id)
                     if row.context_snapshot_id
@@ -111,7 +126,8 @@ async def hydrate_response(owner, saved, factory):
                 status, value = await coordinator.interpret(row)
                 row = await command_plans.complete(session, owner, row.id, status, value)
             result["proposal"] = await command_plans.view(session, row)
-            result["text"] = proposal_text(result["proposal"]["state"])
+            if not review_only:
+                result["text"] = proposal_text(result["proposal"]["state"])
             await session.commit()
     # No original search snippets are persisted or replayed from stale storage.
     if saved.get("trace") and any(

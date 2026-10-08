@@ -151,6 +151,13 @@ async def test_recorded_review_tool_opens_actual_saved_draft_and_preserves_calen
         scenarios()[2]["turns"][0],
         Model(
             tool("read_email", reference="context-1"),
+            # .7 requires explicit identity in mixed-goal chats. Script only
+            # this binding; retain the previously observed review call below.
+            tool(
+                "select_conversation_goal",
+                goal_id=seed["saved_artifact"]["task_id"],
+                source=scenarios()[2]["turns"][0],
+            ),
             tool(
                 "review_email_draft"
             ),  # Exact observed tool choice must still surface reviewable work.
@@ -343,10 +350,13 @@ async def test_goal_binding_rejects_scope_errors_without_mutating_state(
     with pytest.raises((ApiError, ValueError)) as error:
         await runtime.call("prepare_email_draft", PrepareEmailDraft(**values))
     if violation in {"other_chat", "other_owner"}:
-        assert error.value.code == {
-            "other_chat": "conversation_goal_missing",
-            "other_owner": "conversation_not_found",
-        }[violation]
+        assert (
+            error.value.code
+            == {
+                "other_chat": "conversation_goal_missing",
+                "other_owner": "conversation_not_found",
+            }[violation]
+        )
     elif violation == "cancel_ambiguous":
         assert error.value.reason == "email_goal_selection_required"
     else:
@@ -405,7 +415,16 @@ async def test_reopened_task_replays_existing_artifact_and_rejects_other_owner(
         expected_version=seed["previous"]["version"],
     )
     response = await service.turn(
-        1, request, factory=db_sessionmaker, model=Model(tool("review_email_draft"))
+        1,
+        request,
+        factory=db_sessionmaker,
+        model=Model(
+            tool(
+                "review_conversation_goal",
+                goal_id=seed["saved_artifact"]["task_id"],
+                source=request.instruction,
+            )
+        ),
     )
     replay = await service.turn(1, request, factory=db_sessionmaker, model=Model())
     assert replay["task_id"] == response["task_id"] == seed["saved_artifact"]["task_id"]
@@ -421,7 +440,7 @@ async def test_reopening_refreshes_stale_revision_before_reporting_save_status(
 ):
     from app.actions import gmail_draft
     from app.assistant import draft_review
-    from app.conversation import email_review
+    from app.conversation import goal_review
     from app.conversation.runtime import Runtime
     from app.db.models import ArtifactRevision
     from app.schemas.draft_review import DraftRecipients, EditDraftRequest
@@ -458,7 +477,9 @@ async def test_reopening_refreshes_stale_revision_before_reporting_save_status(
         return {"state": "succeeded", "source_artifact_id": original.id, "save_id": "old-save"}
 
     monkeypatch.setattr(gmail_draft, "lookup", old_receipt)
-    result = await email_review.review(runtime, presentation="open")
+    result = await goal_review.review(
+        runtime, goal_id=original.task_id, source=runtime.request.instruction, presentation="open"
+    )
     assert result["task"]["artifact_id"] == revised.id != original.id
     assert runtime.artifact.payload["content"]["body"] == "Please send the updated agenda."
     assert result["email_draft_review"]["save_status"] == "earlier_revision"

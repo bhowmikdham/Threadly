@@ -13,6 +13,8 @@ def requested(runtime):
     if not request:
         return False
     state = getattr(runtime, "state", {})
+    if state.get("active_goal") not in {None, "email_draft", "saved_task", "reply", "task"}:
+        return False
     if not (state.get(email_draft.KEY) or getattr(runtime, "artifact", None)):
         return False
     text = request.instruction.strip()
@@ -62,12 +64,16 @@ async def context(runtime, session):
     from app.actions import gmail_draft
     from app.schemas.assistant import DraftOptions
 
+    if runtime.state.get("active_goal") not in {None, "email_draft", "saved_task", "reply", "task"}:
+        return None
     source = None
     text_draft = email_draft.current_text_draft(runtime.state)
     if text_draft:
         source = ("conversation", text_draft["draft_id"])
     elif runtime.artifact and runtime.artifact.payload.get("kind") == "draft":
         source = ("task", runtime.artifact.task_id)
+    if source is None:
+        return None
     receipt = None
     status = "not_saved"
     if source:
@@ -137,10 +143,30 @@ async def open_existing(runtime):
 
 
 async def review(runtime, *, presentation="status"):
+    from app.conversation import goal_review
+
+    return await goal_review.review(runtime, presentation=presentation, email_only=True)
+
+
+async def selected(runtime, *, presentation="status"):
+    """Only called after the intended owned email/task goal has been resolved."""
     opened = await open_existing(runtime)
     async with runtime.factory() as session:
         value = await context(runtime, session)
     runtime.email_draft_review = value
+    if value is None:
+        pending = runtime.state.get(email_draft.KEY) or {}
+        missing = [field for field in ("recipient", "purpose") if not pending.get(field)]
+        if pending and missing:
+            question = (
+                "Who’s it for, and what would you like to say?"
+                if len(missing) == 2
+                else "Who’s it for?"
+                if missing == ["recipient"]
+                else "What would you like to say?"
+            )
+            return {"kind": "clarification", "text": question}
+        return {"kind": "message", "text": "This request has no draft card to review yet."}
     if presentation == "open" and opened:
         return {
             "kind": "message",
@@ -173,12 +199,6 @@ async def review(runtime, *, presentation="status"):
         text = (
             "Your Google connection changed. "
             "Reload the draft and check its status before continuing."
-        )
-    elif not value["source"]:
-        text = (
-            "I haven’t created a draft card or saved anything in Gmail for this request. "
-            "The earlier chat text is not a saved Gmail draft. I still have your drafting request; "
-            "ask me to prepare the draft again using those details."
         )
     else:
         text = "Your draft is still in this chat. "

@@ -29,6 +29,7 @@ TERMINAL = (
         "prepare_workflow",
         "prepare_email_draft",
         "review_email_draft",
+        "review_conversation_goal",
         "answer_question",
         "revise_draft",
         "read_calendar",
@@ -614,6 +615,18 @@ async def run(context, runtime, model=None):
                                     "trace": trace,
                                 }
                             result = {"json": repair}
+                        elif name == "review_conversation_goal":
+                            trace.append({"tool": name, "status": "invalid"})
+                            result = {
+                                "json": {
+                                    "error": "review_goal_required",
+                                    "message": (
+                                        "Use review_conversation_goal with the intended owned "
+                                        "goal_id and complete current USER source. "
+                                        "Ask which request if ambiguous; do not invent a target."
+                                    ),
+                                }
+                            }
                         elif name == "prepare_calendar_event":
                             # Pydantic errors contain private input. Keep only allowlisted
                             # field names; never serialize its error text or input values.

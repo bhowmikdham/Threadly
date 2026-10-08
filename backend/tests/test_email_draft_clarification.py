@@ -243,28 +243,40 @@ async def test_ambiguous_send_question_and_later_send_never_execute(db_sessionma
         ),
     )
     assert result["kind"] == "clarification"
-    _, state = await prepare(
-        "Draft an email to Alex to clarify the presentation requirements",
-        recipient="Alex",
-        purpose="clarify the presentation requirements",
-        draft=DRAFT,
+    first = request().model_copy(
+        update={"instruction": "Draft an email to Alex to clarify the presentation requirements"}
     )
-    r = runtime("Send it", state)
-    r.factory = db_sessionmaker
-    r.capabilities = {"capabilities": [{"id": "gmail_send", "status": "disabled"}]}
-    result = await engine.run(
-        {},
-        r,
-        Model(
+    await service.turn(
+        1,
+        first,
+        factory=db_sessionmaker,
+        model=Model(
             tool(
-                "respond",
-                kind="message",
-                text="Sending is disabled for this account. You can copy the draft.",
+                "prepare_email_draft",
+                recipient="Alex",
+                purpose="clarify the presentation requirements",
+                draft=DRAFT,
             )
         ),
     )
+    followup = first.model_copy(
+        update={"request_id": str(uuid4()), "expected_version": 1, "instruction": "Send it"}
+    )
+    result = await service.turn(
+        1,
+        followup,
+        factory=db_sessionmaker,
+        model=Model(),
+    )
     assert result["kind"] == "message" and "task_id" not in result
-    assert "active_task_id" not in r.state
+    assert result["email_draft_review"]["chat_can_send"] is False
+    async with db_sessionmaker() as db:
+        from app.db.models import ActionApproval, ActionJob
+
+        state = store.decode(await db.get(Conversation, first.conversation_id))
+        assert "active_task_id" not in state
+        for model in (AssistantTask, ActionApproval, ActionJob):
+            assert await db.scalar(select(func.count()).select_from(model)) == 0
 
 
 @pytest.mark.usefixtures("configured")

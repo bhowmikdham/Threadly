@@ -58,7 +58,7 @@ def observation(runtime, name, values, exc):
     if reason == "source_bound_workflow_required":
         message = "Use prepare_workflow for the source-based draft; preserve the read source."
     elif reason == "draft_artifact_required":
-        message = "Use revise_draft or review_email_draft for the existing saved artifact."
+        message = "Use revise_draft or review_conversation_goal for the existing saved artifact."
     else:
         message = operation + (
             " Copy the complete current USER turn into request_source. Copy new fields only "

@@ -310,6 +310,10 @@ class ReviewEmailDraft(StrictModel):
     )
 
 
+class ReviewConversationGoal(SelectConversationGoal):
+    presentation: Literal["open", "status"] = "open"
+
+
 class AnswerQuestion(StrictModel):
     answer: ClarificationAnswer
 
@@ -336,7 +340,7 @@ TOOLS = {
         "new USER details; retain existing recipient/purpose. When both are known include "
         "draft subject/body, unresolved_fields and sources=[]. An intentional recipient change "
         "revises this goal; starting another email uses start_email_draft. Saved source-based "
-        "artifacts use revise_draft/review_email_draft instead. "
+        "artifacts use revise_draft/review_conversation_goal instead. "
         "No execution or approval. Terminal.",
     ),
     "list_conversation_goals": (
@@ -384,6 +388,17 @@ TOOLS = {
         "Select an older goal first if needed. Retains unrelated goals. Never saves, sends, "
         "inserts, approves, "
         "or changes permissions; Gmail creation still requires the user's card click. Terminal.",
+    ),
+    "review_conversation_goal": (
+        ReviewConversationGoal,
+        "Review the intended owned goal: supply its exact goal_id and copy the complete "
+        "current USER turn into source. Returns its actual current Calendar action, email "
+        "draft, saved task or proposal according to its stored kind. Use presentation=status "
+        "for status/confirmation/button guidance, open to reopen existing work. Ask which "
+        "request if ambiguous; never guess from a pronoun or select an unrelated draft. "
+        "list_conversation_goals(include_closed=true) can find closed Calendar requests "
+        "whose action status is still reviewable. Review never reopens a closed request, "
+        "regenerates work, approves, writes providers, or changes permissions. Terminal.",
     ),
     "prepare_email_draft": (
         PrepareEmailDraft,
@@ -578,6 +593,6 @@ def tool_config():
                 }
             }
             for name, (schema, description) in TOOLS.items()
-            if name != "prepare_email_draft"
+            if name not in {"prepare_email_draft", "review_email_draft"}
         ]
     }
