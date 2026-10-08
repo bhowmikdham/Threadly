@@ -337,7 +337,11 @@ export function VoiceOrb({
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
     // The orb stays centred, and only lifts for replies that offer choices.
-    [docked, setDocked] = useState(false)
+    [docked, setDocked] = useState(false),
+    // Muted: Threadly stops listening (and ignores the mic) until unmuted.
+    [muted, setMuted] = useState(false)
+  const mutedRef = useRef(false)
+  const applyMute = useRef<(muted: boolean) => void>(() => {})
   const overlay = useRef<HTMLDivElement>(null)
   const phaseRef = useRef<Phase>("listening")
   const phaseSince = useRef(performance.now())
@@ -394,6 +398,7 @@ export function VoiceOrb({
       if (stopped || closed.current || broken) return
       heard = ""
       move("listening")
+      if (mutedRef.current) return
       try {
         r.start()
       } catch {}
@@ -418,11 +423,23 @@ export function VoiceOrb({
         )
         .finally(() => (ready = true))
 
-      const IGNORE_PHRASES = ["hello", "hi", "how are you", "thank you", "thanks"]
-      let cleanSaid = said.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
-      cleanSaid = cleanSaid.replace(/^(hello|hi|hey|good morning|good afternoon)\s+/, "").trim();
-      
-      const shouldAcknowledge = !IGNORE_PHRASES.includes(cleanSaid) && cleanSaid.length > 0;
+      const IGNORE_PHRASES = [
+        "hello",
+        "hi",
+        "how are you",
+        "thank you",
+        "thanks"
+      ]
+      let cleanSaid = said
+        .toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
+        .trim()
+      cleanSaid = cleanSaid
+        .replace(/^(hello|hi|hey|good morning|good afternoon)\s+/, "")
+        .trim()
+
+      const shouldAcknowledge =
+        !IGNORE_PHRASES.includes(cleanSaid) && cleanSaid.length > 0
 
       if (shouldAcknowledge) {
         await speak(ACKNOWLEDGE, (value) => (voice.level = value))
@@ -455,7 +472,13 @@ export function VoiceOrb({
       listen()
     }
     r.onresult = (e: any) => {
-      if (stopped || closed.current || phaseRef.current !== "listening") return
+      if (
+        stopped ||
+        closed.current ||
+        mutedRef.current ||
+        phaseRef.current !== "listening"
+      )
+        return
       let text = ""
       for (let i = 0; i < e.results.length; i++)
         text += e.results[i][0].transcript
@@ -485,7 +508,21 @@ export function VoiceOrb({
     // Chrome ends recognition after a long pause; keep listening while it is
     // the user's turn.
     r.onend = () => {
-      if (phaseRef.current === "listening") listen()
+      if (phaseRef.current === "listening" && !mutedRef.current) listen()
+    }
+    // Mute: stop recognition, drop any half-heard words and silence the mic
+    // tap so the user can't trigger barge-in. Unmute resumes listening.
+    applyMute.current = (value) => {
+      mutedRef.current = value
+      stream?.getTracks().forEach((t) => (t.enabled = !value))
+      if (value) {
+        clearTimeout(silence)
+        heard = ""
+        mic.level = 0
+        try {
+          r.abort()
+        } catch {}
+      } else if (phaseRef.current === "listening") listen()
     }
     // The orb follows the user's voice while listening, Threadly's while
     // speaking, and a soft pulse while thinking.
@@ -555,6 +592,7 @@ export function VoiceOrb({
           return
         }
         stream = s
+        s.getTracks().forEach((t) => (t.enabled = !mutedRef.current))
         audio = new AudioContext()
         const analyser = audio.createAnalyser()
         analyser.fftSize = 512
@@ -599,8 +637,21 @@ export function VoiceOrb({
       </button>
       <Orb level={level} />
       <p className="voice-status" role="status">
-        {notice || labels[phase]}
+        {notice || (muted && phase === "listening" ? "Muted" : labels[phase])}
       </p>
+      <button
+        className="voice-mute"
+        type="button"
+        aria-pressed={muted}
+        aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+        onClick={() => {
+          const next = !mutedRef.current
+          setMuted(next)
+          applyMute.current(next)
+        }}>
+        <Icon name={muted ? "mic-off" : "mic"} size={16} />
+        {muted ? "Unmute" : "Mute"}
+      </button>
     </div>
   )
 }

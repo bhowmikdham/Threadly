@@ -49,6 +49,41 @@ const say = (text: string) =>
     })
   )
 
+describe("mute button", () => {
+  it("sits below the status, stops listening and ignores speech while muted, then resumes", async () => {
+    const respond = vi.fn().mockResolvedValue("Hi.")
+    render(<VoiceOrb respond={respond} onClose={vi.fn()} />)
+    const mute = screen.getByRole("button", { name: "Mute microphone" })
+    expect(mute.previousElementSibling?.getAttribute("role")).toBe("status")
+    fireEvent.click(mute)
+    expect(recognizer.abort).toHaveBeenCalled()
+    expect(screen.getByRole("status").textContent).toBe("Muted")
+    const starts = recognizer.start.mock.calls.length
+    act(() => recognizer.onend())
+    expect(recognizer.start).toHaveBeenCalledTimes(starts)
+    say("Check my inbox")
+    await act(() => vi.advanceTimersByTimeAsync(1500))
+    expect(respond).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Unmute microphone" }))
+    expect(recognizer.start).toHaveBeenCalledTimes(starts + 1)
+    expect(screen.getByRole("status").textContent).toBe("Listening…")
+    say("Check my inbox")
+    await act(() => vi.advanceTimersByTimeAsync(1500))
+    expect(respond).toHaveBeenCalledWith("Check my inbox")
+  })
+  it("stays muted after a reply finishes instead of listening again", async () => {
+    const respond = vi.fn().mockResolvedValue("Here it is.")
+    render(<VoiceOrb respond={respond} onClose={vi.fn()} />)
+    say("Check my inbox")
+    await act(() => vi.advanceTimersByTimeAsync(1220))
+    fireEvent.click(screen.getByRole("button", { name: "Mute microphone" }))
+    const starts = recognizer.start.mock.calls.length
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    expect(recognizer.start).toHaveBeenCalledTimes(starts)
+    expect(screen.getByRole("status").textContent).toBe("Muted")
+  })
+})
+
 describe("voice conversation", () => {
   it("uses the current turn handler after the first reply updates conversation state", async () => {
     const firstTurn = vi.fn().mockResolvedValue("What should I call the event?")
