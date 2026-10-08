@@ -1,4 +1,4 @@
-"""Visual classification graph pinned to the selected Claude Haiku 4.5 model."""
+"""Visual classification graph pinned to an explicit Australian Haiku release."""
 
 import json
 from pathlib import Path
@@ -10,22 +10,26 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.classification.contracts import StrictModel
 from app.config import get_settings
+from app.model_client.haiku import HAIKU_45, HAIKU_55, request_options
 from app.model_client.structured import reject_duplicate_keys
 from app.workflows.bedrock_flows import FlowError, _definition_equal
 
 REGION = "ap-southeast-2"
-HAIKU = "anthropic.claude-haiku-4-5-20251001-v1:0"
+HAIKU = HAIKU_45  # Existing releases and CLI defaults remain explicit rollback assets.
 FLOW_RELEASE = "classification-flow-1.0.0"
 
 
-def models(account):
+def models(account, model=HAIKU):
+    if model not in (HAIKU_45, HAIKU_55):
+        raise ValueError("Select an approved Australian Haiku model")
     return {
-        "haiku": f"arn:aws:bedrock:{REGION}:{account}:inference-profile/au.{HAIKU}",
+        "haiku": f"arn:aws:bedrock:{REGION}:{account}:inference-profile/au.{model}",
     }
 
 
 def prompt_variant(model):
     prompt = Path(__file__).with_name("prompt.txt").read_text()
+    options = request_options(model, 1500)
     return {
         "name": "classify", "modelId": model, "templateType": "CHAT",
         "templateConfiguration": {"chat": {
@@ -33,7 +37,8 @@ def prompt_variant(model):
             "messages": [{"role": "user", "content": [{"text": "{{request}}"}]}],
             "inputVariables": [{"name": "request"}],
         }},
-        "inferenceConfiguration": {"text": {"maxTokens": 1500}},
+        "inferenceConfiguration": {"text": options.pop("inferenceConfig")},
+        **options,
     }
 
 
@@ -84,7 +89,9 @@ class ClassificationFlow(StrictModel):
         account = self.flow_arn.split(":")[4]
         if (self.alias_id == "TSTALIASID" or self.execution_role_arn.split(":")[4] != account
                 or self.prompt_arn.split(":")[4] != account
-                or self.model_profile_arn not in models(account).values()
+                or self.model_profile_arn not in {
+                    models(account, model)["haiku"] for model in (HAIKU_45, HAIKU_55)
+                }
                 or self.definition_hash != digest(definition(self.prompt_arn))):
             raise ValueError("Unrecognized classification Flow release")
         return self

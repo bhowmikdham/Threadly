@@ -10,6 +10,7 @@ from contextlib import suppress
 from typing import Any
 
 from app.config import get_settings
+from app.model_client.haiku import is_haiku_55, request_options
 from app.model_client.providers import ProviderError
 
 
@@ -43,7 +44,7 @@ class BedrockProvider:
             result = client.converse(
                 modelId=model,
                 messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={"maxTokens": max_tokens, "temperature": 0.0},
+                **request_options(model, max_tokens, temperature=0.0),
             )
             if result.get("stopReason") != "end_turn":
                 raise ProviderError("bedrock did not produce a complete text response")
@@ -51,6 +52,10 @@ class BedrockProvider:
             blocks = message["content"]
             if message["role"] != "assistant" or not blocks:
                 raise ProviderError("bedrock returned an invalid response")
+            # One-shot text calls never replay reasoning. Select text by type;
+            # reasoning must never be rendered as an answer or parsed as JSON.
+            if is_haiku_55(model):
+                blocks = [b for b in blocks if set(b) != {"reasoningContent"}]
             if any(set(block) != {"text"} or not isinstance(block["text"], str)
                    for block in blocks):
                 raise ProviderError("bedrock returned unsupported content")

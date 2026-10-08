@@ -25,6 +25,12 @@ and an alias verified before/after invocation. The backend checks the prompt,
 model, graph and role; it does not accept a console-edited replacement release.
 See [Flow provisioning and evaluation](classification/VISUAL-FLOWS.md).
 
+The [Haiku 5.5 migration](haiku-55-migration.md) adds explicit compatibility to
+the active Converse adapters and classification Flow builder. It preserves the
+non-thinking request policy, AU routing boundaries, and existing 4.5 release pins.
+Deployment and AWS access approval are separate; this code does not select 5.5
+automatically. Runtime does not call CountTokens.
+
 Conversation release 1.7.0 combines direct Calendar creation with the
 [shared email context design](shared-mail-context.md):
 provider-thread reads, a separate reply target, up to five evidence threads,

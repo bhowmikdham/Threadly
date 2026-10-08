@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provision the selected Haiku 4.5 classification Flow; never activate the application.
+"""Provision an explicit Australian Haiku classification Flow; never activate the application.
 
 Run with the backend dependencies installed, AWS_PROFILE set, and --output pointing
 outside the checkout. --render-only makes no AWS calls and uses a synthetic account.
@@ -23,6 +23,7 @@ from app.classification.flows import (  # noqa: E402
     prompt_variant,
     verify_target,
 )
+from app.model_client.haiku import HAIKU_55  # noqa: E402
 from app.workflows.bedrock_flows import _definition_equal  # noqa: E402
 
 
@@ -143,21 +144,24 @@ def publish(aws, arn, role, model, graph, tags):
 
 def run(args, aws=None):
     aws = aws or provision.Aws()
+    selected_model = getattr(args, "model", HAIKU)
+    candidates = models("123456789012", selected_model)  # Validate before any AWS operation.
     os.umask(0o077)
     if args.render_only:
         account = "123456789012"
     else:
         account = aws("sts", "get-caller-identity")["Account"]
         profile = aws("bedrock", "get-inference-profile",
-                      {"inferenceProfileIdentifier": "au." + HAIKU})
-        provision.validate_profile(profile, account)
+                      {"inferenceProfileIdentifier": "au." + selected_model})
+        provision.validate_profile(profile, account, model=selected_model)
     args.output.mkdir(parents=True, exist_ok=True)
     prompts = {}
-    for key, model in models(account).items():
+    candidates = models(account, selected_model)
+    for key, model in candidates.items():
         prompts[key] = (f"arn:aws:bedrock:{REGION}:{account}:prompt/HAIKU12345:1"
                         if args.render_only else ensure_prompt(aws, key, model))
         provision.write_json(args.output / "prompts.json", prompts)
-    template, graphs, fingerprint, tags = bundle(account, prompts)
+    template, graphs, fingerprint, tags = bundle(account, prompts, model=selected_model)
     if len(provision.canonical(template).encode()) > 51200:
         raise RuntimeError("Template exceeds inline CloudFormation limit.")
     stack = "threadly-classification-" + fingerprint[:12]
@@ -182,7 +186,7 @@ def run(args, aws=None):
         outputs = provision.ensure_stack(aws, stack, template, tags)
         manifest["role_outputs"] = outputs
         for key, graph in graphs.items():
-            model = models(account)[key]
+            model = candidates[key]
             arn = ensure_flow(aws, stack + "-" + key.replace("_", "-"), graph,
                               outputs["HaikuRoleArn"], tags)
             manifest["resources"][key] = arn
@@ -209,6 +213,8 @@ def main():
     mode.add_argument("--prepare-assets", action="store_true",
                       help="Publish prompts and render real-account assets for validation")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--model", choices=[HAIKU, HAIKU_55], default=HAIKU,
+                        help="Explicit model; defaults to the existing 4.5 rollback release")
     run(parser.parse_args())
 
 

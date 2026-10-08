@@ -7,10 +7,12 @@ from app.classification.contracts import Decision
 from app.classification.flows import FLOW_RELEASE, HAIKU, REGION, definition, models, prompt_variant
 
 
-def bundle(account, prompts):
+def bundle(account, prompts, *, model=HAIKU):
     if not re.fullmatch(r"[0-9]{12}", account):
         raise ValueError("Invalid account")
-    candidates = models(account)
+    candidates = models(account, model)
+    selected_model = model
+    model_version = "4.5" if model == HAIKU else "5.5"
     if set(prompts) != set(candidates):
         raise ValueError("Provide only the selected Haiku prompt version")
     graphs = {key: definition(prompts[key]) for key in candidates}
@@ -28,7 +30,7 @@ def bundle(account, prompts):
         statements.append({
             "Effect": "Allow",
             "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-            "Resource": [f"arn:aws:bedrock:{r}::foundation-model/{HAIKU}"
+            "Resource": [f"arn:aws:bedrock:{r}::foundation-model/{selected_model}"
                          for r in (REGION, "ap-southeast-4")],
             "Condition": {"StringEquals": {"bedrock:InferenceProfileArn": model}},
         })
@@ -37,7 +39,8 @@ def bundle(account, prompts):
         resources[role] = {
             "Type": "AWS::IAM::Role",
             "Metadata": {"com.aws.cloudformation.Context": {
-                "why": "Classification role limits inference to the selected Haiku 4.5 model.",
+                "why": ("Classification role limits inference to the selected "
+                        f"Haiku {model_version} model."),
                 "must": ["No mail, storage, secrets or tool permissions.",
                          "Bedrock trust restricted to this account and Sydney Flows."],
             }},
