@@ -302,11 +302,8 @@ async def test_duplicate_names_need_choice_and_click_before_date_keeps_fields(
     assert result["calendar_action"]["preview"]["event"]["summary"] == "Focus"
 
 
-async def test_newly_supplied_relative_date_uses_its_followup_anchor(monkeypatch):
-    def stop(*args, **kwargs):
-        raise RuntimeError("stop before provider")
-
-    from app.calendar import event_creation
+def test_newly_supplied_relative_date_uses_its_followup_anchor():
+    from app.calendar import event_draft
     from app.schemas.conversation import PrepareCalendarEvent
 
     old = datetime(2026, 10, 5, 12, tzinfo=UTC)
@@ -322,20 +319,21 @@ async def test_newly_supplied_relative_date_uses_its_followup_anchor(monkeypatch
         },
         request=SimpleNamespace(instruction="tomorrow", request_id=str(uuid4())),
         calendar_anchor=new,
-        factory=stop,
     )
-    # The factory is deliberately unavailable after source validation/state capture.
-    with pytest.raises(RuntimeError, match="stop before provider"):
-        await event_creation.prepare(
-            runtime,
-            PrepareCalendarEvent(
-                continue_previous=True,
-                intent={"operation": "resume", "source": "tomorrow"},
-                date={"kind": "relative", "offset_days": 1},
-                date_source="tomorrow",
-            ),
-        )
-    assert runtime.state["calendar_event_request"]["anchor"] == new.isoformat()
+    # Inspect the proposed state before preference-dependent date validation and
+    # persistence. A rejected interpretation must not publish this state early.
+    _, saved, _ = event_draft.merge(
+        runtime,
+        PrepareCalendarEvent(
+            continue_previous=True,
+            intent={"operation": "resume", "source": "tomorrow"},
+            date={"kind": "relative", "offset_days": 1},
+            date_source="tomorrow",
+        ),
+        runtime.state["calendar_event_request"],
+    )
+    assert saved["anchor"] == new.isoformat()
+    assert runtime.state["calendar_event_request"]["anchor"] == old.isoformat()
 
 
 async def test_separate_title_day_and_time_answers_only_ask_for_missing_fields(

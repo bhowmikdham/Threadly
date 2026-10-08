@@ -383,6 +383,8 @@ def retain_partial(runtime, args, pending, origin, error):
         try:
             if isinstance(error, IncompleteEventTitle) and field == "title":
                 raise error
+            if isinstance(error, FieldRepairRequired) and field == error.field:
+                raise error
             if (
                 field == "date"
                 and field in cited

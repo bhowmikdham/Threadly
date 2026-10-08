@@ -11,7 +11,15 @@ from app.actions import calendar_preview
 from app.actions import service as actions
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import event_choices, event_draft, event_timezone, intent, permissions, service
+from app.calendar import (
+    date_grounding,
+    event_choices,
+    event_draft,
+    event_timezone,
+    intent,
+    permissions,
+    service,
+)
 from app.calendar.conversation_tools import RequestClarification, duration, literal, resolve_window
 from app.calendar.time_resolution import parse_clock, wall_instants
 from app.capabilities.service import build_capabilities
@@ -27,7 +35,7 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.2.0"
+POLICY = "direct-calendar-event-1.2.1"
 
 
 user_directive = intent.user_directive
@@ -109,7 +117,32 @@ def source_fields(args, text, previous_calendar_names=(), *, constraints=True):
 def complete_trailing_title(args, text):
     # Narrow unambiguous form: "make an event at <time> <date> for <title>".
     # Do not infer titles when dates or other fields still follow the marker.
-    if not (args.title and args.date_source and args.time_source):
+    if not args.title:
+        return
+
+    quoted = re.search(
+        r"\b(?:for|called|named|titled|title(?:\s+to)?|event)\s+"
+        r"(?:\"([^\"\n]+)\"|“([^”\n]+)”|'([^'\n]+)'|‘([^’\n]+)’)",
+        text,
+        re.I,
+    )
+    if quoted:
+        literal_title = next(value for value in quoted.groups() if value is not None)
+        if " ".join(args.title.casefold().split()) != " ".join(literal_title.casefold().split()):
+            raise event_draft.IncompleteEventTitle(literal_title)
+
+    # Explicit naming preserves its article even when the name was not quoted.
+    # This targets article loss only; it never guesses a different title.
+    named = re.search(
+        r"\b(?:called|named|titled|title(?:\s+to)?)\s+[\"“'‘]?((?:a|an|the)\s+"
+        + re.escape(args.title.strip("\"“”'‘’"))
+        + r")(?!\w)",
+        text,
+        re.I,
+    )
+    if named:
+        raise event_draft.IncompleteEventTitle(named[1])
+    if not (args.date_source and args.time_source):
         return
 
     def normalized(value):
@@ -121,7 +154,8 @@ def complete_trailing_title(args, text):
         before = normalized(text[: marker.start()].rsplit("\n", 1)[-1])
         if any(normalized(source) not in before for source in (args.date_source, args.time_source)):
             continue
-        title = text[marker.end() :].split("\n", 1)[0].strip().rstrip(".!?").strip().strip('"“”')
+        raw_title = text[marker.end() :].split("\n", 1)[0].strip().rstrip(".!?").strip()
+        title = raw_title.strip("\"“”'‘’")
         if re.fullmatch(r"(?:that|this|it|the meeting|the event)", title, re.I):
             continue
         other_fields = (
@@ -137,9 +171,11 @@ def complete_trailing_title(args, text):
             or any(value and normalized(value) in normalized(title) for value in other_fields)
         ):
             return
-        without_article = re.sub(
-            r"^(?:a|an|the)\s+(?=(?:meeting|call|appointment|event)\b)", "", title, flags=re.I
-        )
+        # A lowercase indefinite article in a bare, unquoted description is
+        # grammatical scaffolding. Preserve all remaining words, quoted names,
+        # capitalized names and definite articles (e.g. The Office).
+        generic = raw_title == title and re.match(r"^(?:a|an)\s+(?=[a-z])", title)
+        without_article = title[generic.end() :] if generic else title
         if normalized(args.title.strip('"“”')) not in {
             normalized(title),
             normalized(without_article),
@@ -148,21 +184,65 @@ def complete_trailing_title(args, text):
         return
 
 
+def resolve_date(args, anchor, timezone):
+    window = CalendarWindow(subject="self", date=args.date, date_source=args.date_source)
+    zone = ZoneInfo(timezone)
+    start, end = resolve_window(window, args.date_source, anchor, timezone)
+    first, last = start.astimezone(zone).date(), end.astimezone(zone).date()
+    date_grounding.validate(args.date_source, first, last, anchor.astimezone(zone).date())
+    if (last - first).days != 1:
+        raise RequestClarification("Choose one date for this event.")
+    return first
+
+
+async def validate_date(runtime, args, saved, pending):
+    """Reject a date contradiction before replacing state or retiring an action."""
+    if not args.date:
+        return
+    timezone = saved.get("date_anchor_timezone")
+    if (
+        not timezone
+        and pending
+        and pending.get("action_id")
+        and saved["anchor"] == pending["anchor"]
+        and saved["arguments"]["date"] == pending["arguments"].get("date")
+        and saved["arguments"]["date_source"] == pending["arguments"].get("date_source")
+    ):
+        # Pre-1.2.1 drafts pinned the resolved day but not its anchor zone. Recover
+        # that zone only from the same owned immutable preview, never a new zone
+        # correction or current preference that could move the original local day.
+        async with runtime.factory() as session:
+            old = await session.scalar(
+                select(AssistantAction).where(
+                    AssistantAction.id == pending["action_id"],
+                    AssistantAction.user_id == runtime.owner,
+                )
+            )
+            if old:
+                timezone = old.payload["event"]["start"]["timeZone"]
+    if not timezone and args.timezone:
+        timezone = event_timezone.zone_name(args.timezone)
+    if not timezone:
+        async with runtime.factory() as session:
+            pref = await session.get(CalendarPreference, runtime.owner)
+            if pref is None:
+                return  # The existing preference gate still blocks any preview.
+            timezone = pref.preferences["timezone"]
+    resolve_date(args, datetime.fromisoformat(saved["anchor"]), timezone)
+    saved["date_anchor_timezone"] = timezone
+
+
 def resolve_times(args, text, preferences, anchor, date_timezone=None):
     if not args.date or not args.time:
         raise RequestClarification("What day and time should I use?")
     literal(args.date_source, text)
-    window = CalendarWindow(subject="self", date=args.date, date_source=args.date_source)
     timezone = event_timezone.zone_name(args.timezone) if args.timezone else preferences["timezone"]
-    date_zone = ZoneInfo(date_timezone or timezone)
-    start_day, end_day = resolve_window(window, args.date_source, anchor, str(date_zone))
+    day = resolve_date(args, anchor, date_timezone or timezone)
     zone = ZoneInfo(timezone)
-    if (end_day.astimezone(date_zone).date() - start_day.astimezone(date_zone).date()).days != 1:
-        raise RequestClarification("Choose one date for this event.")
     clocks = parse_clock(args.time)
     if len(clocks) != 1:
         raise RequestClarification("What time should it start? Please include AM or PM.")
-    starts = wall_instants(start_day.astimezone(date_zone).date(), clocks[0], zone)
+    starts = wall_instants(day, clocks[0], zone)
     if len(starts) != 1:
         raise RequestClarification(
             "That local time is ambiguous or does not exist. Choose another time."
@@ -243,6 +323,7 @@ async def prepare(runtime, args):
         }
     try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
+        await validate_date(runtime, args, saved, pending)
     except (
         event_draft.IntentSourceMismatch,
         event_draft.IncompleteEventTitle,

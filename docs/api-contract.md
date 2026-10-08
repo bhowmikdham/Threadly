@@ -1383,6 +1383,34 @@ an approval, and all existing account/capability and exact-payload write checks 
 
 ### Calendar voice follow-ups (conversation 1.8.2)
 
+Direct-event policy **1.2.1** checks resolved dates against recognized user date
+constraints before replacing draft state or retiring an existing preview. English
+weekday names and this/next-week qualifiers, literal ISO dates, and supported
+relative-day phrases must agree with the resolved local day. The check applies
+regardless of the model's date representation, including backend-canonicalized
+absolute dates retained from older turns. Unrecognized date wording continues
+through the existing semantic interpretation path; this bounded consistency check
+does not claim to validate every language or paraphrase.
+
+A contradiction returns `calendar_field_interpretation_mismatch` for `date` within
+the existing bounded model repair loop. It cannot create a preview or replace the
+previous immutable action or approval. Other independently grounded fields remain
+available for repair. Date provenance pins its original local anchor timezone;
+later time or timezone corrections retain that date. Older previews without that
+metadata recover it from the same owned action. A newly supplied date uses its new
+turn/citation anchor and timezone. Duration still uses the requested value or the
+unchanged saved default.
+
+For an unambiguous trailing `for <title>` phrase, an unquoted lowercase indefinite
+article (`a` or `an`) before a lowercase word may be omitted, with all remaining
+words preserved. Thus `for a class` accepts `Class`, without a list of event nouns.
+Quoted and explicitly named titles, capitalized names, definite articles such as
+`The Office`, and substantive words remain protected. This allows conservative
+display cleanup; it does not invent or automatically rewrite a title.
+
+These are backend-only validation changes: no schema migration, frontend contract,
+OAuth scope, approval setting or provider-write permission changes.
+
 “Make an event” uses the same preparation path as “create an event”. A model's
 truncated intent source, incomplete unambiguous trailing title or attempted
 continuation of a new creation goal is repaired within the existing bounded tool
