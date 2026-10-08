@@ -65,3 +65,14 @@ pass after protecting retained user provenance and carrying timezone clarificati
 forward. The focused source/approval/field-repair set passes 53 tests. The 6da4c4a
 full suite passed 2,482 tests, but does not validate these subsequent fixes; the
 final commit must pass its own full suite before the patch is reported verified.
+
+Final review also checked implicit source-zone extraction after a user clear,
+including the secondary timezone binder reading a cited clock. Retained USER
+provenance now protects empty timezone values in both paths. The exact 3-turn
+cases cover both “Clear the timezone” and “Remove AEST,” with and without a time
+field quote that includes AEST. Baseline fec62a1 rejected these clear requests at
+validation before the reread; the review's isolated probe demonstrated the later
+implicit overwrite separately. Typed clear validation now recognizes the stored
+source spelling and consumes only the validated timezone label. All four complete
+continuations pass. The combined focused set passes 57 tests. Fec62a1 passed 2,485
+full-suite tests before this last correction; final-head validation is separate.

@@ -332,7 +332,11 @@ async def prepare(runtime, args):
         args,
         runtime.request.instruction
         + "\n"
-        + "\n".join(value["source"] for value in field_citations.values()),
+        + "\n".join(
+            value["source"]
+            for field, value in field_citations.items()
+            if value.get("kind") != "email" or field == "timezone"
+        ),
     )
     if (
         args.timezone

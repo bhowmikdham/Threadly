@@ -217,6 +217,8 @@ def merge(runtime, args, pending):
             old_values = old.get(field) or []
             if not isinstance(old_values, list):
                 old_values = [old_values] if isinstance(old_values, str) else []
+            if field in SOURCE_FIELDS and (old_source := old.get(SOURCE_FIELDS[field])):
+                old_values = [*old_values, old_source]
             if not re.search(r"\b(?:" + names[field] + r")\b", change.source, re.I) and not any(
                 str(v).casefold() in change.source.casefold() for v in old_values
             ):
@@ -295,10 +297,17 @@ def merge(runtime, args, pending):
             check.pop(source, None)
         if field in changes:
             changes[field].update(citation)
+    cleared_zone_labels = (
+        ["timezone", "time zone"]
+        if any(
+            change.field == "timezone" and change.operation == "clear" for change in args.changes
+        )
+        else []
+    )
     source_fields(
         PrepareCalendarEvent.model_validate(check),
         validation_text,
-        (evidence(old).split("\n") if pending else []) + repeated_sources,
+        (evidence(old).split("\n") if pending else []) + repeated_sources + cleared_zone_labels,
     )
     provenance = dict((pending or {}).get("field_provenance", {}))
     if pending and not provenance:

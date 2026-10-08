@@ -175,11 +175,7 @@ async def resolve(runtime, args, pending):
     user_zone = (
         "timezone" in user_fields
         or (args.timezone_source and args.timezone_source in runtime.request.instruction)
-        or (
-            (pending or {}).get("arguments", {}).get("timezone")
-            and (pending or {}).get("field_provenance", {}).get("timezone", {}).get("kind")
-            != "email"
-        )
+        or "timezone" in retained_user_fields
     )
     timezone_required = bool((previous or {}).get("timezone_required"))
     if not user_zone and envelope.ambiguity != "multiple_events":

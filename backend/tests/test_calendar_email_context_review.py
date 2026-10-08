@@ -325,3 +325,62 @@ async def test_shorter_source_envelope_does_not_clear_unresolved_timezone(
     async with db_sessionmaker() as db:
         state = store.decode(await db.get(Conversation, request.conversation_id))
         assert state["calendar_event_request"]["email_source"]["timezone_required"]
+
+
+@pytest.mark.parametrize("clear_text", ["Remove AEST", "Clear the timezone"])
+@pytest.mark.parametrize("repeat_clock", [False, True])
+async def test_implicit_email_zone_cannot_restore_a_user_cleared_timezone(
+    inspection, db_sessionmaker, clear_text, repeat_clock
+):
+    configured, fields, quote = inspection
+    quote = quote.replace("8:30 AM", "8:30 AM AEST")
+    configured[0].text = quote
+    fields["email_source"]["event_quote"] = quote
+    request, result = await prepare(db_sessionmaker, fields)
+    request, result = await follow(
+        db_sessionmaker,
+        request,
+        result,
+        clear_text,
+        tool(
+            "prepare_calendar_event",
+            continue_previous=True,
+            intent={"operation": "revise", "source": clear_text},
+            changes=[{"field": "timezone", "operation": "clear", "source": clear_text}],
+        ),
+    )
+    assert result["kind"] == "calendar_event", result
+    text = "Rename it Visit"
+    source = {**fields["email_source"], "fields": []}
+    repeated = {}
+    if repeat_clock:
+        source["fields"] = [{"field": "time", "quote": "8:30 AM AEST"}]
+        repeated = {"time": fields["time"], "time_source": "8:30 AM AEST"}
+    request, result = await follow(
+        db_sessionmaker,
+        request,
+        result,
+        text,
+        tool("read_email", reference="selected", scope="selected_message"),
+        tool(
+            "prepare_calendar_event",
+            continue_previous=True,
+            intent={"operation": "revise", "source": text},
+            changes=[
+                {"field": "title", "operation": "replace", "value": "Visit", "source": "Visit"}
+            ],
+            email_source=source,
+            **repeated,
+        ),
+    )
+    assert result["kind"] == "calendar_event", result
+    assert (
+        result["calendar_action"]["preview"]["event"]["start"]["timeZone"] == "Australia/Melbourne"
+    )
+    async with db_sessionmaker() as db:
+        pending = store.decode(await db.get(Conversation, request.conversation_id))[
+            "calendar_event_request"
+        ]
+        assert pending["arguments"]["timezone"] == ""
+        assert pending["field_provenance"]["timezone"]["operation"] == "clear"
+        assert pending["field_provenance"]["timezone"].get("kind") != "email"
