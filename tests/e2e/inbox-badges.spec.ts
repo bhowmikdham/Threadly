@@ -197,10 +197,12 @@ test("inbox rows get priority, reply and category badges from the classification
       .evaluate((line) => [...line.children].map((c) => c.className))
   ).toEqual(["tl-slot tl-left", "y6", "y2", "tl-slot tl-right"])
 
-  // Projects has its own icon; Attend is spelled out in the tooltip.
+  // Projects has its own icon; Attend is spelled out in the tooltip. a2's
+  // busy reply pauses every row for its Retry-After, so this can take a while.
   await expect(row("a4").locator(".tl-right")).toHaveAttribute(
     "aria-label",
-    "Projects"
+    "Projects",
+    { timeout: 15000 }
   )
   await expect(row("a4").locator(".tl-left")).toHaveAttribute(
     "aria-label",
