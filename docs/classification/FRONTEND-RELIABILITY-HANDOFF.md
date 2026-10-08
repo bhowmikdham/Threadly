@@ -1,7 +1,8 @@
 # Classification reliability handoff — 8 October 2026
 
-Release status: implementation and validation in progress; deployment evidence will
-be recorded separately. This note does not claim these changes are live yet.
+Release status: the corrected backend is deployed and enabled. See the
+[8 October rollout and verification record](ROLLOUT-2026-10-08.md). The frontend
+cooldown changes below remain work for the frontend team.
 
 ## Integration changes
 
