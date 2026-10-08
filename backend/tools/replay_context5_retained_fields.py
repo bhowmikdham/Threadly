@@ -1,7 +1,7 @@
-"""Offline failing acceptance replay of third-diagnostic calls 1–3.
+"""Offline acceptance replay of third-diagnostic calls 1–3.
 
 Outside default discovery; run explicitly against the owned disposable test DB.
-No live model, auth discovery or diagnostic DB reuse. Expected RED until fixed.
+No live model, auth discovery or diagnostic DB reuse. Also imported by the suite.
 """
 # ruff: noqa: F401, F811
 

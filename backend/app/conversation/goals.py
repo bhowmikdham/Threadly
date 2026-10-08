@@ -18,6 +18,41 @@ KEYS = {
     "mail_search": "mail_goal",
 }
 REFERENCE_FIELDS = ("thread_id", "message_id", "context_id", "remembered_scope")
+UPDATES = "_goal_updates"
+
+
+def retain(state, *, assign_ids=False):
+    """Stage backend-validated goal values until the lease-checked commit.
+
+    Capture full values, including deliberate clears. This is a turn-local write
+    set, not a second source of goal identity or of current provider facts.
+    """
+    updates = state.setdefault(UPDATES, {})
+    for kind, key in KEYS.items():
+        value = state.get(key)
+        if value and assign_ids:
+            value.setdefault("goal_id", str(uuid4()))
+        if value and value.get("goal_id"):
+            updates[value["goal_id"]] = {"kind": kind, "value": deepcopy(value)}
+    return updates
+
+
+def payload_for(state, kind, value):
+    label = (
+        value.get("arguments", {}).get("title")
+        or value.get("recipient")
+        or value.get("instruction")
+        or value.get("creation_origin", {}).get("text")
+        or kind
+    )[:160]
+    refs = {}
+    if kind == "reply" and value.get("reference") and value.get("source_identity"):
+        name = value["reference"]
+        refs[name] = {k: v for k, v in value["source_identity"].items() if v}
+        current = state.get("refs", {}).get(name, {})
+        if all(current.get(k) == v for k, v in refs[name].items()):
+            refs[name].update({k: current[k] for k in REFERENCE_FIELDS if current.get(k)})
+    return {"value": deepcopy(value), "label": label, "references": refs}
 
 
 def close(state, value):
@@ -34,22 +69,12 @@ async def persist(session, chat, state, version):
             continue
         identifier = value.setdefault("goal_id", str(uuid4()))
         pointers[kind] = identifier
-        label = (
-            value.get("arguments", {}).get("title")
-            or value.get("recipient")
-            or value.get("instruction")
-            or value.get("creation_origin", {}).get("text")
-            or kind
-        )[:160]
-        refs = {}
-        if kind == "reply" and value.get("reference") and value.get("source_identity"):
-            name = value["reference"]
-            refs[name] = {k: v for k, v in value["source_identity"].items() if v}
-            current = state.get("refs", {}).get(name, {})
-            if all(current.get(k) == v for k, v in refs[name].items()):
-                refs[name].update({k: current[k] for k in REFERENCE_FIELDS if current.get(k)})
-        payload = {"value": deepcopy(value), "label": label, "references": refs}
+    for identifier, update in retain(state).items():
+        kind, value = update["kind"], update["value"]
+        payload = payload_for(state, kind, value)
         existing = await session.get(ConversationGoal, (chat.id, identifier))
+        if existing is not None and existing.kind != kind:
+            raise ApiError(422, "conversation_goal_kind", "A goal cannot change its kind.")
         if kind == "email_draft" and value.get("status") == "drafted" and not value.get("draft"):
             # Compaction may retain the draft only in the UI window. The goal
             # registry keeps its full generated text independently of that cache.
@@ -82,6 +107,8 @@ async def persist(session, chat, state, version):
             existing.updated_version = max(1, version)
             existing.payload_hash = hashed
             existing.payload_enc = encrypt_token(json.dumps(payload, ensure_ascii=False))
+    # Do not serialize the transient write set into chat context or receipts.
+    state.pop(UPDATES, None)
     # A durable task is already an independent goal; keep an identity-only pointer.
     if identifier := state.get("active_task_id"):
         task = await session.get(AssistantTask, identifier)
@@ -203,12 +230,34 @@ async def select_goal(runtime, args, *, expected_kind=None):
     async with runtime.factory() as session:
         chat = await store.owned(session, runtime.owner, runtime.request.conversation_id)
         row = await session.get(ConversationGoal, (chat.id, args.goal_id))
-        if row is None or row.status == "closed":
+        if (
+            row is None
+            or row.status == "closed"
+            or args.goal_id in runtime.state.get("closed_goal_ids", [])
+        ):
             raise ApiError(404, "conversation_goal_missing", "That goal is no longer available.")
         if expected_kind is not None and row.kind != expected_kind:
             raise ApiError(422, "conversation_goal_kind", "Select a goal of the requested kind.")
         payload = json.loads(decrypt_token(row.payload_enc))
         kind = row.kind
+    # Ownership, source, kind and availability are rechecked on every selection.
+    # Only then may newer validated turn state supersede the committed snapshot.
+    update = retain(runtime.state, assign_ids=True).get(row.goal_id)
+    if update and update["kind"] == kind:
+        stored = payload["value"]
+        payload = payload_for(runtime.state, kind, update["value"])
+        working = payload["value"]
+        if (
+            kind == "email_draft"
+            and working.get("status") == "drafted"
+            and not working.get("draft")
+            and working.get("draft_id")
+            and working["draft_id"] == stored.get("draft_id")
+            and stored.get("draft")
+        ):
+            # Generated text may be compacted out of the active cache. Hydrate
+            # only this exact draft identity; never merge older user fields.
+            working["draft"] = stored["draft"]
     value = payload["value"]
     if kind in KEYS:
         runtime.state[KEYS[kind]] = value

@@ -116,10 +116,12 @@ def complete_trailing_title(args, text):
         return " ".join(value.casefold().split())
 
     for marker in re.finditer(r"\bfor\s+", text, re.I):
-        before = normalized(text[: marker.start()])
+        # Repair validation can join original text, this turn and retained
+        # evidence. Do not assemble a title pattern across those source lines.
+        before = normalized(text[: marker.start()].rsplit("\n", 1)[-1])
         if any(normalized(source) not in before for source in (args.date_source, args.time_source)):
             continue
-        title = text[marker.end() :].strip().rstrip(".!?").strip().strip('"“”')
+        title = text[marker.end() :].split("\n", 1)[0].strip().rstrip(".!?").strip().strip('"“”')
         if re.fullmatch(r"(?:that|this|it|the meeting|the event)", title, re.I):
             continue
         other_fields = (
@@ -192,7 +194,18 @@ async def prepare(runtime, args):
         and args.timezone_source in field_citations["time"]["source"]
     ):
         field_citations["timezone"] = field_citations["time"]
-    pending = event_choices.pending(runtime.state) if args.continue_previous else None
+    current = event_choices.pending(runtime.state)
+    # Retrying this turn's failed creation is a field repair, not a reset. A new
+    # USER turn still starts a distinct goal; reviewed candidates stay immutable.
+    repairing_create = (
+        not args.continue_previous
+        and current
+        and current.get("goal_id") == runtime.request.request_id
+        and current.get("last_request_id") == runtime.request.request_id
+        and current.get("origin_pending_validation")
+        and not current.get("action_id")
+    )
+    pending = current if args.continue_previous or repairing_create else None
     if args.continue_previous and not pending:
         return {
             "kind": "clarification",

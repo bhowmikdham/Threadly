@@ -1,7 +1,7 @@
 # Shared conversation context: implementation and review
 
 Status: locally committed, integrated implementation, prompt
-`contextual-conversation-1.8.9+chat-context.5`. Backend base:
+`contextual-conversation-1.8.9+chat-context.6`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
 The frontend incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and
@@ -21,7 +21,13 @@ separates new and continuing email operations and bounds reason-specific repair.
 The [.5 diagnostic](evaluation/chat-context/context5-results.md) now passes the
 new-goal request but exposes a same-turn persisted-goal reload that erases validated
 purpose during text repair. It stopped after three calls; Calendar was not reached.
-The bug remains unfixed and conversational acceptance remains a release gate.
+The [.6 offline repair](evaluation/chat-context/context6-state-ownership.md) now
+preserves validated turn state across reload, repair and focus changes. Its exact
+recorded-response replay passes. The audit also repairs new email/Calendar retries
+and failed email correction retention, while preserving lease, source, identity
+and immutable-action boundaries. This is runtime evidence, not another live
+model result; conversational acceptance remains a release gate. The third ledger
+remains stopped at 3/12 calls, USD 0.10397772 incl-GST, with nine unused calls.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
@@ -66,6 +72,13 @@ A quote proves authorship, not that the model understood the user's meaning.
   the previous goal. Listing is read-only; selecting one restores focus without
   rerunning or approving it. Cancellation closes only the selected typed goal.
   Closed goals are hidden by default. Saved work is not all automatically active.
+- Validated working goal values survive repeated same-turn selection and switching
+  to another goal. A transient write set flushes every changed goal through the
+  existing checkpoint/completion lease transaction; it is removed before chat
+  serialization. Source, ownership, kind and closed-state checks still run on
+  every selection. Explicit clears/corrections supersede old values. See the
+  [canonical state ownership and reload audit](evaluation/chat-context/context6-state-ownership.md)
+  for provider-read boundaries and intentionally atomic reviewed-candidate edits.
 - With multiple retained email goals, continuation must bind an owned email goal
   ID with the current USER request or explicitly select that goal in this turn.
   Missing binding is rejected before mutation. Recipient strings do not route work;

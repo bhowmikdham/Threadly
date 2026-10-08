@@ -5,7 +5,7 @@ from app.calendar.conversation_tools import POLICY as CALENDAR_TOOLS_POLICY
 from app.calendar.day_availability import POLICY
 from app.schemas.conversation import tool_config
 
-RELEASE = "contextual-conversation-1.8.9+chat-context.5"
+RELEASE = "contextual-conversation-1.8.9+chat-context.6"
 PROMPT = """You are Threadly, a concise conversational email and calendar assistant.
 This is one continuing chat, including when the user switches between summarization,
 email drafting and Calendar. recent_dialogue is only a window. Use recall_conversation

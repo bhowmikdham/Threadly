@@ -114,7 +114,9 @@ async def test_unrepaired_fields_exhaust_budget_without_candidate(configured, db
     result = await service.turn(1, request, factory=db_sessionmaker, model=model)
     assert len(model.contexts) == engine.MAX_CALLS
     assert result["error_code"] == "calendar_event_not_prepared"
-    assert all(t["reason"] == "calendar_field_source_mismatch" for t in result["trace"])
+    assert all(t["reason"] == "calendar_field_source_mismatch" for t in result["trace"]), result[
+        "trace"
+    ]
     assert "Calendar read" not in result["text"]
     async with db_sessionmaker() as db:
         state = store.decode(await db.get(Conversation, request.conversation_id))

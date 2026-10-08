@@ -1576,7 +1576,7 @@ no additional schema migration.
 
 ## Unpublished shared chat context protocol
 
-The `contextual-conversation-1.8.9+chat-context.5` prototype adds
+The `contextual-conversation-1.8.9+chat-context.6` prototype adds
 `context_memory_version: 1` to turn/replay/restore responses. This means the backend
 owns goal focus: clients omit a task pointer derived merely from the last displayed
 card, and send a context snapshot only for an explicit attach/detach or initial pin.
@@ -1614,6 +1614,23 @@ errors in total, end the turn with the existing `email_draft_not_prepared` messa
 This bounds invalid-call loops while retaining validated details; it does not prove
 that a model chose the semantically correct goal. No new retry UI or HTTP endpoint
 is introduced.
+
+Within a claimed turn, validated goal fields take precedence over the older
+committed goal payload. Repeated selection still checks current USER source,
+owned chat, goal kind and closed status. Switching focus stages the outgoing
+goal's complete value; checkpoint/completion saves all staged goals atomically
+under the existing lease, then discards the transient staging data. Explicit
+clears and corrections replace old values; selection cannot resurrect a field,
+retired candidate or locally cancelled goal. Provider facts and action/task
+status still use their existing fresh-read and approval checks.
+
+A failed generation can retain validated recipient/purpose corrections while
+leaving the goal in clarification state; it cannot expose the old generated text
+as a draft for the corrected recipient. A repeated new-email/new-event tool call
+can repair fields retained from that same USER request. New USER requests retain
+the existing independent-goal/reset rules. No prompt wording, tool schema or
+external write permission changed in `.6`; its versioned asset identifies the
+corrected runtime behavior. See [state ownership and verification](evaluation/chat-context/context6-state-ownership.md).
 
 Standalone social closings do not repeat Calendar creation instructions.
 Recognized model-generated Calendar control guidance resolves to the current

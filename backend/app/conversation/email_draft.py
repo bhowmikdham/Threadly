@@ -180,6 +180,17 @@ async def prepare(runtime, args):
         return {"kind": "message", "text": "Okay, I won’t continue that draft."}
     if runtime.loaded:
         raise EmailDraftInputError("source_bound_workflow_required")
+    # A repeated start after a text-generation error repairs this turn's new
+    # goal. It must not reset already validated fields or reuse an older goal.
+    repairing_start = (
+        not args.continue_previous
+        and previous
+        and previous.get("origin_request_id") == runtime.request.request_id
+        and previous.get("status") == "clarification"
+        and getattr(runtime, "email_start_repair", False)
+    )
+    if repairing_start:
+        args = args.model_copy(update={"continue_previous": True})
     if args.continue_previous:
         if not previous:
             raise EmailDraftInputError("no_pending_draft")
@@ -360,8 +371,20 @@ async def prepare(runtime, args):
     else:
         # Preserve validated details even when generation needs a repair. A failed
         # text payload must not make the next turn ask for the message again.
-        if not (args.continue_previous and previous.get("status") == "drafted"):
-            runtime.state[KEY] = goal
+        if (
+            args.continue_previous
+            and previous.get("status") == "drafted"
+            and all(values[field] == previous[field] for field in values)
+            and goal["recipient_roles"] == previous.get("recipient_roles", goal["recipient_roles"])
+            and goal["field_provenance"] == previous.get("field_provenance", {})
+            and goal["user_context"] == previous.get("user_context", [])
+        ):
+            # A failed wording-only revision must not erase a reviewable draft
+            # or its save receipt. Changed recipients/purpose/context, however,
+            # cannot expose the old text as a draft of the corrected goal.
+            goal.update({k: previous[k] for k in ("status", "draft_id", "draft") if k in previous})
+        runtime.state[KEY] = goal
+        runtime.email_start_repair = bool(not args.continue_previous or repairing_start)
         if args.draft is None:
             raise EmailDraftInputError("draft_text_required")
         if args.draft.sources:

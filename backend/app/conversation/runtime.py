@@ -2,6 +2,7 @@
 
 import json
 import re
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -748,6 +749,27 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        # Tools may replace a focused slot, or retain validated partial fields
+        # before raising a repair error. Both belong to this leased turn.
+        before = {key: deepcopy(self.state.get(key)) for key in goals.KEYS.values()}
+        prior_updates = deepcopy(self.state.get(goals.UPDATES))
+        goals.retain(self.state)
+        try:
+            return await self._call(name, args)
+        except BaseException:
+            if all(self.state.get(key) == value for key, value in before.items()):
+                # Rejected authority/identity inputs must not mutate even the
+                # transient write set. Validated partial progress is retained.
+                if prior_updates is None:
+                    self.state.pop(goals.UPDATES, None)
+                else:
+                    self.state[goals.UPDATES] = prior_updates
+            raise
+        finally:
+            if any(self.state.get(key) != value for key, value in before.items()):
+                goals.retain(self.state)
+
+    async def _call(self, name, args):
         if name == "list_conversation_goals":
             return await goals.listing(self, **args.model_dump())
         if name == "select_conversation_goal":

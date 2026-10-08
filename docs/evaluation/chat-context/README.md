@@ -1,30 +1,41 @@
 # Shared chat-context verification
 
-Current prompt: **`contextual-conversation-1.8.9+chat-context.5`**. Earlier snapshots
-remain immutable. The [.5 approved diagnostic](context5-results.md) stopped after
-**3/12 paid attempts, USD 0.10397772 including GST**: starting Casey passed in one
-call, but returning to Alex lost the supplied purpose during draft-text repair.
-An exact offline replay proves the backend reloads older persisted fields over
-validated progress within the same turn. **Calendar was not attempted.** Nine
-attempts remain unused after the agreed semantic stop; no automatic resumption or
-window reset is authorized. Both earlier allowances remain exhausted and unchanged.
-The implementation is unpublished, and this retained-purpose bug remains unfixed.
+Current runtime release: **`contextual-conversation-1.8.9+chat-context.6`**. The
+[offline state repair and audit](context6-state-ownership.md) fixes the exact `.5`
+retained-purpose regression across repeated selection, repair and focus changes.
+It covers all typed goal kinds, new-email/Calendar retries, current-turn cancellation,
+explicit corrections/clears, lease-checked persistence and draft/save-receipt retention.
+Prompt wording and tool schemas are unchanged; earlier snapshots remain immutable.
 
-Backend runtime/test head: `7fb055f409c46479bc1cd1194aa870ff93ccf187`, based on
-released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
+The [.5 diagnostic](context5-results.md) remains the latest live evidence. It stopped
+at **3/12 paid attempts, USD 0.10397772 including GST**: starting Casey passed,
+returning to Alex lost purpose during draft-text repair, and **Calendar was not
+attempted**. The `.6` correction passes its recorded-response replay but has no live
+model result. Nine calls remain unused (3 email, 6 Calendar) after the stop-on-regression
+rule; neither a resumption nor a window reset is authorized. The other two ledgers
+remain exhausted and unchanged. The implementation is unpublished and conversational
+acceptance remains open. The repair report contains a concrete gated resume proposal.
+
+Backend base: released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
+The mechanical receipt pins the final `.6` code/test commit and source hashes.
+Final `.6` gates: **2,322 backend tests passed, no skips**, **185 focused checks
+passed**, and Ruff passed. The first full run's four draft-preservation failures
+and their fixes are retained in the evidence; the final run has none.
 Frontend runtime/test head: `f4601ff85461283ffe535a847450a0f1427ffd58`, with evidence
 head `86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf`. It includes released voice repair,
 PR122 `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and PR126
 `1221a2e3bd1b3fe4316ba3f8c4c9e58811243ea1`, plus merged PR127
 `e2200f134ddb4a2b772913019291d4afea477874`. PR125 and PR128 remain unmerged/excluded.
 
-Current checks: **2,300 backend tests passed, no skips**, **254 frontend unit tests
+Historical `.5` checks: **2,300 backend tests passed, no skips**, **254 frontend unit tests
 passed**, TypeScript, Ruff and both builds. PR127 verification passed **12 focused
 local browser tests plus one public-origin test**. The earlier PR126 head passed
 the full **50 local + one public-origin** suite; that was not repeated in full for PR127. The exact recorded new-Casey call now returns a
 normal missing-purpose clarification in one scripted call, with Alex unchanged.
-These are historical deterministic/runtime checks; the newly captured acceptance
-replay is RED and the latest live semantic result above takes precedence.
+These are historical deterministic/runtime checks. The `.5` acceptance replay was
+RED before this repair and now passes offline. Final `.6` backend gates and the
+intermediate failures are recorded in the mechanical receipt; no frontend runtime
+changed during this repair, so its existing checks were not repeated.
 
 The [design review](../../chat-context-design-review.md) describes implemented
 behavior, remaining semantic limits and the coordinated migration requirement.
