@@ -13,6 +13,7 @@ from functools import lru_cache
 from app.api.errors import ApiError
 from app.classification.limits import get_limits
 from app.config import get_settings
+from app.model_client.haiku import is_haiku_55, request_options
 from app.pii.masking import mask_structure
 from app.workflows.bedrock_flows import FlowError, FlowInvoker
 
@@ -128,10 +129,14 @@ class ClassificationProvider:
                 messages=[{"role": "user", "content": [
                     {"text": serialized}
                 ]}],
-                inferenceConfig={"maxTokens": 1500},
+                **request_options(model, 1500),
             ), stopped, deadline)
             message = response.get("output", {}).get("message", {})
             blocks = message.get("content")
+            if is_haiku_55(model) and isinstance(blocks, list):
+                blocks = [b for b in blocks if not (
+                    isinstance(b, dict) and set(b) == {"reasoningContent"}
+                )]
             if (response.get("stopReason") != "end_turn"
                     or message.get("role") != "assistant"
                     or not isinstance(blocks, list) or not blocks

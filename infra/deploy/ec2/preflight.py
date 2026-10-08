@@ -6,8 +6,9 @@ from cryptography.fernet import Fernet
 from sqlalchemy.engine import make_url
 
 from app.config import get_settings
+from app.model_client.haiku import AU_PROFILES
 
-BEDROCK_PROFILE = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
+BEDROCK_PROFILE = AU_PROFILES[0]
 SUPPORTED_BEDROCK_REGIONS = {"ap-southeast-2", "ap-southeast-4"}
 
 
@@ -39,7 +40,7 @@ def main():
             raise SystemExit("Conversation requires a configured BEDROCK_MODEL_ID.")
         pattern = (
             rf"arn:aws:bedrock:{re.escape(settings.bedrock_region)}:[0-9]{{12}}:"
-            rf"inference-profile/{re.escape(BEDROCK_PROFILE)}"
+            rf"inference-profile/(?:{'|'.join(re.escape(p) for p in AU_PROFILES)})"
         )
         if not re.fullmatch(pattern, settings.bedrock_model_id):
             raise SystemExit(

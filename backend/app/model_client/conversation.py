@@ -7,6 +7,7 @@ from contextlib import suppress
 
 from app.config import get_settings
 from app.model_client.bedrock import _runtime_client
+from app.model_client.haiku import is_haiku_55, request_options
 from app.model_client.providers import ProviderError
 from app.pii.masking import mask_structure, unmask
 
@@ -60,6 +61,10 @@ class ConversationModel:
             raise ProviderError("Conversation requires configured Bedrock")
         if not settings.bedrock_mail_processing_acknowledged:
             raise ProviderError("Bedrock mail processing is not acknowledged")
+        if is_haiku_55(settings.bedrock_model_id) and (
+            not messages or messages[-1].get("role") != "user"
+        ):
+            raise ProviderError("Conversation requires a final user turn")
         client = None
         started = time.monotonic()
         try:
@@ -73,13 +78,20 @@ class ConversationModel:
                 system=[{"text": masked["system"]}],
                 messages=masked["messages"],
                 toolConfig={**tools, "toolChoice": {"any": {}}},
-                inferenceConfig={"maxTokens": 1800, "temperature": 0.0},
+                **request_options(settings.bedrock_model_id, 1800, temperature=0.0),
             )
             if result.get("stopReason") != "tool_use":
                 raise ProviderError("Conversation did not return a complete decision")
             message = result["output"]["message"]
             if message.get("role") != "assistant" or not message.get("content"):
                 raise ProviderError("Invalid conversation decision")
+            # Forced tool choice plus disabled thinking emits only tool calls on
+            # 5.5. Refuse unexpected signed reasoning instead of dropping it and
+            # replaying a broken tool turn after history/masking changes.
+            if is_haiku_55(settings.bedrock_model_id) and any(
+                "reasoningContent" in block for block in message["content"]
+            ):
+                raise ProviderError("Unexpected reasoning in a forced tool decision")
 
             def restore(value):
                 if isinstance(value, str):

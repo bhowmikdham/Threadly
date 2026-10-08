@@ -40,6 +40,36 @@ def test_render_only_never_calls_aws(tmp_path):
     assert not (tmp_path / "nova_micro.flow.json").exists()
 
 
+def test_55_render_only_keeps_explicit_model_and_distinct_release(tmp_path):
+    old = m.run(SimpleNamespace(render_only=True, output=tmp_path / "old"),
+                lambda *a: pytest.fail("AWS call in render-only mode"))
+    new = m.run(SimpleNamespace(render_only=True, output=tmp_path / "new", model=m.HAIKU_55),
+                lambda *a: pytest.fail("AWS call in render-only mode"))
+    assert new["release_hash"] != old["release_hash"]
+    template = json.loads((tmp_path / "new" / "template.json").read_text())
+    statements = template["Resources"]["HaikuRole"]["Properties"]["Policies"][0][
+        "PolicyDocument"]["Statement"]
+    assert statements[0]["Resource"] == [
+        f"arn:aws:bedrock:{m.REGION}:{ACCOUNT}:inference-profile/au.{m.HAIKU_55}"]
+    assert len(statements[1]["Resource"]) == 2
+    assert all(m.HAIKU_55 in resource for resource in statements[1]["Resource"])
+
+
+def test_55_profile_routing_change_rejected_before_provisioning():
+    profile = {
+        "status": "ACTIVE",
+        "inferenceProfileArn":
+            f"arn:aws:bedrock:{m.REGION}:{ACCOUNT}:inference-profile/au.{m.HAIKU_55}",
+        "models": [{"modelArn": f"arn:aws:bedrock:{region}::foundation-model/{m.HAIKU_55}"}
+                   for region in ("ap-southeast-2", "ap-southeast-4")],
+    }
+    m.provision.validate_profile(profile, ACCOUNT, model=m.HAIKU_55)
+    profile["models"].append({
+        "modelArn": f"arn:aws:bedrock:us-east-1::foundation-model/{m.HAIKU_55}"})
+    with pytest.raises(RuntimeError, match="destinations changed"):
+        m.provision.validate_profile(profile, ACCOUNT, model=m.HAIKU_55)
+
+
 def test_existing_flow_reused_without_mutation():
     calls = []
 

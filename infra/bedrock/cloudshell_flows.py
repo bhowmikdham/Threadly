@@ -154,18 +154,20 @@ def cfn_keys(value):
     return value
 
 
-def validate_profile(profile, account):
-    expected = f"arn:aws:bedrock:{REGION}:{account}:inference-profile/{PROFILE}"
+def validate_profile(profile, account, *, model=MODEL):
+    if model not in (MODEL, "anthropic.claude-haiku-5-5"):
+        raise RuntimeError("Unrecognized Australian Haiku model")
+    expected = f"arn:aws:bedrock:{REGION}:{account}:inference-profile/au.{model}"
     if (
         profile.get("inferenceProfileArn") != expected
         or profile.get("status") != "ACTIVE"
     ):
         raise RuntimeError(
-            "The Australian Haiku 4.5 profile is unavailable or inactive. No global fallback."
+            "The selected Australian Haiku profile is unavailable or inactive. No global fallback."
         )
     models = sorted({item["modelArn"] for item in profile.get("models", [])})
     allowed = {
-        f"arn:aws:bedrock:{region}::foundation-model/{MODEL}"
+        f"arn:aws:bedrock:{region}::foundation-model/{model}"
         for region in ("ap-southeast-2", "ap-southeast-4")
     }
     if not models or not set(models).issubset(allowed):

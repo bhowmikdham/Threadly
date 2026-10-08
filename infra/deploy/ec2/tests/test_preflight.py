@@ -74,6 +74,20 @@ class PreflightTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ap-southeast-2 or ap-southeast-4", result.stderr)
 
+    def test_haiku55_requires_the_same_australian_account_profile_boundary(self):
+        profile = (
+            "arn:aws:bedrock:ap-southeast-2:123456789012:"
+            "inference-profile/au.anthropic.claude-haiku-5-5"
+        )
+        for candidate, valid in [(profile, True), (profile.replace("au.", "global."), False),
+                                 (profile.replace("ap-southeast-2", "us-east-1"), False)]:
+            with self.subTest(profile=candidate):
+                result = self.run_preflight(
+                    CONVERSATION_ENABLED="true", BEDROCK_MODEL_ID=candidate,
+                    BEDROCK_MAIL_PROCESSING_ACKNOWLEDGED="true",
+                )
+                self.assertEqual(result.returncode == 0, valid, result.stderr)
+
     def test_classification_requires_selected_flow_and_acknowledgement(self):
         import sys
 
