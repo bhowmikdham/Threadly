@@ -1,7 +1,7 @@
 # Shared conversation context: implementation and review
 
 Status: locally committed, integrated implementation, prompt
-`contextual-conversation-1.8.9+chat-context.6`. Backend base:
+`contextual-conversation-1.8.9+chat-context.7`. Backend base:
 `bc12ef106659f5ac8b5b79890e0887f1431e29ea`; frontend base:
 `afa2180fa16b4060587002b6be440ce32573c603`. No publication or deployment.
 The frontend incorporates PR122 at `60a7aa8dd02dd94105b90ae1ee68f742cf23d204` and
@@ -30,8 +30,11 @@ model result. The later [.6 live resumption](evaluation/chat-context/context6-re
 completed both email drafts and passed Calendar preview/revision/closing, then
 failed confirmation guidance by selecting email review in the Calendar-only chat.
 The event state stayed intact. The third ledger is stopped at 10/12 calls,
-USD 0.34752047 incl-GST, with two unused Calendar calls. Goal-aware review routing
-remains unfixed and conversational acceptance remains a release gate.
+USD 0.34752047 incl-GST, with two unused Calendar calls. The [.7 offline review correction](evaluation/chat-context/context7-goal-review.md)
+now binds review to the owned goal kind, rejects the recorded wrong-domain call,
+and preserves closed Calendar action review without reopening or execution.
+It removes absent-source Gmail controls and guards mixed-goal shortcuts.
+Conversational acceptance remains a release gate; no new live run has started.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use

@@ -1,0 +1,118 @@
+{
+  "status": "offline_goal_review_fix_verified_live_resumption_not_authorized",
+  "recorded_at": "2026-10-08T02:25:26.499878+00:00",
+  "runtime_and_test_head": "30612dbd8c890ae0fc56944312af6556eaba7152",
+  "base_head": "473ebd31d23d6a54272509939baf91a6f514cf0c",
+  "branch": "codex/chat-context-continuity",
+  "release": "contextual-conversation-1.8.9+chat-context.7",
+  "prompt_hash": "ce0910faa57c8b6cdc1265603dcedd51f6f82d276f8be53989a9948185ed5e13",
+  "tools_hash": "e146bafc23f6f538ce418332ced4a291b57aa3f44df1b3c3f57fd077cf3d7b36",
+  "full_suite": {
+    "passed": 2363,
+    "skipped": 0,
+    "warnings": 1,
+    "seconds": 291.64,
+    "log": "context7-full-suite.log"
+  },
+  "new_regressions": {
+    "passed": 30,
+    "seconds": 16.02,
+    "scope": "test_goal_review.py; real disposable PostgreSQL, scripted models and fake Google"
+  },
+  "focused": {
+    "passed": 187,
+    "seconds": 33.59,
+    "log": "context7-focused.log",
+    "scope": "Before final two replay/decoration tests and fixture-only updates; final full suite includes all changes"
+  },
+  "fixture_update_checks": {
+    "passed": 75,
+    "seconds": 9.59,
+    "files": [
+      "test_calendar_event_language.py",
+      "test_email_draft_clarification.py"
+    ]
+  },
+  "red_before": {
+    "failed": 3,
+    "runtime_head": "473ebd31d23d6a54272509939baf91a6f514cf0c",
+    "log": "context7-red-before.log"
+  },
+  "first_full_run": {
+    "failed": 2,
+    "passed": 2361,
+    "seconds": 289.4,
+    "log": "context7-full-before-fixture-updates.log",
+    "resolution": "Owned-chat fixture and explicit mixed-goal clarification assertion updated; runtime unchanged"
+  },
+  "checks": {
+    "ruff_app_tests_tools": "pass",
+    "format_changed_files": "pass",
+    "git_diff_check": "pass",
+    "playbook_validator": "pass"
+  },
+  "recorded_replay": {
+    "ledger": "context6-resumption-ledger.json.gz",
+    "calls": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "failed_request_id": "581cadf6-a28d-4efc-89e5-15c3a177867f",
+    "result": "Wrong legacy email tool rejected with review_goal_required; scripted bound correction returns the same proposed Calendar action with unchanged payload/version/state and no approvals/jobs",
+    "live_model_quality_proven": false
+  },
+  "source_sha256": {
+    "backend/app/calendar/conversation_guard.py": "77fc8a6587cc603adbb3d7cc19e77cb1ea89462a633e7c9f393ab9ef3156f1a5",
+    "backend/app/conversation/email_repair.py": "44622b70e16c44d9561f09ee90b532eb3450f55c9aae21237ef3926671ba8a8e",
+    "backend/app/conversation/email_review.py": "c13ccc01ec0bd3815dbbf37d92ad34b52862965da6c9588848184cf5ea188ebf",
+    "backend/app/conversation/engine.py": "c1139075e1d5e3811ca88227031c24400ac224fa720548cdd7409735f09be3cb",
+    "backend/app/conversation/goal_review.py": "7b68f5e1b819ce9b4e3efdcc1fe6c6bfb75ec5523335306751df5fe20892b1bd",
+    "backend/app/conversation/prompt.py": "670b7a9c4514c0eabb44ffb9de6edc6013028a6a8eedad0f66ed68ac4a7886fc",
+    "backend/app/conversation/runtime.py": "dd1ae88b9dbf33b3c5dcd237f1ae6674aacd9fae876fc138b27c881adbf9ad31",
+    "backend/app/conversation/service.py": "f34784df7c5184fe1cf2c55dcefa2d8c6f5c8b1e0adf0d60174a80c6d9e5df6a",
+    "backend/app/schemas/conversation.py": "eb71c061c67d540dbf7980ee2eff7fcc5b949dc58bc77332245beaf4dcdbc957",
+    "backend/tests/test_calendar_conversation_tools.py": "76eae1c894769943227b7a019362f7629dbe2d1b976d8681aaef598d5c2f84da",
+    "backend/tests/test_calendar_event_language.py": "188dde5c7c4229a12f8754c16ef96ef41f9b2283e64ebd6788e86bbf66d639a4",
+    "backend/tests/test_chat_context_live_regressions.py": "4ec4064b00b50dd19942b1216f319f324573bcc3d1c8f6d5412f7ccaf91f658e",
+    "backend/tests/test_email_draft_clarification.py": "fd75ec8f198c16e1172175189abc0e0170ff5d8b5ce47a7c2607a3e3dadf9e34",
+    "backend/tests/test_goal_review.py": "2aec8e112dcf2e311e8a9cc7081ddcc1cd9dd8d36b365937d9b63c87ca076023",
+    "docs/evaluation/chat-context/contextual-conversation-1.8.9+chat-context.7.json": "e0f3ffde1dc49c26a164cc0406a9dfb46329170a0a20c63efe088e8d632e3b1a"
+  },
+  "frontend": {
+    "head": "86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf",
+    "changed": false,
+    "retested": false
+  },
+  "voice_backend_unchanged_from": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
+  "ledger_sha256_unchanged": {
+    "chat-context-approved-budget-ledger.json": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a",
+    "chat-context-second-approved-budget-ledger.json": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
+    "chat-context-third-approved-budget-ledger.json": "e253f8ab8f47324aa17f0ba2a7e353dc4789fe2ab5b32bfe54f95297c3fb8a0a"
+  },
+  "third_budget": {
+    "used_attempts": 10,
+    "unused_calendar_attempts": 2,
+    "usd_including_gst": "0.34752047",
+    "calendar_usd_including_gst": "0.13795452",
+    "semantic_stop_in_force": true
+  },
+  "new_aws_requests": 0,
+  "new_paid_model_attempts": 0,
+  "real_provider_writes": 0,
+  "production_changes": false,
+  "published": false,
+  "resume_proposal": {
+    "authorized": false,
+    "details": "context7-goal-review.md",
+    "max_attempts": 2,
+    "scope": "Only Where do I confirm it? after scripted Calendar preview/revision/closing; one bounded repair if needed",
+    "fresh_explicit_15_minute_window_required": true,
+    "new_budget_requested": false,
+    "same_total_usd_cap": "0.60",
+    "same_per_case_usd_cap": "0.30",
+    "worst_case_total_usd_including_gst": "0.44674047",
+    "worst_case_calendar_usd_including_gst": "0.23717452"
+  }
+}

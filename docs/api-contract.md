@@ -1489,16 +1489,22 @@ checks the current structured draft identity rather than requiring the last
 exchange itself to contain the draft. New goals and superseding tasks/proposals
 disable old text cards. Older clients keep conservative stale-version behavior.
 
-The read-only `review_email_draft` model tool returns actual card controls and
-the current owned source's save receipt status. In the unpublished shared-context
-release, `presentation: "open"` (default) also returns the existing text editor or
+The read-only `review_conversation_goal` model tool requires an owned `goal_id`
+and the complete current USER `source`. Stored kind determines the actual Calendar
+action, email draft, task or proposal card and its status. Unbound ambiguous legacy
+review/status requests clarify rather than selecting unrelated retained work.
+Closed Calendar goals with existing actions remain reviewable without reopening
+or execution; use `list_conversation_goals(include_closed=true)` to find them.
+The legacy `review_email_draft` tool is hidden from the model and validates an
+applicable email source before returning any Gmail guidance. In the unpublished
+shared-context release, `presentation: "open"` (default) also returns the existing text editor or
 saved task card; `presentation: "status"` includes save-control guidance. Reopening
 refreshes the owned task's current artifact before checking its save receipt,
 restores backend focus and preserves unrelated goals. It does not regenerate work
 or require Gmail draft-creation permission. Select an older retained goal first
-when it is not the current draft. `email_draft_controls` in model
-context distinguishes account grants from callable actions: chat cannot save,
-send or insert email. Repeated confirmations return guidance; only a succeeded
+when it is not the current draft. `email_draft_controls` is null without a
+current applicable draft source. When present it distinguishes account grants
+from callable actions: chat cannot save, send or insert email. Repeated confirmations return guidance; only a succeeded
 receipt confirms Gmail creation. Failed, pending, unknown and older-revision
 saves are distinct, and connection-generation fences remain enforced. A
 missing/disabled card prompts extension update/reload guidance without claiming
@@ -1576,7 +1582,7 @@ no additional schema migration.
 
 ## Unpublished shared chat context protocol
 
-The `contextual-conversation-1.8.9+chat-context.6` prototype adds
+The `contextual-conversation-1.8.9+chat-context.7` prototype adds
 `context_memory_version: 1` to turn/replay/restore responses. This means the backend
 owns goal focus: clients omit a task pointer derived merely from the last displayed
 card, and send a context snapshot only for an explicit attach/detach or initial pin.

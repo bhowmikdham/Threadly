@@ -1,0 +1,162 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [  9%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 21%]
+.....................F.................................................. [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+....................................F................................... [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+........................................................................ [ 94%]
+........................................................................ [ 97%]
+...........................................................              [100%]
+=================================== FAILURES ===================================
+_ test_new_unfinished_event_never_reports_an_older_booking_as_its_success[missing_title] _
+
+configured = ([<Request('GET', 'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=100&showHidden=true&showDeleted=false')>], <httpx.MockTransport object at 0x10dece570>)
+db_sessionmaker = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x10d7d8410>, autoflush=True, expire_on_commit=False)
+failure = 'missing_title'
+
+    @pytest.mark.parametrize("failure", ["missing_title", "tool_limit"])
+    async def test_new_unfinished_event_never_reports_an_older_booking_as_its_success(
+        configured, db_sessionmaker, failure
+    ):
+        await ready(db_sessionmaker)
+        first_request = turn()
+        old = await run(db_sessionmaker, first_request)
+        async with db_sessionmaker.begin() as db:
+            action = await db.get(AssistantAction, old["calendar_action_id"])
+            action.state = "succeeded"
+        next_request = turn(
+            "book 2 pm tmrw", conversation_id=first_request.conversation_id, expected_version=1
+        )
+        if failure == "missing_title":
+            await run(db_sessionmaker, next_request, {**ARGS, "title": "", "time_source": "2 pm"})
+        else:
+            await service.turn(
+                1,
+                next_request,
+                factory=db_sessionmaker,
+                model=Model(
+                    tool("prepare_calendar_event", intent=None),
+                    *[
+                        tool("respond", kind="message", text="Done!")
+                        for _ in range(engine.MAX_CALLS - 1)
+                    ]
+                ),
+            )
+        status = turn(
+            "Did you create the event?",
+            conversation_id=first_request.conversation_id,
+            expected_version=2,
+        )
+        result = await service.turn(
+            1,
+            status,
+            factory=db_sessionmaker,
+            model=Model(tool("respond", kind="message", text="Your event was created.")),
+        )
+>       assert "calendar_action_id" not in result and "confirmed" in result["text"]
+E       AssertionError: assert ('calendar_action_id' not in {'kind': 'clarification', 'text': 'Which request would you like to review?', 'release': 'contextual-conversation-1.8.9+chat-context.7', 'trace': [{'tool': 'respond', 'status': 'ok'}], ...} and 'confirmed' in 'Which request would you like to review?')
+
+tests/test_calendar_event_language.py:438: AssertionError
+__________ test_ambiguous_send_question_and_later_send_never_execute ___________
+
+db_sessionmaker = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x10d7d8410>, autoflush=True, expire_on_commit=False)
+
+    @pytest.mark.usefixtures("configured")
+    async def test_ambiguous_send_question_and_later_send_never_execute(db_sessionmaker):
+        r = runtime("Can you email Alex?")
+        result = await engine.run(
+            {},
+            r,
+            Model(
+                tool(
+                    "respond",
+                    kind="clarification",
+                    text="Would you like a draft to review, or are you asking to send it?",
+                )
+            ),
+        )
+        assert result["kind"] == "clarification"
+        _, state = await prepare(
+            "Draft an email to Alex to clarify the presentation requirements",
+            recipient="Alex",
+            purpose="clarify the presentation requirements",
+            draft=DRAFT,
+        )
+        r = runtime("Send it", state)
+        r.factory = db_sessionmaker
+        r.capabilities = {"capabilities": [{"id": "gmail_send", "status": "disabled"}]}
+>       result = await engine.run(
+            {},
+            r,
+            Model(
+                tool(
+                    "respond",
+                    kind="message",
+                    text="Sending is disabled for this account. You can copy the draft.",
+                )
+            ),
+        )
+
+tests/test_email_draft_clarification.py:255: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/conversation/engine.py:97: in run
+    **await email_review.review(runtime),
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/conversation/email_review.py:148: in review
+    return await goal_review.review(runtime, presentation=presentation, email_only=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/conversation/goal_review.py:67: in review
+    selected = await target(runtime, goal_id=goal_id, source=source)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/conversation/goal_review.py:30: in target
+    chat = await store.owned(session, runtime.owner, runtime.request.conversation_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = <sqlalchemy.ext.asyncio.session.AsyncSession object at 0x10e0ed3d0>
+owner = 1, identifier = '59fa7b2e-6843-4158-b759-f6ac6daf3c79', lock = False
+
+    async def owned(session, owner, identifier, *, lock=False):
+        query = select(Conversation).where(Conversation.id == identifier, Conversation.user_id == owner)
+        row = await session.scalar(query.with_for_update() if lock else query)
+        if row is None or row.expires_at <= datetime.now(UTC):
+>           raise ApiError(
+                404, "conversation_not_found", "This conversation expired. Start a new chat."
+            )
+E           app.api.errors.ApiError: (404, 'conversation_not_found', 'This conversation expired. Start a new chat.')
+
+app/conversation/store.py:174: ApiError
+=============================== warnings summary ===============================
+../../../../../../../../private/tmp/threadly-calendar-rollout-venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /private/tmp/threadly-calendar-rollout-venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_calendar_event_language.py::test_new_unfinished_event_never_reports_an_older_booking_as_its_success[missing_title]
+FAILED tests/test_email_draft_clarification.py::test_ambiguous_send_question_and_later_send_never_execute
+2 failed, 2361 passed, 1 warning in 289.40s (0:04:49)

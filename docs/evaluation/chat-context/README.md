@@ -1,11 +1,18 @@
 # Shared chat-context verification
 
-Current runtime release: **`contextual-conversation-1.8.9+chat-context.6`**. The
-[offline state repair and audit](context6-state-ownership.md) fixes the exact `.5`
+Current runtime release: **`contextual-conversation-1.8.9+chat-context.7`**.
+The [offline goal-review correction](context7-goal-review.md) binds review to owned
+goals, removes inapplicable Gmail controls, and covers mixed/closed-goal status.
+The exact recorded failure is rejected and a scripted correction returns the
+existing Calendar card. Full check evidence is in `context7-verification.json`.
+No new live calls, window, spend or release are authorized by this offline fix.
+
+The prior `.6` [offline state repair and audit](context6-state-ownership.md) fixes the exact `.5`
 retained-purpose regression across repeated selection, repair and focus changes.
 It covers all typed goal kinds, new-email/Calendar retries, current-turn cancellation,
 explicit corrections/clears, lease-checked persistence and draft/save-receipt retention.
-Prompt wording and tool schemas are unchanged; earlier snapshots remain immutable.
+That `.6` repair left prompt wording and tool schemas unchanged; earlier snapshots
+remain immutable.
 
 The latest [.6 live resumption](context6-resumption-results.md) completed Alex and
 Casey drafts independently and passed Calendar preview, 3 pm revision and the
