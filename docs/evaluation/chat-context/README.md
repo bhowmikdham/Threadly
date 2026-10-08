@@ -5,7 +5,10 @@ The [offline goal-review correction](context7-goal-review.md) binds review to ow
 goals, removes inapplicable Gmail controls, and covers mixed/closed-goal status.
 The exact recorded failure is rejected and a scripted correction returns the
 existing Calendar card. Full check evidence is in `context7-verification.json`.
-No new live calls, window, spend or release are authorized by this offline fix.
+The [final authorized Calendar diagnostic](context7-live-results.md) subsequently
+passed both follow-ups in one live call each. The third ledger is now exhausted
+at **12/12, USD 0.41798603 including GST**. The user authorized deployment after
+this bounded acceptance; publication/cutover evidence is tracked separately.
 
 The prior `.6` [offline state repair and audit](context6-state-ownership.md) fixes the exact `.5`
 retained-purpose regression across repeated selection, repair and focus changes.
@@ -20,10 +23,10 @@ user-facing closing. It **stopped on a new failure**: â€œWhere do I confirm it?â
 selected email review in a Calendar-only chat and returned Gmail draft guidance.
 The event state remained intact. Overall conversational acceptance still fails.
 
-The same third ledger is now **10/12 attempts, USD 0.34752047 including GST**:
+At the `.6` stopping point, the third ledger was **10/12 attempts, USD 0.34752047 including GST**:
 seven new calls added to the preserved original three. **Two Calendar calls remain
-unused**, with the stop-on-regression rule in force again; no automatic restart or
-new window is authorized. The other two ledgers are unchanged. No publication,
+unused** at that point. The final separately authorized `.7` segment above has
+now consumed them; there is no remaining model allowance. The other two ledgers are unchanged. No publication,
 deployment or provider write occurred. The [.5 failure](context5-results.md) and
 [.6 offline repair](context6-state-ownership.md) remain historical evidence. The
 live Alex repair repeated purpose, so omitted-purpose retention is specifically
