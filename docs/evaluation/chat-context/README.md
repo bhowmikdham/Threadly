@@ -7,14 +7,20 @@ It covers all typed goal kinds, new-email/Calendar retries, current-turn cancell
 explicit corrections/clears, lease-checked persistence and draft/save-receipt retention.
 Prompt wording and tool schemas are unchanged; earlier snapshots remain immutable.
 
-The [.5 diagnostic](context5-results.md) remains the latest live evidence. It stopped
-at **3/12 paid attempts, USD 0.10397772 including GST**: starting Casey passed,
-returning to Alex lost purpose during draft-text repair, and **Calendar was not
-attempted**. The `.6` correction passes its recorded-response replay but has no live
-model result. Nine calls remain unused (3 email, 6 Calendar) after the stop-on-regression
-rule; neither a resumption nor a window reset is authorized. The other two ledgers
-remain exhausted and unchanged. The implementation is unpublished and conversational
-acceptance remains open. The repair report contains a concrete gated resume proposal.
+The latest [.6 live resumption](context6-resumption-results.md) completed Alex and
+Casey drafts independently and passed Calendar preview, 3 pm revision and the
+user-facing closing. It **stopped on a new failure**: “Where do I confirm it?”
+selected email review in a Calendar-only chat and returned Gmail draft guidance.
+The event state remained intact. Overall conversational acceptance still fails.
+
+The same third ledger is now **10/12 attempts, USD 0.34752047 including GST**:
+seven new calls added to the preserved original three. **Two Calendar calls remain
+unused**, with the stop-on-regression rule in force again; no automatic restart or
+new window is authorized. The other two ledgers are unchanged. No publication,
+deployment or provider write occurred. The [.5 failure](context5-results.md) and
+[.6 offline repair](context6-state-ownership.md) remain historical evidence. The
+live Alex repair repeated purpose, so omitted-purpose retention is specifically
+proved by the recorded-response offline replay.
 
 Backend base: released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
 The mechanical receipt pins the final `.6` code/test commit and source hashes.

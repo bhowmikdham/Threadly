@@ -26,8 +26,12 @@ preserves validated turn state across reload, repair and focus changes. Its exac
 recorded-response replay passes. The audit also repairs new email/Calendar retries
 and failed email correction retention, while preserving lease, source, identity
 and immutable-action boundaries. This is runtime evidence, not another live
-model result; conversational acceptance remains a release gate. The third ledger
-remains stopped at 3/12 calls, USD 0.10397772 incl-GST, with nine unused calls.
+model result. The later [.6 live resumption](evaluation/chat-context/context6-resumption-results.md)
+completed both email drafts and passed Calendar preview/revision/closing, then
+failed confirmation guidance by selecting email review in the Calendar-only chat.
+The event state stayed intact. The third ledger is stopped at 10/12 calls,
+USD 0.34752047 incl-GST, with two unused Calendar calls. Goal-aware review routing
+remains unfixed and conversational acceptance remains a release gate.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use

@@ -36,3 +36,8 @@ The new segment has its own persisted identity; it never rewrites the original
 window. Guard tests cover retained prefix, cumulative/case counts and cost,
 durable semantic/provider/preflight stops, expiry, missing ledger/window, and
 tampered original receipts. Runtime application files remain at the pinned head.
+
+Execution result: stopped on semantic regression at **10/12 cumulative calls,
+USD 0.34752047 incl. GST**, with two unused Calendar attempts. The window is closed
+by policy; this approval does not authorize another restart. See
+[results and evidence](context6-resumption-results.md).
