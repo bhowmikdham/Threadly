@@ -65,3 +65,8 @@ export function hasChoices(entry: Entry | undefined): boolean {
   }
   return (entry?.inbox?.results.length ?? 0) > 1
 }
+
+export const CALENDAR_VOICE_REPLY = {
+  text: "I've prepared the event. Manual approval is required, so please review it in the chat.",
+  showChat: true
+}
