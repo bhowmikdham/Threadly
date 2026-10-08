@@ -351,7 +351,14 @@ async def run(context, runtime, model=None):
                                 "error": exc.code,
                                 "field": exc.field,
                                 "message": (
-                                    "Repair this event field in prepare_calendar_event. "
+                                    "Repair the date interpretation to match date_source. "
+                                    "For weekday wording use kind=weekday with Monday=0 through "
+                                    "Sunday=6 and the stated this/next/upcoming week; let the "
+                                    "backend resolve it using the saved local anchor. Preserve "
+                                    "the other fields. Do not ask the user to repeat the date."
+                                    if exc.field == "date"
+                                    and exc.code.endswith("interpretation_mismatch")
+                                    else "Repair this event field in prepare_calendar_event. "
                                     "Copy its source exactly from the current USER directive; "
                                     "normalized clock values must match that source. "
                                     "Keep the other grounded fields. For a new event, leave "

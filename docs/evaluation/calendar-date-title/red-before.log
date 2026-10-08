@@ -1,0 +1,28 @@
+Release daf5d429; final regression file; isolated PostgreSQL 16.2.
+Full trace: red-before.log.gz
+
+=========================== short test summary info ============================
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning0-next wednesday]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning1-next wednesday]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning2-next wednesday]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning3-next wednesday]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning4-2026-10-14]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning5-Wednesday 2026-10-15]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning6-next Wednesday 2026-10-21]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning7-tomorrow]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning8-in 2 days]
+FAILED tests/test_calendar_date_title_grounding.py::test_conflicting_date_meaning_requires_model_repair[meaning9-this Wednesday]
+FAILED tests/test_calendar_date_title_grounding.py::test_unquoted_indefinite_article_can_be_removed_without_noun_whitelist[a class-Class]
+FAILED tests/test_calendar_date_title_grounding.py::test_unquoted_indefinite_article_can_be_removed_without_noun_whitelist[an interview-Interview]
+FAILED tests/test_calendar_date_title_grounding.py::test_unquoted_indefinite_article_can_be_removed_without_noun_whitelist[a rehearsal with Kelly-Rehearsal with Kelly]
+FAILED tests/test_calendar_date_title_grounding.py::test_cleanup_cannot_change_literal_names_or_substantive_title_words[Create an event called The Office next wednesday at 3pm-Office]
+FAILED tests/test_calendar_date_title_grounding.py::test_cleanup_cannot_change_literal_names_or_substantive_title_words[Create an event named a class next wednesday at 3pm-Class]
+FAILED tests/test_calendar_date_title_grounding.py::test_cleanup_cannot_change_literal_names_or_substantive_title_words[Create an event for "A Class" next wednesday at 3pm-Class]
+FAILED tests/test_calendar_date_title_grounding.py::test_cleanup_cannot_change_literal_names_or_substantive_title_words[Create an event "The Office" next wednesday at 3pm-Office]
+FAILED tests/test_calendar_date_title_grounding.py::test_recorded_request_repairs_date_then_previews_class_without_approval
+FAILED tests/test_calendar_date_title_grounding.py::test_invalid_date_revision_preserves_old_candidate_until_repaired[False]
+FAILED tests/test_calendar_date_title_grounding.py::test_invalid_date_revision_preserves_old_candidate_until_repaired[True]
+FAILED tests/test_calendar_date_title_grounding.py::test_unrepaired_date_never_creates_a_preview_or_retains_the_bad_field
+FAILED tests/test_calendar_date_title_grounding.py::test_timezone_correction_preserves_original_local_date_anchor[False]
+FAILED tests/test_calendar_date_title_grounding.py::test_timezone_correction_preserves_original_local_date_anchor[True]
+23 failed, 25 passed, 1 warning in 2.18s
