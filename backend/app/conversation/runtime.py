@@ -2,6 +2,7 @@
 
 import json
 import re
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -19,7 +20,16 @@ from app.assistant import (
 from app.assistant.summary import digest
 from app.capabilities.service import build_capabilities
 from app.config import get_settings
-from app.conversation import calendar_context, email_draft, email_review, mail_context, mail_goal
+from app.conversation import (
+    calendar_context,
+    email_draft,
+    email_review,
+    goal_review,
+    goals,
+    mail_context,
+    mail_goal,
+    memory,
+)
 from app.db.models import CalendarPreference, ContextSnapshot, User
 from app.mail.inbox_status import check_today
 from app.mail.presentation import clock_context, received_display
@@ -610,6 +620,11 @@ class Runtime:
             "conversation_id": self.request.conversation_id,
             "turn_request_id": self.request.request_id,
             "instruction_hash": digest(instruction),
+            **(
+                {"user_context": self.verified_user_context}
+                if getattr(self, "verified_user_context", None)
+                else {}
+            ),
             "provider": settings.inference_provider,
             "model_id": settings.bedrock_model_id,
             **assets(),
@@ -689,11 +704,19 @@ class Runtime:
             self.email_draft_review = await email_review.context(self, session)
         from app.calendar import event_choices
 
+        dialogue = memory.recent(self.state["history"])
+        memory_context = memory.context(self.state, self.request.expected_version)
+        memory_context["recent_from_version"] = min(
+            (e.get("version", self.request.expected_version + 1) for e in dialogue),
+            default=self.request.expected_version + 1,
+        )
         return {
             **clock_context(self.mail_anchor, self.request.timezone),
             # Keep UI history, but never pass provider-authored agenda details as
             # instructions or remembered facts to the next model decision.
-            "recent_dialogue": model_history(self.state["history"]),
+            "recent_dialogue": dialogue,
+            "chat_memory": memory_context,
+            "retained_goals": await goals.listing(self),
             "previous_calendar_request": calendar_context.model_context(self.state),
             "remembered_email_sources": mail_context.model_context(self.state),
             "pending_mail_goal": self.state.get(mail_goal.KEY),
@@ -727,10 +750,51 @@ class Runtime:
         }
 
     async def call(self, name, args):
+        # Tools may replace a focused slot, or retain validated partial fields
+        # before raising a repair error. Both belong to this leased turn.
+        before = {key: deepcopy(self.state.get(key)) for key in goals.KEYS.values()}
+        prior_updates = deepcopy(self.state.get(goals.UPDATES))
+        goals.retain(self.state)
+        try:
+            return await self._call(name, args)
+        except BaseException:
+            if all(self.state.get(key) == value for key, value in before.items()):
+                # Rejected authority/identity inputs must not mutate even the
+                # transient write set. Validated partial progress is retained.
+                if prior_updates is None:
+                    self.state.pop(goals.UPDATES, None)
+                else:
+                    self.state[goals.UPDATES] = prior_updates
+            raise
+        finally:
+            if any(self.state.get(key) != value for key, value in before.items()):
+                goals.retain(self.state)
+
+    async def _call(self, name, args):
+        if name == "list_conversation_goals":
+            return await goals.listing(self, **args.model_dump())
+        if name == "select_conversation_goal":
+            return await goals.select_goal(self, args)
+        if name == "resume_conversation_task":
+            return await memory.resume_task(self, args)
+        if name == "recall_conversation":
+            return await memory.recall(self, args)
         if name == "review_email_draft":
-            return await email_review.review(self)
-        if name == "prepare_email_draft":
-            return await email_draft.prepare(self, args)
+            return await email_review.review(self, presentation=args.presentation)
+        if name == "review_conversation_goal":
+            return await goal_review.review(self, **args.model_dump())
+        if name in {"prepare_email_draft", "start_email_draft", "continue_email_draft"}:
+            if name == "start_email_draft" and _revokes_compose_request(self.request.instruction):
+                raise email_draft.EmailDraftInputError("cancel_requires_email_goal")
+            if name != "prepare_email_draft":
+                from app.schemas.conversation import PrepareEmailDraft
+
+                args = PrepareEmailDraft(
+                    **args.model_dump(), continue_previous=name == "continue_email_draft"
+                )
+            result = await email_draft.prepare(self, args)
+            self.state["active_goal"] = "email_draft"
+            return result
         if name == "list_calendars":
             from app.calendar import event_choices
 
@@ -742,7 +806,9 @@ class Runtime:
 
             if acknowledgment := social_response(self.request.instruction):
                 return acknowledgment
-            return await prepare(self, args)
+            result = await prepare(self, args)
+            self.state["active_goal"] = "calendar_event"
+            return result
         if name == "retry_calendar_read":
             return await calendar_context.retry(self)
         if name in calendar_context.WINDOW_TOOLS:
@@ -766,7 +832,9 @@ class Runtime:
         if name == "read_calendar":
             return await self.read_calendar(args.period)
         if name == "prepare_workflow":
-            return await self.workflow(args)
+            result = await self.workflow(args)
+            self.state["active_goal"] = "saved_task" if result["kind"] == "task" else "proposal"
+            return result
         if name == "answer_question":
             return await self.answer(args)
         if name == "revise_draft":
@@ -1229,9 +1297,14 @@ class Runtime:
                 "task": view,
             }
         instruction = interpreted or self.authoritative_instruction()
-        authorize_workflow(
-            instruction, args.intent, args.compound, semantic_reply=interpreted is not None
-        )
+        if args.request_source:
+            from app.conversation.user_intent import validate
+
+            validate(args.request_source, self.request.instruction)
+        if not args.request_source or args.compound:
+            authorize_workflow(
+                instruction, args.intent, args.compound, semantic_reply=interpreted is not None
+            )
         validate_workflow_bindings(
             args, set(self.loaded), set(self.recipients), self.recipient_roles
         )
@@ -1242,6 +1315,11 @@ class Runtime:
             and not getattr(self, "email_draft_prepared", False)
         ):
             raise email_draft.EmailDraftRequired
+        from app.conversation import citations
+
+        if args.context_citations:
+            cited = await citations.resolve(self, args.context_citations)
+            self.verified_user_context = list(cited.values())
         scope = args.source_scope
         ref = self.state["refs"].get(args.reference, {})
         if scope == "visible_thread" and not ref.get("context_id"):

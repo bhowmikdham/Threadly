@@ -530,12 +530,12 @@ def test_committed_release_matches_current_prompt_and_tools():
     from app.conversation.prompt import PROMPT, assets
     from app.schemas.conversation import tool_config
 
-    root = Path(__file__).parents[2] / "docs/evaluation/calendar-agent-tools"
+    root = Path(__file__).parents[2] / "docs/evaluation"
     saved = json.loads(
-        (root / "contextual-conversation-1.8.8+calendar-intent.1.json").read_text()
+        (root / "chat-context/contextual-conversation-1.8.9+chat-context.7.json").read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}
-    old = json.loads((root / "contextual-conversation-1.2.5.json").read_text())
+    old = json.loads((root / "calendar-agent-tools/contextual-conversation-1.2.5.json").read_text())
     assert old["release"] == "contextual-conversation-1.2.5"
     assert old["prompt_hash"] != saved["prompt_hash"]
 

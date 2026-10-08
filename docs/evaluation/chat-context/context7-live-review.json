@@ -1,0 +1,56 @@
+{
+  "release": "contextual-conversation-1.8.9+chat-context.7",
+  "runtime_head": "30612dbd8c890ae0fc56944312af6556eaba7152",
+  "harness_head": "a30c785496a7ced3f7c0300c7fe6663692c2ea7b",
+  "results": [
+    {
+      "sha256": "c3e329f054209ffc4fa73eb213934f8d57fa9101875f121d7c2e885d70cf1f85",
+      "decision": "continue",
+      "result": "pass",
+      "notes": "One live call selected the owned Calendar goal; same 15:00 Quiet hour candidate, proposed only, no Gmail guidance, unchanged event fields. Continue to one read-only status follow-up if allowance remains."
+    },
+    {
+      "sha256": "b95f6755a16f1fdb572e5cc001ede78e8df1f91c141e0354bddf508da7e0548d",
+      "decision": "next_case",
+      "result": "pass",
+      "notes": "One live status call chose the same owned goal. Existing proposed action/payload/version/event fields unchanged; no approval, dispatch, provider write or false completion claim."
+    }
+  ],
+  "calls": [
+    {
+      "request_id": "65e6663e-49fd-450b-a290-dcf335641628",
+      "started_at": "2026-10-08T02:53:51.188538+00:00",
+      "finished_at": "2026-10-08T02:53:53.720341+00:00",
+      "usage": {
+        "inputTokens": 28511,
+        "outputTokens": 101,
+        "totalTokens": 28612,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "request_id": "34004e04-83f2-4719-9656-02f61c63bcc8",
+      "started_at": "2026-10-08T02:54:31.058021+00:00",
+      "finished_at": "2026-10-08T02:54:33.659030+00:00",
+      "usage": {
+        "inputTokens": 28710,
+        "outputTokens": 102,
+        "totalTokens": 28812,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    }
+  ],
+  "cumulative_attempts": 12,
+  "new_usd_including_gst": "0.07046556",
+  "total_usd_including_gst": "0.41798603",
+  "unused_attempts": 0,
+  "action_jobs": 0,
+  "approved_actions": 0,
+  "real_google_calls": 0,
+  "semantic_scope": "Two Calendar-only confirmation/status follow-ups, one live call each; mixed/closed-goal cases remain offline coverage.",
+  "ledger_sha256": "6697e5d09bf780cf60bf514b6a2b9559a50e6fda604847a4096accb24ef5d1be"
+}

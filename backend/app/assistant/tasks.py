@@ -193,6 +193,8 @@ async def submit(
             raise ApiError(409, "idempotency_conflict", "Request ID was used for different input.")
         return existing
     session.add(AssistantJob(task_id=task_id, user_id=user_id, state="queued", attempts=0))
+    from app.assistant.user_context import protect
+
     session.add(
         TaskEvent(
             task_id=task_id,
@@ -202,7 +204,11 @@ async def submit(
             kind="task.accepted",
             payload={
                 "state": "queued",
-                **({"conversation_provenance": provenance} if provenance is not None else {}),
+                **(
+                    {"conversation_provenance": protect(provenance)}
+                    if provenance is not None
+                    else {}
+                ),
             },
         )
     )
@@ -277,6 +283,7 @@ class JobClaim:
     compound_input: dict | None = None
     scheduling_input: dict | None = None
     workflow_input: dict | None = None
+    user_context: list | None = None
 
 
 async def claim_next(session: AsyncSession) -> JobClaim | None:
@@ -341,6 +348,14 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
             )
         )
     ).scalar_one_or_none()
+    from app.assistant.user_context import restore
+
+    accepted = await session.scalar(
+        select(TaskEvent).where(
+            TaskEvent.task_id == task.id, TaskEvent.user_id == task.user_id, TaskEvent.sequence == 1
+        )
+    )
+    user_context = restore((accepted.payload if accepted else {}).get("conversation_provenance"))
     await session.flush()
     return JobClaim(
         task.id,
@@ -361,6 +376,7 @@ async def claim_next(session: AsyncSession) -> JobClaim | None:
         task.compound_input,
         task.scheduling_input,
         task.workflow_input,
+        user_context,
     )
 
 

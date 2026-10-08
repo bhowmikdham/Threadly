@@ -318,6 +318,12 @@ async def test_current_clock_and_relative_day_reach_search_read_and_batch_after_
     monkeypatch.setattr(
         "app.conversation.runtime.build_capabilities", lambda user: {"capabilities": []}
     )
+    async def no_retained_goals(runtime, **kwargs):
+        # This test isolates clock propagation; registry ownership is covered by
+        # PostgreSQL conversation-context tests, not this minimal Session stub.
+        return {"goals": [], "next_cursor": None}
+
+    monkeypatch.setattr("app.conversation.runtime.goals.listing", no_retained_goals)
     subject = Runtime(
         7,
         request(),

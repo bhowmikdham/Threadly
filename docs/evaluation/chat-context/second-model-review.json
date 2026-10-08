@@ -1,0 +1,340 @@
+{
+  "recorded_at": "2026-10-07T12:15:27.729727+00:00",
+  "status": "stopped_after_three_targeted_cases_with_confirmed_behavioral_failures",
+  "approval_message": "Sentinel_5ad560968be0819184efa9a9963fbad1",
+  "approved_at": "2026-10-07T11:45:58Z",
+  "release": "contextual-conversation-1.8.9+chat-context.3",
+  "prompt_hash": "a31874ec7687c014e677c24975e172508fc95d9089b83c9be560f93e3d2e30cf",
+  "tools_hash": "4fcf99746abbd2db4358b73e9cbce902ff8fd9fb174342845f3851318ecfa88e",
+  "harness_head": "a3dc5fc",
+  "production_runtime_head": "744982fa2208d23c15180d9b053adc50caf55a0d",
+  "model_id": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "region": "ap-southeast-2",
+  "budget_identity": {
+    "batch": "second-approved-context-evaluation-2026-10-07",
+    "release": "contextual-conversation-1.8.9+chat-context.3",
+    "assets": {
+      "release": "contextual-conversation-1.8.9+chat-context.3",
+      "day_availability_policy": "calendar-day-answer-2.0.0",
+      "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+      "prompt_hash": "a31874ec7687c014e677c24975e172508fc95d9089b83c9be560f93e3d2e30cf",
+      "tools_hash": "4fcf99746abbd2db4358b73e9cbce902ff8fd9fb174342845f3851318ecfa88e",
+      "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+      "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+      "max_calls": 8,
+      "timeout_seconds": 120
+    },
+    "started_unix": 1791374846.360372
+  },
+  "attempts_used": 9,
+  "successful_provider_responses": 9,
+  "failed_provider_attempts": 0,
+  "unused_attempts": 9,
+  "calls_by_case": {
+    "corrected_draft_completion": 4,
+    "calendar_preview_revision": 3,
+    "saved_draft_resumption": 2
+  },
+  "usage": {
+    "inputTokens": 243954,
+    "outputTokens": 1059
+  },
+  "estimated_usd_before_tax": "0.2741739",
+  "estimated_usd_with_10pct_gst": "0.30159129",
+  "combined_batches": {
+    "attempts_used": 27,
+    "successful_provider_responses": 26,
+    "failed_provider_attempts": 1,
+    "estimated_completed_usd_with_10pct_gst": "0.86728323",
+    "estimated_usd_with_10pct_gst_and_first_failed_reserve": "0.91689323"
+  },
+  "scoring": {
+    "corrected_draft_completion": "fail_goal_identity_overwritten_despite_successful_text_generation",
+    "calendar_preview_revision": "preview_and_revision_pass_closing_guidance_fail",
+    "saved_draft_resumption": "fail_returned_save_status_without_restoring_artifact_or_goal_focus"
+  },
+  "provider_writes": 0,
+  "approved_actions": 0,
+  "action_jobs": 0,
+  "throttles": 0,
+  "first_ledger_unchanged": true,
+  "raw_ledger_sha256": "63efbe33d018c1cdaa9f3c9c6b79d417e67a2197954a5e0ef08c56e62b9d6393",
+  "raw_ledger_local_path": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-second-approved-budget-ledger.json",
+  "deadline_utc": "2026-10-07T12:22:26.360372+00:00",
+  "calls": [
+    {
+      "attempt": 1,
+      "scenario": "corrected_draft_completion",
+      "request_id": "c2f7100f-2314-48f5-a96c-6d8a61aa4bc1",
+      "usage": {
+        "inputTokens": 26647,
+        "outputTokens": 98,
+        "totalTokens": 26745,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:07:26.412370+00:00",
+      "finished_at": "2026-10-07T12:07:28.409954+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_DvO2AdpD9tv5Uvxeb7MEVd",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Casey",
+            "purpose": "",
+            "request_source": "Another email for Casey, please.",
+            "continue_previous": false
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "scenario": "corrected_draft_completion",
+      "request_id": "57fe97c4-f131-4cc4-b5e1-588c80ffc923",
+      "usage": {
+        "inputTokens": 26874,
+        "outputTokens": 99,
+        "totalTokens": 26973,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:07:36.485963+00:00",
+      "finished_at": "2026-10-07T12:07:39.026422+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_XQzvfZfQa7L9HLZSaXwYoA",
+          "name": "select_conversation_goal",
+          "input": {
+            "goal_id": "de<PHONE_4>-b1bb-481a-a42d-bdc62d<PHONE_5>",
+            "source": "Back to Alex: ask whether the sapphire crate has arrived."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "scenario": "corrected_draft_completion",
+      "request_id": "40f28f0e-c8fa-43b2-92af-06a1f3fced45",
+      "usage": {
+        "inputTokens": 27220,
+        "outputTokens": 206,
+        "totalTokens": 27426,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:07:47.059911+00:00",
+      "finished_at": "2026-10-07T12:07:49.680591+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_bMguo8IS9zZjXlwksaY4dG",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Alex",
+            "purpose": "ask whether the sapphire crate has arrived",
+            "request_source": "Back to Alex: ask whether the sapphire crate has arrived.",
+            "continue_previous": true,
+            "draft": {
+              "subject": "Has the sapphire crate arrived?",
+              "body": "Hi Alex,\n\nI wanted to check in and see whether the sapphire crate has arrived yet.\n\nThanks,",
+              "unresolved_fields": [],
+              "sources": []
+            }
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 4,
+      "scenario": "corrected_draft_completion",
+      "request_id": "a749d6a2-7b4e-4f31-88a9-e0a99c16afb9",
+      "usage": {
+        "inputTokens": 27315,
+        "outputTokens": 189,
+        "totalTokens": 27504,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:07:57.758403+00:00",
+      "finished_at": "2026-10-07T12:08:00.396567+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_WYHTFiQOiw6LjOsoZej6vS",
+          "name": "prepare_email_draft",
+          "input": {
+            "recipient": "Casey",
+            "purpose": "thank them for the map",
+            "request_source": "Now Casey's one: thank them for the map.",
+            "continue_previous": true,
+            "draft": {
+              "subject": "Thank you for the map",
+              "body": "Hi Casey,\n\nThank you so much for the map. I really appreciate it!\n\nBest regards,",
+              "unresolved_fields": [],
+              "sources": []
+            }
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 5,
+      "scenario": "calendar_preview_revision",
+      "request_id": "7e5d9b82-d621-4627-8c48-125dda0485f5",
+      "usage": {
+        "inputTokens": 26253,
+        "outputTokens": 182,
+        "totalTokens": 26435,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:08:08.469985+00:00",
+      "finished_at": "2026-10-07T12:08:11.118778+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_Sh5s9fJGrgh9J5ifcHD3F0",
+          "name": "prepare_calendar_event",
+          "input": {
+            "intent": {
+              "operation": "create",
+              "source": "Put Quiet hour in my diary tomorrow at 2 pm."
+            },
+            "title": "Quiet hour",
+            "date": {
+              "kind": "relative",
+              "offset_days": 1
+            },
+            "date_source": "tomorrow",
+            "time": "14:00",
+            "time_source": "2 pm"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 6,
+      "scenario": "calendar_preview_revision",
+      "request_id": "352b0803-f371-4559-afe5-2903b0070af9",
+      "usage": {
+        "inputTokens": 27001,
+        "outputTokens": 123,
+        "totalTokens": 27124,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:08:19.233458+00:00",
+      "finished_at": "2026-10-07T12:08:21.592877+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_tcwN7kv1MTcJYZIlAubA3T",
+          "name": "prepare_calendar_event",
+          "input": {
+            "intent": {
+              "operation": "revise",
+              "source": "Make it 3 pm instead."
+            },
+            "continue_previous": true,
+            "changes": [
+              {
+                "field": "time",
+                "operation": "replace",
+                "value": "15:00",
+                "source": "3 pm"
+              }
+            ]
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 7,
+      "scenario": "calendar_preview_revision",
+      "request_id": "f731bb4c-7d7c-49cd-89bc-a3f151d608bb",
+      "usage": {
+        "inputTokens": 27162,
+        "outputTokens": 82,
+        "totalTokens": 27244,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:08:29.705303+00:00",
+      "finished_at": "2026-10-07T12:08:31.907806+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_HWD36Egvv2eOImsjNuvcYV",
+          "name": "respond",
+          "input": {
+            "kind": "message",
+            "text": "Got it. Your \"Quiet hour\" event is ready for tomorrow at 3 pm\u2014just click Create draft to save it to your calendar."
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 8,
+      "scenario": "saved_draft_resumption",
+      "request_id": "44a419f5-f97c-4c54-92bf-4fe918670ad3",
+      "usage": {
+        "inputTokens": 27555,
+        "outputTokens": 57,
+        "totalTokens": 27612,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:08:39.979686+00:00",
+      "finished_at": "2026-10-07T12:08:42.014072+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_xq99nl9oKw49LGP6apgmnq",
+          "name": "read_email",
+          "input": {
+            "reference": "context-1",
+            "scope": "thread"
+          },
+          "type": "tool_use"
+        }
+      ]
+    },
+    {
+      "attempt": 9,
+      "scenario": "saved_draft_resumption",
+      "request_id": "b0ae5a0d-8a32-4aba-9dc0-c7b6f08d71f7",
+      "usage": {
+        "inputTokens": 27927,
+        "outputTokens": 23,
+        "totalTokens": 27950,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "started_at": "2026-10-07T12:08:50.076517+00:00",
+      "finished_at": "2026-10-07T12:08:53.930197+00:00",
+      "outcome": "completed",
+      "tools": [
+        {
+          "toolUseId": "tooluse_7Qm7fVZW9EVeZIg0NV1qDN",
+          "name": "review_email_draft",
+          "input": {},
+          "type": "tool_use"
+        }
+      ]
+    }
+  ],
+  "evidence_sha256": {
+    "second-model-ledger.json.gz": "e0e4c389e0578eceb0a073bf736060d8908480066b57624ebc231f82d87c688d",
+    "second-scenarios.json": "a1301922e9ba183f0cb38bd18ba58709f5c1e474edbbc5f80d0c76b64008ee31"
+  }
+}

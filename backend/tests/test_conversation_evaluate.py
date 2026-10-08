@@ -50,6 +50,45 @@ def _response(kind="message", text="Ready.", **values):
     return {"kind": kind, "text": text, "evidence": [], **values}
 
 
+async def test_historical_fixture_supports_new_email_operation_tools_without_providers():
+    from app.schemas.conversation import ContinueEmailDraft, StartEmailDraft
+
+    state = {"history": []}
+    first = "Draft an email for Morgan."
+    runtime = evaluate.FixtureRuntime({}, first, draft_state=state)
+    response = await runtime.call(
+        "start_email_draft", StartEmailDraft(request_source=first, recipient="Morgan")
+    )
+    assert response["kind"] == "clarification"
+    goal_id = state["email_draft_goal"]["goal_id"]
+    second = "Ask whether the package arrived."
+    runtime = evaluate.FixtureRuntime({}, second, draft_state=state)
+    response = await runtime.call(
+        "continue_email_draft",
+        ContinueEmailDraft(
+            goal_id=goal_id,
+            request_source=second,
+            purpose="whether the package arrived",
+            draft={
+                "subject": "Package",
+                "body": "Hi Morgan, has the package arrived?",
+                "unresolved_fields": [],
+                "sources": [],
+            },
+        ),
+    )
+    assert response["email_draft"]["recipient"] == "Morgan"
+    assert state["email_draft_goal"]["goal_id"] == goal_id
+    assert (
+        evaluate.grade(
+            {"id": "fixture_adapter", "kinds": ["message"], "required": ["prepare_email_draft"]},
+            response,
+            runtime.calls,
+        )
+        == []
+    )
+
+
 def test_live_cli_requires_mail_processing_acknowledgement_before_replay(monkeypatch):
     replay_started = False
 

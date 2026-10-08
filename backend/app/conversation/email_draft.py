@@ -26,6 +26,8 @@ class EmailDraftInputError(ValueError):
             {
                 "user_field_required": "Copy fields from USER text",
                 "source_bound_workflow_required": "Use the source-bound workflow for read email",
+                "new_email_requires_start": "A new compose request must use start_email_draft "
+                "for the new email",
             }.get(reason, reason)
         )
 
@@ -38,6 +40,12 @@ def current_text_draft(state):
         draft = entry.get("email_draft")
         if draft and (not goal.get("draft_id") or draft["draft_id"] == goal["draft_id"]):
             return draft
+    if goal.get("draft_id") and goal.get("draft"):
+        return {
+            "draft_id": goal["draft_id"],
+            "recipient": goal["recipient"],
+            **{key: goal["draft"][key] for key in ("subject", "body", "unresolved_fields")},
+        }
     return None
 
 
@@ -134,18 +142,55 @@ def _quoted(value, instruction):
 
 
 async def prepare(runtime, args):
+    from app.conversation import citations, goals
     from app.conversation.runtime import (
         _revokes_compose_request,
         user_recipient_roles,
     )
 
     latest = runtime.request.instruction.strip()
+    cited = await citations.resolve(runtime, args.citations)
+    user_context = list((await citations.resolve(runtime, args.context_citations)).values())
     previous = runtime.state.get(KEY)
-    if _revokes_compose_request(latest):
+    cancelling = _revokes_compose_request(latest)
+    if args.request_source:
+        from app.conversation.user_intent import validate
+
+        if cancelling:
+            # Declining creation is valid cancellation intent. Still bind it to
+            # this USER turn; the creation-intent validator rejects cancellations.
+            if args.request_source != runtime.request.instruction:
+                raise ValueError("Copy the complete current USER turn as request_source")
+        else:
+            validate(args.request_source, runtime.request.instruction)
+    if (
+        args.continue_previous
+        and not cancelling
+        and re.search(
+            r"\b(?:new|another|different)\s+(?:email|e-mail|message|draft)\b", latest, re.I
+        )
+    ):
+        # Reject the operation before selecting a retained goal or changing focus.
+        raise EmailDraftInputError("new_email_requires_start")
+    if args.continue_previous or cancelling:
+        previous = await goals.bind_email_continuation(runtime, args)
+    if cancelling:
+        goals.close(runtime.state, previous)
         runtime.state.pop(KEY, None)
         return {"kind": "message", "text": "Okay, I won’t continue that draft."}
     if runtime.loaded:
         raise EmailDraftInputError("source_bound_workflow_required")
+    # A repeated start after a text-generation error repairs this turn's new
+    # goal. It must not reset already validated fields or reuse an older goal.
+    repairing_start = (
+        not args.continue_previous
+        and previous
+        and previous.get("origin_request_id") == runtime.request.request_id
+        and previous.get("status") == "clarification"
+        and getattr(runtime, "email_start_repair", False)
+    )
+    if repairing_start:
+        args = args.model_copy(update={"continue_previous": True})
     if args.continue_previous:
         if not previous:
             raise EmailDraftInputError("no_pending_draft")
@@ -154,14 +199,18 @@ async def prepare(runtime, args):
                 422,
                 "draft_artifact_required",
                 "Use active_work and revise_draft for the existing saved draft. "
-                "A new email goal uses continue_previous=false.",
+                "A new email goal uses start_email_draft.",
             )
-        if re.search(
-            r"\b(?:new|another|different)\s+(?:email|e-mail|message|draft)\b", latest, re.I
+        if (
+            previous["status"] != "clarification"
+            and is_compose(latest)
+            and not args.goal_id
+            and not (
+                previous.get("goal_id")
+                and getattr(runtime, "resumed_goal_id", None) == previous["goal_id"]
+            )
         ):
-            raise ValueError("Start the new email with continue_previous=false")
-        if previous["status"] != "clarification" and is_compose(latest):
-            raise ValueError("A new compose request must not reuse the completed draft's fields")
+            raise EmailDraftInputError("new_email_requires_start")
         instruction = previous["instruction"]
         if latest not in instruction.split("\nUser follow-up: "):
             instruction += "\nUser follow-up: " + latest
@@ -189,7 +238,7 @@ async def prepare(runtime, args):
         )
     else:
         instruction = runtime.authoritative_instruction()
-        if not is_compose(instruction):
+        if not args.request_source and not is_compose(instruction):
             raise EmailDraftInputError("continuation_required" if previous else "compose_required")
         values = {"recipient": "", "purpose": ""}
         source = instruction
@@ -199,6 +248,7 @@ async def prepare(runtime, args):
         supplied = getattr(args, field).strip()
         retained = args.continue_previous and supplied == previous[field]
         field_source = latest if args.continue_previous and field == "recipient" else source
+        field_source = cited.get(field, {}).get("source", field_source)
         if not retained and not _quoted(supplied, field_source):
             raise EmailDraftInputError("user_field_required")
         if supplied:
@@ -216,11 +266,37 @@ async def prepare(runtime, args):
         # An updated name cannot silently inherit the previous person's address.
         # Keep recipient authority with the USER turn that supplied that recipient.
         recipient_instruction = latest
+    if "recipient" in cited:
+        # Only the proposed recipient is bound, never unrelated roles or commands
+        # that happen to occur in the older quote. The new goal still needs its
+        # own current compose request above.
+        recipient_instruction = values["recipient"]
     goal = {
         **values,
+        **(
+            {"goal_id": previous["goal_id"]}
+            if args.continue_previous and previous.get("goal_id")
+            else {}
+        ),
         "instruction": instruction,
+        "semantic_request": bool(args.request_source)
+        or bool(args.continue_previous and previous.get("semantic_request")),
         "recipient_instruction": recipient_instruction,
         "status": "clarification",
+        "field_provenance": {
+            **(
+                {
+                    k: v
+                    for k, v in (previous or {}).get("field_provenance", {}).items()
+                    if not getattr(args, k).strip() or getattr(args, k).strip() == previous[k]
+                }
+                if args.continue_previous
+                else {}
+            ),
+            **cited,
+        },
+        "user_context": user_context
+        or ((previous or {}).get("user_context", []) if args.continue_previous else []),
         "origin_request_id": (
             previous.get("origin_request_id")
             if args.continue_previous
@@ -278,20 +354,37 @@ async def prepare(runtime, args):
             role: {ref for ref, address in recipients.items() if address in addresses}
             for role, addresses in roles.items()
         }
+        runtime.verified_user_context = (
+            list(goal["field_provenance"].values()) + goal["user_context"]
+        )
         runtime.email_draft_prepared = True
         goal["status"] = "workflow"
         runtime.state[KEY] = goal
         result = await runtime.workflow(
             PrepareWorkflow(
                 intent="compose",
+                request_source=runtime.request.instruction if goal["semantic_request"] else "",
                 **{role + "_refs": sorted(refs) for role, refs in runtime.recipient_roles.items()},
             )
         )
+        goal["task_id"] = result["task_id"]
     else:
         # Preserve validated details even when generation needs a repair. A failed
         # text payload must not make the next turn ask for the message again.
-        if not (args.continue_previous and previous.get("status") == "drafted"):
-            runtime.state[KEY] = goal
+        if (
+            args.continue_previous
+            and previous.get("status") == "drafted"
+            and all(values[field] == previous[field] for field in values)
+            and goal["recipient_roles"] == previous.get("recipient_roles", goal["recipient_roles"])
+            and goal["field_provenance"] == previous.get("field_provenance", {})
+            and goal["user_context"] == previous.get("user_context", [])
+        ):
+            # A failed wording-only revision must not erase a reviewable draft
+            # or its save receipt. Changed recipients/purpose/context, however,
+            # cannot expose the old text as a draft of the corrected goal.
+            goal.update({k: previous[k] for k in ("status", "draft_id", "draft") if k in previous})
+        runtime.state[KEY] = goal
+        runtime.email_start_repair = bool(not args.continue_previous or repairing_start)
         if args.draft is None:
             raise EmailDraftInputError("draft_text_required")
         if args.draft.sources:

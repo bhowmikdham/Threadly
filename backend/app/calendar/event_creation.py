@@ -11,7 +11,7 @@ from app.actions import calendar_preview
 from app.actions import service as actions
 from app.api.errors import ApiError
 from app.assistant.summary import digest
-from app.calendar import event_choices, event_draft, intent, permissions, service
+from app.calendar import event_choices, event_draft, event_timezone, intent, permissions, service
 from app.calendar.conversation_tools import RequestClarification, duration, literal, resolve_window
 from app.calendar.time_resolution import parse_clock, wall_instants
 from app.capabilities.service import build_capabilities
@@ -33,16 +33,25 @@ POLICY = "direct-calendar-event-1.2.0"
 user_directive = intent.user_directive
 
 
-def source_fields(args, text, previous_calendar_names=()):
-    if re.search(r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat)\b", text, re.I):
+def source_fields(args, text, previous_calendar_names=(), *, constraints=True):
+    if constraints and re.search(
+        r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat)\b", text, re.I
+    ):
         raise RequestClarification("I can create one-time events. Which single date should I use?")
-    complete_trailing_title(args, text)
+    if constraints:
+        complete_trailing_title(args, text)
     for field in ("title", "location", "description", "calendar_name", "duration_phrase"):
         value = getattr(args, field)
         if value:
             event_draft.literal_field(value, text, field)
     if args.date_source:
         event_draft.literal_field(args.date_source, text, "date")
+    if args.timezone:
+        event_draft.literal_field(args.timezone_source, text, "timezone")
+        if event_timezone.zone_name(args.timezone) != event_timezone.zone_name(
+            args.timezone_source
+        ):
+            raise event_draft.FieldRepairRequired("timezone", interpretation=True)
     for address in args.attendees:
         event_draft.literal_field(address, text, "attendees")
     if args.time_source:
@@ -51,7 +60,7 @@ def source_fields(args, text, previous_calendar_names=()):
         )
         # Ambiguous user wording needs a question; a conflicting model value needs repair.
         try:
-            source_clock = parse_clock(args.time_source)
+            source_clock = parse_clock(event_timezone.clock_source(args.time_source))
         except ValueError:
             source_clock = []
         if len(source_clock) != 1:
@@ -62,6 +71,8 @@ def source_fields(args, text, previous_calendar_names=()):
             interpreted_clock = []
         if source_clock != interpreted_clock:
             raise event_draft.FieldRepairRequired("time", interpretation=True)
+    if not constraints:
+        return
     # Fail closed when an extracted candidate omits an explicit constraint. Only
     # literal user-authored fields are removed; provider content never enters here.
     remainder = text.casefold()
@@ -69,6 +80,7 @@ def source_fields(args, text, previous_calendar_names=()):
         args.title,
         args.date_source,
         args.time_source,
+        args.timezone_source,
         args.duration_phrase,
         args.calendar_name,
         args.location,
@@ -82,7 +94,7 @@ def source_fields(args, text, previous_calendar_names=()):
         remainder = re.sub(r"\binvite\b", " ", remainder)
     if re.search(
         r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat|until|ending|ends|"
-        r"timezone|utc|gmt|hours?|minutes?|mins?|tomorrow|today|tonight|"
+        r"timezone|utc|gmt|aest|aedt|hours?|minutes?|mins?|tomorrow|today|tonight|"
         r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|invite)\b|"
         r"\b(?:at|from|to|between|on)\s+\d|\d{1,2}:\d{2}|"
         r"\d\s*[ap]\.?\s*m\b|[^\s@]+@[^\s@]+|[A-Za-z]+/[A-Za-z_]+",
@@ -104,10 +116,14 @@ def complete_trailing_title(args, text):
         return " ".join(value.casefold().split())
 
     for marker in re.finditer(r"\bfor\s+", text, re.I):
-        before = normalized(text[: marker.start()])
+        # Repair validation can join original text, this turn and retained
+        # evidence. Do not assemble a title pattern across those source lines.
+        before = normalized(text[: marker.start()].rsplit("\n", 1)[-1])
         if any(normalized(source) not in before for source in (args.date_source, args.time_source)):
             continue
-        title = text[marker.end() :].strip().rstrip(".!?").strip().strip('"“”')
+        title = text[marker.end() :].split("\n", 1)[0].strip().rstrip(".!?").strip().strip('"“”')
+        if re.fullmatch(r"(?:that|this|it|the meeting|the event)", title, re.I):
+            continue
         other_fields = (
             args.duration_phrase,
             args.location,
@@ -132,19 +148,21 @@ def complete_trailing_title(args, text):
         return
 
 
-def resolve_times(args, text, preferences, anchor):
+def resolve_times(args, text, preferences, anchor, date_timezone=None):
     if not args.date or not args.time:
         raise RequestClarification("What day and time should I use?")
     literal(args.date_source, text)
     window = CalendarWindow(subject="self", date=args.date, date_source=args.date_source)
-    start_day, end_day = resolve_window(window, args.date_source, anchor, preferences["timezone"])
-    zone = ZoneInfo(preferences["timezone"])
-    if (end_day.astimezone(zone).date() - start_day.astimezone(zone).date()).days != 1:
+    timezone = event_timezone.zone_name(args.timezone) if args.timezone else preferences["timezone"]
+    date_zone = ZoneInfo(date_timezone or timezone)
+    start_day, end_day = resolve_window(window, args.date_source, anchor, str(date_zone))
+    zone = ZoneInfo(timezone)
+    if (end_day.astimezone(date_zone).date() - start_day.astimezone(date_zone).date()).days != 1:
         raise RequestClarification("Choose one date for this event.")
     clocks = parse_clock(args.time)
     if len(clocks) != 1:
         raise RequestClarification("What time should it start? Please include AM or PM.")
-    starts = wall_instants(start_day.astimezone(zone).date(), clocks[0], zone)
+    starts = wall_instants(start_day.astimezone(date_zone).date(), clocks[0], zone)
     if len(starts) != 1:
         raise RequestClarification(
             "That local time is ambiguous or does not exist. Choose another time."
@@ -157,8 +175,37 @@ def resolve_times(args, text, preferences, anchor):
 
 
 async def prepare(runtime, args):
+    from app.conversation import citations
+
     intent.validate_source(args.intent, runtime.request.instruction)
-    pending = event_choices.pending(runtime.state) if args.continue_previous else None
+    field_citations = await citations.resolve(runtime, args.citations)
+    runtime.calendar_field_citations = field_citations
+    args = event_timezone.bind(
+        args,
+        runtime.request.instruction
+        + "\n"
+        + "\n".join(value["source"] for value in field_citations.values()),
+    )
+    if (
+        args.timezone
+        and args.timezone_source not in runtime.request.instruction
+        and "timezone" not in field_citations
+        and "time" in field_citations
+        and args.timezone_source in field_citations["time"]["source"]
+    ):
+        field_citations["timezone"] = field_citations["time"]
+    current = event_choices.pending(runtime.state)
+    # Retrying this turn's failed creation is a field repair, not a reset. A new
+    # USER turn still starts a distinct goal; reviewed candidates stay immutable.
+    repairing_create = (
+        not args.continue_previous
+        and current
+        and current.get("goal_id") == runtime.request.request_id
+        and current.get("last_request_id") == runtime.request.request_id
+        and current.get("origin_pending_validation")
+        and not current.get("action_id")
+    )
+    pending = current if args.continue_previous or repairing_create else None
     if args.continue_previous and not pending:
         return {
             "kind": "clarification",
@@ -186,6 +233,9 @@ async def prepare(runtime, args):
         ):
             raise RequestClarification("Please confirm cancellation of this pending event.")
         await retire_candidate(runtime, pending, "cancelled")
+        from app.conversation import goals
+
+        goals.close(runtime.state, pending)
         runtime.state.pop("calendar_event_request", None)
         return {
             "kind": "message",
@@ -197,11 +247,13 @@ async def prepare(runtime, args):
         event_draft.IntentSourceMismatch,
         event_draft.IncompleteEventTitle,
         event_draft.FieldRepairRequired,
-    ):
+    ) as error:
         # This is a model protocol error, not information missing from the user.
         # Keep the exact-source fence and let the bounded engine repair the call.
+        event_draft.retain_partial(runtime, args, pending, origin, error)
         raise
     except (RequestClarification, ValueError) as error:
+        event_draft.retain_partial(runtime, args, pending, origin, error)
         return {"kind": "clarification", "text": str(error)}
     saved["creation_origin"] = origin
     if pending and pending.get("action_id"):
@@ -210,11 +262,8 @@ async def prepare(runtime, args):
                 return await response(session, runtime.owner, pending["action_id"])
         await retire_candidate(runtime, pending, "superseded")
         saved.pop("action_id", None)
-    elif not pending and event_choices.pending(runtime.state):
-        # A new user-authorized goal supersedes an older undispatched candidate.
-        await retire_candidate(
-            runtime, runtime.state["calendar_event_request"], "superseded", new_goal=True
-        )
+    # A new independent goal changes focus. The previous goal and candidate stay
+    # in the owned registry; only an explicit revision/cancellation retires them.
     runtime.state["calendar_event_request"] = saved
     text = saved["user_text"]
     anchor = datetime.fromisoformat(saved["anchor"])
@@ -254,12 +303,22 @@ async def prepare(runtime, args):
             user.google_account_version,
         )
     try:
-        start, end = resolve_times(args, text, preferences, anchor)
+        start, end = resolve_times(
+            args, text, preferences, anchor, saved.get("date_anchor_timezone")
+        )
     except (RequestClarification, ValueError) as error:
         return {"kind": "clarification", "text": str(error)}
     saved["arguments"]["date"] = {
         "kind": "absolute",
-        "start": start.astimezone(ZoneInfo(preferences["timezone"])).date().isoformat(),
+        "start": start.astimezone(
+            ZoneInfo(
+                event_timezone.zone_name(args.timezone)
+                if args.timezone
+                else preferences["timezone"]
+            )
+        )
+        .date()
+        .isoformat(),
     }
     key = str(
         uuid5(
@@ -371,8 +430,18 @@ async def propose(
         "summary": args.title,
         "description": args.description,
         "location": args.location,
-        "start": {"dateTime": start.isoformat(), "timeZone": preferences["timezone"]},
-        "end": {"dateTime": end.isoformat(), "timeZone": preferences["timezone"]},
+        "start": {
+            "dateTime": start.isoformat(),
+            "timeZone": event_timezone.zone_name(args.timezone)
+            if args.timezone
+            else preferences["timezone"],
+        },
+        "end": {
+            "dateTime": end.isoformat(),
+            "timeZone": event_timezone.zone_name(args.timezone)
+            if args.timezone
+            else preferences["timezone"],
+        },
         "attendees": [{"email": address} for address in args.attendees],
         "extendedProperties": {"private": {"threadlyAction": digest({"owner": owner, "key": key})}},
         "reminders": {"useDefault": False},

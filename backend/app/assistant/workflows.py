@@ -12,6 +12,7 @@ from app.api.errors import ApiError
 from app.assistant import drafting, planning, reads, scheduling, steps, summary_quality, tasks
 from app.assistant.source_data import context_data
 from app.assistant.summary import digest
+from app.assistant.user_context import augment
 from app.calendar import slots
 from app.db.models import ArtifactRevision, AssistantJob, AssistantStep, CalendarSlotRequest
 from app.model_client.client import get_model_client
@@ -401,6 +402,7 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
                             prompt = drafting.make_prompt(
                                 claim.instruction, claim.snapshot, claim.draft_input, mode
                             )
+                            prompt = augment(prompt, claim)
                             entry = manifest.operations[operation] if manifest else None
                             if isinstance(entry, registry.FlowEntry):
                                 generated = await (flow_invoker or FlowInvoker()).invoke(
@@ -421,6 +423,8 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
                                 claim.snapshot, claim.instruction, policy=policy
                             )
                         )
+                        if operation == "summary":
+                            prompt = augment(prompt, claim)
                         entry = (
                             manifest.operations["summarise_thread"]
                             if manifest and operation == "summary"

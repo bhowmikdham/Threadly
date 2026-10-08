@@ -115,24 +115,34 @@ async def recover(owner, conversation_id, request, *, factory=None):
             if pending:
                 # Do not invent user instructions from generated/provider content.
                 # Consumers display this as an assistant-only recovered result.
-                state["history"] = (
-                    state["history"]
-                    + [
-                        {
-                            "user": "",
-                            "assistant": result.get("text", ""),
-                            "kind": result["kind"],
-                            "recovered": True,
-                            "request_id": row.pending_request_id,
-                            "task_id": result.get("task_id"),
-                            "proposal_id": result.get("proposal_id"),
-                            "calendar_action_id": result.get("calendar_action_id"),
-                            "error_code": result.get("error_code"),
-                        }
-                    ]
-                )[-store.HISTORY_LIMIT :]
+                state["history"] = state["history"] + [
+                    {
+                        "user": "",
+                        "assistant": result.get("text", ""),
+                        "kind": result["kind"],
+                        "recovered": True,
+                        "request_id": row.pending_request_id,
+                        "task_id": result.get("task_id"),
+                        "proposal_id": result.get("proposal_id"),
+                        "calendar_action_id": result.get("calendar_action_id"),
+                        "error_code": result.get("error_code"),
+                        "version": row.version + 1,
+                        **state.get("pending_turn_clock", {}),
+                    }
+                ]
+                await store.memory.persist_state(
+                    session, row.id, state, current_request_id=row.pending_request_id
+                )
             state.pop("pending_result", None)
+            state.pop("pending_turn_clock", None)
+            await store.goals.persist(session, row, state, row.version + 1)
             for key in ("calendar_read_request", "calendar_event_request"):
+                if key == "calendar_event_request" and (
+                    state.get(key, {}).get("last_request_id") != row.pending_request_id
+                ):
+                    # Cancelling a crashed detour does not cancel a different
+                    # unfinished Calendar goal in the same conversation.
+                    continue
                 if (
                     not pending
                     or state.get(key, {}).get("last_request_id") != row.pending_request_id

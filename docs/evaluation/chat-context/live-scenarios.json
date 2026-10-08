@@ -1,0 +1,291 @@
+{
+  "release": "contextual-conversation-1.8.9+chat-context.2",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+  "prompt_hash": "709e54825fd673707dbd407609feaa36fc901de671661111e9c6272f6a8d5b92",
+  "tools_hash": "9d611b454709adfc068f5a35cde1eff5619ff0ddd5126e965cb5c29e98fd4e78",
+  "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "mode": "real_model_synthetic_providers",
+  "budget": {
+    "calls": 18,
+    "calls_per_scenario": 6,
+    "input_tokens_per_call": 32000,
+    "output_tokens_per_call": 1800,
+    "seconds_to_start_last_call": 900,
+    "maximum_usd_before_tax": 0.8118
+  },
+  "model_id": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "region": "ap-southeast-2",
+  "scenarios": [
+    {
+      "id": "long_arbitrary_correction",
+      "rubric": "Find old user details beyond the window; South supersedes North; no repeated question for known details.",
+      "turns": [
+        {
+          "user": "What did I say about Lumen's kit and delivery?",
+          "response": {
+            "kind": "message",
+            "text": "For Project Lumen, you said the kit colour is violet and the delivery gate is South (corrected from North in turn 30).",
+            "evidence": [],
+            "release": "contextual-conversation-1.8.9+chat-context.2",
+            "trace": [
+              {
+                "tool": "recall_conversation",
+                "status": "ok"
+              },
+              {
+                "tool": "recall_conversation",
+                "status": "ok"
+              },
+              {
+                "tool": "recall_conversation",
+                "status": "ok"
+              },
+              {
+                "tool": "respond",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 9076,
+            "conversation_id": "bf3b10c4-9479-4feb-bb77-8bdaa0bc1899",
+            "version": 46
+          },
+          "state": {
+            "active_goal_id": null,
+            "calendar_event_request": null,
+            "email_draft_goal": null,
+            "active_task_id": null
+          },
+          "goals": {
+            "goals": [],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "An email for Alex would help; cover those arrangements.",
+          "error": {
+            "code": "conversation_unavailable",
+            "status": 503
+          }
+        }
+      ]
+    },
+    {
+      "id": "two_unfinished_drafts",
+      "rubric": "Two stable goals; correct recipient/purpose per goal; drafts are reviewable, not sent.",
+      "turns": [
+        {
+          "user": "Can you help with an email for Alex?",
+          "response": {
+            "kind": "clarification",
+            "text": "What would you like to say?",
+            "release": "contextual-conversation-1.8.9+chat-context.2",
+            "trace": [
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 3368,
+            "conversation_id": "a488a23e-9e79-4a59-81fd-e0f370b10514",
+            "version": 1
+          },
+          "state": {
+            "active_goal_id": "3a42a6fe-578b-4812-843d-898c854d8ab9",
+            "calendar_event_request": null,
+            "email_draft_goal": {
+              "recipient": "Alex",
+              "purpose": "",
+              "instruction": "Can you help with an email for Alex?",
+              "semantic_request": true,
+              "recipient_instruction": "Can you help with an email for Alex?",
+              "status": "clarification",
+              "field_provenance": {},
+              "user_context": [],
+              "origin_request_id": "50e14d82-3567-4528-99e0-2afbbcf5ccd3",
+              "superseded_task_id": null,
+              "recipient_roles": {
+                "to": [],
+                "cc": [],
+                "bcc": []
+              },
+              "goal_id": "3a42a6fe-578b-4812-843d-898c854d8ab9"
+            },
+            "active_task_id": null
+          },
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "3a42a6fe-578b-4812-843d-898c854d8ab9",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Alex",
+                "updated_version": 1,
+                "focused": true
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Another email for Casey, please.",
+          "response": {
+            "kind": "clarification",
+            "text": "What would you like to say?",
+            "release": "contextual-conversation-1.8.9+chat-context.2",
+            "trace": [
+              {
+                "tool": "prepare_email_draft",
+                "status": "invalid",
+                "reason": "continuation_required",
+                "fields": []
+              },
+              {
+                "tool": "prepare_email_draft",
+                "status": "invalid",
+                "reason": "email_draft_invalid_input",
+                "fields": []
+              },
+              {
+                "tool": "prepare_email_draft",
+                "status": "ok"
+              }
+            ],
+            "context_references": [],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 6150,
+            "conversation_id": "a488a23e-9e79-4a59-81fd-e0f370b10514",
+            "version": 2
+          },
+          "state": {
+            "active_goal_id": "32c16426-cba4-4e56-bcc8-2bb5a82d6e80",
+            "calendar_event_request": null,
+            "email_draft_goal": {
+              "recipient": "Casey",
+              "purpose": "",
+              "instruction": "Another email for Casey, please.",
+              "semantic_request": true,
+              "recipient_instruction": "Another email for Casey, please.",
+              "status": "clarification",
+              "field_provenance": {},
+              "user_context": [],
+              "origin_request_id": "2340be5c-c8e4-4e25-8452-8a57ee63b6ea",
+              "superseded_task_id": null,
+              "recipient_roles": {
+                "to": [],
+                "cc": [],
+                "bcc": []
+              },
+              "goal_id": "32c16426-cba4-4e56-bcc8-2bb5a82d6e80"
+            },
+            "active_task_id": null
+          },
+          "goals": {
+            "goals": [
+              {
+                "goal_id": "32c16426-cba4-4e56-bcc8-2bb5a82d6e80",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Casey",
+                "updated_version": 2,
+                "focused": true
+              },
+              {
+                "goal_id": "3a42a6fe-578b-4812-843d-898c854d8ab9",
+                "kind": "email_draft",
+                "status": "retained",
+                "label": "Alex",
+                "updated_version": 1,
+                "focused": false
+              }
+            ],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Back to Alex: ask whether the sapphire crate has arrived.",
+          "error": {
+            "code": "conversation_unavailable",
+            "status": 503
+          }
+        }
+      ]
+    },
+    {
+      "id": "source_summary_draft_calendar_return",
+      "rubric": "Fresh bounded source reads, correct saved artifact on return without rerunning summary.",
+      "turns": [
+        {
+          "user": "Give me a rundown of the selected email.",
+          "response": {
+            "kind": "message",
+            "text": "The selected email is from sender@example.test, sent on 20 Sep 2026 with the subject \"Agenda\". The message asks you to \"review the revised agenda by Friday.\"",
+            "evidence": [
+              {
+                "reference": "selected",
+                "quote": "Please review the revised agenda by Friday."
+              }
+            ],
+            "release": "contextual-conversation-1.8.9+chat-context.2",
+            "trace": [
+              {
+                "tool": "read_email",
+                "status": "ok"
+              },
+              {
+                "tool": "respond",
+                "status": "invalid",
+                "reason": "citation_required"
+              },
+              {
+                "tool": "respond",
+                "status": "ok"
+              }
+            ],
+            "context_references": [
+              "context-1"
+            ],
+            "context_memory_version": 1,
+            "active_email_draft_id": null,
+            "latency_ms": 6156,
+            "conversation_id": "0a841b8e-15a8-4ed9-b3e9-3d025281fe7f",
+            "version": 1
+          },
+          "state": {
+            "active_goal_id": null,
+            "calendar_event_request": null,
+            "email_draft_goal": null,
+            "active_task_id": null
+          },
+          "goals": {
+            "goals": [],
+            "next_cursor": null,
+            "notice": "Retained work is not automatically active or approved. Ask which goal if ambiguous."
+          }
+        },
+        {
+          "user": "Write a reply thanking them for the agenda.",
+          "error": {
+            "code": "conversation_unavailable",
+            "status": 503
+          }
+        }
+      ]
+    }
+  ],
+  "google_calendar_calls": [],
+  "human_review_required": true
+}

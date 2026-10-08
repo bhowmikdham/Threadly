@@ -13,6 +13,8 @@ def requested(runtime):
     if not request:
         return False
     state = getattr(runtime, "state", {})
+    if state.get("active_goal") not in {None, "email_draft", "saved_task", "reply", "task"}:
+        return False
     if not (state.get(email_draft.KEY) or getattr(runtime, "artifact", None)):
         return False
     text = request.instruction.strip()
@@ -62,12 +64,16 @@ async def context(runtime, session):
     from app.actions import gmail_draft
     from app.schemas.assistant import DraftOptions
 
+    if runtime.state.get("active_goal") not in {None, "email_draft", "saved_task", "reply", "task"}:
+        return None
     source = None
     text_draft = email_draft.current_text_draft(runtime.state)
     if text_draft:
         source = ("conversation", text_draft["draft_id"])
     elif runtime.artifact and runtime.artifact.payload.get("kind") == "draft":
         source = ("task", runtime.artifact.task_id)
+    if source is None:
+        return None
     receipt = None
     status = "not_saved"
     if source:
@@ -105,10 +111,69 @@ async def context(runtime, session):
     }
 
 
-async def review(runtime):
+async def open_existing(runtime):
+    """Surface the owned current draft as work, without executing or regenerating it."""
+    from app.api.routes.assistant import task_view
+    from app.assistant import draft_review, tasks
+
+    if draft := email_draft.current_text_draft(runtime.state):
+        runtime.state["active_goal"] = "email_draft"
+        runtime.resumed_goal_id = runtime.state[email_draft.KEY].get("goal_id")
+        return {"email_draft": draft}
+    if not runtime.artifact or runtime.artifact.payload.get("kind") != "draft":
+        return {}
+    # The source comes from the server-loaded current artifact, not a model ID.
+    # Recheck ownership/current revision before returning a card, even on replay.
+    async with runtime.factory() as session:
+        task = await tasks.owned_task(session, runtime.owner, runtime.artifact.task_id)
+        if not task.final_artifact_id:
+            return {}
+        artifact = await draft_review.owned_artifact(session, runtime.owner, task.final_artifact_id)
+        if artifact.payload.get("kind") != "draft":
+            return {}
+        active = await task_view(session, task)
+    runtime.state["active_task_id"] = task.id
+    runtime.state.pop("proposal_id", None)
+    runtime.state["active_goal"] = "saved_task"
+    runtime.state["active_goal_id"] = task.id
+    runtime.active, runtime.artifact = active, artifact
+    runtime.resumed_task_id = task.id
+    runtime.resumed_goal_id = task.id
+    return {"task_id": task.id, "task": active}
+
+
+async def review(runtime, *, presentation="status"):
+    from app.conversation import goal_review
+
+    return await goal_review.review(runtime, presentation=presentation, email_only=True)
+
+
+async def selected(runtime, *, presentation="status"):
+    """Only called after the intended owned email/task goal has been resolved."""
+    opened = await open_existing(runtime)
     async with runtime.factory() as session:
         value = await context(runtime, session)
     runtime.email_draft_review = value
+    if value is None:
+        pending = runtime.state.get(email_draft.KEY) or {}
+        missing = [field for field in ("recipient", "purpose") if not pending.get(field)]
+        if pending and missing:
+            question = (
+                "Who’s it for, and what would you like to say?"
+                if len(missing) == 2
+                else "Who’s it for?"
+                if missing == ["recipient"]
+                else "What would you like to say?"
+            )
+            return {"kind": "clarification", "text": question}
+        return {"kind": "message", "text": "This request has no draft card to review yet."}
+    if presentation == "open" and opened:
+        return {
+            "kind": "message",
+            "text": "Here is your existing draft.",
+            **opened,
+            "email_draft_review": value,
+        }
     status = value["save_status"]
     if status == "succeeded":
         text = (
@@ -135,12 +200,6 @@ async def review(runtime):
             "Your Google connection changed. "
             "Reload the draft and check its status before continuing."
         )
-    elif not value["source"]:
-        text = (
-            "I haven’t created a draft card or saved anything in Gmail for this request. "
-            "The earlier chat text is not a saved Gmail draft. I still have your drafting request; "
-            "ask me to prepare the draft again using those details."
-        )
     else:
         text = "Your draft is still in this chat. "
         if value["gmail_draft_capability"] in {
@@ -164,7 +223,7 @@ async def review(runtime):
             "Chat replies don’t save or send it. If the card or button is missing or disabled, "
             "update/reload the extension and reopen this chat."
         )
-    return {"kind": "message", "text": text, "email_draft_review": value}
+    return {"kind": "message", "text": text, **opened, "email_draft_review": value}
 
 
 def unsupported_promise(text):

@@ -1,0 +1,125 @@
+{
+  "recorded_at": "2026-10-08T00:53:12.439079+00:00",
+  "status": "stopped_on_semantic_regression",
+  "release": "contextual-conversation-1.8.9+chat-context.5",
+  "prompt_hash": "e5ca88fb92cbef91bf7ce74602f9b0df3105cd94003560e8ca3ccb87b0827ad9",
+  "tools_hash": "dad14c370181f2d077b0329f5dfd8f3cfa5f146044d3053678057a34bcad2417",
+  "harness_head": "90dd4bb4400924af5c5ea74c33bb6ad25a271d4e",
+  "application_runtime_head": "7fb055f409c46479bc1cd1194aa870ff93ccf187",
+  "frontend_head": "86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf",
+  "approval_message": "Sentinel_3973d49c351881918d50d28411bca36c",
+  "approved_at": "2026-10-08T00:40:11Z",
+  "window_started_at": "2026-10-08T00:48:16.472158+00:00",
+  "window_deadline": "2026-10-08T01:03:16.472158+00:00",
+  "finished_at": "2026-10-08T00:49:49.313887+00:00",
+  "attempts": 3,
+  "provider_completed": 3,
+  "provider_failures": 0,
+  "usage": {
+    "inputTokens": 84022,
+    "outputTokens": 382
+  },
+  "estimated_usd_with_10pct_gst": "0.10397772",
+  "approved_maximum_usd_with_10pct_gst": "0.60",
+  "unused_attempts": 9,
+  "unused_by_case": {
+    "email": 3,
+    "calendar": 6
+  },
+  "unused_not_automatic_resumption": true,
+  "score": {
+    "new_casey_goal": "pass_one_call",
+    "alex_completion": "fail_purpose_lost_during_same_turn_repair",
+    "casey_completion": "not_attempted_after_stop",
+    "email_variation": "not_attempted_after_stop",
+    "calendar": "not_attempted_after_stop"
+  },
+  "proven_cause": "continue_email_draft -> bind_email_continuation always calls select_goal; second same-turn call reloads persisted empty purpose over validated in-memory purpose retained after draft_text_required. Offline exact-response replay observes populated before/empty after selection.",
+  "provider_writes": 0,
+  "approved_actions": 0,
+  "action_jobs": 0,
+  "calls": [
+    {
+      "n": 1,
+      "scenario": "email",
+      "started_at": "2026-10-08T00:48:16.534152+00:00",
+      "finished_at": "2026-10-08T00:48:19.800272+00:00",
+      "request_id": "21f4b699-7c92-4a47-b9a2-e81cea3eb069",
+      "usage": {
+        "inputTokens": 27697,
+        "outputTokens": 79,
+        "totalTokens": 27776,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 2895
+    },
+    {
+      "n": 2,
+      "scenario": "email",
+      "started_at": "2026-10-08T00:48:46.447595+00:00",
+      "finished_at": "2026-10-08T00:48:48.951187+00:00",
+      "request_id": "3d094519-4646-4412-b502-0bf8bcfc07c4",
+      "usage": {
+        "inputTokens": 27924,
+        "outputTokens": 124,
+        "totalTokens": 28048,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 2152
+    },
+    {
+      "n": 3,
+      "scenario": "email",
+      "started_at": "2026-10-08T00:48:57.043876+00:00",
+      "finished_at": "2026-10-08T00:48:59.038845+00:00",
+      "request_id": "5a251cde-0c82-4d91-8f82-33e50c9af279",
+      "usage": {
+        "inputTokens": 28401,
+        "outputTokens": 179,
+        "totalTokens": 28580,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed",
+      "latency_ms": 1665
+    }
+  ],
+  "prior_ledgers_unchanged": true,
+  "ledger_sha256": "7b6f1d8a59c4d92b29fcefc8a6151375d1bcf7dca4c6cd637f772ae6bcb6df40",
+  "reviews": {
+    "email-1.json": {
+      "sha256": "c450b7fb100934e99d593b90f9cb0a3f3d1deb3f2de8d24ca64db7141a71066c",
+      "decision": "stop",
+      "assessment": "FAIL: user explicitly supplied sapphire-crate purpose for Alex, but after draft_text_required repair the service asked for purpose again; no email_draft returned. Stop entire paid run on semantic regression; Calendar not attempted."
+    },
+    "email-0.json": {
+      "sha256": "30c889e23e42555bf3f867cdedf62900d39dfe5fa734cd6be09e077016e1e30b",
+      "decision": "continue",
+      "assessment": "PASS: one start_email_draft call; separate Casey missing-purpose clarification; Alex retained at version 1; no actions/jobs."
+    },
+    "email-1.state.json": {
+      "eb50175f-c007-4fdb-93f9-6048d51ac0f1": {
+        "kind": "email_draft",
+        "payload_hash": "20ba5615537c5d2d330a9a4c503458249b37d7d069bf937ecf36e549c7afeb9c"
+      },
+      "ab329465-a825-4246-abbe-982bdc508b32": {
+        "kind": "email_draft",
+        "payload_hash": "19637c4d00476772ea0f6d3a26029bfdf0a336823da03b995f732de6e82bad18"
+      }
+    }
+  },
+  "offline_replay": "backend/tools/replay_context5_retained_fields.py",
+  "offline_replay_result": "1 failed acceptance assertion; same purpose loss reproduced; no live call",
+  "limitations": [
+    "New-goal creation passed for one wording only.",
+    "No completed two-draft scenario; no Calendar coverage in this batch.",
+    "Pytest live harness 1 passed proves execution/stop controls only, not behavioral success.",
+    "Remaining calls are unused after mandated semantic stop; no automatic restart or deadline reset."
+  ],
+  "casey_payload_unchanged": true,
+  "casey_payload_hash": "20ba5615537c5d2d330a9a4c503458249b37d7d069bf937ecf36e549c7afeb9c"
+}

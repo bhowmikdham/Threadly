@@ -1,0 +1,69 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_________ test_exact_context6_wrong_domain_call_requires_bound_review __________
+
+prepared = [{'previous': {'kind': 'clarification', 'text': 'What would you like to say?', 'release': 'contextual-conversation-1.8...ser_input', ...}, {'quote': None, 'ref_id': 'source-1', 'source_id': 'def456', 'source_kind': 'message', ...}], ...}}}]
+db_sessionmaker = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x10e5d5950>, autoflush=True, expire_on_commit=False)
+
+    async def test_exact_context6_wrong_domain_call_requires_bound_review(prepared, db_sessionmaker):
+        previous, wrong = await recorded_calendar(db_sessionmaker)
+        r = await owned_runtime(db_sessionmaker, previous, "Where do I confirm it?")
+        pending = deepcopy(r.state["calendar_event_request"])
+        async with db_sessionmaker() as db:
+            action = await db.get(AssistantAction, pending["action_id"])
+            before = (action.state, action.payload_hash, action.version)
+        result = await step(
+            db_sessionmaker, previous, r.request.instruction,
+            Model(wrong, tool("review_conversation_goal", goal_id=pending["goal_id"],
+                              source=r.request.instruction, presentation="status")),
+        )
+>       assert result["trace"][0]["status"] == "review_goal_required"
+E       AssertionError: assert 'ok' == 'review_goal_required'
+E         
+E         - review_goal_required
+E         + ok
+
+tests/test_goal_review.py:46: AssertionError
+_______________ test_calendar_only_context_has_no_email_controls _______________
+
+prepared = [{'previous': {'kind': 'clarification', 'text': 'What would you like to say?', 'release': 'contextual-conversation-1.8...ser_input', ...}, {'quote': None, 'ref_id': 'source-1', 'source_id': 'def456', 'source_kind': 'message', ...}], ...}}}]
+db_sessionmaker = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x10e5d5950>, autoflush=True, expire_on_commit=False)
+
+    async def test_calendar_only_context_has_no_email_controls(prepared, db_sessionmaker):
+        previous = await calendar_preview(db_sessionmaker)
+        r = await owned_runtime(db_sessionmaker, previous)
+        r.capabilities = {"capabilities": []}
+        async with db_sessionmaker() as db:
+>           assert await email_review.context(r, db) is None
+E           AssertionError: assert {'execution': 'user_card_click_only', 'chat_can_save': False, 'chat_can_send': False, 'source': None, ...} is None
+
+tests/test_goal_review.py:64: AssertionError
+________ test_unbound_review_of_mixed_goals_clarifies_without_switching ________
+
+prepared = [{'previous': {'kind': 'clarification', 'text': 'What would you like to say?', 'release': 'contextual-conversation-1.8...ser_input', ...}, {'quote': None, 'ref_id': 'source-1', 'source_id': 'def456', 'source_kind': 'message', ...}], ...}}}]
+db_sessionmaker = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x10e5d5950>, autoflush=True, expire_on_commit=False)
+
+    async def test_unbound_review_of_mixed_goals_clarifies_without_switching(prepared, db_sessionmaker):
+        previous = prepared[2]["previous"]
+        r = await owned_runtime(db_sessionmaker, previous, "Where do I confirm it?")
+        await r.context()
+        before = deepcopy(r.state)
+        result = await email_review.review(r)
+>       assert result["kind"] == "clarification"
+E       AssertionError: assert 'message' == 'clarification'
+E         
+E         - clarification
+E         + message
+
+tests/test_goal_review.py:73: AssertionError
+=============================== warnings summary ===============================
+../../../../../../../../private/tmp/threadly-calendar-rollout-venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /private/tmp/threadly-calendar-rollout-venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_goal_review.py::test_exact_context6_wrong_domain_call_requires_bound_review
+FAILED tests/test_goal_review.py::test_calendar_only_context_has_no_email_controls
+FAILED tests/test_goal_review.py::test_unbound_review_of_mixed_goals_clarifies_without_switching
+3 failed, 1 warning in 1.92s

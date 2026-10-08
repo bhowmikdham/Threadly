@@ -637,6 +637,20 @@ payloads are distinct from original mailbox bodies. Account deletion cascades;
 receipt history otherwise remains durable so retries cannot duplicate writes.
 The table is never read by the send worker and grants no send authority.
 
+### Isolated chat archive prototype (not deployed)
+
+Migration `h071026e9043`, after `g071026e9042`, adds `conversation_exchanges`:
+`(conversation_id, version)` primary key, unique `(conversation_id, request_id)`,
+positive version constraint, and encrypted `payload_enc`. The foreign key cascades
+only with chat deletion. Payloads contain original generated/user dialogue and
+identity-only mail source handles, not raw tool observations or provider snippets.
+Conversation completion archives exchanges atomically before state compaction;
+lazy backfill preserves only still-retained pre-upgrade history. Downgrade refuses
+to drop a nonempty archive. Expired chats are inaccessible; explicit retention
+cleanup can remove them after its configured grace period without deleting tasks,
+artifacts or action audit/recovery records. No automatic cleanup schedule is added.
+See [design, invariants and limitations](chat-context-design-review.md).
+
 ### Conversational draft continuity (1.8.7)
 
 Encrypted `email_draft_goal` additionally retains `origin_request_id` and, after
@@ -658,3 +672,17 @@ assessments; new goals replace retained constraints. A continuation preserves
 scope; changing it requires an explicit new goal. Existing account/version/lease
 and conversation expiry fences apply. No schema migration is required. Runtime
 search cards remain transient; filtered card ordinals cannot rename source IDs.
+
+## Independent chat goals (unpublished context prototype)
+
+`conversation_goals` is added with `conversation_exchanges` by `h071026e9043`.
+Its composite key is `(conversation_id, goal_id)`; deletion cascades from the chat.
+Kind, retained/closed status and updated version are indexed metadata. The typed
+goal payload, bounded label and identity-only source references are Fernet encrypted,
+with a hash to avoid rewriting unchanged goals. It is not a universal user-facts schema.
+
+Task/proposal conversation provenance may contain `user_context_enc`, encrypted
+verified quotes selected for this requested work. Workers decrypt it only for
+generation prompts, independently of the instruction used for operation routing.
+No original provider message bodies enter this field. See the context design review
+for legacy backfill, retention and rollback limitations.

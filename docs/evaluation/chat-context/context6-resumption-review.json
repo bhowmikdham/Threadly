@@ -1,0 +1,320 @@
+{
+  "status": "stopped_on_calendar_confirmation_routed_to_email_review",
+  "runtime_head": "4262c5b1f820a7cf0b0eb6e115e4317ad15a768f",
+  "harness_head": "2041a84717f80c7b1d930f04994ae4d8cd02b8cf",
+  "release": "contextual-conversation-1.8.9+chat-context.6",
+  "segment": {
+    "segment": "third-budget-context6-20261008T012942Z",
+    "approval_message": "Sentinel_9c1436a73e6c81918da6e5d560589f68",
+    "approved_at": "2026-10-08T01:29:42Z",
+    "release": "contextual-conversation-1.8.9+chat-context.6",
+    "assets": {
+      "release": "contextual-conversation-1.8.9+chat-context.6",
+      "day_availability_policy": "calendar-day-answer-2.0.0",
+      "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+      "prompt_hash": "e5ca88fb92cbef91bf7ce74602f9b0df3105cd94003560e8ca3ccb87b0827ad9",
+      "tools_hash": "dad14c370181f2d077b0329f5dfd8f3cfa5f146044d3053678057a34bcad2417",
+      "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+      "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+      "max_calls": 8,
+      "timeout_seconds": 120
+    },
+    "runtime": "4262c5b1f820a7cf0b0eb6e115e4317ad15a768f",
+    "evidence": "a1f20a7abdc956f4197db3aee6c2c9b196cc5da0",
+    "prior_attempts": 3,
+    "prior_usd_including_gst": "0.10397772",
+    "original_ledger_sha256": "7b6f1d8a59c4d92b29fcefc8a6151375d1bcf7dca4c6cd637f772ae6bcb6df40",
+    "maximum_cumulative_attempts": 12,
+    "maximum_cumulative_usd_including_gst": "0.60",
+    "per_case_cumulative_attempts": 6,
+    "per_case_usd_including_gst": "0.30",
+    "maximum_new_calls": {
+      "email": 3,
+      "calendar": 6
+    },
+    "started_unix": 1791423592.1298618,
+    "halted": true,
+    "deadline_unix": 1791424492.1298618,
+    "stop_reason": "semantic_regression",
+    "stopped_at": "2026-10-08T01:45:27.988012+00:00"
+  },
+  "new_attempts": 7,
+  "cumulative_attempts": 10,
+  "provider_completed_new": 7,
+  "new_usage": {
+    "inputTokens": 196540,
+    "outputTokens": 947
+  },
+  "cumulative_usage": {
+    "inputTokens": 280562,
+    "outputTokens": 1329
+  },
+  "new_usd_including_gst": "0.24354275",
+  "cumulative_usd_including_gst": "0.34752047",
+  "per_case_cumulative_usd": {
+    "email": "0.20956595",
+    "calendar": "0.13795452"
+  },
+  "unused": {
+    "email": 0,
+    "calendar": 2
+  },
+  "automatic_resumption": false,
+  "original_three_receipts_preserved": true,
+  "original_identity_unchanged": true,
+  "first_and_second_ledgers_unchanged": true,
+  "ledger_sha256": "e253f8ab8f47324aa17f0ba2a7e353dc4789fe2ab5b32bfe54f95297c3fb8a0a",
+  "scores": {
+    "alex_completion": "pass_two_calls_live_repair_repeated_purpose",
+    "casey_completion": "pass_one_call_alex_hash_unchanged",
+    "optional_morgan": "not_attempted_email_cap",
+    "calendar_preview": "pass_one_call",
+    "calendar_revision": "pass_one_call_same_goal_old_action_superseded",
+    "calendar_closing": "pass_user_facing_guard_replaced_raw_model_guidance",
+    "calendar_confirm_where": "fail_wrong_email_review_tool_and_gmail_guidance"
+  },
+  "call_refs": [
+    {
+      "scenario": "email",
+      "request_id": "f8cb69c5-cba7-46fc-95e3-7cee4c8c7cbd",
+      "started_at": "2026-10-08T01:40:00.198778+00:00",
+      "finished_at": "2026-10-08T01:40:03.068875+00:00",
+      "usage": {
+        "inputTokens": 27920,
+        "outputTokens": 124,
+        "totalTokens": 28044,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "email",
+      "request_id": "d3176dbe-08da-47ba-8ab8-d73e101b45ba",
+      "started_at": "2026-10-08T01:40:11.168217+00:00",
+      "finished_at": "2026-10-08T01:40:14.618523+00:00",
+      "usage": {
+        "inputTokens": 28397,
+        "outputTokens": 205,
+        "totalTokens": 28602,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "email",
+      "request_id": "95e228b0-9db2-4284-b230-f22fcf9188d3",
+      "started_at": "2026-10-08T01:41:19.336031+00:00",
+      "finished_at": "2026-10-08T01:41:22.618577+00:00",
+      "usage": {
+        "inputTokens": 28346,
+        "outputTokens": 191,
+        "totalTokens": 28537,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "calendar",
+      "request_id": "135ea783-abdb-4fb6-9d69-c815636a3edd",
+      "started_at": "2026-10-08T01:42:09.653559+00:00",
+      "finished_at": "2026-10-08T01:42:12.566014+00:00",
+      "usage": {
+        "inputTokens": 27312,
+        "outputTokens": 182,
+        "totalTokens": 27494,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "calendar",
+      "request_id": "7ca364fa-b6eb-4842-9180-4a76fed4a745",
+      "started_at": "2026-10-08T01:42:59.402605+00:00",
+      "finished_at": "2026-10-08T01:43:01.685948+00:00",
+      "usage": {
+        "inputTokens": 28005,
+        "outputTokens": 123,
+        "totalTokens": 28128,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "calendar",
+      "request_id": "57617e9a-5018-45ba-b8a8-3d5c38a81a06",
+      "started_at": "2026-10-08T01:43:51.285160+00:00",
+      "finished_at": "2026-10-08T01:43:53.454501+00:00",
+      "usage": {
+        "inputTokens": 28204,
+        "outputTokens": 82,
+        "totalTokens": 28286,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    },
+    {
+      "scenario": "calendar",
+      "request_id": "581cadf6-a28d-4efc-89e5-15c3a177867f",
+      "started_at": "2026-10-08T01:44:44.771001+00:00",
+      "finished_at": "2026-10-08T01:44:46.488644+00:00",
+      "usage": {
+        "inputTokens": 28356,
+        "outputTokens": 40,
+        "totalTokens": 28396,
+        "cacheReadInputTokens": 0,
+        "cacheWriteInputTokens": 0
+      },
+      "outcome": "completed"
+    }
+  ],
+  "reviews": {
+    "calendar-0.json": {
+      "sha256": "76a0c74a81838ece72db77e35d65053c2543b2e992c421ac5be4bce36195a501",
+      "decision": "continue",
+      "findings": "Exact Quiet hour preview for tomorrow at 14:00 Australia/Melbourne, saved 30-minute duration disclosed, state proposed, no approval/jobs/provider event write."
+    },
+    "calendar-1.json": {
+      "sha256": "5f899510a1bc1e43e68f6e95a36cf3661cf82eb8198c36a708f7a83c52fd1281",
+      "decision": "continue",
+      "findings": "Same goal/day/title retained at revised 15:00 Melbourne. Prior exact action superseded, replacement merely proposed. Zero approval rows or jobs. Continue to closing."
+    },
+    "calendar-1.state.json": {
+      "actions": [
+        {
+          "id": "821bd18d-6252-418d-9e14-ee3f3cb25f19",
+          "state": "superseded",
+          "version": 2,
+          "payload_hash": "79b20557877796207cd2ba153d2071b3ac1009153aa9b1adecfc2b76a1a1f49c"
+        },
+        {
+          "id": "674b0d76-2bac-433b-9b06-5cf416751d3c",
+          "state": "proposed",
+          "version": 1,
+          "payload_hash": "111b961ea8b6ee7632c449abe54ebc48c36b11a3b0b3597203cc88bb62586580"
+        }
+      ],
+      "approval_rows": 0,
+      "job_rows": 0
+    },
+    "calendar-2.json": {
+      "sha256": "13dd0ed8e7ea0e26964efd49ac1839cb2de934395b646beaa21ed1cb8bde48ed",
+      "decision": "continue",
+      "findings": "User-facing closing is short and does not repeat booking controls or claim completion. Raw model offered event guidance; the existing deterministic closing guard correctly replaced it. No approval/jobs. Continue to actual-control guidance."
+    },
+    "calendar-3.json": {
+      "sha256": "2e8accd0a4988a8e4076f81cda29cf84f06b4e2e1bf4270580f78f05adb088ef",
+      "decision": "stop",
+      "findings": "Semantic regression: in the Calendar-only chat, Where do I confirm it? selected review_email_draft(status). Runtime returned Gmail draft-missing/permission guidance despite the current owned proposed Calendar action. Stop immediately; do not consume the two unused Calendar attempts."
+    },
+    "email-0.json": {
+      "sha256": "ee38bb16c7bb30c5b216d87bcfe296514ef05050d3b225979fe0200b086967e5",
+      "decision": "continue",
+      "findings": "Alex draft is useful and goal-bound; validated purpose retained, Casey hash unchanged, no approved actions/jobs. Live repair repeated purpose; omitted-purpose protection remains exact offline evidence."
+    },
+    "email-0.state.json": {
+      "goals": [
+        {
+          "goal_id": "76dc0d11-ec8e-49ae-bf86-dff5daf97511",
+          "kind": "email_draft",
+          "status": "retained",
+          "updated_version": 2,
+          "payload_hash": "35a1a09a3e759b7c0e2c939594a6fae2dbfed9338266da541fd348f145aff444"
+        },
+        {
+          "goal_id": "f3e9b792-0216-4b01-886d-a1870895ad93",
+          "kind": "email_draft",
+          "status": "retained",
+          "updated_version": 3,
+          "payload_hash": "187c19df901e00a7e92f623e3130c49f34d30f7105559870bd493ec49f2c2b66"
+        }
+      ],
+      "casey_unchanged": true
+    },
+    "email-1.json": {
+      "sha256": "c9c02841299818cd55c89e00cba8df819ef651cb069d96b64b2305346301d127",
+      "decision": "next_case",
+      "findings": "Casey completed in one call with correct recipient/purpose; Alex payload hash unchanged, both drafts independent, no approval/job. Email allocation exhausted; optional Morgan is not attempted. Proceed to the separately authorized six Calendar attempts."
+    },
+    "email-1.state.json": {
+      "goals": [
+        {
+          "goal_id": "f3e9b792-0216-4b01-886d-a1870895ad93",
+          "kind": "email_draft",
+          "status": "retained",
+          "updated_version": 3,
+          "payload_hash": "187c19df901e00a7e92f623e3130c49f34d30f7105559870bd493ec49f2c2b66"
+        },
+        {
+          "goal_id": "76dc0d11-ec8e-49ae-bf86-dff5daf97511",
+          "kind": "email_draft",
+          "status": "retained",
+          "updated_version": 4,
+          "payload_hash": "954ca4c1cf5bd21a9092c99daf386ad72fdd9c0f969c4b4b97d9ea564c665dbe"
+        }
+      ],
+      "alex_unchanged": true
+    }
+  },
+  "final_state": {
+    "actions": [
+      {
+        "id": "821bd18d-6252-418d-9e14-ee3f3cb25f19",
+        "state": "superseded",
+        "version": 2,
+        "payload_hash": "79b20557877796207cd2ba153d2071b3ac1009153aa9b1adecfc2b76a1a1f49c"
+      },
+      {
+        "id": "674b0d76-2bac-433b-9b06-5cf416751d3c",
+        "state": "proposed",
+        "version": 1,
+        "payload_hash": "111b961ea8b6ee7632c449abe54ebc48c36b11a3b0b3597203cc88bb62586580"
+      }
+    ],
+    "goals": [
+      {
+        "conversation_id": "d5bf493b-7191-413f-bf4e-00f2a97caa52",
+        "goal_id": "f3e9b792-0216-4b01-886d-a1870895ad93",
+        "kind": "email_draft",
+        "status": "retained",
+        "updated_version": 3,
+        "payload_hash": "187c19df901e00a7e92f623e3130c49f34d30f7105559870bd493ec49f2c2b66"
+      },
+      {
+        "conversation_id": "d5bf493b-7191-413f-bf4e-00f2a97caa52",
+        "goal_id": "76dc0d11-ec8e-49ae-bf86-dff5daf97511",
+        "kind": "email_draft",
+        "status": "retained",
+        "updated_version": 4,
+        "payload_hash": "954ca4c1cf5bd21a9092c99daf386ad72fdd9c0f969c4b4b97d9ea564c665dbe"
+      },
+      {
+        "conversation_id": "8fa4d2fd-a28d-40c3-967c-9e60e3fc2ba1",
+        "goal_id": "781a1150-c8c9-41ca-a73c-da3400fdf480",
+        "kind": "calendar_event",
+        "status": "retained",
+        "updated_version": 2,
+        "payload_hash": "ef67448c2fdd49a35b891a217e04c362da35ab9ba23ea9edfe585ba9d9cb2a27"
+      }
+    ],
+    "approval_rows": 0,
+    "job_rows": 0,
+    "event_still_retained_after_wrong_email_review": true
+  },
+  "provider_operations": [
+    {
+      "method": "GET",
+      "path": "/calendar/v3/users/me/calendarList"
+    },
+    {
+      "method": "GET",
+      "path": "/calendar/v3/users/me/calendarList"
+    }
+  ],
+  "limitation": "Synthetic-only Google adapters. Omitted-purpose behavior was covered by the exact offline replay, not independently observed live: this resumption repeated purpose. Overall conversational acceptance remains failed at final Calendar guidance."
+}

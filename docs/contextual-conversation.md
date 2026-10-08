@@ -1,6 +1,12 @@
 # Contextual conversation architecture
 
-Implementation release: `contextual-conversation-1.8.5`. Feature switch:
+An isolated, unpublished prototype is reviewed in
+[Shared conversation context](chat-context-design-review.md). It adds an archive,
+bounded recall, verified historical user citations, independent goals and browser
+restoration. See its compatibility and evaluation gates. No new live-model quality
+claim is made.
+
+Historical implementation release: `contextual-conversation-1.8.5`. Feature switch:
 `CONVERSATION_ENABLED=true`; default off. Requires configured Bedrock and current
 backend migrations through `c061026e9041`. Release `1.1.6` makes an explicit sender address an exact From
 constraint and makes “latest N emails in my inbox” (N from 1 to 5) a fresh,

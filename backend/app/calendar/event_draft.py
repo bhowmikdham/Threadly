@@ -9,14 +9,15 @@ FIELDS = (
     "title",
     "date",
     "time",
+    "timezone",
     "duration_phrase",
     "calendar_name",
     "location",
     "description",
     "attendees",
 )
-CONTROLS = {"intent", "changes", "continue_previous"}
-SOURCE_FIELDS = {"date": "date_source", "time": "time_source"}
+CONTROLS = {"intent", "changes", "continue_previous", "citations"}
+SOURCE_FIELDS = {"date": "date_source", "time": "time_source", "timezone": "timezone_source"}
 
 
 class IntentSourceMismatch(ValueError):
@@ -122,6 +123,7 @@ def merge(runtime, args, pending):
     from app.schemas.conversation import PrepareCalendarEvent
 
     latest = user_directive(runtime.request.instruction)
+    cited = getattr(runtime, "calendar_field_citations", {})
     if args.intent:
         if " ".join(args.intent.source.split()) != " ".join(latest.split()):
             raise IntentSourceMismatch
@@ -138,7 +140,32 @@ def merge(runtime, args, pending):
         for k, v in args.model_dump(mode="json").items()
         if k not in CONTROLS and v not in (None, "", []) and v != old.get(k)
     }
+    repeated_sources = []
+    if pending and args.intent and args.intent.operation == "resume":
+        for field in FIELDS:
+            value = getattr(args, field)
+            if (
+                isinstance(value, str)
+                and value
+                and value.strip().casefold() == str(old.get(field, "")).strip().casefold()
+            ):
+                source = SOURCE_FIELDS.get(field, field)
+                subset = {field: value}
+                if source != field:
+                    subset[source] = getattr(args, source)
+                source_fields(
+                    PrepareCalendarEvent.model_validate(subset),
+                    cited.get(field, {}).get("source", latest),
+                    constraints=False,
+                )
+                repeated_sources.append(getattr(args, source))
+                supplied.pop(field, None)
+                supplied.pop(source, None)
     for field, source in SOURCE_FIELDS.items():
+        if getattr(args, field) and getattr(args, field) == old.get(field):
+            # Repeating the same interpreted field with different casing or a
+            # shorter source quote is not a correction to a reviewed candidate.
+            supplied.pop(source, None)
         if field in supplied or source in supplied:
             supplied[field] = args.model_dump(mode="json")[field]
             supplied[source] = getattr(args, source)
@@ -166,6 +193,8 @@ def merge(runtime, args, pending):
         if field in supplied:
             raise ValueError("Use either a field change or a legacy value for each field")
         literal_field(change.source, latest, field)
+        if field in cited and change.operation != "replace":
+            raise ValueError("Historical data can replace a field, not authorize its removal")
         if change.operation in {"clear", "remove"}:
             literal_field(
                 change.source, re.sub(r'"[^"\n]*"|“[^”\n]*”|`[^`\n]*`', " ", latest), field
@@ -177,6 +206,7 @@ def merge(runtime, args, pending):
                 "location": r"location|place|room",
                 "date": r"date|day",
                 "time": r"time",
+                "timezone": r"timezone|time zone",
                 "title": r"title|name",
                 "description": r"description|notes?",
                 "calendar_name": r"calendar",
@@ -208,10 +238,10 @@ def merge(runtime, args, pending):
             )
             supplied[field] = value
             if field in SOURCE_FIELDS:
-                supplied[SOURCE_FIELDS[field]] = change.source
+                supplied[SOURCE_FIELDS[field]] = cited.get(field, {}).get("source", change.source)
             if field not in SOURCE_FIELDS:
                 for entry in value if isinstance(value, list) else [value]:
-                    literal_field(entry, change.source, field)
+                    literal_field(entry, cited.get(field, {}).get("source", change.source), field)
         changes[field] = {
             "operation": change.operation,
             "source": change.source,
@@ -239,10 +269,33 @@ def merge(runtime, args, pending):
     for change in args.changes:
         if change.operation == "remove":
             check.pop("attendees", None)
+    validation_text = latest
+    if pending and pending.get("origin_pending_validation"):
+        original = pending["creation_origin"]["text"]
+        for field, source in pending.get("unresolved_sources", {}).items():
+            if field in supplied and source:
+                original = original.replace(source, " ")
+        validation_text = original + "\n" + latest + "\n" + evidence(old)
+        check = candidate.model_dump(mode="json", exclude=CONTROLS)
+    for field, citation in cited.items():
+        if not values.get(field):
+            raise ValueError("A historical citation needs its corresponding proposed field")
+        source = SOURCE_FIELDS.get(field, field)
+        subset = {field: values[field]}
+        if source != field:
+            subset[source] = values[source]
+        source_fields(
+            PrepareCalendarEvent.model_validate(subset), citation["source"], constraints=False
+        )
+        check.pop(field, None)
+        if source != field:
+            check.pop(source, None)
+        if field in changes:
+            changes[field].update(citation)
     source_fields(
         PrepareCalendarEvent.model_validate(check),
-        latest,
-        evidence(old).split("\n") if pending else [],
+        validation_text,
+        (evidence(old).split("\n") if pending else []) + repeated_sources,
     )
     provenance = dict((pending or {}).get("field_provenance", {}))
     if pending and not provenance:
@@ -263,6 +316,19 @@ def merge(runtime, args, pending):
         if "date" in changes or not pending
         else datetime.fromisoformat(pending["anchor"])
     )
+    date_timezone = (pending or {}).get("date_anchor_timezone")
+    if "date" in changes or not pending:
+        date_timezone = None
+        if date_citation := cited.get("date"):
+            if candidate.date.kind != "absolute" and (
+                not date_citation["recorded_at"] or not date_citation["timezone"]
+            ):
+                raise RequestClarification(
+                    "Which calendar date do you mean? That older message has no saved local date."
+                )
+            if date_citation["recorded_at"]:
+                anchor = datetime.fromisoformat(date_citation["recorded_at"])
+                date_timezone = candidate.timezone or date_citation["timezone"]
     saved = {
         "schema_version": 2,
         "goal_id": (pending or {}).get("goal_id", runtime.request.request_id),
@@ -271,8 +337,9 @@ def merge(runtime, args, pending):
         "field_provenance": provenance,
         "user_text": evidence(candidate.model_dump()),
         "anchor": anchor.isoformat(),
+        "date_anchor_timezone": date_timezone,
         "expires_at": (pending or {}).get("expires_at")
-        or (datetime.now(UTC) + timedelta(minutes=15)).isoformat(),
+        or (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         "last_request_id": runtime.request.request_id,
     }
     if pending:
@@ -287,3 +354,83 @@ def merge(runtime, args, pending):
                 if key in pending:
                     saved[key] = pending[key]
     return candidate, saved, bool(changes)
+
+
+def retain_partial(runtime, args, pending, origin, error):
+    """Keep independently grounded fields after clarification, never an approval.
+
+    An invalid field cannot erase the other supplied details. Reviewed candidates are
+    unchanged until a complete validated revision can retire them atomically.
+    """
+    from app.calendar.event_creation import source_fields
+    from app.schemas.conversation import PrepareCalendarEvent
+
+    current = runtime.state.get("calendar_event_request") or {}
+    if current.get("action_id") or args.changes or isinstance(error, IntentSourceMismatch):
+        return
+    values = dict((pending or {}).get("arguments", {}))
+    provenance = dict((pending or {}).get("field_provenance", {}))
+    unresolved = dict((pending or {}).get("unresolved_sources", {}))
+    supplied = args.model_dump(mode="json", exclude=CONTROLS)
+    cited = getattr(runtime, "calendar_field_citations", {})
+    for field in FIELDS:
+        if not supplied.get(field):
+            continue
+        source = SOURCE_FIELDS.get(field, field)
+        subset = {field: supplied[field]}
+        if source != field:
+            subset[source] = supplied[source]
+        try:
+            if isinstance(error, IncompleteEventTitle) and field == "title":
+                raise error
+            if (
+                field == "date"
+                and field in cited
+                and args.date.kind != "absolute"
+                and not (cited[field]["recorded_at"] and cited[field]["timezone"])
+            ):
+                raise RequestClarification("That old relative date has no saved clock")
+            source_fields(
+                PrepareCalendarEvent.model_validate(subset),
+                cited.get(field, {}).get("source", runtime.request.instruction),
+                constraints=False,
+            )
+        except (ValueError, RequestClarification):
+            rejected_source = supplied.get(source, "")
+            if (
+                field in SOURCE_FIELDS
+                and isinstance(rejected_source, str)
+                and rejected_source.casefold() in runtime.request.instruction.casefold()
+            ):
+                unresolved[field] = rejected_source
+            continue
+        if values.get(field) and values[field] != supplied[field]:
+            continue
+        values.update(subset)
+        provenance[field] = {
+            "operation": "replace",
+            "source": supplied.get(source),
+            "request_id": runtime.request.request_id,
+            **cited.get(field, {}),
+        }
+        unresolved.pop(field, None)
+    candidate = PrepareCalendarEvent.model_validate(values)
+    dated = provenance.get("date", {})
+    runtime.state["calendar_event_request"] = {
+        "schema_version": 2,
+        "goal_id": (pending or {}).get("goal_id", runtime.request.request_id),
+        "revision": (pending or {}).get("revision", 0),
+        "arguments": candidate.model_dump(mode="json", exclude=CONTROLS),
+        "field_provenance": provenance,
+        "user_text": evidence(candidate.model_dump()),
+        "creation_origin": origin,
+        "origin_pending_validation": True,
+        "unresolved_sources": unresolved,
+        "anchor": dated.get("recorded_at")
+        or (pending or {}).get("anchor", runtime.calendar_anchor.isoformat()),
+        "date_anchor_timezone": dated.get("timezone")
+        or (pending or {}).get("date_anchor_timezone"),
+        "expires_at": (pending or {}).get("expires_at")
+        or (datetime.now(UTC) + timedelta(days=7)).isoformat(),
+        "last_request_id": runtime.request.request_id,
+    }

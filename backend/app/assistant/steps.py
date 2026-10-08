@@ -15,6 +15,7 @@ from app.api.errors import ApiError
 from app.assistant import drafting, lookup_draft, reads, routing, summary_quality, tasks, ui_routing
 from app.assistant.source_data import context_data
 from app.assistant.summary import digest
+from app.assistant.user_context import augment
 from app.db.models import (
     ArtifactRevision,
     AssistantJob,
@@ -328,6 +329,7 @@ async def run_task(factory, claim, model=None, flow_invoker=None):
                         if ordinal == 1
                         else draft_prompt(claim, request, summary)
                     )
+                    prompt = augment(prompt, claim)
                     entry = manifest.operations[operation] if manifest else None
                     if isinstance(entry, registry.FlowEntry):
                         result = await (flow_invoker or FlowInvoker()).invoke(entry, prompt)

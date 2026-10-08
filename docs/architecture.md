@@ -1,5 +1,10 @@
 # Architecture — what runs where
 
+The isolated chat-context prototype and its unresolved architecture gaps are
+documented in [Shared conversation context](chat-context-design-review.md).
+That review distinguishes implemented storage mechanics from unverified semantic
+behavior; it is not a claim that a new release has been deployed.
+
 [Email badge classification](classification/README.md) is a separate on-demand
 service: authenticated thread ID → bounded live Gmail context → dedicated configured
 published Bedrock classification Flow (or explicit Converse baseline) → strict

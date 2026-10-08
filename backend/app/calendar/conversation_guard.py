@@ -16,6 +16,10 @@ def social_response(text):
     # Only complete standalone phrases qualify. A greeting/thanks prefix must
     # never hide an event request, correction, status question or quoted source.
     value = " ".join(text.strip().casefold().split()).rstrip(".! ")
+    thanks = r"(?:thanks(?: a lot| so much)?|thank you(?: very much| so much)?)"
+    closing = r"that(?:'s| is) all"
+    if re.fullmatch(rf"{thanks}[,.!]? (?:and )?{closing}|{closing}[,.!]? {thanks}", value):
+        return {"kind": "message", "text": "All right. Take care!"}
     if re.fullmatch(r"(?:no,? (?:thank you|thanks)|that(?:'s| is) all(?:,? thanks)?)", value):
         return {"kind": "message", "text": "All right. Take care!"}
     if re.fullmatch(
@@ -115,19 +119,40 @@ async def respond(runtime, answer):
         pending or (action_id and history and history[-1].get("calendar_action_id") == action_id)
     )
     if status_question(text, active_event_context):
-        if action_id:
-            from app.calendar.event_creation import response
+        if action_id or pending:
+            from app.conversation.goal_review import calendar_status
 
-            async with runtime.factory() as session:
-                return await response(session, runtime.owner, action_id)
-        if pending:
-            pending["last_request_id"] = request.request_id
+            return await calendar_status(runtime)
         return {
             "kind": "message",
             "text": "I don't have a confirmed Calendar event for this request yet.",
         }
     if requires_preparation(runtime):
         raise CalendarPreparationRequired
+    # Model prose cannot invent controls for an owned Calendar action. Resolve
+    # recognized action guidance from its fresh state (including pending/failed),
+    # and return the actual card instead of a guessed button or save instruction.
+    calendar_guidance = (
+        active_event_context
+        and state.get("active_goal") in {None, "calendar_event"}
+        and not answer.evidence
+        and re.search(r"\b(?:calendar|event|appointment|booking)\b", answer.text, re.I)
+        and re.search(
+            r"\b(?:click|tap|press|select|choose|use)\b.{0,80}"
+            r"\b(?:create|save|approve|confirm|send|button|card)\b",
+            answer.text,
+            re.I,
+        )
+    )
+    if calendar_guidance:
+        if action_id:
+            from app.conversation.goal_review import calendar_status
+
+            return await calendar_status(runtime)
+        return {
+            "kind": "message",
+            "text": "This event still needs details before it can be reviewed.",
+        }
     # Source-less prose cannot establish a provider-side result. Existing direct
     # actions always use current owned durable state, including queued/unknown/failed.
     if not answer.evidence and re.search(
@@ -139,10 +164,9 @@ async def respond(runtime, answer):
         re.I,
     ):
         if action_id:
-            from app.calendar.event_creation import response
+            from app.conversation.goal_review import calendar_status
 
-            async with runtime.factory() as session:
-                return await response(session, runtime.owner, action_id)
+            return await calendar_status(runtime)
         return {"kind": "message", "text": "I haven't confirmed that an event was created."}
     return None
 

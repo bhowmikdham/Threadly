@@ -1,0 +1,70 @@
+{
+  "chat-context-resume-pricing.json": {
+    "checked_at": "2026-10-07T13:28:40.183982+00:00",
+    "source": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+    "publication": "2026-09-30T00:19:12Z",
+    "rates": {
+      "input": {
+        "rateCode": "2NQNKY7KEQKJPGCD.4799GE89SK.6YS6EN2CT7",
+        "price": "1.1000000000",
+        "RegionlessRateCode": "APY9uM3JGxEtL5H9EDm5AwcPdLxfrWr-RFMq0UellFs"
+      },
+      "output": {
+        "rateCode": "UM84PHMW42ATFREN.4799GE89SK.6YS6EN2CT7",
+        "price": "5.5000000000",
+        "RegionlessRateCode": "O6zZHzgP5kfAsKpsBRIEEOBkSjbbqAoskrV4twdrBE4"
+      }
+    },
+    "currency": "USD"
+  },
+  "chat-context-resume-auth.json": {
+    "checked_at": "2026-10-07T13:28:40.695503+00:00",
+    "auth": "success",
+    "expected_account": true,
+    "request_id": "740d0c63-63c4-4afb-9a04-fe656729b2a7"
+  },
+  "chat-context-resume-full-preflight.json": {
+    "release": "contextual-conversation-1.8.9+chat-context.4",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+    "prompt_hash": "9de33f3534b9332fe2fba22e1341ec369b01f4fe7e2afb0190f68758ee66b669",
+    "tools_hash": "31c04e749e051f77dfb1304fadd9733718c9e4bd71b8a16c61b6e709e82e0bc4",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120,
+    "at": "2026-10-07T13:35:50.603562+00:00",
+    "input_tokens": 27004,
+    "request_id": "f38653c7-503a-49f4-a66c-0d5ae6f1d9a5",
+    "paid_calls": 0
+  },
+  "chat-context-second-approved-budget-ledger.resume-context-4.json": {
+    "segment": "second-budget-resume-context-4-20261007T132428Z",
+    "approval_message": "Sentinel_06ff4ac627b48191bc8af71e1651a557",
+    "approved_at": "2026-10-07T13:24:28Z",
+    "release": "contextual-conversation-1.8.9+chat-context.4",
+    "assets": {
+      "release": "contextual-conversation-1.8.9+chat-context.4",
+      "day_availability_policy": "calendar-day-answer-2.0.0",
+      "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+      "prompt_hash": "9de33f3534b9332fe2fba22e1341ec369b01f4fe7e2afb0190f68758ee66b669",
+      "tools_hash": "31c04e749e051f77dfb1304fadd9733718c9e4bd71b8a16c61b6e709e82e0bc4",
+      "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+      "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+      "max_calls": 8,
+      "timeout_seconds": 120
+    },
+    "prior_attempts": 9,
+    "prior_cost_including_gst": "0.30159129",
+    "original_ledger_sha256": "63efbe33d018c1cdaa9f3c9c6b79d417e67a2197954a5e0ef08c56e62b9d6393",
+    "maximum_cumulative_attempts": 18,
+    "maximum_cumulative_cost_including_gst": "1.00",
+    "planned_new_calls": {
+      "goals": 4,
+      "saved_artifact": 2,
+      "calendar": 3
+    },
+    "started_unix": 1791380150.6206012,
+    "deadline_unix": 1791381050.6206012
+  }
+}

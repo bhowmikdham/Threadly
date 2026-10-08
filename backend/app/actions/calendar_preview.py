@@ -159,6 +159,10 @@ async def blockers(session, owner, action):
     if action.expires_at <= await session.scalar(select(func.clock_timestamp())):
         result.append("action_expired")
     try:
+        if action.source_versions.get("meeting_email"):
+            from app.calendar.meeting_email import blockers as meeting_email_blockers
+
+            return result + await meeting_email_blockers(session, owner, action)
         if action.source_versions.get("direct"):
             from app.calendar.event_creation import blockers as direct_blockers
 

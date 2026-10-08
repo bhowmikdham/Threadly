@@ -286,6 +286,8 @@ async def test_new_goal_supersedes_active_card_and_does_not_inherit_fields(db_se
                 "prepare_email_draft",
                 continue_previous=True,
                 purpose="thanks for your help",
+                goal_id=state[email_draft.KEY]["goal_id"],
+                request_source=turn.instruction,
                 draft=DRAFT,
             )
         ),

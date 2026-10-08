@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-07T11:03:05.833269+00:00",
+  "operation": "CountTokens",
+  "model_id": "arn:aws:bedrock:ap-southeast-2:710507379899:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "region": "ap-southeast-2",
+  "inference_calls": 0,
+  "release": "contextual-conversation-1.8.9+chat-context.2",
+  "day_availability_policy": "calendar-day-answer-2.0.0",
+  "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+  "prompt_hash": "709e54825fd673707dbd407609feaa36fc901de671661111e9c6272f6a8d5b92",
+  "tools_hash": "9d611b454709adfc068f5a35cde1eff5619ff0ddd5126e965cb5c29e98fd4e78",
+  "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+  "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+  "max_calls": 8,
+  "timeout_seconds": 120,
+  "status": "failed",
+  "error_type": "ValidationException",
+  "error_code": "ValidationException",
+  "request_id": "edb45d29-9541-4c41-87ee-5deb5ef6e655"
+}

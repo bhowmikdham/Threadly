@@ -1411,9 +1411,12 @@ never infer event titles or another person's availability. Older responses witho
 fields remain valid text responses. These card details are not persisted in history.
 # Conversational email drafting clarification (1.8.7)
 
-Standalone composition uses the backend model tool `prepare_email_draft` before
-reserving a durable workflow. It accepts exact user-sourced `recipient` and
-`purpose`, `continue_previous`, and optional generated `draft` text. Missing fields
+Standalone composition uses `start_email_draft` for new work and
+`continue_email_draft` for an existing owned goal before reserving a durable
+workflow (split in the unpublished `chat-context.5` contract). Both accept exact
+user-sourced `recipient` and `purpose`, the complete current `request_source`, and
+optional generated `draft` text. Continuation requires `goal_id`; starting accepts
+no identity or continuation flag. Missing fields
 return a normal `kind=clarification` conversation response without a task or
 preparation acknowledgment. The backend asks only for the recipient, purpose, or
 both; no subject or exact mailbox is required just to write text.
@@ -1491,10 +1494,22 @@ checks the current structured draft identity rather than requiring the last
 exchange itself to contain the draft. New goals and superseding tasks/proposals
 disable old text cards. Older clients keep conservative stale-version behavior.
 
-The read-only `review_email_draft` model tool returns actual card controls and
-the current owned source's save receipt status. `email_draft_controls` in model
-context distinguishes account grants from callable actions: chat cannot save,
-send or insert email. Repeated confirmations return guidance; only a succeeded
+The read-only `review_conversation_goal` model tool requires an owned `goal_id`
+and the complete current USER `source`. Stored kind determines the actual Calendar
+action, email draft, task or proposal card and its status. Unbound ambiguous legacy
+review/status requests clarify rather than selecting unrelated retained work.
+Closed Calendar goals with existing actions remain reviewable without reopening
+or execution; use `list_conversation_goals(include_closed=true)` to find them.
+The legacy `review_email_draft` tool is hidden from the model and validates an
+applicable email source before returning any Gmail guidance. In the unpublished
+shared-context release, `presentation: "open"` (default) also returns the existing text editor or
+saved task card; `presentation: "status"` includes save-control guidance. Reopening
+refreshes the owned task's current artifact before checking its save receipt,
+restores backend focus and preserves unrelated goals. It does not regenerate work
+or require Gmail draft-creation permission. Select an older retained goal first
+when it is not the current draft. `email_draft_controls` is null without a
+current applicable draft source. When present it distinguishes account grants
+from callable actions: chat cannot save, send or insert email. Repeated confirmations return guidance; only a succeeded
 receipt confirms Gmail creation. Failed, pending, unknown and older-revision
 saves are distinct, and connection-generation fences remain enforced. A
 missing/disabled card prompts extension update/reload guidance without claiming
@@ -1569,3 +1584,66 @@ refreshes capabilities/account version after callback, and waits for a separate
 Create draft click. OAuth completion never calls the draft-save endpoint. The
 follow-up is a separate release requiring its own deployment approval and introduces
 no additional schema migration.
+
+## Unpublished shared chat context protocol
+
+The `contextual-conversation-1.8.9+chat-context.7` prototype adds
+`context_memory_version: 1` to turn/replay/restore responses. This means the backend
+owns goal focus: clients omit a task pointer derived merely from the last displayed
+card, and send a context snapshot only for an explicit attach/detach or initial pin.
+Older responses retain legacy client behavior. Exact pending retry bodies remain
+immutable regardless of protocol negotiation.
+
+Restore responses include `active_email_draft` (the current text draft or null)
+and `active_goal_id`, independently of compact history. If its original exchange
+was evicted, the client restores that draft as an editor at the current chat version.
+
+Internal model tools add bounded `recall_conversation`, `list_conversation_goals`,
+`select_conversation_goal` and saved-task resumption. Calendar/email field citations
+contain `{field, turn_version, quote}`; generation context citations contain
+`{turn_version, quote}`. Quotes must match exact USER text in this owned, unexpired
+chat. Workflow `request_source` is the complete current user turn, separate from
+historical data. These tools do not approve external actions. See the
+[design and compatibility review](chat-context-design-review.md) before deployment.
+
+`start_email_draft` allocates an independent goal without accepting an existing
+identity. `continue_email_draft` requires an owned `goal_id` and the complete
+current USER `request_source`. Missing or invalid identity is rejected before
+draft mutation (`email_goal_selection_required` / `conversation_goal_missing`).
+Recipient text never chooses the target goal.
+An intentional recipient edit remains a revision of the explicitly selected goal.
+The legacy internal/replay `prepare_email_draft` shape is accepted but is no longer
+advertised to the model. An explicit boolean `continue_previous:false` discards any
+stale ID and allocates new work without inheriting fields. An ID with an omitted
+operation fails with `email_goal_operation_required`. Legacy continuation still
+requires explicit binding when multiple goals exist. Other-chat, other-owner,
+closed and wrong-kind goals cannot be selected as an email target.
+
+Repair observations preserve the requested operation and give reason-specific
+instructions. Two occurrences of the same email-tool error, or three email-tool
+errors in total, end the turn with the existing `email_draft_not_prepared` message.
+This bounds invalid-call loops while retaining validated details; it does not prove
+that a model chose the semantically correct goal. No new retry UI or HTTP endpoint
+is introduced.
+
+Within a claimed turn, validated goal fields take precedence over the older
+committed goal payload. Repeated selection still checks current USER source,
+owned chat, goal kind and closed status. Switching focus stages the outgoing
+goal's complete value; checkpoint/completion saves all staged goals atomically
+under the existing lease, then discards the transient staging data. Explicit
+clears and corrections replace old values; selection cannot resurrect a field,
+retired candidate or locally cancelled goal. Provider facts and action/task
+status still use their existing fresh-read and approval checks.
+
+A failed generation can retain validated recipient/purpose corrections while
+leaving the goal in clarification state; it cannot expose the old generated text
+as a draft for the corrected recipient. A repeated new-email/new-event tool call
+can repair fields retained from that same USER request. New USER requests retain
+the existing independent-goal/reset rules. No prompt wording, tool schema or
+external write permission changed in `.6`; its versioned asset identifies the
+corrected runtime behavior. See [state ownership and verification](evaluation/chat-context/context6-state-ownership.md).
+
+Standalone social closings do not repeat Calendar creation instructions.
+Recognized model-generated Calendar control guidance resolves to the current
+owned action card/state, or a missing-details message. This bounded guidance guard
+does not approve, dispatch or retry the action and is not a universal language check.

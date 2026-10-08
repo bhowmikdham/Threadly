@@ -1,7 +1,7 @@
 """Owned, expiring Calendar destination choices; labels never become event instructions."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from app.calendar import service
@@ -17,14 +17,16 @@ def pending(state):
 def public(state):
     value = pending(state)
     options = value.get("calendar_choices") if value and not value.get("action_id") else None
-    if not options:
+    if not options or datetime.fromisoformat(
+        options.get("expires_at", value["expires_at"])
+    ) <= datetime.now(UTC):
         return None
     return {
         "choices": [
             {"choice_id": row["choice_id"], "label": row["label"], "access": "editable"}
             for row in options["options"]
         ],
-        "expires_at": value["expires_at"],
+        "expires_at": options.get("expires_at", value["expires_at"]),
     }
 
 
@@ -61,6 +63,9 @@ def offer(state, rows, preference_version, account_version, *, error=None):
         return unavailable()
     value.pop("selected_calendar", None)
     value["calendar_choices"] = {
+        "expires_at": min(
+            datetime.fromisoformat(value["expires_at"]), datetime.now(UTC) + timedelta(minutes=15)
+        ).isoformat(),
         "preference_version": preference_version,
         "account_version": account_version,
         "options": [
@@ -134,6 +139,12 @@ def resolve(state, rows, preference_version, account_version, name=""):
     if value is None:
         return None, unavailable()
     saved = value.get("calendar_choices", {})
+    if saved and datetime.fromisoformat(
+        saved.get("expires_at", value["expires_at"])
+    ) <= datetime.now(UTC):
+        return None, offer(
+            state, rows, preference_version, account_version, error="calendar_choices_changed"
+        )
     selected = value.get("selected_calendar")
     index = ordinal(name) if name else None
     if index is not None:
@@ -203,6 +214,10 @@ async def select(runtime, choice_id):
         return unavailable()
     value["last_request_id"] = runtime.request.request_id
     saved = value.get("calendar_choices", {})
+    if saved and datetime.fromisoformat(
+        saved.get("expires_at", value["expires_at"])
+    ) <= datetime.now(UTC):
+        return await show(runtime)
     option = next((row for row in saved.get("options", []) if row["choice_id"] == choice_id), None)
     if option is None:
         return unavailable()

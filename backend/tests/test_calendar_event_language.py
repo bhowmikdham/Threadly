@@ -185,7 +185,7 @@ async def test_exhausted_creation_completes_turn_and_allows_next_read(configured
         factory=db_sessionmaker,
         model=Model(
             tool("prepare_calendar_event", intent=None),
-            *[tool("respond", kind="message", text="Done!") for _ in range(engine.MAX_CALLS - 1)]
+            *[tool("respond", kind="message", text="Done!") for _ in range(engine.MAX_CALLS - 1)],
         ),
     )
     assert result["error_code"] == "calendar_event_not_prepared" and result["version"] == 1
@@ -421,7 +421,7 @@ async def test_new_unfinished_event_never_reports_an_older_booking_as_its_succes
                 *[
                     tool("respond", kind="message", text="Done!")
                     for _ in range(engine.MAX_CALLS - 1)
-                ]
+                ],
             ),
         )
     status = turn(
@@ -435,7 +435,14 @@ async def test_new_unfinished_event_never_reports_an_older_booking_as_its_succes
         factory=db_sessionmaker,
         model=Model(tool("respond", kind="message", text="Your event was created.")),
     )
-    assert "calendar_action_id" not in result and "confirmed" in result["text"]
+    assert "calendar_action_id" not in result
+    if failure == "missing_title":
+        # Both independent Calendar goals remain retained. An unbound status
+        # request must clarify which one, never return the older booking.
+        assert result["kind"] == "clarification"
+        assert result["text"] == "Which request would you like to review?"
+    else:
+        assert "confirmed" in result["text"]
     async with db_sessionmaker() as db:
         assert await db.scalar(select(func.count()).select_from(AssistantAction)) == 1
         assert (await db.get(AssistantAction, old["calendar_action_id"])).state == "succeeded"
