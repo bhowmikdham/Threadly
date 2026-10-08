@@ -15,7 +15,8 @@ function brief(text: string) {
 /**
  * What Threadly says aloud for a chat entry in voice mode, or null while the
  * answer is still on its way. Drafts, cards and approvals are pointed to
- * rather than read out, and nothing is ever sent or booked by voice.
+ * rather than read out, and nothing is ever sent by voice. Calendar events are
+ * only created after an explicit spoken yes (see calendar-voice.ts).
  */
 export function spokenReply(entry: Entry | undefined): string | null {
   if (!entry || entry.pending) return null
@@ -64,4 +65,61 @@ export function hasChoices(entry: Entry | undefined): boolean {
     return true
   }
   return (entry?.inbox?.results.length ?? 0) > 1
+}
+
+const YES = new Set([
+  "yes",
+  "yeah",
+  "yep",
+  "yup",
+  "sure",
+  "okay",
+  "ok",
+  "please",
+  "do it",
+  "go ahead",
+  "create it",
+  "create event",
+  "create the event",
+  "please do",
+  "yes please",
+  "yes create it",
+  "yes create event",
+  "sure thing",
+  "that's right",
+  "correct",
+  "confirm",
+  "approve",
+  "book it"
+])
+const NO = new Set([
+  "no",
+  "nope",
+  "nah",
+  "cancel",
+  "don't",
+  "do not",
+  "stop",
+  "never mind",
+  "nevermind",
+  "don't do it",
+  "no thanks",
+  "no thank you",
+  "not now",
+  "reject"
+])
+
+/**
+ * Strict yes/no for approvals. Anything else, such as "yes but make it 4pm",
+ * returns null so it is handled as a new request and nothing is created.
+ */
+export function parseConfirmation(said: string): "yes" | "no" | null {
+  const t = said
+    .toLowerCase()
+    .replace(/[.,!?]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (YES.has(t)) return "yes"
+  if (NO.has(t)) return "no"
+  return null
 }

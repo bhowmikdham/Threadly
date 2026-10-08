@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 
 import { api, errorText, requestId } from "../lib/api"
+import {
+  CALENDAR_ACTION_EVENT,
+  CALENDAR_DECISION_EVENT
+} from "../lib/calendar-voice"
 import type { CalendarAction } from "../lib/types"
 import { GoogleCalendarIcon } from "./Icon"
 
@@ -67,6 +71,15 @@ export function CalendarEventCard({
       clearTimeout(timer)
     }
   }, [path, pending])
+  // Voice mode approves or rejects through the same endpoints; mirror it here.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const next = (e as CustomEvent<CalendarAction>).detail
+      if (next?.action_id === id) setAction(next)
+    }
+    window.addEventListener(CALENDAR_ACTION_EVENT, on)
+    return () => window.removeEventListener(CALENDAR_ACTION_EVENT, on)
+  }, [id])
   const act = async (operation?: string) => {
     if (!action && operation) return
     setBusy(true)
@@ -83,6 +96,11 @@ export function CalendarEventCard({
           })
         : await api(path)
       setAction(result.action || result)
+      // If voice mode is open, it comes back to full screen and says the outcome.
+      if (operation)
+        window.dispatchEvent(
+          new CustomEvent(CALENDAR_DECISION_EVENT, { detail: { operation } })
+        )
     } catch (e) {
       setError(errorText(e))
     } finally {

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 
 import { api } from "../lib/api"
+import {
+  CALENDAR_DECISION_EVENT,
+  type VoiceConfirm
+} from "../lib/calendar-voice"
+import { parseConfirmation } from "../lib/spoken-reply"
 import { Icon } from "./Icon"
 
 // The glowing purple and white orb, drawn with a single WebGL shader so the
@@ -318,7 +323,9 @@ export async function speak(text: string, onLevel: (level: number) => void) {
 // Voice mode: a spoken back-and-forth with Threadly. The orb listens, thinks
 // and answers aloud, then listens again, until the user closes it. Requests
 // and replies also land in the chat, where drafts and approvals are handled.
-export type VoiceReply = string | { text: string; showChat?: boolean }
+export type VoiceReply =
+  | string
+  | { text: string; showChat?: boolean; confirm?: VoiceConfirm }
 
 export function VoiceOrb({
   respond,
@@ -390,6 +397,8 @@ export function VoiceOrb({
     // Each request gets a number, so an interrupted one can tell it was
     // replaced and stop talking.
     let turn = 0
+    // A spoken yes/no question waiting for its answer (e.g. create the event?).
+    let pending: VoiceConfirm | null = null
     const r = new Recognition()
     r.lang = navigator.language
     r.interimResults = true
@@ -414,9 +423,21 @@ export function VoiceOrb({
       // Acknowledge straight away, so there is no silence while the answer is
       // worked out. The request is sent at the same time.
       move("speaking")
+      let step: () => Promise<VoiceReply> = () =>
+        callbacks.current.respond(said)
+      let ack = ACKNOWLEDGE
+      let confirming = false
+      if (pending && Date.now() < pending.expiresAt) {
+        const answer = parseConfirmation(said)
+        if (answer) {
+          step = answer === "yes" ? pending.onYes : pending.onNo
+          ack = "Okay."
+          confirming = true
+        }
+      }
+      pending = null
       let ready = false
-      const work = callbacks.current
-        .respond(said)
+      const work = step()
         .then(
           (result) => result,
           () => null
@@ -439,10 +460,11 @@ export function VoiceOrb({
         .trim()
 
       const shouldAcknowledge =
-        !IGNORE_PHRASES.includes(cleanSaid) && cleanSaid.length > 0
+        confirming ||
+        (!IGNORE_PHRASES.includes(cleanSaid) && cleanSaid.length > 0)
 
       if (shouldAcknowledge) {
-        await speak(ACKNOWLEDGE, (value) => (voice.level = value))
+        await speak(ack, (value) => (voice.level = value))
         if (stale()) return
       }
 
@@ -456,6 +478,7 @@ export function VoiceOrb({
       } else {
         answer = typeof result === "string" ? result : result.text
         showChat = typeof result === "string" ? false : !!result.showChat
+        if (typeof result !== "string") pending = result.confirm ?? null
       }
 
       if (stale()) return
@@ -471,6 +494,28 @@ export function VoiceOrb({
       stopSpeaking()
       listen()
     }
+    // The user clicked Create event or Cancel on the card: the question is
+    // answered, so the orb returns to full screen, says the outcome and listens.
+    const decided = async (e: Event) => {
+      if (stopped || closed.current) return
+      const operation = (e as CustomEvent).detail?.operation
+      pending = null
+      const mine = ++turn
+      stopSpeaking()
+      try {
+        r.stop()
+      } catch {}
+      setDocked(false)
+      move("speaking")
+      await speak(
+        operation === "approve"
+          ? "Okay, creating it."
+          : "Okay, I won't create it.",
+        (value) => (voice.level = value)
+      )
+      if (!(stopped || closed.current || mine !== turn)) listen()
+    }
+    addEventListener(CALENDAR_DECISION_EVENT, decided)
     r.onresult = (e: any) => {
       if (
         stopped ||
@@ -616,6 +661,7 @@ export function VoiceOrb({
     addEventListener("keydown", key)
     return () => {
       removeEventListener("keydown", key)
+      removeEventListener(CALENDAR_DECISION_EVENT, decided)
       closed.current = true
       stopResources()
     }

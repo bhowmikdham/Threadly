@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { CalendarApprovalMenu } from "./components/CalendarApprovalMenu"
+import { calendarVoiceReply } from "./lib/calendar-voice"
 
 import "./style.css"
 
@@ -272,6 +273,8 @@ function Assistant({
     [subjects, setSubjects] = useState<Record<string, string>>({}),
     [historyCursor, setHistoryCursor] = useState<string | null>(null),
     [recording, setRecording] = useState(false),
+    // While voice shows a calendar event, the chat shows only that entry.
+    [voiceCalendar, setVoiceCalendar] = useState<string | null>(null),
     [openEmail, setOpenEmail] = useState(false),
     [permissionSaving, setPermissionSaving] = useState(false),
     [connecting, setConnecting] = useState(""),
@@ -400,6 +403,7 @@ function Assistant({
       return "I'm still finishing the last request. Give me a moment."
     const before = entriesNow.current.length
     atBottom.current = true
+    setVoiceCalendar(null)
     void c.submit(said)
     const deadline = Date.now() + 90_000
     while (Date.now() < deadline) {
@@ -407,6 +411,10 @@ function Assistant({
       const entry = entriesNow.current
         .slice(before)
         .find((e) => e.instruction === said)
+      if (entry?.calendarActionId && !entry.pending && !entry.error) {
+        setVoiceCalendar(entry.id)
+        return calendarVoiceReply(entry.calendarActionId, entry.calendarAction)
+      }
       const reply = spokenReply(entry)
       if (reply) return { text: reply, showChat: hasChoices(entry) }
     }
@@ -414,6 +422,7 @@ function Assistant({
   }
   const voiceDone = (error?: string) => {
     setRecording(false)
+    setVoiceCalendar(null)
     if (error) c.setError(error)
     input.current?.focus()
   }
@@ -768,7 +777,10 @@ function Assistant({
             </div>
           </section>
         )}
-        {c.entries.map((entry) => (
+        {(voiceCalendar
+          ? c.entries.filter((e) => e.id === voiceCalendar)
+          : c.entries
+        ).map((entry) => (
           <TaskCard
             key={entry.id}
             entry={entry}
