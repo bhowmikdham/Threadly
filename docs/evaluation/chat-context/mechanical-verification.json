@@ -1,9 +1,9 @@
 {
-  "status": "context5_live_stopped_on_same_turn_retained_purpose_regression_calendar_unobserved",
-  "recorded_at": "2026-10-08T00:54:52.771141+00:00",
+  "status": "context6_offline_repair_verified_live_resumption_requires_explicit_approval",
+  "recorded_at": "2026-10-08T01:26:59.097856+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
-  "prompt_release": "contextual-conversation-1.8.9+chat-context.5",
+  "prompt_release": "contextual-conversation-1.8.9+chat-context.6",
   "frontend": {
     "branch": "codex/chat-context-restoration",
     "base_commit": "afa2180fa16b4060587002b6be440ce32573c603",
@@ -478,6 +478,48 @@
       "scope": "Offline exact recorded-response acceptance replay; selection instrumentation proves populated purpose overwritten by stored empty purpose. Outside default discovery.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context5-retained-fields-red.log",
       "log_sha256": "9adff244f8f91e06ed9e12cc7a4549d4b5769d3640fd725e459ec036fc047b61"
+    },
+    {
+      "name": "context6_red_baseline",
+      "result": "9 failed, 4 passed in 6.84s",
+      "scope": "Expanded acceptance baseline before implementation; corrected fixture indexing.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-goal-turn-red-final.log",
+      "log_sha256": "b52d2a5da408e21146bcc3e32cfa7e307598f31f133dbe2a6d60b871ba398b40"
+    },
+    {
+      "name": "context6_first_full",
+      "result": "4 failed, 2317 passed in 318.63s",
+      "scope": "Found wording-only failed revisions invalidating existing reviewable draft/save receipts; fixed before final run.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context6-full-backend.log",
+      "log_sha256": "b684f73f8ee92af6f38a940c5faf59346041195039251c3fdef02a9e4741864b"
+    },
+    {
+      "name": "context6_compacted_draft_red",
+      "result": "1 failed in 1.04s",
+      "scope": "Proved working-state selection must hydrate omitted text only for the matching committed draft ID.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context6-compacted-draft-red.log",
+      "log_sha256": "d5b2986152d2b8a45666e43681e8ae87283bf50d008744ec50074f6fdf208f69"
+    },
+    {
+      "name": "context6_final_focused",
+      "result": "185 passed, no skips, 1 warning in 32.02s",
+      "scope": "Recorded provider responses, typed goal switching, source/ownership/closed status, leases/checkpoints, Calendar clears, draft/save receipt retention and compaction.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context6-targeted-final.log",
+      "log_sha256": "9d0a76161ea23fd8a3608743be5f8be81fc6191be9a036464b34d60414fee15c"
+    },
+    {
+      "name": "context6_final_full",
+      "result": "2322 passed, no skips, 1 warning in 290.80s",
+      "scope": "Full backend suite at pinned runtime/test commit, disposable local PostgreSQL, scripted/recorded model decisions and fake Google.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context6-full-backend-final.log",
+      "log_sha256": "a45ffb34be6ae3d0d41a9b7001e6720ad4e888a8adbb4c4fa98f4c9f858b40c9"
+    },
+    {
+      "name": "context6_ruff",
+      "result": "All checks passed",
+      "scope": "Ruff app/tests/tools; changed Python files also pass formatting checks.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context6-ruff.log",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
     }
   ],
   "previous_runs": [
@@ -565,23 +607,23 @@
     "backend/app/assistant/workflows.py": "7351fba65707bb854b6bc318b659e9d6d2a348c8555833f22996bbc0734bf962",
     "backend/app/calendar/conversation_guard.py": "123de4c1dea2dafc09579de12a50881cf1cb4e083b829e686464fb76bb2619b2",
     "backend/app/calendar/event_choices.py": "2ae40c3d428a83e34f62b5aeef821f8873ac6a51b53e597eddeffb74a820e5bb",
-    "backend/app/calendar/event_creation.py": "813aa3781694284c9c1d73cd2420b203a25591c41f30c3a1c5448f6181bd7e78",
+    "backend/app/calendar/event_creation.py": "b866d4ed2c6f887ea538619e29b5992cdedd706bccd517ad7ff6a59ec13be4e2",
     "backend/app/calendar/event_draft.py": "04b7692463e3263793f8592652ffbcc5a78cd7ae5ca7a78028928d29f07b768e",
     "backend/app/calendar/event_timezone.py": "60c0bba8ee4b05cab23c4147156ca92bee185b93afd0759ca8eef77755558e7a",
     "backend/app/calendar/meeting_email.py": "895f64f91a9ede8950427760a9c4d0e26bd4de334db60beb95f55d340168dc88",
     "backend/app/conversation/budget.py": "4df16539bde7114f9fa724d6b7e4a6703adef1c6c6a15d391efa0d0d511d5b56",
     "backend/app/conversation/citations.py": "0ce9bd4838e063915ae65f34700d5b399107b26e9f607beca972e2fab25ec176",
-    "backend/app/conversation/email_draft.py": "60692449a01c766bf11d70931f76ec6a4186c62df719716939c5a70911f39092",
+    "backend/app/conversation/email_draft.py": "d24b68cf499fc27228182fd3076379b3a9ad3d05a9faf84bc72cff78ce168d9d",
     "backend/app/conversation/email_repair.py": "ce136af8033b21b08459c8032b826df9a1bfab2924011071b72b5dc328003efc",
     "backend/app/conversation/email_review.py": "59bd61ea79a929344828069420fff749105c0ab3bfcb2f5f22873eb8e23de9c4",
     "backend/app/conversation/engine.py": "14515cc9908cc61ca1e5d0422f8fc5418d2a81865833851306a7f679b2ef30dd",
     "backend/app/conversation/evaluate.py": "b82d9035f708bcb70690189bec010206ef5c9d6a6dff5082ca1cc59336025525",
-    "backend/app/conversation/goals.py": "0c8e944946320cb7d15915b3d8e077675e03b5bcb1355aba0ac0b1046ac6bda0",
+    "backend/app/conversation/goals.py": "d1c28c1654662094357785e9127ba7e46be818990196afdf8a4710b186b67188",
     "backend/app/conversation/mail_goal.py": "ace7641b4bbbe8a5a878c7b92c095d993f4fb589a9fac8c2365a56ae2830c7b2",
     "backend/app/conversation/memory.py": "9b4f98fe291b6c585800d0d9ce08a1cba4bbbd950587e022652d803a49ef2479",
-    "backend/app/conversation/prompt.py": "b3aa043846b63389f86ff014a62cd1de36fe10fd25627c0fd7da0be122ea075c",
+    "backend/app/conversation/prompt.py": "4fcf1bdb1e11b21e2fafcc783051ccee757278ad8ea7e3d17edb01bf1fbded69",
     "backend/app/conversation/recovery.py": "bdd7a545dd24655af366a9103e9a960bc80e032064cf5e956cd7a3a643dc622e",
-    "backend/app/conversation/runtime.py": "199651d6dd85de50b25802a79b719ee26653c995c49ee0458563727d99f6c889",
+    "backend/app/conversation/runtime.py": "a69085b3c5bc7add56923abc69c700afed56c9e5d0479a7f608b9fa526992248",
     "backend/app/conversation/service.py": "fe8ebcba312f75946a5ed336e14fdc9a3cc10ede11b6a7f8e46578b0f870efb0",
     "backend/app/conversation/store.py": "5ebae40c04d3cdcc023e17e3bda0f64fdc431b170fb494439e6ce32a8c626ec5",
     "backend/app/conversation/user_intent.py": "99f792a200526368a78f53b78f0c56cf28e7b318081d42ebfc8c8f2d7d7567bd",
@@ -592,8 +634,8 @@
     "backend/app/schemas/conversation.py": "cd3df076a55801744db2eaa91df9f7ae121915734143483bb717d6027765f4e0",
     "backend/app/schemas/meeting_email.py": "eadac114067387e8927f13d879ce0236527c9f562448c0b8208493a2ccd59894",
     "backend/tests/test_assistant_migration.py": "e5edb33003fff41727e98e000bf35f35dbb1e2e42554afc453623af908ab3acd",
-    "backend/tests/test_calendar_conversation_tools.py": "2b02470f4e0bf25af8742d7918180572bee69112408d901e688ed00a24611f0e",
-    "backend/tests/test_calendar_field_repair.py": "eac00617d00e455eab59590debbf4a9f739fb555c337368129b12b07c9bd6b99",
+    "backend/tests/test_calendar_conversation_tools.py": "2933edd9383c76c134e387caba407a1755a3d22c9527a96891b2fafa5d10da7f",
+    "backend/tests/test_calendar_field_repair.py": "d14e3b597e995fb2ee88caac6edb533f9b0b98444383f2950e2f751a5542f1a9",
     "backend/tests/test_chat_context_continuity.py": "99fa1b70f5540c0a97f48af9d436a378abdf8bec5e4c3e40594bca807b773adc",
     "backend/tests/test_chat_context_evaluation_budget.py": "a593e7eb1a949d210a400cd747e7e214c055953f6faf06778c9704ea624e3168",
     "backend/tests/test_chat_context_followup_evaluation.py": "cc0b49a7f8fdf4674371598a6dab528511946064a2a173cb22697417f1496830",
@@ -613,7 +655,8 @@
     "backend/tools/resume_chat_context_evaluation.py": "d6fe6204fbfb32f692978365bf3b39a1006941ec70d674521f26d993e290e28c",
     "backend/tools/evaluate_chat_context5.py": "55a358f632a75227c16df6ab576295d2f5935af608f5b7e31dff08ed2cd26140",
     "backend/tests/test_chat_context5_budget.py": "89bc91a878739ccd7d5b963f5440414b111c1c9327cbcd3aeec16a38e6bb9686",
-    "backend/tools/replay_context5_retained_fields.py": "515c9a08135cbbeb62e2657f9e74e07eb7cab4c0e30335b80651a06e9e1e14d0"
+    "backend/tools/replay_context5_retained_fields.py": "d698b98847b8584331b37b95345c6b9156f6f6406170e5eeb3e51ce96866852d",
+    "backend/tests/test_goal_turn_state.py": "e621ab7e9f182d5249da3959a8f7d81c3186356572a87cf184718eacececb58a"
   },
   "review_findings_resolved": [
     "Unversioned legacy turns skipped by recall without inventing citation identity.",
@@ -633,10 +676,10 @@
     "Explicit legacy new email with a stale goal ID does not select or mutate that retained goal.",
     "New and continuing drafts have distinct model tools; reason-specific repair and 2-same/3-total invalid-call bounds.",
     "Explicitly bound recipient/wording corrections preserve goal identity.",
-    "PR126 and subsequently authorized PR127 integrated unchanged; open PR125 and closed/unmerged PR128 excluded."
+    "PR126 and subsequently authorized PR127 integrated unchanged; open PR125 and closed/unmerged PR128 excluded.",
+    "Context6: exact recorded same-turn retained-purpose failure passes offline; shared typed-goal staging preserves validated fields through repeated selection, focus changes, cancellation, explicit corrections/clears and lease-checked persistence. New email/Calendar retry and draft/save-receipt/compaction regressions also pass; 2322 full tests, no skips. Live acceptance remains open."
   ],
   "remaining_gates": [
-    "Fix same-turn owned email goal rebinding overwriting validated purpose with older persisted fields; exact recorded-response acceptance replay currently RED.",
     "Complete live Alex/Casey drafts and Calendar revision/closing acceptance after correction. Third diagnostic stopped by semantic-regression policy at 3/12; nine unused calls cannot be automatically resumed/reset.",
     "Final release review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
   ],
@@ -663,7 +706,7 @@
     "combined_review": "integration-review.md"
   },
   "external_writes_or_deployment": false,
-  "backend_code_and_test_head": "7fb055f409c46479bc1cd1194aa870ff93ccf187",
+  "backend_code_and_test_head": "4262c5b1f820a7cf0b0eb6e115e4317ad15a768f",
   "previous_real_model_evaluation_status": {
     "status": "blocked_before_paid_inference",
     "approved_at": "2026-10-07T10:58:05Z",
@@ -681,10 +724,10 @@
     "contents": "Synthetic offline red/green/integration/build logs, including unsuccessful fixture/assertion/build attempts."
   },
   "candidate_live_model_status": {
-    "release": "contextual-conversation-1.8.9+chat-context.5",
-    "paid_calls": 3,
-    "status": "new_goal_pass_alex_completion_fail_calendar_not_attempted",
-    "details": "context5-results.md"
+    "release": "contextual-conversation-1.8.9+chat-context.6",
+    "paid_calls": 0,
+    "status": "not_live_evaluated_after_context5_stop",
+    "details": "context6-state-ownership.md"
   },
   "second_real_model_initial_segment": {
     "status": "behavioral_failures_confirmed",
@@ -725,10 +768,9 @@
   "application_runtime_unchanged_after_structural_full_suite": false,
   "previous_candidate_live_model_status": {
     "release": "contextual-conversation-1.8.9+chat-context.5",
-    "paid_calls": 0,
-    "status": "not_live_evaluated",
-    "details": "email-operation-repair.md",
-    "next_gate": "Proposal only: six attempts / USD 0.30 with 10% GST, same model, email new/continue only; not approved or executed."
+    "paid_calls": 3,
+    "status": "new_goal_pass_alex_completion_fail_calendar_not_attempted",
+    "details": "context5-results.md"
   },
   "operation_repair_offline_evidence": {
     "path": "operation-repair-offline-evidence.json.gz",
@@ -788,5 +830,100 @@
     "context5-scenarios.json.gz": "eb810de09598dd2acae7f7d94fca59505b5d22dabd71a50fe7353dda350be88b",
     "context5-preflights.json": "09b6832628e3df217e6ac65bb56ed010e13bbae3825df404e4f5dfe830114472",
     "context5-offline-replay-evidence.json.gz": "32a7995d579f2153084d5730a89fbc404b4a9905a94f0e9fdfad9cbbfda7fc46"
+  },
+  "context5_runtime_and_test_sha256": {
+    "backend/alembic/versions/h071026e9043_conversation_exchanges.py": "4ccf267426797174addd3414e6c5361e907c25d536cb13a18e0c690a7699cbe0",
+    "backend/app/actions/calendar_preview.py": "808d526bfde9441bf543efe9908e50e23bb093de3624210337a0f84c9fceaf1e",
+    "backend/app/api/routes/calendar.py": "c4ddb715e12a32ab87c54946bee47cba0c41f5d86a9481844778ec77d3ee65dc",
+    "backend/app/assistant/coordinator.py": "ddc6ae7fc171ad530c4efd2ac282073490c57346619aefef07a8be831b5b7fd7",
+    "backend/app/assistant/steps.py": "84e860c5e0838b547173b0adfa25eb4117714325c3d110ea5807300b6290b820",
+    "backend/app/assistant/tasks.py": "ff204ec7af6a26f06a3891a6e194288ce4390e48521f58c92bcdd92a530a5147",
+    "backend/app/assistant/user_context.py": "7b65918f28094f08bc4b63350a286f4f68e6814ac777c0c866e66aad259568e6",
+    "backend/app/assistant/worker.py": "f33721de83e220680423fc4b99a254e93a4625c7dc839b6fe732680a08d0f714",
+    "backend/app/assistant/workflows.py": "7351fba65707bb854b6bc318b659e9d6d2a348c8555833f22996bbc0734bf962",
+    "backend/app/calendar/conversation_guard.py": "123de4c1dea2dafc09579de12a50881cf1cb4e083b829e686464fb76bb2619b2",
+    "backend/app/calendar/event_choices.py": "2ae40c3d428a83e34f62b5aeef821f8873ac6a51b53e597eddeffb74a820e5bb",
+    "backend/app/calendar/event_creation.py": "813aa3781694284c9c1d73cd2420b203a25591c41f30c3a1c5448f6181bd7e78",
+    "backend/app/calendar/event_draft.py": "04b7692463e3263793f8592652ffbcc5a78cd7ae5ca7a78028928d29f07b768e",
+    "backend/app/calendar/event_timezone.py": "60c0bba8ee4b05cab23c4147156ca92bee185b93afd0759ca8eef77755558e7a",
+    "backend/app/calendar/meeting_email.py": "895f64f91a9ede8950427760a9c4d0e26bd4de334db60beb95f55d340168dc88",
+    "backend/app/conversation/budget.py": "4df16539bde7114f9fa724d6b7e4a6703adef1c6c6a15d391efa0d0d511d5b56",
+    "backend/app/conversation/citations.py": "0ce9bd4838e063915ae65f34700d5b399107b26e9f607beca972e2fab25ec176",
+    "backend/app/conversation/email_draft.py": "60692449a01c766bf11d70931f76ec6a4186c62df719716939c5a70911f39092",
+    "backend/app/conversation/email_repair.py": "ce136af8033b21b08459c8032b826df9a1bfab2924011071b72b5dc328003efc",
+    "backend/app/conversation/email_review.py": "59bd61ea79a929344828069420fff749105c0ab3bfcb2f5f22873eb8e23de9c4",
+    "backend/app/conversation/engine.py": "14515cc9908cc61ca1e5d0422f8fc5418d2a81865833851306a7f679b2ef30dd",
+    "backend/app/conversation/evaluate.py": "b82d9035f708bcb70690189bec010206ef5c9d6a6dff5082ca1cc59336025525",
+    "backend/app/conversation/goals.py": "0c8e944946320cb7d15915b3d8e077675e03b5bcb1355aba0ac0b1046ac6bda0",
+    "backend/app/conversation/mail_goal.py": "ace7641b4bbbe8a5a878c7b92c095d993f4fb589a9fac8c2365a56ae2830c7b2",
+    "backend/app/conversation/memory.py": "9b4f98fe291b6c585800d0d9ce08a1cba4bbbd950587e022652d803a49ef2479",
+    "backend/app/conversation/prompt.py": "b3aa043846b63389f86ff014a62cd1de36fe10fd25627c0fd7da0be122ea075c",
+    "backend/app/conversation/recovery.py": "bdd7a545dd24655af366a9103e9a960bc80e032064cf5e956cd7a3a643dc622e",
+    "backend/app/conversation/runtime.py": "199651d6dd85de50b25802a79b719ee26653c995c49ee0458563727d99f6c889",
+    "backend/app/conversation/service.py": "fe8ebcba312f75946a5ed336e14fdc9a3cc10ede11b6a7f8e46578b0f870efb0",
+    "backend/app/conversation/store.py": "5ebae40c04d3cdcc023e17e3bda0f64fdc431b170fb494439e6ce32a8c626ec5",
+    "backend/app/conversation/user_intent.py": "99f792a200526368a78f53b78f0c56cf28e7b318081d42ebfc8c8f2d7d7567bd",
+    "backend/app/db/models.py": "86031c0362fb70827b66070cacf6cd45afc773959d52687f7e71338c2bd9238d",
+    "backend/app/operations/retention.py": "7cf5da896146de3418e2ac62918c295be78fe126a5ba50271027f77775a85bea",
+    "backend/app/schemas/calendar_event.py": "a14e5100113a9e57fa4879e0afa0283644d1ad6eff2034739a2092dbb7d9c6bd",
+    "backend/app/schemas/chat_context.py": "ddbdb85860a9d7e7fae7b174eedd230c967017eea003cbab68f325eb0212872e",
+    "backend/app/schemas/conversation.py": "cd3df076a55801744db2eaa91df9f7ae121915734143483bb717d6027765f4e0",
+    "backend/app/schemas/meeting_email.py": "eadac114067387e8927f13d879ce0236527c9f562448c0b8208493a2ccd59894",
+    "backend/tests/test_assistant_migration.py": "e5edb33003fff41727e98e000bf35f35dbb1e2e42554afc453623af908ab3acd",
+    "backend/tests/test_calendar_conversation_tools.py": "2b02470f4e0bf25af8742d7918180572bee69112408d901e688ed00a24611f0e",
+    "backend/tests/test_calendar_field_repair.py": "eac00617d00e455eab59590debbf4a9f739fb555c337368129b12b07c9bd6b99",
+    "backend/tests/test_chat_context_continuity.py": "99fa1b70f5540c0a97f48af9d436a378abdf8bec5e4c3e40594bca807b773adc",
+    "backend/tests/test_chat_context_evaluation_budget.py": "a593e7eb1a949d210a400cd747e7e214c055953f6faf06778c9704ea624e3168",
+    "backend/tests/test_chat_context_followup_evaluation.py": "cc0b49a7f8fdf4674371598a6dab528511946064a2a173cb22697417f1496830",
+    "backend/tests/test_chat_context_live_regressions.py": "bb4ecd0ab692ab9ba267e0aff5aa765b3891943934606c1c41cbbb8b4440422f",
+    "backend/tests/test_chat_context_meeting_email.py": "b42a105ab3e465f9bc45d40bab19fca7e6177df1c6ef8dcfe03718a2711801b0",
+    "backend/tests/test_chat_context_resume_budget.py": "5d8538aaa18c49c5e4f18467981e1726d362edb0c5e70ce893173cab5df56597",
+    "backend/tests/test_chat_context_sources_goals.py": "2614b2fa23e343e54a7ab18987f5a052feb2a8d9369764f6b688ed7ce49078e5",
+    "backend/tests/test_chat_context_workflows.py": "e0cd58b794bca79288abd4977784021350ed9882abf85976c3e6109f3fde4888",
+    "backend/tests/test_conversation_evaluate.py": "332c726a2b506b310ea801ec5185dba4b702e549b529323e15a8c3a549d7fd28",
+    "backend/tests/test_email_draft_clarification.py": "e6a2c7050e3a3a5dcd05d72f8b809444247f1860a01f20bad9c4231d83990bb5",
+    "backend/tests/test_email_draft_followup.py": "81266ec6de907ae4a4e9782a3839d1eff326ae0b94f231ac722dd4ee6d1bee3c",
+    "backend/tests/test_email_operation_contract.py": "86dd6c930d7820cd1975a18e59283bff002ecc8acbe2259b2d5be641182f9740",
+    "backend/tests/test_meeting_email_event.py": "a44588ebb15648047f8b23db810876b5f6f64f4b1a3821e930511ca769bdaaf8",
+    "backend/tests/test_primary_inbox.py": "9959636d18d262074607e3de197fc19c49d2b7ba0342219338ae5d4e4d15e2ac",
+    "backend/tools/evaluate_chat_context.py": "dcde67f6047c5e6b8364f56aebbc0d5e30c9093a310053a28b103f9a66b8491f",
+    "backend/tools/evaluate_chat_context_followup.py": "b76b748951e5a7d3d7a2371eb8048f2f4d15341642a715952b8ece5275f751c9",
+    "backend/tools/resume_chat_context_evaluation.py": "d6fe6204fbfb32f692978365bf3b39a1006941ec70d674521f26d993e290e28c",
+    "backend/tools/evaluate_chat_context5.py": "55a358f632a75227c16df6ab576295d2f5935af608f5b7e31dff08ed2cd26140",
+    "backend/tests/test_chat_context5_budget.py": "89bc91a878739ccd7d5b963f5440414b111c1c9327cbcd3aeec16a38e6bb9686",
+    "backend/tools/replay_context5_retained_fields.py": "515c9a08135cbbeb62e2657f9e74e07eb7cab4c0e30335b80651a06e9e1e14d0"
+  },
+  "context6_offline_repair": {
+    "recorded_at": "2026-10-08T01:26:59.097856+00:00",
+    "runtime_and_test_head": "4262c5b1f820a7cf0b0eb6e115e4317ad15a768f",
+    "tree": "f094285b2fdb9d4de7ada6e259e92ce548e78365",
+    "release": "contextual-conversation-1.8.9+chat-context.6",
+    "prompt_and_tool_bytes_unchanged": true,
+    "new_default_regressions": 17,
+    "full_passed": 2322,
+    "full_skipped": 0,
+    "focused_passed": 185,
+    "provider_calls": 0,
+    "production_changes": false,
+    "published": false,
+    "frontend_unchanged_head": "86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf",
+    "report": "context6-state-ownership.md",
+    "evidence_bundle": "context6-offline-evidence.json.gz",
+    "evidence_bundle_sha256": "6d001bd26e682bdea9e217e064a834af0ed55c065693fc6d4caf729585678ef3",
+    "asset_sha256": "8bdddd713e956102c3f7a104a0ea003439c8785fd6941fccccbc9c4d7f856eb6",
+    "protected_ledgers_sha256": {
+      "chat-context-approved-budget-ledger.json": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a",
+      "chat-context-second-approved-budget-ledger.json": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
+      "chat-context-third-approved-budget-ledger.json": "7b6f1d8a59c4d92b29fcefc8a6151375d1bcf7dca4c6cd637f772ae6bcb6df40"
+    },
+    "third_budget": {
+      "used": 3,
+      "unused": 9,
+      "unused_email": 3,
+      "unused_calendar": 6,
+      "usd_including_gst": "0.10397772",
+      "stop_still_in_force": true
+    },
+    "next_gate": "Explicitly approved resumption window on the same ledger and caps; concrete 3-email/6-Calendar proposal is in the report. End-to-end real model acceptance remains unverified."
   }
 }
