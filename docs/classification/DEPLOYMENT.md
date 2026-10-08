@@ -22,7 +22,8 @@ recreate only `api`, `assistant-worker` and `action-worker` with `--no-deps` usi
 the existing public HTTPS/launch Compose overlays. Verify the Caddy container and
 its website/download mounts remain unchanged. Running the full public-launch
 helper would also replace website/proxy assets and is outside this service's scope.
-The [initial rollout record](ROLLOUT-2026-10-07.md) includes the actual outcome.
+See the [initial rollout](ROLLOUT-2026-10-07.md) and the subsequent
+[reliability rollout](ROLLOUT-2026-10-08.md) for actual outcomes.
 
 The existing private release receipt contains `haiku.target.json` and
 `haiku.caller-policy.json`. Attach the latter as the separate named inline policy

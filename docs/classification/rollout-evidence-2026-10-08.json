@@ -1,0 +1,225 @@
+{
+  "tested_commit": "e43f1730d1feb89c83ee32a95e7b3d7399488961",
+  "deployed_commit": "89df879e657e1f30dafc34df86d48becdbed95ac",
+  "identical_tree": "1d3e1fe6505a837a0a0cf682a985cc3249ebbc2a",
+  "ci_run": "https://github.com/bhowmikdham/Threadly/actions/runs/37703767171",
+  "backend_tests_passed": 2237,
+  "source_ci_conclusion": "success",
+  "public_smoke": {
+    "records": [
+      {
+        "http_status": 200,
+        "duration_ms": 3607,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2597,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2880,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2804,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2866,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 258,
+        "error_code": "classification_busy",
+        "retry_after": 5
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 254,
+        "error_code": "classification_busy",
+        "retry_after": 5
+      }
+    ],
+    "auth_and_response_contract": true,
+    "mail_modified": false,
+    "concurrency_codes": [
+      200,
+      200,
+      429,
+      429
+    ]
+  },
+  "public_budget_recovery": {
+    "remaining_budget_probes": [
+      {
+        "http_status": 200,
+        "duration_ms": 2854
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2663
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2765
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 26,
+        "error_code": "classification_busy",
+        "retry_after": 30
+      }
+    ],
+    "recovery_after_cooldown": {
+      "http_status": 200,
+      "duration_ms": 2612
+    },
+    "mail_modified": false
+  },
+  "production_audit": {
+    "backend_commit": "89df879e657e1f30dafc34df86d48becdbed95ac",
+    "checked_at_utc": "2026-10-08T00:03:09.400538+00:00",
+    "services": {
+      "api": "healthy",
+      "assistant-worker": "healthy",
+      "action-worker": "healthy"
+    },
+    "configuration": {
+      "enabled": true,
+      "transport": "bedrock_flow",
+      "concurrency": 2,
+      "requests_per_minute": 8,
+      "valid_seconds": 3600,
+      "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+    },
+    "classification_log_counts": {
+      "classified:ok": 9,
+      "error:classification_busy": 3
+    },
+    "provider_log_counts": {},
+    "gmail_log_counts": {},
+    "website_proxy_mounts_unchanged": true,
+    "schema_head": "g071026e9042",
+    "database_backup_taken": true
+  },
+  "candidate_smoke": {
+    "records": [
+      {
+        "http_status": 200,
+        "duration_ms": 3110,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2508,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2459,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2564,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 3474,
+        "status": "classified",
+        "valid_seconds": 3600,
+        "contract_valid": true,
+        "release_id": "b172f30aaec1607ed1110208cd8707257a0ae99e1282470bb368263bb8f0b77d"
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 172,
+        "error_code": "classification_busy",
+        "retry_after": 5
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 172,
+        "error_code": "classification_busy",
+        "retry_after": 5
+      }
+    ],
+    "auth_and_response_contract": true,
+    "mail_modified": false,
+    "concurrency_codes": [
+      200,
+      200,
+      429,
+      429
+    ]
+  },
+  "candidate_budget_recovery": {
+    "remaining_budget_probes": [
+      {
+        "http_status": 200,
+        "duration_ms": 2554
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 3837
+      },
+      {
+        "http_status": 200,
+        "duration_ms": 2940
+      },
+      {
+        "http_status": 429,
+        "duration_ms": 46,
+        "error_code": "classification_busy",
+        "retry_after": 32
+      }
+    ],
+    "recovery_after_cooldown": {
+      "http_status": 200,
+      "duration_ms": 2602
+    },
+    "mail_modified": false
+  },
+  "applied_haiku_requests_per_minute": 10,
+  "support_case": "179141544300892",
+  "initial_attempt_rolled_back": true,
+  "model_prompt_flow_changed": false,
+  "release_branch_ci": {
+    "html_url": "https://github.com/bhowmikdham/Threadly/actions/runs/37705184127",
+    "status": "in_progress",
+    "conclusion": null
+  }
+}
