@@ -16,7 +16,7 @@ FIELDS = (
     "description",
     "attendees",
 )
-CONTROLS = {"intent", "changes", "continue_previous", "citations"}
+CONTROLS = {"intent", "changes", "continue_previous", "citations", "email_source"}
 SOURCE_FIELDS = {"date": "date_source", "time": "time_source", "timezone": "timezone_source"}
 
 
@@ -153,11 +153,13 @@ def merge(runtime, args, pending):
                 subset = {field: value}
                 if source != field:
                     subset[source] = getattr(args, source)
-                source_fields(
-                    PrepareCalendarEvent.model_validate(subset),
-                    cited.get(field, {}).get("source", latest),
-                    constraints=False,
-                )
+                prior = pending.get("field_provenance", {}).get(field, {})
+                if not (field == "title" and prior.get("kind") == "email" and prior.get("derived")):
+                    source_fields(
+                        PrepareCalendarEvent.model_validate(subset),
+                        cited.get(field, {}).get("source", latest),
+                        constraints=False,
+                    )
                 repeated_sources.append(getattr(args, source))
                 supplied.pop(field, None)
                 supplied.pop(source, None)
@@ -284,9 +286,10 @@ def merge(runtime, args, pending):
         subset = {field: values[field]}
         if source != field:
             subset[source] = values[source]
-        source_fields(
-            PrepareCalendarEvent.model_validate(subset), citation["source"], constraints=False
-        )
+        if not (field == "title" and citation.get("kind") == "email" and citation.get("derived")):
+            source_fields(
+                PrepareCalendarEvent.model_validate(subset), citation["source"], constraints=False
+            )
         check.pop(field, None)
         if source != field:
             check.pop(source, None)
@@ -392,11 +395,15 @@ def retain_partial(runtime, args, pending, origin, error):
                 and not (cited[field]["recorded_at"] and cited[field]["timezone"])
             ):
                 raise RequestClarification("That old relative date has no saved clock")
-            source_fields(
-                PrepareCalendarEvent.model_validate(subset),
-                cited.get(field, {}).get("source", runtime.request.instruction),
-                constraints=False,
-            )
+            citation = cited.get(field, {})
+            if not (
+                field == "title" and citation.get("kind") == "email" and citation.get("derived")
+            ):
+                source_fields(
+                    PrepareCalendarEvent.model_validate(subset),
+                    citation.get("source", runtime.request.instruction),
+                    constraints=False,
+                )
         except (ValueError, RequestClarification):
             rejected_source = supplied.get(source, "")
             if (

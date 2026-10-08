@@ -90,7 +90,13 @@ async def review(runtime, *, goal_id=None, source=None, presentation="status", e
         elif not closed and staged and staged["kind"] == row.kind:
             value = staged["value"]
         if action_id := value.get("action_id"):
+            from app.assistant import source_data
             from app.calendar.event_creation import response
+            from app.mail.dependency import references
+
+            await source_data.prefetch(
+                runtime.owner, await references(runtime.owner, [action_id], factory=runtime.factory)
+            )
 
             async with runtime.factory() as session:
                 action = await session.get(AssistantAction, action_id)

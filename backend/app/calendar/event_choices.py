@@ -43,9 +43,12 @@ def model_context(state):
             "selected_calendar",
             "previous_calendar_names",
             "creation_origin",
+            "email_source",
         }
     }
     result["calendar_choices"] = public(state)
+    if source := value.get("email_source"):
+        result["email_source"] = {"reference": source["reference"], "fresh_read_required": True}
     if selected := value.get("selected_calendar"):
         result["selected_calendar_label"] = selected["label"]
     return result

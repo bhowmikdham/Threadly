@@ -19,6 +19,26 @@ class CalendarIntent(StrictModel):
     )
 
 
+class EmailEventField(StrictModel):
+    field: Literal["title", "date", "time", "timezone", "location"]
+    quote: str = Field(min_length=1, max_length=500)
+
+
+class EmailEventSource(StrictModel):
+    """Fresh email data, distinct from the current user's operation authority."""
+
+    reference: str = Field(min_length=1, max_length=40)
+    event_quote: str = Field(min_length=1, max_length=2000)
+    ambiguity: Literal["none", "multiple_events", "date", "time"]
+    fields: list[EmailEventField] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def unique_fields(self):
+        if len({item.field for item in self.fields}) != len(self.fields):
+            raise ValueError("Cite each email event field once")
+        return self
+
+
 class EventFieldChange(StrictModel):
     field: Literal[
         "title",

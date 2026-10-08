@@ -549,6 +549,7 @@ class Runtime:
             else datetime.now(UTC)
         )
         self.evidence, self.loaded, self.read_scopes = {}, {}, {}
+        self.email_observations = {}
         self.source_selections = {}
         self.last_read_scopes = {}
         self.turn_source_references = []
@@ -1124,6 +1125,13 @@ class Runtime:
             str(m.get(k) or "") for m in output for k in ("subject", "sender", "reply_to", "body")
         )
         self.loaded[reference] = source
+        self.email_observations[reference] = [
+            {
+                "message_id": message["gmail_msg_id"],
+                "text": (shown["subject"] or "") + "\n" + shown["body"],
+            }
+            for message, shown in zip(messages, output, strict=True)
+        ]
         self.read_scopes.setdefault(reference, set()).add(scope)
         self.last_read_scopes[reference] = scope
         self.source_selections[(reference, scope)] = {
@@ -1188,6 +1196,7 @@ class Runtime:
                 self.evidence.get(reference, sentinel),
                 self.loaded.get(reference, sentinel),
                 set(self.read_scopes[reference]) if reference in self.read_scopes else sentinel,
+                self.email_observations.get(reference, sentinel),
             )
             for reference in references
         }
@@ -1218,6 +1227,15 @@ class Runtime:
                     if earlier_evidence is sentinel
                     else earlier_evidence + "\n" + excerpt_evidence
                 )
+                if prior[reference][3] is sentinel:
+                    self.email_observations[reference] = [
+                        {**observed, "text": (shown["subject"] or "") + "\n" + shown["body"]}
+                        for observed, shown in zip(
+                            self.email_observations[reference], messages, strict=True
+                        )
+                    ]
+                else:
+                    self.email_observations[reference] = prior[reference][3]
                 results.append({"reference": reference, "messages": messages})
         except Exception:
             self.state.clear()
@@ -1227,7 +1245,9 @@ class Runtime:
             self.turn_source_references = turn_refs_before
             for reference, values in prior.items():
                 for mapping, value in zip(
-                    (self.evidence, self.loaded, self.read_scopes), values, strict=True
+                    (self.evidence, self.loaded, self.read_scopes, self.email_observations),
+                    values,
+                    strict=True,
                 ):
                     if value is sentinel:
                         mapping.pop(reference, None)

@@ -359,7 +359,9 @@ async def run(context, runtime, model=None):
                                     if exc.field == "date"
                                     and exc.code.endswith("interpretation_mismatch")
                                     else "Repair this event field in prepare_calendar_event. "
-                                    "Copy its source exactly from the current USER directive; "
+                                    "Copy its source exactly from the current USER directive, "
+                                    "or use email_source field quotes from this turn's owned "
+                                    "read_email result for an explicitly requested email event; "
                                     "normalized clock values must match that source. "
                                     "Keep the other grounded fields. For a new event, leave "
                                     "unsupplied fields empty (including title) so the tool asks "
@@ -663,9 +665,14 @@ async def run(context, runtime, model=None):
                                         "Repair prepare_calendar_event using its declared schema. "
                                         "Use create intent and continue_previous=false for a new "
                                         "event; use changes only for a retained event revision. "
-                                        "Include exact user source wording with each date/time. "
-                                        "Preserve grounded fields, leave genuinely missing fields "
-                                        "empty, and do not repeat an identical rejected call."
+                                        + (
+                                            "Use email_source with exact event/field quotes from "
+                                            "a fresh owned read_email result. "
+                                            if values.get("email_source")
+                                            else "Include exact USER wording with each date/time. "
+                                        )
+                                        + "Keep grounded fields. Leave missing fields empty; "
+                                        "do not repeat an identical rejected call."
                                     ),
                                 }
                             }

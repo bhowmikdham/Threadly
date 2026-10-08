@@ -13,6 +13,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import (
     date_grounding,
+    email_source,
     event_choices,
     event_draft,
     event_timezone,
@@ -35,7 +36,7 @@ from app.db.models import (
 from app.schemas.actions import ApproveActionRequest
 from app.schemas.calendar_tools import CalendarWindow
 
-POLICY = "direct-calendar-event-1.2.1"
+POLICY = "direct-calendar-event-1.3.0"
 
 
 user_directive = intent.user_directive
@@ -100,6 +101,8 @@ def source_fields(args, text, previous_calendar_names=(), *, constraints=True):
             remainder = remainder.replace(value.casefold(), " ")
     if args.attendees:
         remainder = re.sub(r"\binvite\b", " ", remainder)
+    if args.timezone:
+        remainder = re.sub(r"\b(?:timezone|time zone)\b", " ", remainder)
     if re.search(
         r"\b(?:every|recurring|daily|weekly|monthly|yearly|repeat|until|ending|ends|"
         r"timezone|utc|gmt|aest|aedt|hours?|minutes?|mins?|tomorrow|today|tonight|"
@@ -185,9 +188,15 @@ def complete_trailing_title(args, text):
 
 
 def resolve_date(args, anchor, timezone):
-    window = CalendarWindow(subject="self", date=args.date, date_source=args.date_source)
+    source = args.date_source
+    if args.date.kind == "absolute" and re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", source):
+        stated = email_source.absolute_date(source)
+        if args.date.start != stated.isoformat():
+            raise event_draft.FieldRepairRequired("date", interpretation=True)
+        source = stated.isoformat()
+    window = CalendarWindow(subject="self", date=args.date, date_source=source)
     zone = ZoneInfo(timezone)
-    start, end = resolve_window(window, args.date_source, anchor, timezone)
+    start, end = resolve_window(window, source, anchor, timezone)
     first, last = start.astimezone(zone).date(), end.astimezone(zone).date()
     date_grounding.validate(args.date_source, first, last, anchor.astimezone(zone).date())
     if (last - first).days != 1:
@@ -259,21 +268,6 @@ async def prepare(runtime, args):
 
     intent.validate_source(args.intent, runtime.request.instruction)
     field_citations = await citations.resolve(runtime, args.citations)
-    runtime.calendar_field_citations = field_citations
-    args = event_timezone.bind(
-        args,
-        runtime.request.instruction
-        + "\n"
-        + "\n".join(value["source"] for value in field_citations.values()),
-    )
-    if (
-        args.timezone
-        and args.timezone_source not in runtime.request.instruction
-        and "timezone" not in field_citations
-        and "time" in field_citations
-        and args.timezone_source in field_citations["time"]["source"]
-    ):
-        field_citations["timezone"] = field_citations["time"]
     current = event_choices.pending(runtime.state)
     # Retrying this turn's failed creation is a field repair, not a reset. A new
     # USER turn still starts a distinct goal; reviewed candidates stay immutable.
@@ -322,8 +316,37 @@ async def prepare(runtime, args):
             "text": "Cancelled this pending event request. No new event was created.",
         }
     try:
+        (
+            args,
+            source_citations,
+            source_binding,
+            source_question,
+            source_error,
+        ) = await email_source.resolve(runtime, args, pending)
+    except RequestClarification as error:
+        return {"kind": "clarification", "text": str(error)}
+    field_citations.update(source_citations)
+    runtime.calendar_field_citations = field_citations
+    runtime.calendar_email_source = source_binding
+    args = event_timezone.bind(
+        args,
+        runtime.request.instruction
+        + "\n"
+        + "\n".join(value["source"] for value in field_citations.values()),
+    )
+    if (
+        args.timezone
+        and args.timezone_source not in runtime.request.instruction
+        and "timezone" not in field_citations
+        and "time" in field_citations
+        and args.timezone_source in field_citations["time"]["source"]
+    ):
+        field_citations["timezone"] = field_citations["time"]
+    try:
         args, saved, changed = event_draft.merge(runtime, args, pending)
         await validate_date(runtime, args, saved, pending)
+        if source_error:
+            raise source_error
     except (
         event_draft.IntentSourceMismatch,
         event_draft.IncompleteEventTitle,
@@ -332,11 +355,25 @@ async def prepare(runtime, args):
         # This is a model protocol error, not information missing from the user.
         # Keep the exact-source fence and let the bounded engine repair the call.
         event_draft.retain_partial(runtime, args, pending, origin, error)
+        partial = runtime.state.get("calendar_event_request", {})
+        if not partial.get("action_id"):
+            email_source.persist(partial, source_binding)
         raise
     except (RequestClarification, ValueError) as error:
         event_draft.retain_partial(runtime, args, pending, origin, error)
+        partial = runtime.state.get("calendar_event_request", {})
+        if not partial.get("action_id"):
+            email_source.persist(partial, source_binding)
         return {"kind": "clarification", "text": str(error)}
     saved["creation_origin"] = origin
+    if source_binding and source_binding.get("timezone_required"):
+        if args.timezone:
+            source_binding["timezone_required"] = False
+        else:
+            source_question = (
+                "Which timezone should I use? Please give an IANA timezone, AEST or AEDT."
+            )
+    email_source.persist(saved, source_binding)
     if pending and pending.get("action_id"):
         if not changed:
             async with runtime.factory() as session:
@@ -348,6 +385,8 @@ async def prepare(runtime, args):
     runtime.state["calendar_event_request"] = saved
     text = saved["user_text"]
     anchor = datetime.fromisoformat(saved["anchor"])
+    if source_question:
+        return {"kind": "clarification", "text": source_question}
     if not args.title:
         return {"kind": "clarification", "text": "What should I call the event?"}
     if not args.date:
@@ -506,6 +545,12 @@ async def propose(
         raise service.conflict()
     chat = await store.owned(session, owner, runtime.request.conversation_id)
     policy = permissions.view(chat, user)
+    binding = getattr(runtime, "calendar_email_source", None)
+    if binding:
+        from app.calendar.meeting_email import owned_source
+
+        await owned_source(session, owner, binding["context_snapshot_id"], binding["source"])
+        policy = {**policy, "mode": "ask"}
     event = {
         "id": uuid5(NAMESPACE_URL, key).hex,
         "summary": args.title,
@@ -547,6 +592,7 @@ async def propose(
         version=1,
         latest_sequence=1,
         release={"workflow": POLICY},
+        context_snapshot_id=binding["context_snapshot_id"] if binding else None,
     )
     session.add(task)
     await session.flush()
@@ -556,7 +602,7 @@ async def propose(
         user_id=owner,
         revision=1,
         payload={"kind": "calendar_event", "content": payload},
-        provenance={"policy": POLICY},
+        provenance={"policy": POLICY, **({"email_source": binding} if binding else {})},
         draft_envelope=None,
     )
     session.add(artifact)
@@ -584,6 +630,7 @@ async def propose(
         payload=payload,
         source_versions={
             "direct": True,
+            **({"email_source": binding} if binding else {}),
             "conversation_id": chat.id,
             "account_version": user.google_account_version,
             "google_subject": user.google_sub,
@@ -594,6 +641,7 @@ async def propose(
             "default_duration_minutes": preferences["default_duration_minutes"]
             if not args.duration_phrase
             else None,
+            "default_timezone": preferences["timezone"] if binding and not args.timezone else None,
         },
         expires_at=min(now + timedelta(minutes=10), start),
     )
@@ -614,6 +662,10 @@ async def propose(
 async def blockers(session, owner, action):
     reasons = []
     expected = action.source_versions
+    if (binding := expected.get("email_source")) and action.state in {"proposed", "approved"}:
+        from app.calendar.meeting_email import owned_source
+
+        await owned_source(session, owner, binding["context_snapshot_id"], binding["source"])
     user = await calendar_preview.ready_account(session, owner)
     pref = await session.get(CalendarPreference, owner, populate_existing=True)
     if (
@@ -666,6 +718,10 @@ async def response(session, owner, action_id):
             messages["proposed"] = (
                 f"Using your saved {minutes}-minute duration. Review this event before creating it."
             )
+        if zone := stored.source_versions.get("default_timezone"):
+            messages["proposed"] = f"Using your saved timezone, {zone}. " + messages["proposed"]
+        if stored.source_versions.get("email_source"):
+            messages["proposed"] += " Tell me any changes before you select Create event."
     return {
         "kind": "calendar_event",
         "text": messages.get(action["state"], "Check the event status below."),

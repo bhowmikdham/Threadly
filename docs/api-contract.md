@@ -1675,3 +1675,29 @@ Standalone social closings do not repeat Calendar creation instructions.
 Recognized model-generated Calendar control guidance resolves to the current
 owned action card/state, or a missing-details message. This bounded guidance guard
 does not approve, dispatch or retry the action and is not a universal language check.
+
+### Email facts into a conversational Calendar preview (1.9.0)
+
+`prepare_calendar_event` accepts optional `email_source` after a current-turn
+owned `read_email`: `reference`, exact `event_quote`, explicit `ambiguity`
+(`none`, `multiple_events`, `date`, `time`), and unique `fields` entries containing
+`field`/exact `quote` for title, date, time, timezone or location. The backend
+resolves message identity from the observed read; models cannot supply an owner,
+provider ID, snapshot ID or fingerprint. Event and field quotes must appear in
+the returned excerpt. A proposed title can paraphrase the cited subject; date,
+time, timezone and location remain validated against their quoted source.
+
+This supports both summary → “create an event for that” and selected/open email →
+“create an event from this.” Historical assistant summaries are not field evidence.
+Current user intent remains required. Only unambiguous absolute source dates with
+a year are accepted; ambiguous numeric dates, relative/yearless source dates and
+missing clocks require clarification. Saved timezone/duration defaults are labelled.
+Attendees, descriptions and destination changes still require user wording.
+
+Email-derived candidates always require separate exact-payload approval, including
+in an Always-allow chat. Follow-up user corrections retain other grounded fields
+and supersede the old candidate. Source freshness/account/ownership is checked on
+continuation, proposed/approved review/replay, approval and dispatch. Completed
+or outcome-unknown execution receipts remain viewable without Gmail access. Goal restoration retains its
+own email reference. No endpoint or frontend contract changes are required; use
+the existing Calendar preview and chat correction/approval controls.

@@ -686,3 +686,16 @@ verified quotes selected for this requested work. Workers decrypt it only for
 generation prompts, independently of the instruction used for operation routing.
 No original provider message bodies enter this field. See the context design review
 for legacy backfill, retention and rollback limitations.
+
+### Conversational email-derived event provenance (1.9.0)
+
+No migration. The encrypted event goal optionally holds `email_source` with an
+owned context snapshot ID, Gmail message reference/identity and fingerprint.
+A required-timezone marker preserves unresolved source-zone clarification.
+Email field provenance stores its kind, quote hash, context ID and whether the
+proposed title is derived. Exact email quotes and bodies are turn-local and are
+not copied into the durable goal; selected event facts remain draft arguments.
+The goal registry restores its own source handle independently of the current pin.
+Source-bound event tasks reference the capture, and actions/artifacts retain the
+binding in their existing provenance/source-version metadata. Existing action
+approvals, jobs, retries and reconciliation remain the execution authority.

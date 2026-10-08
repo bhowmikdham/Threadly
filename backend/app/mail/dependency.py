@@ -32,7 +32,15 @@ async def references(owner, identifiers, *, factory=None):
                     select(model).where(model.user_id == owner, model.id.in_(ids))
                 )
             ).all()
-            ids.update(row.task_id for row in rows)
+            ids.update(
+                row.task_id
+                for row in rows
+                if not (
+                    model is AssistantAction
+                    and row.source_versions.get("email_source")
+                    and row.state not in {"proposed", "approved"}
+                )
+            )
             if model is AssistantAction:
                 ids.update(
                     row.source_versions.get("negotiation_id")
