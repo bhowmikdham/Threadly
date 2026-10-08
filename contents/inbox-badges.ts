@@ -3,6 +3,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   categoryDisplay,
   categoryIcon,
+  cooldownCodes,
   priorityIcon,
   priorityTip,
   replyIcon,
@@ -41,7 +42,11 @@ let account: string | null = null
 let generation = 0
 let inFlight = 0
 let pausedUntil = 0
+let resumeTimer = 0
 let stopped = false
+// The AI service failing is retried a few times per row, then left blank.
+const providerTries = new Map<string, number>()
+const PROVIDER_TRIES = 3
 
 const root = document.documentElement
 const inInbox = () => /^#inbox(\/p\d+)?(\?.*)?$/.test(location.hash || "#inbox")
@@ -153,6 +158,15 @@ function pump() {
     if (r?.state === "queued") void classify(key, r)
   }
 }
+// The server said to wait: everything waits. Rows not yet answered go back to
+// pending and are asked again afterwards only if they're still on screen.
+function pauseFor(seconds: number) {
+  const jitter = 250 + Math.random() * 750
+  pausedUntil = Math.max(pausedUntil, Date.now() + seconds * 1000 + jitter)
+  for (const key of queue.splice(0)) results.delete(key)
+  clearTimeout(resumeTimer)
+  resumeTimer = window.setTimeout(schedule, pausedUntil - Date.now() + 10)
+}
 const retry = (key: string, r: Result, ms: number) => {
   results.set(key, { ...r, state: "queued", attempts: r.attempts + 1 })
   setTimeout(() => {
@@ -184,7 +198,9 @@ async function classify(key: string, r: Result) {
   }
   if (run !== generation) return
   const soon = Date.now() + 5 * 60 * 1000
+  const provider = reply?.code === "classification_provider_unavailable"
   if (reply?.ok && validClassification(reply.data, threadId)) {
+    providerTries.delete(key)
     results.set(key, {
       state: "done",
       value: reply.data,
@@ -192,8 +208,13 @@ async function classify(key: string, r: Result) {
       attempts: 0
     })
     show(true)
-  } else if (reply?.code === "classification_busy" && r.attempts < 3) {
-    retry(key, r, 5000 * (r.attempts + 1))
+  } else if (
+    cooldownCodes.includes(reply?.code) &&
+    !(provider && (providerTries.get(key) || 0) >= PROVIDER_TRIES - 1)
+  ) {
+    if (provider) providerTries.set(key, (providerTries.get(key) || 0) + 1)
+    results.delete(key)
+    pauseFor(reply.retryAfterSeconds || 5)
   } else if (
     [
       "classification_source_changed",
@@ -232,6 +253,8 @@ async function classify(key: string, r: Result) {
 // badges. Printed once each time the rows on screen have all finished.
 let lastReport = ""
 function report() {
+  // Mid-pause, waiting rows have no result yet; report once they settle.
+  if (Date.now() < pausedUntil) return
   const counts: Record<string, number> = {}
   for (const row of visible) {
     const key = row.isConnected && rowKey(row)
@@ -287,6 +310,10 @@ function scan() {
     generation += 1
     results.clear()
     queue.length = 0
+    providerTries.clear()
+    // The background still holds any server-side pause for the new account.
+    pausedUntil = 0
+    clearTimeout(resumeTimer)
     show(false)
   }
   root.setAttribute(

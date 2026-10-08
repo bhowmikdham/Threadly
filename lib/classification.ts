@@ -125,3 +125,28 @@ export function validClassification(
     Object.hasOwn(actionDisplay, l.action)
   )
 }
+
+/**
+ * Seconds to wait from a Retry-After header (seconds or an HTTP date),
+ * clamped to 1s–1h; null when absent or unreadable.
+ */
+export function retryAfterSeconds(
+  value: string | null | undefined,
+  now = Date.now()
+): number | null {
+  if (!value?.trim()) return null
+  const seconds = /^\d+$/.test(value.trim())
+    ? Number(value.trim())
+    : (Date.parse(value) - now) / 1000
+  if (!Number.isFinite(seconds)) return null
+  return Math.min(3600, Math.max(1, Math.ceil(seconds)))
+}
+
+/** Codes that mean "wait, then ask again": the row stays pending meanwhile. */
+export const cooldownCodes = [
+  "classification_cooldown",
+  "classification_busy",
+  "classification_provider_unavailable",
+  "gmail_rate_limited",
+  "gmail_quota_exceeded"
+]

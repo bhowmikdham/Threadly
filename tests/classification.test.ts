@@ -76,3 +76,18 @@ describe("classification responses", () => {
     ).toBe("Low priority · no reply needed")
   })
 })
+
+describe("Retry-After from the classification server", async () => {
+  const { retryAfterSeconds } = await import("../lib/classification")
+  it("reads seconds and HTTP dates, clamped to one second to one hour", () => {
+    expect(retryAfterSeconds("60")).toBe(60)
+    expect(retryAfterSeconds("0")).toBe(1)
+    expect(retryAfterSeconds("86400")).toBe(3600)
+    const now = Date.parse("2026-10-08T00:00:00Z")
+    expect(retryAfterSeconds("Thu, 08 Oct 2026 00:01:30 GMT", now)).toBe(90)
+  })
+  it("ignores a missing or unreadable header", () => {
+    expect(retryAfterSeconds(null)).toBeNull()
+    expect(retryAfterSeconds("soon")).toBeNull()
+  })
+})

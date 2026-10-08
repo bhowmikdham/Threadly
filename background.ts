@@ -1,3 +1,4 @@
+import { retryAfterSeconds } from "./lib/classification"
 import { showUpdateNotice } from "./lib/extension-updates"
 import {
   allowedRequest,
@@ -138,6 +139,9 @@ async function transport(
     )
     error.code = data?.error?.code || "backend_error"
     error.status = response.status
+    error.retryAfterSeconds = retryAfterSeconds(
+      response.headers.get("Retry-After")
+    )
     throw error
   }
   return data
@@ -287,6 +291,17 @@ async function login(capabilities?: string[], expectedUserId?: number) {
 // every Gmail tab shares these two slots.
 let classifying = 0
 const classifyWaiting: (() => void)[] = []
+// When the server says to wait, every Gmail tab waits: the model budget is
+// shared by the whole server, and Gmail limits are per account.
+let modelPausedUntil = 0
+const gmailPausedUntil = new Map<number, number>()
+const pauseLeft = (userId: number) =>
+  Math.max(modelPausedUntil, gmailPausedUntil.get(userId) || 0) - Date.now()
+const cooldown = (userId: number) => ({
+  ok: false,
+  code: "classification_cooldown",
+  retryAfterSeconds: Math.ceil(pauseLeft(userId) / 1000)
+})
 // Signing out, from wherever, forgets kept badge results.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
@@ -342,10 +357,13 @@ async function classifyThread(message: any) {
   const kept = (await chrome.storage.session.get(key))[key]
   if (kept && Date.parse(kept.valid_until) > Date.now())
     return { ok: true, data: kept }
+  if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
   if (classifying >= 2)
     await new Promise<void>((resolve) => classifyWaiting.push(resolve))
   classifying += 1
   try {
+    // A pause may have started while this request waited for a slot.
+    if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
     const data = await transport(
       s.origin,
       `/threads/${threadId}/classification`,
@@ -361,10 +379,26 @@ async function classifyThread(message: any) {
       await keepClassification(key, data)
     return { ok: true, data }
   } catch (error) {
+    const wait = error.retryAfterSeconds
+    if (wait) {
+      const until = Date.now() + wait * 1000
+      if (["gmail_rate_limited", "gmail_quota_exceeded"].includes(error.code))
+        gmailPausedUntil.set(
+          s.user.id,
+          Math.max(gmailPausedUntil.get(s.user.id) || 0, until)
+        )
+      else if (
+        ["classification_busy", "classification_provider_unavailable"].includes(
+          error.code
+        )
+      )
+        modelPausedUntil = Math.max(modelPausedUntil, until)
+    }
     return {
       ok: false,
       code: error.code || "connection_failed",
-      status: error.status
+      status: error.status,
+      retryAfterSeconds: wait ?? null
     }
   } finally {
     classifying -= 1
