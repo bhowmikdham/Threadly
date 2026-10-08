@@ -18,15 +18,20 @@ const status: Record<string, string> = {
 }
 export function CalendarEventCard({
   id,
-  initial
+  initial,
+  onChange
 }: {
   id: string
   initial?: CalendarAction
+  onChange?: (action: CalendarAction) => void
 }) {
   const [action, setAction] = useState(initial),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("")
   const approvalKey = useRef(requestId())
+  useEffect(() => {
+    if (action) onChange?.(action)
+  }, [action, onChange])
   const path = `/assistant/calendar-actions/${id}`
   const pending =
     !action ||

@@ -1412,3 +1412,220 @@ it("restores the active draft's current version without advancing unrelated hist
   expect(result.current.canCreateDraft(result.current.entries[0])).toBe(true)
   expect(result.current.entries[1].conversationVersion).toBe(2)
 })
+
+it("keeps backend goal focus instead of resending the last task card", async () => {
+  let first = true
+  const calls = mock((m) => {
+    const task = first
+      ? { task_id: "old-task", state: "needs_clarification" }
+      : undefined
+    first = false
+    return respond(m, { context_memory_version: 1, task })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("Draft a message")
+  })
+  await act(async () => {
+    await result.current.submit("Return to the earlier event")
+  })
+  expect(calls[1].body).not.toHaveProperty("active_task_id")
+  expect(calls[1].body.instruction).toBe("Return to the earlier event")
+})
+
+it("restores a draft editor after its original exchange leaves compact history", async () => {
+  ;(chrome.storage.session.get as any).mockResolvedValue({
+    "threadlyConversation:1": { id: "c", version: 20 }
+  })
+  const draft = {
+    draft_id: "retained",
+    recipient: "Alex",
+    subject: "Mosaic",
+    body: "Thursday works",
+    unresolved_fields: []
+  }
+  const calls = mock((m) =>
+    m.path === "/assistant/conversations/c"
+      ? {
+          conversation_id: "c",
+          version: 20,
+          context_memory_version: 1,
+          history: [
+            {
+              request_id: "recent",
+              version: 20,
+              user: "Thanks",
+              assistant: "Welcome"
+            }
+          ],
+          active_email_draft_id: "retained",
+          active_email_draft: draft
+        }
+      : respond(m, { context_memory_version: 1 })
+  )
+  const { result } = renderHook(() => useAssistant(user))
+  await waitFor(() => expect(result.current.restoring).toBe(false))
+  const restored = result.current.entries.find((entry) => entry.emailDraft)
+  expect(restored.emailDraft).toEqual(draft)
+  expect(restored.conversationVersion).toBe(20)
+  expect(result.current.canCreateDraft(restored)).toBe(true)
+  await act(async () => {
+    await result.current.submit("Return to Alex's message")
+  })
+  expect(calls.at(-1).body).not.toHaveProperty("active_task_id")
+})
+
+it("opens a returned saved draft after a Calendar detour without restarting work or approving actions", async () => {
+  const artifact = {
+    artifact_id: "saved-artifact",
+    kind: "draft",
+    revision: 2,
+    payload: {
+      kind: "draft",
+      content: { subject: "Agenda", body: "Thanks for the agenda." }
+    }
+  }
+  const calls = mock((m) => {
+    if (m.path === "/assistant/artifacts/saved-artifact") return artifact
+    if (m.path !== "/assistant/conversation-turns")
+      throw new Error(`Unexpected ${m.path}`)
+    return respond(m, {
+      context_memory_version: 1,
+      ...(m.body.expected_version === 0
+        ? { text: "What time should Focus start?" }
+        : m.body.expected_version === 1
+          ? {
+              text: "Here is your existing draft.",
+              task_id: "saved-task",
+              task: {
+                task_id: "saved-task",
+                state: "succeeded",
+                instruction: "Draft a reply",
+                artifact_id: "saved-artifact"
+              }
+            }
+          : { text: "You're welcome." })
+    })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await act(async () => {
+    await result.current.submit("Create Focus tomorrow")
+  })
+  await act(async () => {
+    await result.current.submit("Bring back the saved agenda reply draft")
+  })
+  await waitFor(() =>
+    expect(result.current.entries[1].artifacts).toEqual([artifact])
+  )
+  expect(result.current.entries[1].task?.task_id).toBe("saved-task")
+  await act(async () => {
+    await result.current.submit("Thanks")
+  })
+  expect(calls.at(-1).body).not.toHaveProperty("active_task_id")
+  expect(calls.map((call) => call.path)).toEqual([
+    "/assistant/conversation-turns",
+    "/assistant/conversation-turns",
+    "/assistant/artifacts/saved-artifact",
+    "/assistant/conversation-turns"
+  ])
+})
+
+it("follows the open email before chat, pins its visible reply target, and preserves server focus after a switch", async () => {
+  const firstId = "abcdef123456aa",
+    secondId = "abcdef123456bb"
+  let openId = firstId
+  const source = (id: string) => ({
+    thread: {
+      thread_id: id,
+      subject: id === firstId ? "First email" : "Second email",
+      version: 1
+    },
+    messages: [
+      {
+        gmail_msg_id: `${id}-old`,
+        is_from_user: false,
+        received_at: "2026-10-07T01:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-new`,
+        is_from_user: false,
+        received_at: "2026-10-07T02:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-mine`,
+        is_from_user: true,
+        received_at: "2026-10-07T03:00:00Z"
+      },
+      {
+        gmail_msg_id: `${id}-hidden`,
+        is_from_user: false,
+        received_at: "2026-10-07T04:00:00Z"
+      }
+    ]
+  })
+  vi.mocked(chrome.tabs.query).mockResolvedValue([
+    { id: 1, url: "https://mail.google.com/mail/u/0/" }
+  ] as any)
+  vi.mocked(chrome.tabs.sendMessage).mockImplementation(async () => ({
+    accountEmail: user.email,
+    threadId: openId,
+    subject: source(openId).thread.subject,
+    messageIds: [`${openId}-old`, `${openId}-new`, `${openId}-mine`],
+    selectedMessageId: null
+  }))
+  const calls = mock((m) => {
+    if (m.path.startsWith("/threads/")) return source(m.path.split("/").at(-1))
+    if (m.path === "/assistant/context-snapshots")
+      return { context_snapshot_id: `context-${m.body.thread_id}` }
+    return respond(m, { context_memory_version: 1 })
+  })
+  const { result } = renderHook(() => useAssistant(user))
+  await waitFor(() => expect(result.current.restoring).toBe(false))
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(result.current.selection?.thread.thread_id).toBe(firstId)
+  openId = secondId
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(result.current.selection?.thread.thread_id).toBe(secondId)
+  expect(result.current.selection?.targetId).toBe(`${secondId}-new`)
+  await act(async () => {
+    await result.current.submit("Draft a reply")
+  })
+  const capture = calls.find((m) => m.path === "/assistant/context-snapshots")
+  expect(capture.body).toMatchObject({
+    thread_id: secondId,
+    ui_map: { selected_message_ids: [`${secondId}-new`] }
+  })
+  expect(capture.body.ui_map.visible_message_ids).not.toContain(
+    `${secondId}-hidden`
+  )
+  openId = firstId
+  const beforeObservation = calls.length
+  await act(async () => {
+    await result.current.followActive(true)
+  })
+  expect(calls).toHaveLength(beforeObservation)
+  expect(result.current.openElsewhere).toBe("First email")
+  expect(result.current.selection?.thread.thread_id).toBe(secondId)
+  await act(async () => {
+    await result.current.submit("Return to the earlier event")
+  })
+  const turns = calls.filter((m) => m.path === "/assistant/conversation-turns")
+  expect(turns[1].body).not.toHaveProperty("active_task_id")
+  expect(turns[1].body).not.toHaveProperty("context_snapshot_id")
+  await act(async () => {
+    await result.current.newChat()
+  })
+  expect(result.current.entries).toEqual([])
+  expect(result.current.openElsewhere).toBeNull()
+  expect(result.current.selection?.thread.thread_id).toBe(firstId)
+  await act(async () => {
+    await result.current.submit("Summarise this email")
+  })
+  const last = calls.at(-1).body
+  expect(last.conversation_id).not.toBe(turns[0].body.conversation_id)
+  expect(last.context_snapshot_id).toBe(`context-${firstId}`)
+})

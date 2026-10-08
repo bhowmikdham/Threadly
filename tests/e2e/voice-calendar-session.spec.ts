@@ -282,6 +282,7 @@ async function firstTurn() {
   await say(request)
   await expect.poll(() => voiceCalls.includes(question)).toBe(true)
   await expect(page.locator(".voice-status")).toHaveText("Listening…")
+  await expect(page.locator(".voice-overlay")).not.toHaveClass(/docked/)
 }
 
 test("legacy speech 401 reproduces local sign-out after the spoken title", async () => {
@@ -303,9 +304,16 @@ for (const status of [502, 503, 504, 403, 429]) {
     await expect
       .poll(() => page.evaluate(() => (window as any).voiceTest.spoken))
       .toContain(answer)
+    await expect(page.locator(".voice-overlay")).toHaveClass(/docked/)
+    // The ready Calendar card is usable while voice stays open. Trial click
+    // verifies the orb does not cover its control, without approving anything.
+    await page
+      .getByRole("button", { name: "Create event", exact: true })
+      .click({ trial: true })
     await say("Thank you")
     await expect.poll(() => turns.length).toBe(3)
     await expect(page.locator(".voice-status")).toHaveText("Listening…")
+    await expect(page.locator(".voice-overlay")).not.toHaveClass(/docked/)
     expect((await stored()).user.id).toBe(user.id)
     expect(new Set(turns.map((t) => t.conversation_id)).size).toBe(1)
     expect(turns.map((t) => t.expected_version)).toEqual([0, 1, 2])
