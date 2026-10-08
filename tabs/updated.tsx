@@ -12,24 +12,24 @@ export default function Updated() {
         <h1>Threadly was updated</h1>
         <p className="update-intro">Pick up where you left off.</p>
         <section>
-          <h2>Stay signed in</h2>
+          <h2>Return to earlier work</h2>
           <p>
-            Reload Threadly or restart your browser without signing in again.
-            Your login can renew for up to 30 days after sign-in.
+            Keep drafts and event requests in the same chat, and return to them
+            after switching topics. Earlier details stay with their request.
           </p>
         </section>
         <section>
-          <h2>A smoother return</h2>
+          <h2>Review the right request</h2>
           <p>
-            A temporary connection problem keeps your login ready to retry.
-            Signing out removes it from this browser.
+            Reopen an existing draft or event to review its current details and
+            status. Creating an event or saving a draft still uses its review card.
           </p>
         </section>
         <section>
-          <h2>Updating from an older version?</h2>
+          <h2>Events from meeting emails</h2>
           <p>
-            Sign in once if prompted. Threadly will remember that login across
-            future reloads and browser restarts.
+            Prepare an event from a selected meeting email, check the extracted
+            details, and confirm it when you’re ready.
           </p>
         </section>
         <a
