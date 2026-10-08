@@ -1,0 +1,73 @@
+{
+  "chat-context-context5-auth.json": {
+    "checked_at": "2026-10-08T00:46:03.470620+00:00",
+    "auth": "success",
+    "expected_account": true,
+    "request_id": "beaaa9ae-8729-4ed2-9a09-ce34c6972b3c"
+  },
+  "chat-context-context5-pricing-raw.json": {
+    "checked_at": "2026-10-08T00:42:50.530038+00:00",
+    "source": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+    "manifest": {
+      "serviceId": "bedrockfoundationmodels",
+      "accessType": "publish",
+      "esIndex": "plc-bedrockfoundationmodels-usd-20261007183733",
+      "hawkFilePublicationDate": "2026-10-07T18:37:33Z",
+      "ETLIngestionTriggerDate": "2026-10-07T18:37:33Z",
+      "currencyCode": "USD",
+      "source": "bedrockfoundationmodels",
+      "isMapped": "true"
+    },
+    "rates": {
+      "input": {
+        "rateCode": "2NQNKY7KEQKJPGCD.4799GE89SK.6YS6EN2CT7",
+        "price": "1.1000000000",
+        "RegionlessRateCode": "APY9uM3JGxEtL5H9EDm5AwcPdLxfrWr-RFMq0UellFs"
+      },
+      "output": {
+        "rateCode": "UM84PHMW42ATFREN.4799GE89SK.6YS6EN2CT7",
+        "price": "5.5000000000",
+        "RegionlessRateCode": "O6zZHzgP5kfAsKpsBRIEEOBkSjbbqAoskrV4twdrBE4"
+      }
+    }
+  },
+  "chat-context-context5-full-preflight.json": {
+    "release": "contextual-conversation-1.8.9+chat-context.5",
+    "day_availability_policy": "calendar-day-answer-2.0.0",
+    "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+    "prompt_hash": "e5ca88fb92cbef91bf7ce74602f9b0df3105cd94003560e8ca3ccb87b0827ad9",
+    "tools_hash": "dad14c370181f2d077b0329f5dfd8f3cfa5f146044d3053678057a34bcad2417",
+    "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+    "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+    "max_calls": 8,
+    "timeout_seconds": 120,
+    "at": "2026-10-08T00:48:16.458029+00:00",
+    "input_tokens": 27714,
+    "request_id": "3785d7e2-99f5-4603-b5e2-dc8fa2b2cf83",
+    "paid_calls": 0
+  },
+  "chat-context-third-approved-budget-ledger.json.identity.json": {
+    "approval": "Sentinel_3973d49c351881918d50d28411bca36c",
+    "approved_at": "2026-10-08T00:40:11Z",
+    "batch": "approved-context5-twelve-060-gst-20261008",
+    "release": "contextual-conversation-1.8.9+chat-context.5",
+    "assets": {
+      "release": "contextual-conversation-1.8.9+chat-context.5",
+      "day_availability_policy": "calendar-day-answer-2.0.0",
+      "calendar_tools_policy": "calendar-conversation-reads-2.2.0",
+      "prompt_hash": "e5ca88fb92cbef91bf7ce74602f9b0df3105cd94003560e8ca3ccb87b0827ad9",
+      "tools_hash": "dad14c370181f2d077b0329f5dfd8f3cfa5f146044d3053678057a34bcad2417",
+      "mail_context_policy": "mail-context-1.0:5-sources:50-messages:24000-chars:fair-excerpts:boundary-sampling",
+      "mail_context_prompt_hash": "83ccb9862432cdf477b381053900a59e37a590f42ca1783ad66ad73c2860146d",
+      "max_calls": 8,
+      "timeout_seconds": 120
+    },
+    "runtime": "7fb055f409c46479bc1cd1194aa870ff93ccf187",
+    "maximum_attempts": 12,
+    "per_case_attempts": 6,
+    "maximum_usd_including_gst": "0.60",
+    "per_case_usd_including_gst": "0.30",
+    "started_unix": 1791420496.472158,
+    "deadline_unix": 1791421396.472158
+  }
+}

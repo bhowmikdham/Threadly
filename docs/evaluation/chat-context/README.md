@@ -1,12 +1,14 @@
 # Shared chat-context verification
 
 Current prompt: **`contextual-conversation-1.8.9+chat-context.5`**. Earlier snapshots
-remain immutable. The [.4 resumption](second-resumption-results.md) passed saved-draft
-restoration but found a new-goal repair loop; Calendar coverage was partial. The
-[.5 offline correction](email-operation-repair.md) separates new-email and continuation
-tools, preserves operation during repair, and bounds invalid repeats. It has **no
-live model evaluation**. Both paid allowances are exhausted. The implementation
-remains locally committed and unpublished, with behavioral release gates open.
+remain immutable. The [.5 approved diagnostic](context5-results.md) stopped after
+**3/12 paid attempts, USD 0.10397772 including GST**: starting Casey passed in one
+call, but returning to Alex lost the supplied purpose during draft-text repair.
+An exact offline replay proves the backend reloads older persisted fields over
+validated progress within the same turn. **Calendar was not attempted.** Nine
+attempts remain unused after the agreed semantic stop; no automatic resumption or
+window reset is authorized. Both earlier allowances remain exhausted and unchanged.
+The implementation is unpublished, and this retained-purpose bug remains unfixed.
 
 Backend runtime/test head: `7fb055f409c46479bc1cd1194aa870ff93ccf187`, based on
 released voice repair `bc12ef106659f5ac8b5b79890e0887f1431e29ea`.
@@ -21,7 +23,8 @@ passed**, TypeScript, Ruff and both builds. PR127 verification passed **12 focus
 local browser tests plus one public-origin test**. The earlier PR126 head passed
 the full **50 local + one public-origin** suite; that was not repeated in full for PR127. The exact recorded new-Casey call now returns a
 normal missing-purpose clarification in one scripted call, with Alex unchanged.
-These are deterministic/runtime checks, not proof of live semantic quality.
+These are historical deterministic/runtime checks; the newly captured acceptance
+replay is RED and the latest live semantic result above takes precedence.
 
 The [design review](../../chat-context-design-review.md) describes implemented
 behavior, remaining semantic limits and the coordinated migration requirement.

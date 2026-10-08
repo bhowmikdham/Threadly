@@ -1,5 +1,10 @@
 # Offline correction of the new-email repair loop
 
+Subsequent outcome: the [approved .5 diagnostic](context5-results.md) confirmed
+the new-goal correction, then found retained purpose lost during same-turn text
+repair. It stopped after three paid attempts. The offline work described below
+predates that diagnostic and does not resolve this newly reproduced failure.
+
 Runtime/test head: `7fb055f409c46479bc1cd1194aa870ff93ccf187`.
 Prompt/tool snapshot: `contextual-conversation-1.8.9+chat-context.5.json`.
 This is an unpublished offline correction; no `.5` live model calls, provider

@@ -1,6 +1,6 @@
 {
-  "status": "offline_context5_operation_repair_and_pr127_mechanical_gates_pass_live_semantic_gates_open",
-  "recorded_at": "2026-10-07T14:50:22.683346+00:00",
+  "status": "context5_live_stopped_on_same_turn_retained_purpose_regression_calendar_unobserved",
+  "recorded_at": "2026-10-08T00:54:52.771141+00:00",
   "branch": "codex/chat-context-continuity",
   "base_commit": "bc12ef106659f5ac8b5b79890e0887f1431e29ea",
   "prompt_release": "contextual-conversation-1.8.9+chat-context.5",
@@ -457,6 +457,27 @@
       "scope": "Packaged public-origin check, mocked denied permission, no real service call.",
       "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-pr127-public-browser.log",
       "log_sha256": "a310fe7239db0e1c961bd042ae67c8dad2eda11c15c840f97db486b390e296c6"
+    },
+    {
+      "name": "context5_offline_guards",
+      "result": "24 passed, 1 warning in 1.20s",
+      "scope": "New 12-attempt/per-case/tax/restart guard and earlier guards; fake clients only.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context5-offline-guards.log",
+      "log_sha256": "d121e17755427aa99a41cd6a3a1df67819f71d25e11c44929742e5462ff8b8a7"
+    },
+    {
+      "name": "context5_live_harness",
+      "result": "1 passed harness invocation, 1 warning in 94.31s; semantic case FAILED",
+      "scope": "3 completed paid provider responses; explicit stop on second user turn; Calendar not attempted. Harness pass is not acceptance.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context5-live-run.log",
+      "log_sha256": "2e73a1bfd6604bb2c8fdb7eb79b4c0028bb2f9616e8e2f5b81adb75a7b83f364"
+    },
+    {
+      "name": "context5_exact_retained_fields_replay",
+      "result": "1 failed, 1 warning in 1.40s",
+      "scope": "Offline exact recorded-response acceptance replay; selection instrumentation proves populated purpose overwritten by stored empty purpose. Outside default discovery.",
+      "evidence_log": "/Users/bhowmikdham/Documents/Codex/2026-10-06/task-4/evidence/chat-context-context5-retained-fields-red.log",
+      "log_sha256": "9adff244f8f91e06ed9e12cc7a4549d4b5769d3640fd725e459ec036fc047b61"
     }
   ],
   "previous_runs": [
@@ -589,7 +610,10 @@
     "backend/tests/test_primary_inbox.py": "9959636d18d262074607e3de197fc19c49d2b7ba0342219338ae5d4e4d15e2ac",
     "backend/tools/evaluate_chat_context.py": "dcde67f6047c5e6b8364f56aebbc0d5e30c9093a310053a28b103f9a66b8491f",
     "backend/tools/evaluate_chat_context_followup.py": "b76b748951e5a7d3d7a2371eb8048f2f4d15341642a715952b8ece5275f751c9",
-    "backend/tools/resume_chat_context_evaluation.py": "d6fe6204fbfb32f692978365bf3b39a1006941ec70d674521f26d993e290e28c"
+    "backend/tools/resume_chat_context_evaluation.py": "d6fe6204fbfb32f692978365bf3b39a1006941ec70d674521f26d993e290e28c",
+    "backend/tools/evaluate_chat_context5.py": "55a358f632a75227c16df6ab576295d2f5935af608f5b7e31dff08ed2cd26140",
+    "backend/tests/test_chat_context5_budget.py": "89bc91a878739ccd7d5b963f5440414b111c1c9327cbcd3aeec16a38e6bb9686",
+    "backend/tools/replay_context5_retained_fields.py": "515c9a08135cbbeb62e2657f9e74e07eb7cab4c0e30335b80651a06e9e1e14d0"
   },
   "review_findings_resolved": [
     "Unversioned legacy turns skipped by recall without inventing citation identity.",
@@ -612,9 +636,8 @@
     "PR126 and subsequently authorized PR127 integrated unchanged; open PR125 and closed/unmerged PR128 excluded."
   ],
   "remaining_gates": [
-    "Live .5 two-draft completion and varied new/continue semantic acceptance; exact six-response replay now passes offline in one call with Alex unchanged.",
-    "Saved-artifact restoration and initial Calendar preview live passes apply only to .4. Calendar revision/closing were not reached in that resumption; .5 combined acceptance remains unverified.",
-    "Both original allowances are exhausted (18/18 each); further calls need new explicit authorization with preserved ledgers.",
+    "Fix same-turn owned email goal rebinding overwriting validated purpose with older persisted fields; exact recorded-response acceptance replay currently RED.",
+    "Complete live Alex/Casey drafts and Calendar revision/closing acceptance after correction. Third diagnostic stopped by semantic-regression policy at 3/12; nine unused calls cannot be automatically resumed/reset.",
     "Final release review and separate publication/deployment authorization; coordinated API/worker migration h071026e9043."
   ],
   "known_limits": [
@@ -622,7 +645,7 @@
     "Legacy/compound semantic gates retain their existing lexical boundaries.",
     "Character-based production context allocation, not tokenizer allocation.",
     "Historical citations do not expand deterministic scheduling/source-quoted plan-item schemas.",
-    "A model can still explicitly select a semantically wrong owned goal; .5 has no live-model evaluation yet.",
+    "A model can still explicitly select a semantically wrong owned goal; .5 was evaluated for two turns and failed retained-purpose repair.",
     "Calendar control-advice recognition is bounded, not a universal natural-language check."
   ],
   "meeting_email_button": {
@@ -659,10 +682,9 @@
   },
   "candidate_live_model_status": {
     "release": "contextual-conversation-1.8.9+chat-context.5",
-    "paid_calls": 0,
-    "status": "not_live_evaluated",
-    "details": "email-operation-repair.md",
-    "next_gate": "Proposal only: six attempts / USD 0.30 with 10% GST, same model, email new/continue only; not approved or executed."
+    "paid_calls": 3,
+    "status": "new_goal_pass_alex_completion_fail_calendar_not_attempted",
+    "details": "context5-results.md"
   },
   "second_real_model_initial_segment": {
     "status": "behavioral_failures_confirmed",
@@ -702,11 +724,11 @@
   "resumption_harness_head": "669400dd47b13b8650dd827a1857189d3c9cb776",
   "application_runtime_unchanged_after_structural_full_suite": false,
   "previous_candidate_live_model_status": {
-    "release": "contextual-conversation-1.8.9+chat-context.4",
-    "paid_calls": 9,
-    "status": "saved_restoration_pass_new_goal_repair_failure_calendar_partial",
-    "details": "second-resumption-results.md",
-    "third_budget_proposal": "superseded_never_executed"
+    "release": "contextual-conversation-1.8.9+chat-context.5",
+    "paid_calls": 0,
+    "status": "not_live_evaluated",
+    "details": "email-operation-repair.md",
+    "next_gate": "Proposal only: six attempts / USD 0.30 with 10% GST, same model, email new/continue only; not approved or executed."
   },
   "operation_repair_offline_evidence": {
     "path": "operation-repair-offline-evidence.json.gz",
@@ -717,10 +739,54 @@
     "first_sha256": "9bc8946f9c9cb4c7bbdceafc1342cb78ceaca2d8227afcd6cbe3a5e71927245a",
     "second_cumulative_sha256": "7aa0b884d78d66620c3712bb077cbfc328b9e7e75d0735db0cc8416c6eb6e015",
     "unchanged": true,
-    "paid_calls_added": 0
+    "paid_calls_added": 0,
+    "third_sha256": "7b6f1d8a59c4d92b29fcefc8a6151375d1bcf7dca4c6cd637f772ae6bcb6df40",
+    "paid_calls_added_in_new_approved_third_run": 3
   },
   "pr127_integration_evidence": {
     "path": "pr127-integration-evidence.json.gz",
     "sha256": "b0bc004406259f478445e95cb3775bf67cc0acedee6b03a15c58afd0398d02b6"
+  },
+  "third_real_model_evaluation": {
+    "approval_message": "Sentinel_3973d49c351881918d50d28411bca36c",
+    "approved_at": "2026-10-08T00:40:11Z",
+    "window_started_at": "2026-10-08T00:48:16.472158+00:00",
+    "window_deadline": "2026-10-08T01:03:16.472158+00:00",
+    "finished_at": "2026-10-08T00:49:49.313887+00:00",
+    "harness_head": "90dd4bb4400924af5c5ea74c33bb6ad25a271d4e",
+    "application_runtime_head": "7fb055f409c46479bc1cd1194aa870ff93ccf187",
+    "frontend_head": "86af12f5e26aca9cb8a9a8c2ba76e1d2cfdd60bf",
+    "attempts": 3,
+    "provider_completed": 3,
+    "provider_failures": 0,
+    "usage": {
+      "inputTokens": 84022,
+      "outputTokens": 382
+    },
+    "estimated_usd_with_10pct_gst": "0.10397772",
+    "unused_attempts": 9,
+    "unused_by_case": {
+      "email": 3,
+      "calendar": 6
+    },
+    "unused_not_automatic_resumption": true,
+    "score": {
+      "new_casey_goal": "pass_one_call",
+      "alex_completion": "fail_purpose_lost_during_same_turn_repair",
+      "casey_completion": "not_attempted_after_stop",
+      "email_variation": "not_attempted_after_stop",
+      "calendar": "not_attempted_after_stop"
+    },
+    "ledger_sha256": "7b6f1d8a59c4d92b29fcefc8a6151375d1bcf7dca4c6cd637f772ae6bcb6df40",
+    "casey_payload_unchanged": true,
+    "receipt": "context5-model-review.json",
+    "details": "context5-results.md"
+  },
+  "context5_evidence": {
+    "context5-model-review.json": "fad51e1cd8f46003e4038f95b1cd9824fc2255e90383b6d57a6350757deef009",
+    "context5-model-ledger.json.gz": "892a16e83605e22bc8145f789aa2803c4d9fb4cb24bb010759dd608353699ace",
+    "context5-scenarios.json.gz": "eb810de09598dd2acae7f7d94fca59505b5d22dabd71a50fe7353dda350be88b",
+    "context5-preflights.json": "09b6832628e3df217e6ac65bb56ed010e13bbae3825df404e4f5dfe830114472",
+    "context5-offline-replay-evidence.json.gz": "32a7995d579f2153084d5730a89fbc404b4a9905a94f0e9fdfad9cbbfda7fc46"
   }
 }

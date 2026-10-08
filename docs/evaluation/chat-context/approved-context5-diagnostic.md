@@ -1,5 +1,9 @@
 # Approved .5 email/Calendar diagnostic
 
+Executed and stopped on semantic regression after 3/12 attempts; see
+[actual results](context5-results.md). This historical approval does not authorize
+an automatic restart/reset after that stop.
+
 User approval: `Sentinel_3973d49c351881918d50d28411bca36c`, 2026-10-08
 00:40:11 UTC, “yep you can”, responding to:
 

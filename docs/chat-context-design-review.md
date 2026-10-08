@@ -18,7 +18,10 @@ reproduce and fix those calls with scripted regressions. The [.4 live resumption
 passed saved restoration but found a new-goal schema/repair loop; Calendar coverage
 was partial. The [.5 offline correction](evaluation/chat-context/email-operation-repair.md)
 separates new and continuing email operations and bounds reason-specific repair.
-No live model has evaluated `.5`; conversational acceptance remains a release gate.
+The [.5 diagnostic](evaluation/chat-context/context5-results.md) now passes the
+new-goal request but exposes a same-turn persisted-goal reload that erases validated
+purpose during text repair. It stopped after three calls; Calendar was not reached.
+The bug remains unfixed and conversational acceptance remains a release gate.
 
 The reported Calendar exchange retained all three user messages. Initial
 validation failed before useful fields were saved; later recovery tried to use
