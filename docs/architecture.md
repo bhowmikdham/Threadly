@@ -844,3 +844,18 @@ Mail presentation 1.2 removes hidden HTML comment metadata and repeated/boundary
 combining joiner padding while retaining ordinary numbers and meaningful Unicode
 joiners. Historical model/tool assets remain immutable. The versioned 1.8.8
 snapshot and synthetic replay live in `docs/evaluation/handsfree-mail/`.
+
+### Conversational email-to-event preparation (1.9.0)
+
+The conversational event tool has a separate email-evidence envelope, distinct
+from user-message citations and current user authority. Runtime records only the
+owned excerpts actually exposed by a read. Preparation validates the quoted
+message and fields, captures a reference-only source, and proposes an event
+through the existing Calendar pipeline. The semantic model proposes a faithful
+title and identifies ambiguity; deterministic checks verify source membership,
+absolute dates, clocks, identity and approval, not arbitrary paraphrase semantics.
+Both selected-email and summary-follow-up requests use the same path. Uncertain
+source dates/times need a focused clarification; saved defaults are displayed.
+Email-derived previews require exact approval irrespective of chat Always mode.
+Provider reads occur before database checks/locks on continuation and review;
+existing source-dependent action prefetch covers approval and worker dispatch.

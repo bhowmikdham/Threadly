@@ -16,7 +16,7 @@ FIELDS = (
     "description",
     "attendees",
 )
-CONTROLS = {"intent", "changes", "continue_previous", "citations"}
+CONTROLS = {"intent", "changes", "continue_previous", "citations", "email_source"}
 SOURCE_FIELDS = {"date": "date_source", "time": "time_source", "timezone": "timezone_source"}
 
 
@@ -153,11 +153,13 @@ def merge(runtime, args, pending):
                 subset = {field: value}
                 if source != field:
                     subset[source] = getattr(args, source)
-                source_fields(
-                    PrepareCalendarEvent.model_validate(subset),
-                    cited.get(field, {}).get("source", latest),
-                    constraints=False,
-                )
+                prior = pending.get("field_provenance", {}).get(field, {})
+                if not (field == "title" and prior.get("kind") == "email" and prior.get("derived")):
+                    source_fields(
+                        PrepareCalendarEvent.model_validate(subset),
+                        cited.get(field, {}).get("source", latest),
+                        constraints=False,
+                    )
                 repeated_sources.append(getattr(args, source))
                 supplied.pop(field, None)
                 supplied.pop(source, None)
@@ -215,6 +217,8 @@ def merge(runtime, args, pending):
             old_values = old.get(field) or []
             if not isinstance(old_values, list):
                 old_values = [old_values] if isinstance(old_values, str) else []
+            if field in SOURCE_FIELDS and (old_source := old.get(SOURCE_FIELDS[field])):
+                old_values = [*old_values, old_source]
             if not re.search(r"\b(?:" + names[field] + r")\b", change.source, re.I) and not any(
                 str(v).casefold() in change.source.casefold() for v in old_values
             ):
@@ -284,18 +288,26 @@ def merge(runtime, args, pending):
         subset = {field: values[field]}
         if source != field:
             subset[source] = values[source]
-        source_fields(
-            PrepareCalendarEvent.model_validate(subset), citation["source"], constraints=False
-        )
+        if not (field == "title" and citation.get("kind") == "email" and citation.get("derived")):
+            source_fields(
+                PrepareCalendarEvent.model_validate(subset), citation["source"], constraints=False
+            )
         check.pop(field, None)
         if source != field:
             check.pop(source, None)
         if field in changes:
             changes[field].update(citation)
+    cleared_zone_labels = (
+        ["timezone", "time zone"]
+        if any(
+            change.field == "timezone" and change.operation == "clear" for change in args.changes
+        )
+        else []
+    )
     source_fields(
         PrepareCalendarEvent.model_validate(check),
         validation_text,
-        (evidence(old).split("\n") if pending else []) + repeated_sources,
+        (evidence(old).split("\n") if pending else []) + repeated_sources + cleared_zone_labels,
     )
     provenance = dict((pending or {}).get("field_provenance", {}))
     if pending and not provenance:
@@ -392,11 +404,15 @@ def retain_partial(runtime, args, pending, origin, error):
                 and not (cited[field]["recorded_at"] and cited[field]["timezone"])
             ):
                 raise RequestClarification("That old relative date has no saved clock")
-            source_fields(
-                PrepareCalendarEvent.model_validate(subset),
-                cited.get(field, {}).get("source", runtime.request.instruction),
-                constraints=False,
-            )
+            citation = cited.get(field, {})
+            if not (
+                field == "title" and citation.get("kind") == "email" and citation.get("derived")
+            ):
+                source_fields(
+                    PrepareCalendarEvent.model_validate(subset),
+                    citation.get("source", runtime.request.instruction),
+                    constraints=False,
+                )
         except (ValueError, RequestClarification):
             rejected_source = supplied.get(source, "")
             if (

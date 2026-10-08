@@ -46,6 +46,12 @@ def payload_for(state, kind, value):
         or kind
     )[:160]
     refs = {}
+    if kind == "calendar_event" and (source := value.get("email_source")):
+        refs[source["reference"]] = {
+            "thread_id": source["source"]["thread_id"],
+            "message_id": source["source"]["message_id"],
+            "context_id": source["context_snapshot_id"],
+        }
     if kind == "reply" and value.get("reference") and value.get("source_identity"):
         name = value["reference"]
         refs[name] = {k: v for k, v in value["source_identity"].items() if v}
@@ -268,6 +274,8 @@ async def select_goal(runtime, args, *, expected_kind=None):
         runtime.state["refs"][handle] = reference
         if value.get("reference") == original:
             value["reference"] = handle
+        if value.get("email_source", {}).get("reference") == original:
+            value["email_source"]["reference"] = handle
     runtime.state["active_goal"] = kind if kind != "task" else "saved_task"
     runtime.state["active_goal_id"] = row.goal_id
     runtime.state.pop("proposal_id", None)

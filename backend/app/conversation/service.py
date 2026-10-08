@@ -99,6 +99,12 @@ async def hydrate_response(owner, saved, factory):
 
     result = dict(saved)
     result["context_memory_version"] = 1
+    if saved.get("calendar_action_id"):
+        from app.mail.dependency import references
+
+        await source_data.prefetch(
+            owner, await references(owner, [saved["calendar_action_id"]], factory=factory)
+        )
     async with factory() as session:
         if saved.get("calendar_action_id"):
             from app.calendar.event_creation import response
