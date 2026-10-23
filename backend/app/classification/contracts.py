@@ -81,6 +81,14 @@ class Decision(StrictModel):
         return self
 
 
+class IncomingMessage(StrictModel):
+    """Provider metadata only; never a security/authenticity verdict."""
+
+    message_id: str = Field(pattern=r"^[a-f0-9]{1,32}$")
+    received_at: datetime
+    timestamp_source: Literal["gmail.internalDate"] = "gmail.internalDate"
+
+
 class ClassificationResponse(StrictModel):
     schema_version: Literal["email-classification-with-action.v1"] = (
         "email-classification-with-action.v1"
@@ -99,6 +107,7 @@ class ClassificationResponse(StrictModel):
     source: Literal["live_gmail"] = "live_gmail"
     coverage: Literal["cleaned_text_only"] = "cleaned_text_only"
     persisted: Literal[False] = False
+    latest_incoming: IncomingMessage | None = None
 
     @model_validator(mode="after")
     def consistent_state(self):

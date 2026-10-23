@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from app.api.errors import ApiError
-from app.classification.contracts import ClassificationResponse, Decision, Evidence
+from app.classification.contracts import ClassificationResponse, Decision, Evidence, IncomingMessage
 from app.classification.flows import FLOW_RELEASE, ClassificationFlow, configured_flow
 from app.classification.limits import get_limits
 from app.classification.provider import get_provider
@@ -121,6 +121,32 @@ async def classify(owner, account_version, mailbox_address, thread_id, request):
         return await _classify(owner, account_version, mailbox_address, thread_id, request, pinned)
 
 
+def latest_incoming(messages):
+    """Fail closed if ordering/receipt is unknown or the latest message isn't incoming.
+
+    received_at is normalized solely from Gmail internalDate, never the Date header.
+    Metadata comes from the existing owned source read and is not stored server-side.
+    """
+    if not messages:
+        return None
+    try:
+        times = [datetime.fromisoformat(m["received_at"]) for m in messages]
+        if any(t.tzinfo is None or t.utcoffset() is None for t in times):
+            return None
+        newest = max(times)
+        candidates = [m for m, t in zip(messages, times, strict=True) if t == newest]
+        if len(candidates) != 1:
+            return None
+        message = candidates[0]
+        labels = set(message["reply_metadata"]["label_ids"])
+        if ("INBOX" not in labels or labels & {"SENT", "DRAFT", "SPAM", "TRASH"}
+                or message["is_from_user"]):
+            return None
+        return IncomingMessage(message_id=message["gmail_msg_id"], received_at=newest)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 async def _classify(owner, account_version, mailbox_address, thread_id, request, pinned):
     source = await live.thread(owner, thread_id)
     source_guard(source, owner, account_version, thread_id)
@@ -133,6 +159,7 @@ async def _classify(owner, account_version, mailbox_address, thread_id, request,
         source_fingerprint=source["fingerprint"], labels=None, evidence=None,
         evaluated_at=evaluated_at, valid_until=evaluated_at + timedelta(seconds=pinned.validity),
         time_zone=request.time_zone, release_id=pinned.identifier,
+        latest_incoming=latest_incoming(source["messages"]),
     )
     if not messages or not any("INBOX" in m["reply_metadata"]["label_ids"] for m in messages):
         return ClassificationResponse(**response, status="skipped", reason_codes=["not_in_inbox"])
