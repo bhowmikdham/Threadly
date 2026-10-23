@@ -12,6 +12,12 @@ import {
 } from "../lib/classification"
 import { gmailAccountEmail, gmailId, gmailIsDark } from "../lib/gmail-context"
 import { inboxMarks } from "../lib/inbox-marks"
+import {
+  DAY,
+  possibleSecuritySubject,
+  type Awareness,
+  type Recognition
+} from "../lib/security-awareness"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://mail.google.com/*"],
@@ -27,6 +33,7 @@ type Result = {
   until: number
   attempts: number
   code?: string
+  awareness?: Awareness | null
 }
 const results = new Map<string, Result>()
 const threads = new Map<string, { thread: string; last: string }>()
@@ -94,6 +101,7 @@ function render(row: Element) {
   const target = slots(row)
   if (!key || !target) return
   const r = results.get(key)
+  renderAwareness(row, key, r)
   const labels =
     r?.state === "done" &&
     r.until > Date.now() &&
@@ -229,7 +237,8 @@ async function classify(key: string, r: Result) {
       state: "done",
       value: reply.data,
       until: Date.parse(reply.data.valid_until),
-      attempts: 0
+      attempts: 0,
+      awareness: reply.awareness
     })
     show(true)
   } else if (
@@ -333,6 +342,7 @@ function scan() {
     preferencesReady && preferences.enabled && inInbox() ? "on" : "off"
   )
   if (!preferencesReady || !preferences.enabled || !inInbox()) {
+    clearAwareness()
     show(false)
     hideTooltip()
     return
@@ -343,6 +353,7 @@ function scan() {
     account = now
     generation += 1
     results.clear()
+    clearAwareness()
     queue.length = 0
     providerTries.clear()
     // The background still holds any server-side pause for the new account.
@@ -388,11 +399,20 @@ function applyPreferences(value: unknown, reset = false) {
     generation += 1
     queue.length = 0
     results.clear()
+    clearAwareness()
   }
   hideTooltip()
   scan()
 }
 chrome.runtime.onMessage.addListener((message, sender) => {
+  if (
+    sender.id === chrome.runtime.id &&
+    message?.type === "THREADLY_SECURITY_ACKED" &&
+    /^[a-f0-9]{64}$/.test(message.key)
+  ) {
+    suppressedSecurityKeys.add(message.key)
+    for (const row of onScreen) if (row.isConnected) render(row)
+  }
   if (
     sender.id === chrome.runtime.id &&
     message?.type === "THREADLY_INBOX_MARKS"
@@ -495,3 +515,116 @@ style.textContent = `
 [data-threadly-theme="dark"] .tl-tooltip { background: #e8eaed; color: #202124; }
 `
 document.head.append(style)
+
+// Email text remains in Gmail's DOM. Only the exact message reference and a
+// fixed recognition enum go to the protected background bridge.
+const suppressedSecurityKeys = new Set<string>()
+function clearAwareness() {
+  for (const cue of document.querySelectorAll(".tl-security-cue")) cue.remove()
+  for (const row of document.querySelectorAll(".tl-security-row"))
+    row.classList.remove("tl-security-row")
+}
+function renderAwareness(row: Element, rowId: string, result?: Result) {
+  const existing = row.querySelector<HTMLElement>(".tl-security-cue")
+  const awareness = result?.awareness
+  const subject = row.querySelector(".bog")?.textContent || ""
+  const eligible =
+    preferences.enabled &&
+    inInbox() &&
+    result?.state === "done" &&
+    result.until > Date.now() &&
+    awareness &&
+    /^[a-f0-9]{64}$/.test(awareness.key) &&
+    awareness.receivedAt <= Date.now() &&
+    awareness.receivedAt > Date.now() - DAY &&
+    !suppressedSecurityKeys.has(awareness.key) &&
+    possibleSecuritySubject(subject)
+  if (
+    !eligible ||
+    existing?.dataset.rowId !== rowId ||
+    existing?.dataset.key !== awareness?.key
+  ) {
+    existing?.remove()
+    row.classList.remove("tl-security-row")
+  }
+  if (!eligible || row.querySelector(".tl-security-cue")) return
+  const line = row.querySelector(".xT")
+  if (!line?.parentElement) return
+  const cue = document.createElement("div")
+  cue.className = "tl-security-cue"
+  cue.dataset.rowId = rowId
+  cue.dataset.key = awareness.key
+  cue.setAttribute("role", "group")
+  cue.setAttribute("aria-label", "Possible security alert; sender not verified")
+  const text = document.createElement("span")
+  text.className = "tl-security-question"
+  text.textContent = "Do you recognise this security alert?"
+  const note = document.createElement("span")
+  note.className = "tl-security-note"
+  note.textContent = "Subject cue only · sender not verified"
+  const copy = document.createElement("span")
+  copy.append(text, note)
+  cue.append(copy)
+  for (const [state, label] of [
+    ["recognised", "I recognise it"],
+    ["dismissed", "Dismiss"]
+  ] as [Recognition, string][]) {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = label
+    button.addEventListener("click", async () => {
+      const hadFocus = cue.contains(document.activeElement)
+      const ids = threads.get(rowId)
+      if (!ids || rowKey(row) !== rowId) return
+      for (const b of cue.querySelectorAll("button")) b.disabled = true
+      let saved: any
+      try {
+        saved = await chrome.runtime.sendMessage({
+          type: "THREADLY_SECURITY_ACK",
+          threadId: ids.thread,
+          lastMessageId: ids.last,
+          timeZone,
+          accountEmail: account,
+          state
+        })
+      } catch {
+        /* No success indication until protected storage confirms. */
+      }
+      if (saved?.ok && saved.key === awareness.key) {
+        suppressedSecurityKeys.add(saved.key)
+        render(row)
+        if (hadFocus && rowKey(row) === rowId)
+          (row as HTMLElement).focus({ preventScroll: true })
+      } else if (cue.isConnected) {
+        for (const b of cue.querySelectorAll("button")) b.disabled = false
+        note.textContent = "Could not save. Please try again."
+        note.setAttribute("role", "status")
+      }
+    })
+    cue.append(button)
+  }
+  cue.addEventListener("click", (e) => e.stopPropagation())
+  cue.addEventListener("mousedown", (e) => e.stopPropagation())
+  cue.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") e.stopPropagation()
+  })
+  line.after(cue)
+  row.classList.add("tl-security-row")
+}
+const securityStyle = document.createElement("style")
+securityStyle.textContent = `
+.tl-security-cue { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:5px 6px; margin:3px 0; border-inline-start:3px solid #946200; background:#fff5d6; color:#513600; border-radius:4px; white-space:normal; font:400 12px/17px Roboto,Arial,sans-serif; }
+.tl-security-question,.tl-security-note { display:block; }
+.tl-security-question { font-weight:600; }
+.tl-security-note { font-size:11px; }
+.tl-security-cue button { appearance:none; cursor:pointer; min-height:32px; padding:4px 8px; border:1px solid #946200; border-radius:5px; background:transparent; color:inherit; font:600 12px/16px Roboto,Arial,sans-serif; white-space:nowrap; }
+.tl-security-cue button:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.tl-security-cue button:disabled { cursor:default; opacity:.6; }
+.tl-security-row { animation:tl-security-fade 2s ease-out 2; }
+@keyframes tl-security-fade { from { box-shadow:inset 0 0 20px #e9b64566; } to { box-shadow:inset 0 0 0 transparent; } }
+@media(prefers-reduced-motion:reduce) { .tl-security-row { animation:none; } }
+[data-threadly-theme="dark"] .tl-security-cue { background:#40351a; color:#ffe4a0; border-color:#dfb85d; }
+[data-threadly-theme="dark"] .tl-security-cue button { border-color:#dfb85d; }
+[data-threadly-badges="off"] .tl-security-cue { display:none; }
+`
+document.head.append(securityStyle)

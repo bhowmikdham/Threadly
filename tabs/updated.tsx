@@ -10,21 +10,25 @@ export default function Updated() {
         <Logo height={40} />
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
-        <p className="update-intro">A calmer inbox, with shorter previews.</p>
+        <p className="update-intro">
+          A gentle cue for possible new security alerts.
+        </p>
         <section>
-          <h2>Shorter previews, clear subjects</h2>
+          <h2>Notice new security alerts</h2>
           <p>
-            Preview snippets after each subject take up less space. The original
-            subject and message stay intact, with priority, reply and category
-            marks still available.
+            A subtle glow and a question can flag a possible security alert in
+            new mail. This is a subject cue only: Threadly has not verified the
+            sender. No links open and no security actions are taken.
           </p>
         </section>
         <section>
-          <h2>Your display choices stay with you</h2>
+          <h2>Recognise or dismiss, once per message</h2>
           <p>
-            Your words/icons preference is unchanged. Hover, focus or tap a mark
-            for its meaning, now with a normal pointer. Hide marks in Settings
-            to return to Gmail’s original preview layout.
+            Only mail received after activation and within 24 hours is eligible.
+            Recognised or dismissed messages stay quiet for 30 days. This
+            feature saves only opaque references, timestamps and your response
+            locally; it stores no email text. Hide Inbox marks in Settings to
+            hide the cue.
           </p>
         </section>
         <a

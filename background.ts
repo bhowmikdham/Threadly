@@ -10,6 +10,11 @@ import {
   publishedBackendBuild,
   trustedSender
 } from "./lib/security"
+import {
+  incomingMetadata,
+  SECURITY_STATE_KEY,
+  SecurityAwarenessStore
+} from "./lib/security-awareness"
 
 type Session = {
   jwt: string
@@ -23,6 +28,31 @@ let sessionGeneration = 0
 let refreshing: Promise<string> | null = null
 let refreshGeneration = -1
 let sessionWriteTail: Promise<void> = Promise.resolve()
+const awarenessStore = new SecurityAwarenessStore({
+  read: async () =>
+    (await chrome.storage.local.get(SECURITY_STATE_KEY))[SECURITY_STATE_KEY],
+  write: async (value) =>
+    chrome.storage.local.set({ [SECURITY_STATE_KEY]: value })
+})
+const awarenessScope = (s: Session) =>
+  JSON.stringify([s.origin, s.user.id, s.user.email.toLowerCase()])
+async function withAwareness(
+  s: Session,
+  data: any,
+  thread: string,
+  last: string
+) {
+  let awareness = null
+  try {
+    awareness = await awarenessStore.check(
+      awarenessScope(s),
+      incomingMetadata(data, thread, last)
+    )
+  } catch {
+    /* Unavailable storage hides awareness; existing badges remain usable. */
+  }
+  return { ok: true, data, awareness }
+}
 function mutateSession<T>(operation: () => Promise<T>): Promise<T> {
   const result = sessionWriteTail.then(operation)
   sessionWriteTail = result.then(
@@ -387,12 +417,19 @@ async function classifyThread(message: any) {
     message.accountEmail.toLowerCase() !== s.user.email.toLowerCase()
   )
     return { ok: false, code: "account_mismatch" }
+  // First use establishes a post-activation baseline before any source read.
+  // This never treats existing inbox position/unread state as a received date.
+  try {
+    await awarenessStore.check(awarenessScope(s), null)
+  } catch {
+    /* Fail closed. */
+  }
   // Kept for this browser session until valid_until, so reopening Gmail
   // reuses results. Labels and IDs only; a new message changes the key.
   const key = `classification:${s.user.id}:${threadId}:${lastMessageId}:${timeZone}`
   const kept = (await chrome.storage.session.get(key))[key]
   if (kept && Date.parse(kept.valid_until) > Date.now())
-    return { ok: true, data: kept }
+    return withAwareness(s, kept, threadId, lastMessageId)
   if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
   if (classifying >= 2)
     await new Promise<void>((resolve) => classifyWaiting.push(resolve))
@@ -414,7 +451,7 @@ async function classifyThread(message: any) {
       Date.parse(data.valid_until) > Date.now()
     )
       await keepClassification(key, data)
-    return { ok: true, data }
+    return withAwareness(s, data, threadId, lastMessageId)
   } catch (error) {
     const wait = error.retryAfterSeconds
     if (wait) {
@@ -462,6 +499,61 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     })()
       .then(respond)
       .catch(() => respond(null))
+    return true
+  }
+  if (message?.type === "THREADLY_SECURITY_ACK" && fromGmail) {
+    void (async () => {
+      await storageReady
+      const run = sessionGeneration
+      const s = await activeSession()
+      if (
+        !inboxMarks(
+          (await chrome.storage.local.get(INBOX_MARKS_KEY))[INBOX_MARKS_KEY]
+        ).enabled ||
+        message.accountEmail?.toLowerCase() !== s.user.email.toLowerCase() ||
+        !["recognised", "dismissed"].includes(message.state) ||
+        !/^[a-f0-9]{1,32}$/.test(message.threadId) ||
+        !/^[a-f0-9]{1,32}$/.test(message.lastMessageId) ||
+        !/^[A-Za-z0-9_+\-/]{1,64}$/.test(message.timeZone)
+      )
+        return { ok: false }
+      // Only metadata already fetched through this authenticated classifier is accepted.
+      const cacheKey = `classification:${s.user.id}:${message.threadId}:${message.lastMessageId}:${message.timeZone}`
+      const data = (await chrome.storage.session.get(cacheKey))[cacheKey]
+      if (
+        !(Date.parse(data?.valid_until) > Date.now()) ||
+        run !== sessionGeneration
+      )
+        return { ok: false }
+      const metadata = incomingMetadata(
+        data,
+        message.threadId,
+        message.lastMessageId
+      )
+      if (!metadata) return { ok: false }
+      const saved = await awarenessStore.check(
+        awarenessScope(s),
+        metadata,
+        message.state
+      )
+      if (!saved || run !== sessionGeneration) return { ok: false }
+      const tabs = await chrome.tabs.query({ url: "https://mail.google.com/*" })
+      await Promise.all(
+        tabs
+          .filter((t) => t.id !== undefined)
+          .map((t) =>
+            chrome.tabs
+              .sendMessage(t.id, {
+                type: "THREADLY_SECURITY_ACKED",
+                key: saved.key
+              })
+              .catch(() => {})
+          )
+      )
+      return { ok: true, key: saved.key }
+    })()
+      .then(respond)
+      .catch(() => respond({ ok: false }))
     return true
   }
   // Gmail pages can request badges, never arbitrary API paths or credentials.
