@@ -50,9 +50,11 @@ The supplied video has not been redrawn or re-encoded. Its original SHA-256 is
 The web copy moves the MP4 movie index before its media data for fast startup;
 the encoded media bytes remain identical. Web copy SHA-256:
 `4af4a20408646bbb016c2ca9899a05cca0006174605d71ae186f66e11a5147af`.
-The poster is the opening frame. Native controls and inline playback work without
-site JavaScript; `preload="none"` avoids fetching the video before interaction.
-The adjacent expandable description supplies the visual information in text.
+The poster is the opening frame. The silent video autoplays muted, loops, and
+plays inline. Native controls let visitors pause or seek without site JavaScript.
+The plain player sits directly in the existing marks section, without a card,
+extra heading or duration/audio labels. A visually hidden description supplies
+the animation's visual information to assistive technology.
 
 Playback requires the website CSP to allow same-origin media (`media-src 'self'`).
 The original default-deny policy blocks this player. Keep all other directives,

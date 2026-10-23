@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
 
-<link rel="stylesheet" href="/site.css?v=threadly-video-1">
+<link rel="stylesheet" href="/site.css?v=threadly-video-2">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
@@ -153,26 +153,15 @@
         <p class="lede">This design concept shows priority, reply and category marks. Hover any mark to explore it. Automatic inbox classification is not included in the early-access release.</p>
       </div>
 
-      <figure class="marks-video" aria-labelledby="marks-video-title">
-        <div class="marks-video-head">
-          <h3 id="marks-video-title">See the marks <em>in motion.</em></h3>
-          <span class="marks-video-meta">20 seconds · No audio</span>
-        </div>
-        <div class="marks-video-screen">
-          <video controls playsinline preload="none" width="1920" height="1080"
-            poster="/media/threadly-classifiers-poster.jpg"
-            aria-label="Threadly inbox marks concept video"
-            aria-describedby="marks-video-caption" tabindex="0">
-            <source src="/media/threadly-classifiers.mp4" type='video/mp4; codecs="avc1.640028"'>
-            <p>Your browser cannot play this video. <a href="/media/threadly-classifiers.mp4">Open the MP4 video</a> or read the description below.</p>
-          </video>
-        </div>
-        <figcaption id="marks-video-caption">A closer look at priority, reply and category marks in a sample inbox. Design concept; automatic classification is not included in the current extension.</figcaption>
-        <details class="marks-video-description">
-          <summary>Read the video description</summary>
-          <p>A sample inbox appears under “Know what needs you.” The view zooms in on three priority marks: two red chevrons for high priority, one amber chevron for medium, and one grey chevron pointing down for low.</p>
-          <p>A reply arrow is labelled “Waiting on your reply”; a small dash is labelled “Nothing owed.” The view moves to category icons, including scales for Legal and a banknote for Finance, then returns to the full inbox. There is no speech or other audio.</p>
-        </details>
+      <figure class="marks-video">
+        <video autoplay muted loop controls playsinline preload="metadata" width="1920" height="1080"
+          poster="/media/threadly-classifiers-poster.jpg"
+          aria-label="Threadly inbox marks concept video"
+          aria-describedby="marks-video-description" tabindex="0">
+          <source src="/media/threadly-classifiers.mp4" type='video/mp4; codecs="avc1.640028"'>
+          <p>Your browser cannot play this video. <a href="/media/threadly-classifiers.mp4">Open the MP4 video</a>.</p>
+        </video>
+        <figcaption id="marks-video-description" class="visually-hidden">A sample inbox appears under “Know what needs you.” Two red chevrons indicate high priority, one amber chevron indicates medium, and one grey chevron pointing down indicates low. A reply arrow means “Waiting on your reply”; a dash means “Nothing owed.” Category icons include scales for Legal and a banknote for Finance. The view returns to the full inbox.</figcaption>
       </figure>
 
       <div class="spec" id="specSheet">
