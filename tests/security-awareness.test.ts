@@ -107,22 +107,56 @@ it("requires bound provider metadata and rejects missing/forged timestamp source
   expect(incomingMetadata(data, "aaa", "ccc")).toBeNull()
 })
 
-it("establishes a baseline before eligibility and ignores old, preactivation, future and missing dates", async () => {
+it("offers recent pre-installation mail on first use and after a restart", async () => {
   const f = fixture(),
-    s = f.make(),
-    baseline = f.now()
-  expect(await s.check("account-a", f.meta())).toBeNull()
-  f.advance(1000)
+    metadata = f.meta("aaa", f.now() - 4 * 3600000),
+    offered = await f.make().check("account-a", metadata)
+  expect(offered).not.toBeNull()
+  expect(await f.make().check("account-a", metadata)).toEqual(offered)
+})
+
+it("enforces the rolling 24-hour boundary and ignores future, missing and invalid dates", async () => {
+  const f = fixture(),
+    s = f.make()
+  expect(
+    await s.check("account-a", f.meta("aaa", f.now() - DAY + 1))
+  ).not.toBeNull()
   expect(await s.check("account-a", f.meta())).not.toBeNull()
   for (const metadata of [
     null,
-    f.meta("aaa", baseline),
     f.meta("bbb", f.now() + 1),
     f.meta("ccc", f.now() - DAY),
+    f.meta("ddd", f.now() - 31 * DAY),
     { ...f.meta(), received_at: "invalid" }
   ])
     expect(await s.check("account-a", metadata)).toBeNull()
 })
+
+it.each(["recognised", "dismissed"] as const)(
+  "preserves existing v1 %s state while allowing unacknowledged mail before its saved activation time",
+  async (state) => {
+    const f = fixture(),
+      s = f.make()
+    await s.check("account-a", null)
+    f.advance(1000)
+    const acknowledged = f.meta()
+    await s.check("account-a", acknowledged, state)
+    const previous = structuredClone(f.read()),
+      recent = f.meta("def456", f.now() - 4 * 3600000),
+      restarted = f.make()
+    expect(Date.parse(recent.received_at)).toBeLessThan(
+      previous.accounts[0].activatedAt
+    )
+    expect(await restarted.check("account-a", recent)).not.toBeNull()
+    expect(await restarted.check("account-a", acknowledged)).toBeNull()
+    expect(f.read().version).toBe(1)
+    expect(f.read().salt).toEqual(previous.salt)
+    expect(f.read().acknowledgements).toEqual(previous.acknowledgements)
+    expect(f.read().accounts[0].activatedAt).toBe(
+      previous.accounts[0].activatedAt
+    )
+  }
+)
 
 it.each(["recognised", "dismissed"] as const)(
   "persists %s across refresh/service-worker restart and isolates accounts/new messages",

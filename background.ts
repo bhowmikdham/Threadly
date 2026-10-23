@@ -423,8 +423,8 @@ async function classifyThread(message: any) {
     message.accountEmail.toLowerCase() !== s.user.email.toLowerCase()
   )
     return { ok: false, code: "account_mismatch" }
-  // First use establishes a post-activation baseline before any source read.
-  // This never treats existing inbox position/unread state as a received date.
+  // Check protected storage before any source read. Eligibility uses the provider
+  // receipt within 24 hours, independent of installation or inbox position.
   try {
     await awarenessStore.check(awarenessScope(s), null)
   } catch {

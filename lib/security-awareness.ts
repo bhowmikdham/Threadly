@@ -201,11 +201,9 @@ export class SecurityAwarenessStore {
       }
       account.lastSeen = now
       const receivedAt = Date.parse(metadata?.received_at || "")
-      const recent =
-        metadata &&
-        receivedAt > account.activatedAt &&
-        receivedAt <= now &&
-        receivedAt > now - DAY
+      // Recent arrivals remain eligible even when they predate installation.
+      // Keep the existing account state so upgrades preserve acknowledgements.
+      const recent = metadata && receivedAt <= now && receivedAt > now - DAY
       const key = metadata
         ? await this.key(s, ["message", scope, metadata.message_id])
         : null
@@ -222,7 +220,7 @@ export class SecurityAwarenessStore {
             state
           })
       }
-      // Persist before presenting or confirming a question, including the baseline.
+      // Persist account state before presenting or confirming a question.
       await this.store.write(s)
       return result
     })
