@@ -303,3 +303,122 @@ test("another Gmail account gets no badges and no classification calls", async (
   expect(calls.length).toBe(before)
   await other.close()
 })
+
+test("words, preview and reversible visibility work without reclassifying or changing mail", async () => {
+  const worker = context.serviceWorkers()[0]
+  const id = new URL(worker.url()).host
+  const settings = await context.newPage()
+  await settings.goto(`chrome-extension://${id}/sidepanel.html`)
+  await settings
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await settings
+    .getByRole("button", { name: "Account menu", exact: true })
+    .click()
+  await settings
+    .getByRole("button", { name: "Settings", exact: true })
+    .first()
+    .click()
+  await expect(
+    settings.getByRole("heading", { name: "A more readable inbox" })
+  ).toBeVisible()
+  const words = settings.getByRole("checkbox", {
+    name: "Rather have words than icons"
+  })
+  const enabled = settings.getByRole("checkbox", {
+    name: "Show marks in Gmail"
+  })
+  await expect(enabled).toBeChecked()
+  await settings.setViewportSize({ width: 320, height: 900 })
+  await settings.screenshot({ path: "test-results/inbox-marks-320-light.png" })
+  expect(
+    await settings
+      .locator(".settings")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth)
+  ).toBe(true)
+  await context.unroute("https://mail.google.com/**")
+  await context.route("https://mail.google.com/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: inbox(user.email) })
+  )
+  await page.goto("https://mail.google.com/mail/u/0/#inbox")
+  const left = page.locator("tr.zA").first().locator(".tl-left")
+  await expect(left).toHaveAttribute(
+    "aria-label",
+    "High priority · reply needed · Review"
+  )
+  await expect(
+    page
+      .locator("tr.zA")
+      .filter({ has: page.locator('[data-legacy-thread-id="a2"]') })
+      .locator(".tl-left")
+  ).toHaveAttribute("aria-label", "Low priority · no reply needed", {
+    timeout: 15000
+  })
+  await expect(
+    page
+      .locator("tr.zA")
+      .filter({ has: page.locator('[data-legacy-thread-id="a4"]') })
+      .locator(".tl-right")
+  ).toHaveAttribute("aria-label", "Projects", { timeout: 15000 })
+  const before = calls.length
+  const subject = page.locator("tr.zA .y6").first()
+  const original = await subject.boundingBox()
+  await words.check()
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-threadly-mark-words",
+    "true"
+  )
+  await expect(left.locator(".tl-word")).toBeVisible()
+  await page.screenshot({ path: "test-results/inbox-marks-words.png" })
+  await settings.locator(".threadly").evaluate((el) => el.classList.add("dark"))
+  await settings.screenshot({ path: "test-results/inbox-marks-320-dark.png" })
+  expect((await subject.boundingBox()).x).toBe(original.x)
+  await expect(
+    settings.locator(".inbox-marks-sample-left .inbox-marks-hidden")
+  ).toHaveCount(0)
+  await left.focus()
+  await expect(page.locator(".tl-tooltip")).toHaveText(
+    "High priority · reply needed · Review"
+  )
+  await page.keyboard.press("Escape")
+  await expect(page.locator(".tl-tooltip")).toHaveCount(0)
+  await left.click()
+  expect(page.url()).toContain("#inbox")
+  await expect(page.locator(".tl-tooltip")).toHaveText(
+    "High priority · reply needed · Review"
+  )
+  await words.uncheck()
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-threadly-mark-words",
+    "false"
+  )
+  expect((await subject.boundingBox()).x).toBe(original.x)
+  expect(calls.length).toBe(before)
+
+  await enabled.uncheck()
+  await expect(page.locator(".tl-slot:visible")).toHaveCount(0)
+  await expect(page.locator(".tl-tooltip")).toHaveCount(0)
+  await page.reload()
+  await page.waitForTimeout(1500)
+  expect(calls.length).toBe(before)
+  await enabled.check()
+  await expect(page.locator(".tl-slot:visible")).not.toHaveCount(0)
+  await settings.reload()
+  await settings
+    .getByRole("button", { name: "Conversation menu", exact: true })
+    .click()
+  await settings
+    .getByRole("button", { name: "Account menu", exact: true })
+    .click()
+  await settings
+    .getByRole("button", { name: "Settings", exact: true })
+    .first()
+    .click()
+  await expect(
+    settings.getByRole("checkbox", { name: "Show marks in Gmail" })
+  ).toBeChecked()
+  await expect(
+    settings.getByRole("checkbox", { name: "Rather have words than icons" })
+  ).not.toBeChecked()
+  await settings.close()
+})

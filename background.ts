@@ -1,5 +1,6 @@
 import { retryAfterSeconds } from "./lib/classification"
 import { showUpdateNotice } from "./lib/extension-updates"
+import { INBOX_MARKS_KEY, inboxMarks } from "./lib/inbox-marks"
 import {
   allowedRequest,
   backendOrigin,
@@ -318,6 +319,36 @@ chrome.storage.onChanged.addListener((changes, area) => {
       )
     )
 })
+// Content scripts cannot read protected storage. Send only these two display
+// preferences, never the session or other extension settings, to Gmail tabs.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return
+  const session = changes.threadlySession
+  const reset = Boolean(
+    session && session.oldValue?.user?.id !== session.newValue?.user?.id
+  )
+  if (!changes[INBOX_MARKS_KEY] && !reset) return
+  void (async () => {
+    await storageReady
+    const preferences = inboxMarks(
+      (await chrome.storage.local.get(INBOX_MARKS_KEY))[INBOX_MARKS_KEY]
+    )
+    const tabs = await chrome.tabs.query({ url: "https://mail.google.com/*" })
+    await Promise.all(
+      tabs
+        .filter((tab) => tab.id !== undefined)
+        .map((tab) =>
+          chrome.tabs
+            .sendMessage(tab.id, {
+              type: "THREADLY_INBOX_MARKS",
+              preferences,
+              reset
+            })
+            .catch(() => {})
+        )
+    )
+  })().catch(() => {})
+})
 async function keepClassification(key: string, data: any) {
   const all = await chrome.storage.session.get()
   const expired = Object.keys(all).filter(
@@ -329,6 +360,11 @@ async function keepClassification(key: string, data: any) {
   await chrome.storage.session.set({ [key]: data })
 }
 async function classifyThread(message: any) {
+  const allowed = async () =>
+    inboxMarks(
+      (await chrome.storage.local.get(INBOX_MARKS_KEY))[INBOX_MARKS_KEY]
+    ).enabled
+  if (!(await allowed())) return { ok: false, code: "inbox_marks_disabled" }
   const threadId = String(message.threadId || "")
   const timeZone = String(message.timeZone || "UTC")
   const lastMessageId = String(message.lastMessageId || "")
@@ -363,6 +399,7 @@ async function classifyThread(message: any) {
   classifying += 1
   try {
     // A pause may have started while this request waited for a slot.
+    if (!(await allowed())) return { ok: false, code: "inbox_marks_disabled" }
     if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
     const data = await transport(
       s.origin,
@@ -414,9 +451,24 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     void chrome.sidePanel.open({ tabId: sender.tab.id })
     return false
   }
-  // Gmail pages may ask for one thing only: a thread's badges.
+  if (message?.type === "THREADLY_GET_INBOX_MARKS" && fromGmail) {
+    void (async () => {
+      await storageReady
+      return {
+        preferences: inboxMarks(
+          (await chrome.storage.local.get(INBOX_MARKS_KEY))[INBOX_MARKS_KEY]
+        )
+      }
+    })()
+      .then(respond)
+      .catch(() => respond(null))
+    return true
+  }
+  // Gmail pages can request badges, never arbitrary API paths or credentials.
   if (message?.type === "THREADLY_CLASSIFY" && fromGmail) {
-    void classifyThread(message).then(respond)
+    void classifyThread(message)
+      .then(respond)
+      .catch(() => respond({ ok: false, code: "inbox_settings_unavailable" }))
     return true
   }
   if (

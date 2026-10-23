@@ -10,26 +10,19 @@ export default function Updated() {
         <Logo height={40} />
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
-        <p className="update-intro">Pick up where you left off.</p>
+        <p className="update-intro">Make your inbox easier to scan.</p>
         <section>
-          <h2>Return to earlier work</h2>
+          <h2>Your inbox, with clearer marks</h2>
           <p>
-            Keep drafts and event requests in the same chat, and return to them
-            after switching topics. Earlier details stay with their request.
+            Priority chevrons, reply marks and categories help you spot what
+            needs attention. Hover, focus or tap any mark for its meaning.
           </p>
         </section>
         <section>
-          <h2>Review the right request</h2>
+          <h2>Prefer words?</h2>
           <p>
-            Reopen an existing draft or event to review its current details and
-            status. Creating an event or saving a draft still uses its review card.
-          </p>
-        </section>
-        <section>
-          <h2>Events from meeting emails</h2>
-          <p>
-            Prepare an event from a selected meeting email, check the extracted
-            details, and confirm it when you’re ready.
+            Open Settings to preview words beside the reply and category icons.
+            You can hide inbox marks at any time. Your messages stay in place.
           </p>
         </section>
         <a
