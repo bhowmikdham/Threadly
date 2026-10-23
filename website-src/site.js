@@ -1,4 +1,24 @@
 
+/* ---- Silent inbox marks animation ---- */
+const marksVideo = document.querySelector(".marks-video video");
+if (marksVideo) {
+  const syncVideoLabel = () => marksVideo.setAttribute("aria-label", marksVideo.paused ? "Play inbox animation" : "Pause inbox animation");
+  const toggleVideo = () => {
+    if (marksVideo.paused) marksVideo.play().catch(syncVideoLabel);
+    else marksVideo.pause();
+  };
+  marksVideo.addEventListener("click", toggleVideo);
+  marksVideo.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleVideo();
+    }
+  });
+  marksVideo.addEventListener("play", syncVideoLabel);
+  marksVideo.addEventListener("pause", syncVideoLabel);
+  syncVideoLabel();
+}
+
 /* ------------------------------------------------------------------
    Content. Every thread carries its own summary, draft and metadata,
    so the panel says something true about whichever row you pick.

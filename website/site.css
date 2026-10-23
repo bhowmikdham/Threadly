@@ -702,21 +702,6 @@ button.tp-icon:hover{background:var(--g-hover);color:var(--g-ink)}
 .hero-frame[data-open="true"] .hero-panel{transform:translateX(0)}
 @media (max-width:640px){.hero-panel{width:100%}}
 
-.hero-underbar{
-  display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;
-  padding:14px var(--gutter) 0 0;
-}
-.hero-note{font-size:12.5px;color:var(--ink-3);line-height:1.5;max-width:52ch;transition:color .2s ease}
-.hero-note[data-said="true"]{color:var(--ink);font-weight:500}
-.keyhints{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:11.5px;color:var(--ink-3)}
-.keyhints span{display:flex;align-items:center;gap:5px;white-space:nowrap}
-kbd{
-  font-family:var(--sans);font-size:10.5px;font-weight:600;line-height:1;
-  padding:3px 5px;min-width:17px;text-align:center;
-  border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;
-  color:var(--ink-2);background:var(--paper);
-}
-
 /* editable marks */
 .mk{display:flex;align-items:center;gap:4px;padding:3px;margin:-3px;border:0;background:none;position:relative;min-width:0}
 .mk-act{color:var(--g-muted)}
@@ -744,7 +729,7 @@ button.mk:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
 .marks-open{max-width:60ch;margin-bottom:38px}
 .marks-open .h2{margin-bottom:18px}
 .marks-video{margin-bottom:clamp(28px,4vw,44px)}
-.marks-video video{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain}
+.marks-video video{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;cursor:pointer}
 .marks-video video:focus-visible{outline:3px solid var(--teal);outline-offset:-3px;border-radius:0}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .legend .h2{text-wrap:pretty}
@@ -756,8 +741,6 @@ button.mk:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
    ========================================================= */
 .anim #heroRows .stamp{opacity:0;animation:stampIn .01s linear 3s forwards}
 @keyframes stampIn{to{opacity:1}}
-.anim .keyhints{opacity:0;animation:hintIn .4s ease 1.5s forwards}
-@keyframes hintIn{to{opacity:1}}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
   .stamp{opacity:1!important}

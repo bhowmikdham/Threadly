@@ -51,7 +51,9 @@ The web copy moves the MP4 movie index before its media data for fast startup;
 the encoded media bytes remain identical. Web copy SHA-256:
 `4af4a20408646bbb016c2ca9899a05cca0006174605d71ae186f66e11a5147af`.
 The poster is the opening frame. The silent video autoplays muted, loops, and
-plays inline. Native controls let visitors pause or seek without site JavaScript.
+plays inline without a playback bar. Visitors can click or tap the animation to
+pause or play, or focus it and press Enter or Space; its accessible label follows
+the playback state. The hero's visible demo note and shortcut strip are omitted.
 The plain player sits directly in the existing marks section, without a card,
 extra heading or duration/audio labels. A visually hidden description supplies
 the animation's visual information to assistive technology.
