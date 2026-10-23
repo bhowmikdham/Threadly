@@ -54,7 +54,7 @@ responses to the current session, bound in-page suppression, preserve the first
 concurrent acknowledgement and purge expired references on worker startup/use.
 Expiry is logical at 30 days and physical cleanup happens on startup/next use.
 
-Release isolation: currently deployed backend is 8970bd4b7cb8ce504a672b6eb37d275ef8b14971,
+Release isolation: the isolation base was deployed backend 8970bd4b7cb8ce504a672b6eb37d275ef8b14971,
 public-launch. release/backend additionally contains unshipped calendar PR140.
 Companion PR144 targets release/security-awareness based on deployed 8970bd4,
 using the same complete backend CI gates and immutable tested-tree requirement.
@@ -78,3 +78,12 @@ a fresh run of the exact built/source revision passed all five focused browser
 tests (17.2s). The completion gate now follows actual animationend and the
 250ms delayed-start regression passes. The independent visual checkpoint and
 synthetic captures are in [security-visuals](security-visuals/README.md).
+
+Final CI correction: both optional close-up captures now check the screenshot
+output directory before joining a path. The complete normal packaged suite ran
+with THREADLY_SECURITY_SCREENSHOT_DIR explicitly unset: 60 passed, with the
+HTTPS-only smoke run separately. Independent review confirmed assertions and
+production behavior are unchanged. A private synthetic browser recording also
+passed both security cases; its measured glow end was 3761.6ms and prompt
+insertion 3923.4ms (161.8ms gap), with no active animation at insertion. Playback
+frames were inspected across glow, gap, prompt and dark/narrow presentation.

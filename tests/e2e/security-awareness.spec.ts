@@ -193,7 +193,7 @@ test("only new provider-dated messages prompt; recognition persists and row reus
           `security-${width}.png`
         )
       })
-    if (width === 640)
+    if (width === 640 && process.env.THREADLY_SECURITY_SCREENSHOT_DIR)
       await cue.screenshot({
         path: path.join(
           process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
@@ -307,12 +307,13 @@ test("words/icons, account isolation, disabled marks and unavailable storage fai
           `security-theme-${dark ? "dark" : "light"}.png`
         )
       })
-    await page.locator(".tl-security-cue").screenshot({
-      path: path.join(
-        process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
-        `security-prompt-closeup-${dark ? "dark" : "light"}.png`
-      )
-    })
+    if (process.env.THREADLY_SECURITY_SCREENSHOT_DIR)
+      await page.locator(".tl-security-cue").screenshot({
+        path: path.join(
+          process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
+          `security-prompt-closeup-${dark ? "dark" : "light"}.png`
+        )
+      })
   }
   await setup.evaluate(() =>
     chrome.storage.local.set({
