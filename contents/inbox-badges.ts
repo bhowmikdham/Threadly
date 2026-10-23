@@ -11,6 +11,7 @@ import {
   type Classification
 } from "../lib/classification"
 import { gmailAccountEmail, gmailId, gmailIsDark } from "../lib/gmail-context"
+import { inboxMarks } from "../lib/inbox-marks"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://mail.google.com/*"],
@@ -44,6 +45,8 @@ let inFlight = 0
 let pausedUntil = 0
 let resumeTimer = 0
 let stopped = false
+let preferences = inboxMarks(null)
+let preferencesReady = false
 // The AI service failing is retried a few times per row, then left blank.
 const providerTries = new Map<string, number>()
 const PROVIDER_TRIES = 3
@@ -51,7 +54,10 @@ const PROVIDER_TRIES = 3
 const root = document.documentElement
 const inInbox = () => /^#inbox(\/p\d+)?(\?.*)?$/.test(location.hash || "#inbox")
 const show = (on: boolean) =>
-  root.setAttribute("data-threadly-badges", on ? "on" : "off")
+  root.setAttribute(
+    "data-threadly-badges",
+    on && preferencesReady && preferences.enabled && inInbox() ? "on" : "off"
+  )
 show(false)
 
 function rowKey(row: Element) {
@@ -94,7 +100,7 @@ function render(row: Element) {
       ? r.value.labels
       : null
   const state = labels
-    ? `${labels.priority}|${labels.needs_reply}|${labels.action}|${labels.category}`
+    ? `${labels.priority}|${labels.needs_reply}|${labels.action}|${labels.category}|${preferences.words}`
     : "empty"
   if (target.left.dataset.tlState === state) return
   target.left.dataset.tlState = state
@@ -104,27 +110,40 @@ function render(row: Element) {
     slot.removeAttribute("data-tl-tip")
     slot.removeAttribute("aria-label")
     slot.removeAttribute("role")
+    slot.removeAttribute("tabindex")
   }
   if (!labels) return
   const tip = priorityTip(labels)
   target.left.innerHTML =
     `<span class="tl-priority tl-${labels.priority.toLowerCase()}">${priorityIcon[labels.priority]}</span>` +
-    (labels.needs_reply
-      ? `<span class="tl-reply">${replyIcon}</span>`
-      : '<span class="tl-hairline"></span>')
-  target.right.innerHTML = categoryIcon[labels.category]
+    `<span class="tl-reply-mark">${
+      labels.needs_reply
+        ? `<span class="tl-reply">${replyIcon}</span>`
+        : '<span class="tl-hairline"></span>'
+    }<span class="tl-word">${labels.needs_reply ? "Reply" : "No reply"}</span></span>`
+  target.right.innerHTML =
+    categoryIcon[labels.category] +
+    `<span class="tl-word">${categoryDisplay[labels.category]}</span>`
   for (const [slot, text] of [
     [target.left, tip],
     [target.right, categoryDisplay[labels.category]]
   ] as const) {
     slot.setAttribute("role", "img")
+    slot.setAttribute("tabindex", "0")
     slot.setAttribute("aria-label", text)
     slot.dataset.tlTip = text
   }
 }
 
 function schedule() {
-  if (stopped || !inInbox() || document.visibilityState !== "visible") return
+  if (
+    stopped ||
+    !preferencesReady ||
+    !preferences.enabled ||
+    !inInbox() ||
+    document.visibilityState !== "visible"
+  )
+    return
   if (Date.now() < pausedUntil) return
   const now = Date.now()
   const rows = Array.from(visible).filter((row) => row.isConnected)
@@ -151,6 +170,10 @@ function pump() {
     inFlight < 2 &&
     queue.length &&
     !stopped &&
+    preferencesReady &&
+    preferences.enabled &&
+    inInbox() &&
+    document.visibilityState === "visible" &&
     Date.now() >= pausedUntil
   ) {
     const key = queue.shift()
@@ -303,6 +326,12 @@ const watcher = new IntersectionObserver((entries) => {
 let pending = 0
 function scan() {
   pending = 0
+  root.setAttribute("data-threadly-mark-words", String(preferences.words))
+  if (!preferencesReady || !preferences.enabled || !inInbox()) {
+    show(false)
+    hideTooltip()
+    return
+  }
   const now = gmailAccountEmail(document)?.toLowerCase() || null
   if (now !== account) {
     // Another account's results must never show here.
@@ -320,7 +349,11 @@ function scan() {
     "data-threadly-theme",
     gmailIsDark(document) ? "dark" : "light"
   )
-  if (!inInbox()) return
+  show(
+    Array.from(results.values()).some(
+      (r) => r.state === "done" && r.until > Date.now()
+    )
+  )
   for (const row of document.querySelectorAll('[role="main"] tr.zA')) {
     if (!observed.has(row)) {
       observed.add(row)
@@ -335,40 +368,116 @@ const rescan = () => {
 }
 new MutationObserver(rescan).observe(document.body, {
   childList: true,
-  subtree: true
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["data-legacy-thread-id", "data-legacy-last-message-id"]
 })
 window.addEventListener("hashchange", rescan)
 document.addEventListener("visibilitychange", rescan)
 // Expired badges clear, then refresh while their rows are still on screen.
 setInterval(scan, 30 * 1000)
-scan()
+function applyPreferences(value: unknown, reset = false) {
+  preferences = inboxMarks(value)
+  preferencesReady = true
+  if (!preferences.enabled || reset) {
+    generation += 1
+    queue.length = 0
+    results.clear()
+  }
+  hideTooltip()
+  scan()
+}
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (
+    sender.id === chrome.runtime.id &&
+    message?.type === "THREADLY_INBOX_MARKS"
+  )
+    applyPreferences(message.preferences, message.reset === true)
+  return false
+})
+void chrome.runtime
+  .sendMessage({ type: "THREADLY_GET_INBOX_MARKS" })
+  .then((reply) => {
+    if (!preferencesReady && reply?.preferences)
+      applyPreferences(reply.preferences)
+  })
+  .catch(() => show(false))
 
 // One Gmail-style tooltip; rows clip anything drawn inside them.
 const tooltip = document.createElement("div")
 tooltip.className = "tl-tooltip"
 tooltip.setAttribute("role", "tooltip")
-document.addEventListener("mouseover", (e) => {
-  const slot = (e.target as Element).closest?.<HTMLElement>("[data-tl-tip]")
-  if (!slot) return tooltip.remove()
+let tooltipSlot: HTMLElement | null = null
+function hideTooltip() {
+  tooltip.remove()
+  tooltipSlot = null
+}
+function revealTooltip(slot: HTMLElement) {
+  if (!preferences.enabled || !inInbox()) return
+  tooltipSlot = slot
   tooltip.textContent = slot.dataset.tlTip
   document.body.append(tooltip)
   const box = slot.getBoundingClientRect()
-  tooltip.style.left = `${Math.max(8, box.left + box.width / 2 - tooltip.offsetWidth / 2)}px`
-  tooltip.style.top = `${box.bottom + 6}px`
+  tooltip.style.left = `${Math.max(8, Math.min(innerWidth - tooltip.offsetWidth - 8, box.left + box.width / 2 - tooltip.offsetWidth / 2))}px`
+  tooltip.style.top = `${box.bottom + 6 + tooltip.offsetHeight > innerHeight ? Math.max(8, box.top - tooltip.offsetHeight - 6) : box.bottom + 6}px`
+}
+const markAt = (target: EventTarget) =>
+  (target as Element)?.closest?.<HTMLElement>("[data-tl-tip]")
+document.addEventListener("mouseover", (e) => {
+  const slot = markAt(e.target)
+  if (slot) revealTooltip(slot)
+  else if (!tooltipSlot?.matches(":focus")) hideTooltip()
 })
+document.addEventListener("focusin", (e) => {
+  const slot = markAt(e.target)
+  if (slot) revealTooltip(slot)
+  else hideTooltip()
+})
+document.addEventListener("focusout", hideTooltip)
+document.addEventListener(
+  "click",
+  (e) => {
+    const slot = markAt(e.target)
+    if (!slot) return hideTooltip()
+    e.preventDefault()
+    e.stopPropagation()
+    revealTooltip(slot)
+  },
+  true
+)
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "Escape") hideTooltip()
+    const slot = markAt(e.target)
+    if (slot && ["Enter", " "].includes(e.key)) {
+      e.preventDefault()
+      e.stopPropagation()
+      revealTooltip(slot)
+    }
+  },
+  true
+)
+window.addEventListener("scroll", hideTooltip, true)
+window.addEventListener("resize", hideTooltip)
 
 const style = document.createElement("style")
 style.textContent = `
 [data-threadly-badges="off"] .tl-slot { display: none; }
 .tl-slot { display: inline-flex; align-items: center; flex: 0 0 auto; height: 20px; color: #5f6368; box-sizing: border-box; }
-.tl-left { width: 62px; gap: 12px; padding: 0 6px 0 4px; }
-.tl-right { width: 56px; justify-content: center; }
+.tl-left { width: 118px; gap: 10px; padding: 0 6px 0 4px; }
+.tl-right { width: 92px; gap: 5px; justify-content: center; }
+.tl-slot { cursor: help; font: 400 12px/20px Roboto, Arial, sans-serif; }
+.tl-slot:focus-visible { outline: 2px solid #08786f; outline-offset: -1px; border-radius: 4px; }
+.tl-reply-mark { display: inline-flex; align-items: center; gap: 5px; }
+.tl-word { display: inline-block; }
+[data-threadly-mark-words="false"] .tl-word { visibility: hidden; }
 .tl-slot svg { display: block; flex: 0 0 16px; }
 .tl-priority { display: inline-flex; }
 .tl-high { color: #c5372c; } .tl-medium { color: #a2620a; } .tl-low { color: #5f6368; }
 .tl-reply { display: inline-flex; color: #202124; }
 .tl-hairline { width: 5px; height: 1px; margin: 0 5.5px; background: currentColor; opacity: .45; }
-.tl-tooltip { position: fixed; z-index: 2147483647; pointer-events: none; padding: 4px 8px; border-radius: 4px; background: #3c4043; color: #fff; font: 500 12px/16px "Google Sans", Roboto, Arial, sans-serif; white-space: nowrap; }
+.tl-tooltip { position: fixed; z-index: 2147483647; pointer-events: none; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 4px 8px; border-radius: 4px; background: #3c4043; color: #fff; font: 500 12px/16px "Google Sans", Roboto, Arial, sans-serif; }
 [data-threadly-theme="dark"] .tl-slot { color: #9aa0a6; }
 [data-threadly-theme="dark"] .tl-high { color: #f28b82; }
 [data-threadly-theme="dark"] .tl-medium { color: #fdd663; }

@@ -1,0 +1,71 @@
+.inbox-marks-settings .inbox-marks-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.inbox-marks-example {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  opacity: 0.65;
+}
+.inbox-marks-sample {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 56px;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.inbox-marks-sample svg {
+  display: block;
+}
+.inbox-marks-sample-left,
+.inbox-marks-sample-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.inbox-marks-sample-left {
+  width: 72px;
+}
+.inbox-marks-sample-category {
+  width: 56px;
+}
+.inbox-marks-high {
+  color: #c5372c;
+}
+.inbox-marks-hidden {
+  visibility: hidden;
+}
+.inbox-marks-sample-subject {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.inbox-marks-sample strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-marks-settings .inbox-marks-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.inbox-marks-settings .inbox-marks-option input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: #08786f;
+}
+.inbox-marks-option:focus-within {
+  outline: 2px solid #08786f;
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+.dark .inbox-marks-high {
+  color: #f28b82;
+}

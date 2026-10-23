@@ -10,6 +10,7 @@ import {
 } from "../lib/security"
 import type { Capability, User } from "../lib/types"
 import { ConnectorDetails, ConnectorList, type ConnectorId } from "./Connectors"
+import { InboxMarksSettings } from "./InboxMarksSettings"
 
 export function Settings({
   user,
@@ -60,6 +61,7 @@ export function Settings({
         <h2>Settings</h2>
         <button onClick={onClose}>Back to chat</button>
       </div>
+      {!connector && <InboxMarksSettings />}
       {user && (
         <>
           {connector ? (
