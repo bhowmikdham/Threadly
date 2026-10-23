@@ -1,6 +1,12 @@
 # Security awareness implementation checkpoint
 
-Status: implemented locally, not released. Backend companion adds only optional
+Current correction prepared for 0.2.8: include unacknowledged mail received within
+the last 24 hours even when it arrived before installation. The user approved
+removing the 0.2.7 activation cutoff after a recent existing alert stayed quiet.
+Existing v1 acknowledgements, privacy salt and account references are preserved;
+there is no storage reset or migration and no backend change.
+
+The 0.2.7 implementation and backend companion are released. The companion adds only optional
 latest_incoming metadata from the existing owner-checked classification source
 read, based on Gmail internalDate. No new provider/model request or scope.
 
@@ -14,10 +20,10 @@ A bounded account/message presentation history prevents replay on row rerenders.
 Existing subject/snippet content, labels, words/icons, native controls are preserved.
 
 The background binds metadata to the authenticated mailbox, origin/user and exact
-last Gmail message ID. First classifier use after feature activation establishes
-an account baseline before source retrieval. Only receipts strictly after that
-baseline, not in the future and less than 24 hours old can prompt. Existing mail
-on first install, unknown identity/timestamp/order, old unread mail, and account
+last Gmail message ID. Protected storage is checked before source retrieval.
+Receipts not in the future and less than 24 hours old can prompt, including
+unacknowledged mail already in the inbox on first install or upgrade. Unknown
+identity/timestamp/order, old unread mail, and account
 mismatch fail closed. A new incoming message in an old thread has its own key.
 
 Protected local storage retains a random HMAC privacy salt, account-key/baseline/
@@ -31,9 +37,10 @@ allowlisted and confirmed before a successful acknowledgement is shown.
 
 Acknowledgements expire after 30 days with a global 1000-entry cap; active entries
 are never evicted to admit another question. At capacity, new prompts stop.
-Account baselines cap at 100 with 30-day inactivity expiry; reactivation resets
-baseline to now. Expired acknowledgements cannot revive old mail due to the
-24-hour and activation gates. Corrupt/unavailable storage and clock rollback
+Account records cap at 100 with 30-day inactivity expiry. Their original activation
+timestamps remain in the compatible v1 schema, but no longer gate eligibility.
+Expired acknowledgements cannot revive old mail due to the 24-hour gate.
+Corrupt/unavailable storage and clock rollback
 suppress awareness while ordinary inbox marks remain usable.
 
 Verification before PR: 287 frontend unit tests and TypeScript passed; full

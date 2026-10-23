@@ -107,7 +107,7 @@ test.afterAll(async () => {
   await rm(profile, { recursive: true, force: true })
 })
 
-test("only new provider-dated messages prompt; recognition persists and row reuse is safe", async () => {
+test("recent provider-dated messages before installation prompt; recognition persists and row reuse is safe", async () => {
   await expect(page.locator(".tl-security-cue")).toHaveCount(0)
   await page.evaluate(() => {
     const trace = ((window as any).securityMotionTrace = {
@@ -141,7 +141,9 @@ test("only new provider-dated messages prompt; recognition persists and row reus
   await page.addStyleTag({
     content: ".tl-security-row { animation-delay:250ms !important; }"
   })
-  await cache("aaa1")
+  // This receipt predates the saved account activation time, like mail already
+  // in the inbox when the extension was installed. The old month-old row stays quiet.
+  await cache("aaa1", 4 * 3600000)
   await reuse("aaa1")
   await expect(page.locator(".tl-security-row")).toHaveCount(1)
   await expect(page.locator(".tl-security-cue")).toHaveCount(0)
@@ -248,6 +250,10 @@ test("only new provider-dated messages prompt; recognition persists and row reus
     "snippet"
   ])
     expect(JSON.stringify(state)).not.toContain(forbidden)
+  await cache("aaa6", 25 * 3600000)
+  await reuse("aaa6")
+  await expect(page.locator(".tl-right[aria-label]")).toHaveCount(1)
+  await expect(cue).toHaveCount(0)
   await cache("aaa3", 0, false)
   await reuse("aaa3")
   await expect(page.locator(".tl-right[aria-label]")).toHaveCount(1)

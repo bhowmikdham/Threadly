@@ -11,13 +11,13 @@ export default function Updated() {
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
         <p className="update-intro">
-          A gentle cue for possible new security alerts.
+          A gentle cue for possible recent security alerts.
         </p>
         <section>
-          <h2>Notice new security alerts</h2>
+          <h2>Notice recent security alerts</h2>
           <p>
             A subtle glow fades away before a compact recognition check appears
-            for possible new security alerts. This is a subject cue only:
+            for possible recent security alerts. This is a subject cue only:
             Threadly has not verified the sender. No links open and no security
             actions are taken.
           </p>
@@ -25,11 +25,11 @@ export default function Updated() {
         <section>
           <h2>Recognise or dismiss, once per message</h2>
           <p>
-            Only mail received after activation and within 24 hours is eligible.
-            Recognised or dismissed messages stay quiet for 30 days. This
-            feature saves only opaque references, timestamps and your response
-            locally; it stores no email text. Hide Inbox marks in Settings to
-            hide the cue.
+            Unacknowledged mail received within the last 24 hours is eligible,
+            including mail that arrived before this update. Recognised or
+            dismissed messages stay quiet for 30 days. This feature saves only
+            opaque references, timestamps and your response locally; it stores
+            no email text. Hide Inbox marks in Settings to hide the cue.
           </p>
         </section>
         <a
