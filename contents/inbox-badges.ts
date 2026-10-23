@@ -12,6 +12,12 @@ import {
 } from "../lib/classification"
 import { gmailAccountEmail, gmailId, gmailIsDark } from "../lib/gmail-context"
 import { inboxMarks } from "../lib/inbox-marks"
+import {
+  DAY,
+  possibleSecuritySubject,
+  type Awareness,
+  type Recognition
+} from "../lib/security-awareness"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://mail.google.com/*"],
@@ -27,6 +33,7 @@ type Result = {
   until: number
   attempts: number
   code?: string
+  awareness?: Awareness | null
 }
 const results = new Map<string, Result>()
 const threads = new Map<string, { thread: string; last: string }>()
@@ -92,8 +99,14 @@ function slots(row: Element) {
 function render(row: Element) {
   const key = rowKey(row)
   const target = slots(row)
-  if (!key || !target) return
+  if (!key || !target) {
+    row.querySelector(".tl-security-cue")?.remove()
+    row.classList.remove("tl-security-row")
+    row.removeAttribute("data-tl-security-key")
+    return
+  }
   const r = results.get(key)
+  renderAwareness(row, key, r)
   const labels =
     r?.state === "done" &&
     r.until > Date.now() &&
@@ -229,7 +242,8 @@ async function classify(key: string, r: Result) {
       state: "done",
       value: reply.data,
       until: Date.parse(reply.data.valid_until),
-      attempts: 0
+      attempts: 0,
+      awareness: reply.awareness
     })
     show(true)
   } else if (
@@ -333,6 +347,7 @@ function scan() {
     preferencesReady && preferences.enabled && inInbox() ? "on" : "off"
   )
   if (!preferencesReady || !preferences.enabled || !inInbox()) {
+    clearAwareness()
     show(false)
     hideTooltip()
     return
@@ -343,6 +358,7 @@ function scan() {
     account = now
     generation += 1
     results.clear()
+    clearAwareness()
     queue.length = 0
     providerTries.clear()
     // The background still holds any server-side pause for the new account.
@@ -388,11 +404,20 @@ function applyPreferences(value: unknown, reset = false) {
     generation += 1
     queue.length = 0
     results.clear()
+    clearAwareness()
   }
   hideTooltip()
   scan()
 }
 chrome.runtime.onMessage.addListener((message, sender) => {
+  if (
+    sender.id === chrome.runtime.id &&
+    message?.type === "THREADLY_SECURITY_ACKED" &&
+    /^[a-f0-9]{64}$/.test(message.key)
+  ) {
+    suppressSecurityKey(message.key)
+    for (const row of onScreen) if (row.isConnected) render(row)
+  }
   if (
     sender.id === chrome.runtime.id &&
     message?.type === "THREADLY_INBOX_MARKS"
@@ -495,3 +520,273 @@ style.textContent = `
 [data-threadly-theme="dark"] .tl-tooltip { background: #e8eaed; color: #202124; }
 `
 document.head.append(style)
+
+// Email text remains in Gmail's DOM. Only the exact message reference and a
+// fixed recognition enum go to the protected background bridge.
+const suppressedSecurityKeys = new Set<string>()
+function suppressSecurityKey(key: string) {
+  suppressedSecurityKeys.add(key)
+  if (suppressedSecurityKeys.size > 1000)
+    suppressedSecurityKeys.delete(suppressedSecurityKeys.values().next().value)
+  // Forget the offer too: even an eventual bounded-memory eviction cannot re-prompt it.
+  for (const result of results.values())
+    if (result.awareness?.key === key) result.awareness = null
+}
+const SECURITY_GLOW_MS = 1400
+const SECURITY_REVEAL_MS = SECURITY_GLOW_MS + 160
+const securityMotion = matchMedia("(prefers-reduced-motion: reduce)")
+type Presentation = {
+  ready: boolean
+  started: boolean
+  entered: boolean
+  expiresAt: number
+  timer?: number
+  finishScheduled?: boolean
+}
+const securityPresentations = new Map<string, Presentation>()
+const renderSecurityRows = () => {
+  for (const row of onScreen) if (row.isConnected) render(row)
+}
+function securityPresentation(awareness: Awareness): Presentation {
+  let state = securityPresentations.get(awareness.key)
+  if (state) return state
+  for (const [key, old] of securityPresentations)
+    if (old.expiresAt <= Date.now()) {
+      clearTimeout(old.timer)
+      securityPresentations.delete(key)
+    }
+  // At the history bound show the static prompt, never replay an evicted glow.
+  if (securityPresentations.size >= 1000)
+    return {
+      ready: true,
+      started: true,
+      entered: true,
+      expiresAt: awareness.receivedAt + DAY
+    }
+  state = {
+    ready: securityMotion.matches,
+    started: false,
+    entered: false,
+    expiresAt: awareness.receivedAt + DAY
+  }
+  securityPresentations.set(awareness.key, state)
+  if (!state.ready) {
+    const finishIfIdle = (attempt = 0) => {
+      const running = Array.from(
+        document.querySelectorAll("[data-tl-security-key]")
+      )
+        .filter(
+          (row) => row.getAttribute("data-tl-security-key") === awareness.key
+        )
+        .some((row) => securityGlowRunning(row))
+      if (running) {
+        // Never truncate a delayed/pending animation to meet a timer deadline.
+        if (attempt < 20)
+          state.timer = window.setTimeout(() => finishIfIdle(attempt + 1), 100)
+        else state.timer = undefined // animationend still completes the sequence.
+      } else finishSecurityGlow(state)
+    }
+    state.timer = window.setTimeout(finishIfIdle, SECURITY_REVEAL_MS)
+  }
+  return state
+}
+securityMotion.addEventListener("change", () => {
+  if (!securityMotion.matches) return
+  for (const state of securityPresentations.values()) {
+    clearTimeout(state.timer)
+    state.timer = undefined
+    state.ready = true
+  }
+  renderSecurityRows()
+})
+function securityGlowRunning(row: Element) {
+  return row
+    .getAnimations()
+    .some(
+      (animation) =>
+        (animation as CSSAnimation).animationName === "tl-security-glow" &&
+        (animation.pending || animation.playState === "running")
+    )
+}
+function finishSecurityGlow(state: Presentation) {
+  if (state.ready || state.finishScheduled) return
+  state.finishScheduled = true
+  clearTimeout(state.timer)
+  state.timer = window.setTimeout(() => {
+    state.ready = true
+    state.timer = undefined
+    renderSecurityRows()
+  }, SECURITY_REVEAL_MS - SECURITY_GLOW_MS)
+}
+document.addEventListener("animationend", (event) => {
+  if (event.animationName !== "tl-security-glow") return
+  const row = event.target as Element
+  if (securityGlowRunning(row)) return
+  row.classList.remove("tl-security-row")
+  const state = securityPresentations.get(
+    row.getAttribute("data-tl-security-key")
+  )
+  if (state) finishSecurityGlow(state)
+})
+function clearAwareness() {
+  for (const cue of document.querySelectorAll(".tl-security-cue")) cue.remove()
+  for (const row of document.querySelectorAll("[data-tl-security-key]")) {
+    row.classList.remove("tl-security-row")
+    row.removeAttribute("data-tl-security-key")
+  }
+}
+function renderAwareness(row: Element, rowId: string, result?: Result) {
+  const existing = row.querySelector<HTMLElement>(".tl-security-cue")
+  const awareness = result?.awareness
+  const subject = row.querySelector(".bog")?.textContent || ""
+  const eligible =
+    preferences.enabled &&
+    inInbox() &&
+    result?.state === "done" &&
+    result.until > Date.now() &&
+    awareness &&
+    /^[a-f0-9]{64}$/.test(awareness.key) &&
+    awareness.receivedAt <= Date.now() &&
+    awareness.receivedAt > Date.now() - DAY &&
+    !suppressedSecurityKeys.has(awareness.key) &&
+    possibleSecuritySubject(subject)
+  if (!eligible) {
+    existing?.remove()
+    row.classList.remove("tl-security-row")
+    row.removeAttribute("data-tl-security-key")
+    return
+  }
+  if (row.getAttribute("data-tl-security-key") !== awareness.key) {
+    existing?.remove()
+    row.classList.remove("tl-security-row")
+    row.setAttribute("data-tl-security-key", awareness.key)
+  }
+  const state = securityPresentation(awareness)
+  if (!state.ready && !securityMotion.matches) {
+    if (!state.started) {
+      state.started = true
+      // Flush a previous message's animation before starting this new message.
+      void (row as HTMLElement).offsetWidth
+      row.classList.add("tl-security-row")
+    }
+    return
+  }
+  row.classList.remove("tl-security-row")
+  if (row.querySelector(".tl-security-cue")) return
+  const line = row.querySelector(".xT")
+  if (!line?.parentElement) return
+  const cue = document.createElement("div")
+  cue.className =
+    "tl-security-cue" +
+    (!state.entered && !securityMotion.matches ? " tl-security-reveal" : "")
+  state.entered = true
+  cue.dataset.rowId = rowId
+  cue.dataset.key = awareness.key
+  cue.setAttribute("role", "group")
+  cue.setAttribute("aria-label", "Email recognition check")
+  const text = document.createElement("span")
+  text.className = "tl-security-question"
+  text.textContent = "Do you recognise this email?"
+  const note = document.createElement("span")
+  note.className = "tl-security-note"
+  note.textContent = "Subject cue · sender not verified"
+  const copy = document.createElement("span")
+  copy.append(text, note)
+  cue.append(copy)
+  const actions = document.createElement("span")
+  actions.className = "tl-security-actions"
+  for (const [state, label] of [
+    ["recognised", "Recognise"],
+    ["dismissed", "Dismiss"]
+  ] as [Recognition, string][]) {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "tl-security-" + state
+    button.setAttribute(
+      "aria-label",
+      state === "recognised"
+        ? "I recognise this email"
+        : "Dismiss recognition check"
+    )
+    button.title = label
+    if (state === "recognised") {
+      const check = document.createElement("span")
+      check.className = "tl-security-check"
+      check.setAttribute("aria-hidden", "true")
+      check.textContent = "✓"
+      button.append(check, document.createTextNode(label))
+    } else {
+      const close = document.createElement("span")
+      close.setAttribute("aria-hidden", "true")
+      close.textContent = "×"
+      button.append(close)
+    }
+    button.addEventListener("click", async () => {
+      const hadFocus = cue.contains(document.activeElement)
+      const ids = threads.get(rowId)
+      if (!ids || rowKey(row) !== rowId) return
+      for (const b of cue.querySelectorAll("button")) b.disabled = true
+      let saved: any
+      try {
+        saved = await chrome.runtime.sendMessage({
+          type: "THREADLY_SECURITY_ACK",
+          threadId: ids.thread,
+          lastMessageId: ids.last,
+          timeZone,
+          accountEmail: account,
+          state
+        })
+      } catch {
+        /* No success indication until protected storage confirms. */
+      }
+      if (saved?.ok && saved.key === awareness.key) {
+        suppressSecurityKey(saved.key)
+        render(row)
+        if (hadFocus && rowKey(row) === rowId)
+          (row as HTMLElement).focus({ preventScroll: true })
+      } else if (cue.isConnected) {
+        for (const b of cue.querySelectorAll("button")) b.disabled = false
+        note.textContent = "Could not save. Please try again."
+        note.setAttribute("role", "status")
+      }
+    })
+    actions.append(button)
+  }
+  cue.append(actions)
+  cue.addEventListener("click", (e) => e.stopPropagation())
+  cue.addEventListener("mousedown", (e) => e.stopPropagation())
+  cue.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") e.stopPropagation()
+  })
+  line.after(cue)
+}
+const securityStyle = document.createElement("style")
+securityStyle.textContent = `
+.tl-security-cue { display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px 12px; width:max-content; max-width:100%; box-sizing:border-box; padding:8px 10px 8px 12px; margin:7px 0 5px; border:1px solid #e3e5e9; border-radius:12px; background:linear-gradient(135deg,#fff,#fafbfc); color:#25272c; box-shadow:0 2px 5px #1b233009,0 6px 18px #1b233008; white-space:normal; font:400 12px/17px "Google Sans",Roboto,Arial,sans-serif; }
+.tl-security-question,.tl-security-note { display:block; }
+.tl-security-question { font-size:13px; font-weight:500; letter-spacing:-.12px; line-height:19px; }
+.tl-security-note { margin-top:1px; font-size:10px; line-height:14px; color:#6c707b; }
+.tl-security-actions { display:inline-flex; align-items:center; gap:5px; margin-inline-start:auto; }
+.tl-security-cue button { appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; min-height:36px; padding:0 11px; border:1px solid transparent; border-radius:8px; background:none; color:inherit; font:500 12px/18px "Google Sans",Roboto,Arial,sans-serif; white-space:nowrap; transition:background-color 140ms,box-shadow 140ms; }
+.tl-security-cue .tl-security-recognised { background:#292c32; color:#fff; box-shadow:0 1px 2px #1118271a; }
+.tl-security-cue .tl-security-recognised:hover { background:#41464f; }
+.tl-security-check { font-size:12px; opacity:.8; }
+.tl-security-cue .tl-security-dismissed { width:36px; padding:0; color:#727783; font-size:21px; font-weight:400; }
+.tl-security-cue .tl-security-dismissed:hover { background:#eceef2; color:#282c34; }
+.tl-security-cue button:focus-visible { outline:2px solid #586cc2; outline-offset:2px; }
+.tl-security-cue button:disabled { cursor:default; opacity:.5; }
+.tl-security-row { --tl-glow-line:#8a98d44d; --tl-glow-fill:#98a7e52e; animation:tl-security-glow ${SECURITY_GLOW_MS}ms cubic-bezier(.2,.65,.25,1) 1; }
+@keyframes tl-security-glow { 0% { box-shadow:inset 0 0 0 1px transparent,inset 0 0 0 transparent; } 28% { box-shadow:inset 0 0 0 1px var(--tl-glow-line),inset 0 0 32px var(--tl-glow-fill); } 62% { box-shadow:inset 0 0 0 1px var(--tl-glow-line),inset 0 0 26px var(--tl-glow-fill); } 100% { box-shadow:inset 0 0 0 1px transparent,inset 0 0 0 transparent; } }
+.tl-security-reveal { animation:tl-security-reveal 180ms cubic-bezier(.2,.7,.3,1) 1; }
+@keyframes tl-security-reveal { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
+[data-threadly-theme="dark"] .tl-security-row { --tl-glow-line:#9eace645; --tl-glow-fill:#9aa9f329; }
+[data-threadly-theme="dark"] .tl-security-cue { background:linear-gradient(135deg,#2c2f35,#282b30); color:#eceef3; border-color:#43474f; box-shadow:0 2px 5px #0002,0 6px 18px #0002; }
+[data-threadly-theme="dark"] .tl-security-note { color:#afb5c1; }
+[data-threadly-theme="dark"] .tl-security-cue .tl-security-recognised { background:#e4e7ef; color:#262930; box-shadow:0 1px 2px #0002; }
+[data-threadly-theme="dark"] .tl-security-cue .tl-security-recognised:hover { background:#fff; }
+[data-threadly-theme="dark"] .tl-security-cue .tl-security-dismissed { color:#afb5c1; }
+[data-threadly-theme="dark"] .tl-security-cue .tl-security-dismissed:hover { background:#41464e; color:#f1f3f8; }
+@media(prefers-reduced-motion:reduce) { .tl-security-row,.tl-security-reveal { animation:none; } .tl-security-cue button { transition:none; } }
+[data-threadly-badges="off"] .tl-security-cue { display:none; }
+`
+document.head.append(securityStyle)
