@@ -7,7 +7,7 @@
 <meta name="description" content="Threadly brings email search, summaries, drafts and Google Calendar assistance into Gmail.">
 <meta name="theme-color" content="#efebe3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#100f0e" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMiAxNiI+PHJlY3Qgd2lkdGg9IjIyIiBoZWlnaHQ9IjE2IiBmaWxsPSIjZWZlYmUzIi8+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjIxZTE4IiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNNi43IDUuMkEzLjUgMy41IDAgMSAwIDYuNyAxMS44Ii8+PHBhdGggZD0iTTkuMyA1LjJBMy41IDMuNSAwIDEgMSA5LjMgMTEuOCIvPjwvZz48Y2lyY2xlIGN4PSIxOC42IiBjeT0iOC41IiByPSIxLjkiIGZpbGw9IiNiODg0MmEiLz48L3N2Zz4=">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2VmZWJlMyIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAgMTIwKSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMWQyMjM1IiBzdHJva2Utd2lkdGg9IjM0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05NiAxMzJDOTYgOTAgMTM0IDY0IDE4NCA2NGM1NCAwIDkwIDQwIDkwIDg2IDAgMzgtMjIgNTgtNTQgNTgtMzggMC02OC0yNi03MC03NiIvPjxwYXRoIGQ9Ik0zMjYgMTMwYzEwIDUwIDQ4IDc4IDkyIDc4IDQ0IDAgNzItMjggNzItNjggMC00Ni0zOC03Ni04OC03Ni01OCAwLTEwMCAyMC0xMjIgNDQiLz48L2c+PC9zdmc+">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Threadly for Gmail">
 <meta property="og:description" content="Threadly brings email search, summaries, drafts and Google Calendar assistance into Gmail.">
@@ -18,11 +18,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
 
-<link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/site.css?v=threadly-logo-1">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
-  <symbol id="tl-mark" viewBox="0 0 16 16"><path d="M6.7 5.2A3.5 3.5 0 1 0 6.7 11.8"/><path d="M9.3 5.2A3.5 3.5 0 1 1 9.3 11.8"/></symbol>
+  <!-- Existing extension Logo artwork (components/Icon.tsx), without redrawing. -->
+  <symbol id="tl-mark" viewBox="76 44 434 184"><g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"><path d="M96 132C96 90 134 64 184 64c54 0 90 40 90 86 0 38-22 58-54 58-38 0-68-26-70-76"/><path d="M326 130c10 50 48 78 92 78 44 0 72-28 72-68 0-46-38-76-88-76-58 0-100 20-122 44"/></g></symbol>
   <symbol id="tl-high" viewBox="0 0 16 16"><path d="M3.4 7.9 8 3.6l4.6 4.3"/><path d="M3.4 12.4 8 8.1l4.6 4.3"/></symbol>
   <symbol id="tl-medium" viewBox="0 0 16 16"><path d="M3.4 10.2 8 5.9l4.6 4.3"/></symbol>
   <symbol id="tl-low" viewBox="0 0 16 16"><path d="M3.4 5.9 8 10.2l4.6-4.3"/></symbol>
@@ -58,7 +59,7 @@
   <div class="wrap head-in">
     <a class="brand" href="#top" aria-label="Threadly, back to top">
       <span class="lockup">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#tl-mark"/></svg>
+        <svg class="brand-mark" viewBox="0 0 434 184" aria-hidden="true"><use href="#tl-mark"/></svg>
         <b>Threadly</b>
       </span>
       <span class="live-dot" aria-hidden="true"></span>
@@ -370,7 +371,7 @@
           <h3 class="h3">Threadly drafts</h3>
           <p>It reads the thread, works out what is actually being asked, and writes a reply in your voice.</p>
           <span class="loop-tag">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#tl-mark"/></svg>
+            <svg class="brand-mark" viewBox="0 0 434 184" aria-hidden="true"><use href="#tl-mark"/></svg>
             Written by Threadly
           </span>
         </div>
@@ -443,7 +444,7 @@
         <p style="font-size:13.5px;margin-top:14px;margin-bottom:0">Desktop early access. Public Google signup and store distribution are not yet available.</p>
       </div>
       <div class="install-mark" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><use href="#tl-mark"/></svg>
+        <svg class="brand-mark" viewBox="0 0 434 184" aria-hidden="true"><use href="#tl-mark"/></svg>
       </div>
     </div>
   </section>
@@ -453,7 +454,7 @@
   <div class="wrap foot-in">
     <a class="brand" href="#top" aria-label="Threadly">
       <span class="lockup">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#tl-mark"/></svg>
+        <svg class="brand-mark" viewBox="0 0 434 184" aria-hidden="true"><use href="#tl-mark"/></svg>
         <b>Threadly</b>
       </span>
     </a>
@@ -465,6 +466,6 @@
 </footer>
 
 <script type="module" src="/extension-version.js?v=2"></script>
-<script type="module" src="/site.js"></script>
+<script type="module" src="/site.js?v=threadly-logo-1"></script>
 </body>
 </html>
