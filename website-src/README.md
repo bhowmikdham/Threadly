@@ -42,7 +42,7 @@ page before checking the download. Existing unpacked installations are unchanged
 
 The video beside “The marks” is the user-selected `threadly-classifiers.mp4`:
 20 seconds, 1920×1080, 30 fps, H.264 High profile level 4.0, with no audio track.
-It animates the same fictional inbox fixtures used by this page. Its caption
+It animates the same fictional inbox fixtures used by this page. The existing section text
 retains the distinction between the design concept and released functionality.
 The supplied video has not been redrawn or re-encoded. Its original SHA-256 is
 `3558fca54c9ab52aab86ce1251fb8182614e40e5431dea6afa6a31143f4909c4`.
