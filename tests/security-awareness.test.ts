@@ -215,3 +215,31 @@ it("suppresses new prompts at capacity without evicting active acknowledgements"
   expect(await s.check("account", f.meta())).toBeNull()
   expect(f.read().acknowledgements).toHaveLength(ACK_CAP)
 })
+
+it("keeps one first acknowledgement under concurrent conflicting responses", async () => {
+  const f = fixture(),
+    s = f.make()
+  await s.check("account", null)
+  f.advance(1)
+  const responses = await Promise.all([
+    s.check("account", f.meta(), "recognised"),
+    s.check("account", f.meta(), "dismissed")
+  ])
+  expect(responses[0]).toEqual(responses[1])
+  expect(f.read().acknowledgements).toHaveLength(1)
+  expect(f.read().acknowledgements[0].state).toBe("recognised")
+})
+
+it("purges expired references at worker startup without creating new state", async () => {
+  const f = fixture(),
+    s = f.make()
+  await s.prune()
+  expect(f.read()).toBeUndefined()
+  await s.check("account", null)
+  f.advance(1)
+  await s.check("account", f.meta(), "recognised")
+  f.advance(RETENTION + 1)
+  await f.make().prune()
+  expect(f.read().accounts).toHaveLength(0)
+  expect(f.read().acknowledgements).toHaveLength(0)
+})

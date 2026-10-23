@@ -10,7 +10,7 @@ import {
 } from "@playwright/test"
 
 let context: BrowserContext, page: Page, setup: Page, profile: string
-const fixture = `<!doctype html><html><head><style>body{font:14px Arial;margin:0}table{width:100%;table-layout:fixed;border-collapse:collapse}td{padding:6px;overflow:hidden}.xT{display:flex;align-items:center;overflow:hidden;white-space:nowrap}.y6{min-width:0;overflow:hidden}.y2{color:#687078}.sender{width:110px}.when{width:60px}tr{border-bottom:1px solid #ddd}button{font:inherit}</style></head><body><div aria-label="Google Account: Synthetic (tester@example.test)">Synthetic Gmail fixture</div><div role="main"><table><tr class="zA" tabindex="0"><td style="width:24px"><input type="checkbox" aria-label="Select synthetic message"></td><td style="width:24px"><button aria-label="Star synthetic message">☆</button></td><td class="sender">Example sender</td><td><div class="xS"><div class="xT"><div class="y6"><span class="bog" data-legacy-thread-id="aaa" data-legacy-last-message-id="aaa0">Security alert</span></div><span class="y2"> — Synthetic preview</span></div></div></td><td class="when">12:00</td></tr></table></div><script>document.querySelector('tr').addEventListener('click',e=>{if(!e.target.closest('button,input'))document.body.dataset.opened='yes'})</script></body></html>`
+const fixture = `<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px Arial;margin:0;background:#fff;color:#202124}table{width:100%;table-layout:fixed;border-collapse:collapse}td{padding:6px;overflow:hidden}.xT{display:flex;align-items:center;overflow:hidden;white-space:nowrap}.y6{min-width:0;overflow:hidden}.y2{color:#687078}.sender{width:110px}.when{width:60px}tr{border-bottom:1px solid #ddd}button{font:inherit}</style></head><body><div aria-label="Google Account: Synthetic (tester@example.test)">Synthetic Gmail fixture</div><div role="main"><table><tr class="zA zE" tabindex="0"><td style="width:24px"><input type="checkbox" aria-label="Select synthetic message"></td><td style="width:24px"><button aria-label="Star synthetic message">☆</button></td><td class="sender">Example sender</td><td><div class="xS"><div class="xT"><div class="y6"><span class="bog" data-legacy-thread-id="aaa" data-legacy-last-message-id="aaa0">Security alert</span></div><span class="y2"> — Synthetic preview</span></div></div></td><td class="when">12:00</td></tr></table></div><script>document.querySelector('tr').addEventListener('click',e=>{if(!e.target.closest('button,input'))document.body.dataset.opened='yes'})</script></body></html>`
 async function cache(id: string, age = 0, metadata = true) {
   await setup.evaluate(
     async ({ id, age, metadata }) => {
@@ -194,6 +194,49 @@ test("words/icons, account isolation, disabled marks and unavailable storage fai
   await cache("bbb1")
   await reuse("bbb1")
   await expect(page.locator(".tl-security-cue")).toBeVisible()
+  for (const id of [null, "invalid-thread-id"]) {
+    await page.locator(".bog").evaluate((el, id) => {
+      if (id === null) el.removeAttribute("data-legacy-thread-id")
+      else el.setAttribute("data-legacy-thread-id", id)
+    }, id)
+    await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+    await expect(page.locator(".tl-security-row")).toHaveCount(0)
+    await page
+      .locator(".bog")
+      .evaluate((el) => el.setAttribute("data-legacy-thread-id", "aaa"))
+    await expect(page.locator(".tl-security-cue")).toBeVisible()
+  }
+  await page.locator(".xT").evaluate((el) => {
+    ;(window as any).syntheticLine = el
+    el.remove()
+  })
+  await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+  await page
+    .locator(".xS")
+    .evaluate((el) => el.prepend((window as any).syntheticLine))
+  await expect(page.locator(".tl-security-cue")).toBeVisible()
+  // Explicit dark and light Gmail backgrounds retain a visible static cue.
+  for (const dark of [true, false]) {
+    await page.locator("body").evaluate((el, dark) => {
+      el.style.backgroundColor = dark ? "#202124" : "#fff"
+      el.style.color = dark ? "#eee" : "#202124"
+    }, dark)
+    await page.evaluate(() =>
+      window.dispatchEvent(new HashChangeEvent("hashchange"))
+    )
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-threadly-theme",
+      dark ? "dark" : "light"
+    )
+    await expect(page.locator(".tl-security-cue")).toBeVisible()
+    if (process.env.THREADLY_SECURITY_SCREENSHOT_DIR)
+      await page.screenshot({
+        path: path.join(
+          process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
+          `security-theme-${dark ? "dark" : "light"}.png`
+        )
+      })
+  }
   await setup.evaluate(() =>
     chrome.storage.local.set({
       threadlyInboxMarks: { enabled: true, words: false }

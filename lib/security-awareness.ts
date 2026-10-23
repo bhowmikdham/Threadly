@@ -56,7 +56,8 @@ export function incomingMetadata(
     data?.thread_id !== thread ||
     data.source !== "live_gmail" ||
     data.persisted !== false ||
-    !data.source_message_ids?.includes(last) ||
+    !Array.isArray(data.source_message_ids) ||
+    !data.source_message_ids.includes(last) ||
     m?.message_id !== last ||
     m.timestamp_source !== "gmail.internalDate" ||
     typeof m.received_at !== "string" ||
@@ -174,6 +175,13 @@ export class SecurityAwarenessStore {
       (a) => a.acknowledgedAt > now - RETENTION && a.acknowledgedAt <= now
     )
     return s
+  }
+  /** Purge expired state on worker startup as well as each use; create nothing. */
+  prune(): Promise<void> {
+    return this.serial(async () => {
+      if ((await this.store.read()) !== undefined)
+        await this.store.write(await this.load(this.clock()))
+    })
   }
   /** scope is authenticated origin/user/mailbox; only its keyed hash is retained. */
   check(

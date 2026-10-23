@@ -40,8 +40,10 @@ async function withAwareness(
   s: Session,
   data: any,
   thread: string,
-  last: string
+  last: string,
+  run: number
 ) {
+  if (run !== sessionGeneration) return { ok: false, code: "account_mismatch" }
   let awareness = null
   try {
     awareness = await awarenessStore.check(
@@ -51,7 +53,9 @@ async function withAwareness(
   } catch {
     /* Unavailable storage hides awareness; existing badges remain usable. */
   }
-  return { ok: true, data, awareness }
+  return run === sessionGeneration
+    ? { ok: true, data, awareness }
+    : { ok: false, code: "account_mismatch" }
 }
 function mutateSession<T>(operation: () => Promise<T>): Promise<T> {
   const result = sessionWriteTail.then(operation)
@@ -79,6 +83,7 @@ const storageReady = (async () => {
 })()
 // Every message awaits this promise; startup failure must not leak an unhandled rejection.
 void storageReady.catch(() => {})
+void storageReady.then(() => awarenessStore.prune()).catch(() => {})
 chrome.runtime.onInstalled.addListener(async (details) => {
   await storageReady
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
@@ -390,6 +395,7 @@ async function keepClassification(key: string, data: any) {
   await chrome.storage.session.set({ [key]: data })
 }
 async function classifyThread(message: any) {
+  const run = sessionGeneration
   const allowed = async () =>
     inboxMarks(
       (await chrome.storage.local.get(INBOX_MARKS_KEY))[INBOX_MARKS_KEY]
@@ -429,7 +435,7 @@ async function classifyThread(message: any) {
   const key = `classification:${s.user.id}:${threadId}:${lastMessageId}:${timeZone}`
   const kept = (await chrome.storage.session.get(key))[key]
   if (kept && Date.parse(kept.valid_until) > Date.now())
-    return withAwareness(s, kept, threadId, lastMessageId)
+    return withAwareness(s, kept, threadId, lastMessageId, run)
   if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
   if (classifying >= 2)
     await new Promise<void>((resolve) => classifyWaiting.push(resolve))
@@ -437,6 +443,8 @@ async function classifyThread(message: any) {
   try {
     // A pause may have started while this request waited for a slot.
     if (!(await allowed())) return { ok: false, code: "inbox_marks_disabled" }
+    if (run !== sessionGeneration)
+      return { ok: false, code: "account_mismatch" }
     if (pauseLeft(s.user.id) > 0) return cooldown(s.user.id)
     const data = await transport(
       s.origin,
@@ -447,11 +455,12 @@ async function classifyThread(message: any) {
       60000
     )
     if (
+      run === sessionGeneration &&
       data?.thread_id === threadId &&
       Date.parse(data.valid_until) > Date.now()
     )
       await keepClassification(key, data)
-    return withAwareness(s, data, threadId, lastMessageId)
+    return withAwareness(s, data, threadId, lastMessageId, run)
   } catch (error) {
     const wait = error.retryAfterSeconds
     if (wait) {
@@ -537,7 +546,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         message.state
       )
       if (!saved || run !== sessionGeneration) return { ok: false }
-      const tabs = await chrome.tabs.query({ url: "https://mail.google.com/*" })
+      const tabs = await chrome.tabs
+        .query({ url: "https://mail.google.com/*" })
+        .catch(() => [])
       await Promise.all(
         tabs
           .filter((t) => t.id !== undefined)

@@ -99,7 +99,11 @@ function slots(row: Element) {
 function render(row: Element) {
   const key = rowKey(row)
   const target = slots(row)
-  if (!key || !target) return
+  if (!key || !target) {
+    row.querySelector(".tl-security-cue")?.remove()
+    row.classList.remove("tl-security-row")
+    return
+  }
   const r = results.get(key)
   renderAwareness(row, key, r)
   const labels =
@@ -410,7 +414,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     message?.type === "THREADLY_SECURITY_ACKED" &&
     /^[a-f0-9]{64}$/.test(message.key)
   ) {
-    suppressedSecurityKeys.add(message.key)
+    suppressSecurityKey(message.key)
     for (const row of onScreen) if (row.isConnected) render(row)
   }
   if (
@@ -519,6 +523,14 @@ document.head.append(style)
 // Email text remains in Gmail's DOM. Only the exact message reference and a
 // fixed recognition enum go to the protected background bridge.
 const suppressedSecurityKeys = new Set<string>()
+function suppressSecurityKey(key: string) {
+  suppressedSecurityKeys.add(key)
+  if (suppressedSecurityKeys.size > 1000)
+    suppressedSecurityKeys.delete(suppressedSecurityKeys.values().next().value)
+  // Forget the offer too: even an eventual bounded-memory eviction cannot re-prompt it.
+  for (const result of results.values())
+    if (result.awareness?.key === key) result.awareness = null
+}
 function clearAwareness() {
   for (const cue of document.querySelectorAll(".tl-security-cue")) cue.remove()
   for (const row of document.querySelectorAll(".tl-security-row"))
@@ -591,7 +603,7 @@ function renderAwareness(row: Element, rowId: string, result?: Result) {
         /* No success indication until protected storage confirms. */
       }
       if (saved?.ok && saved.key === awareness.key) {
-        suppressedSecurityKeys.add(saved.key)
+        suppressSecurityKey(saved.key)
         render(row)
         if (hadFocus && rowKey(row) === rowId)
           (row as HTMLElement).focus({ preventScroll: true })

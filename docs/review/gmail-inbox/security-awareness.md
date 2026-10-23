@@ -34,18 +34,28 @@ baseline to now. Expired acknowledgements cannot revive old mail due to the
 24-hour and activation gates. Corrupt/unavailable storage and clock rollback
 suppress awareness while ordinary inbox marks remain usable.
 
-Local checks: 285 frontend unit tests, TypeScript, four focused packaged browser
-tests (security awareness and existing row layouts), plus one separate public
-origin smoke passed. Synthetic screenshots at 1440/640 inspected; current fixture
-has a transparent body and is detected as dark, so verify explicit light/dark
-fixtures before final acceptance. Backend focused classification/metadata/assets
-suite: 70 passed; backend Ruff clean. Full backend PostgreSQL CI, full packaged
-browser suite, independent source review, release CI/public artifact acceptance
-and deployment remain pending. No real inbox/provider/model test was run.
+Verification before PR: 287 frontend unit tests and TypeScript passed; full
+localhost packaged browser suite 60 passed (HTTPS-only smoke separately). Final
+public build passed five focused browser tests including both snippet structures,
+security-awareness interactions, missing/invalid reused-row identities, removed
+row structure, explicit light/dark/narrow layouts and the public-origin smoke.
+Backend focused classification/metadata/assets suite: 71 passed; Ruff clean.
+Full PostgreSQL and deployment/Flow checks run in companion PR144's backend CI.
+No real mailbox/provider/model test was run.
+
+Independent source review found one P2: an existing cue survived when Gmail
+cleared a reused row's identity/subject structure. The fix removes cue/glow before
+render's early return; synthetic missing/invalid ID and removed-line regressions
+pass. No other concrete blocking findings. Additional review fixes fence late
+responses to the current session, bound in-page suppression, preserve the first
+concurrent acknowledgement and purge expired references on worker startup/use.
+Expiry is logical at 30 days and physical cleanup happens on startup/next use.
 
 Release isolation: currently deployed backend is 8970bd4b7cb8ce504a672b6eb37d275ef8b14971,
-public-launch. release/backend additionally contains unshipped calendar PR140
-(6ae527e). Companion is based on deployed 8970bd4 so it contains no new calendar
-changes. Select a reviewed, merged maintenance release route from that baseline;
-never deploy current release/backend head as part of this task. Frontend version
-is prepared as 0.2.7 from released 0.2.6; no PR/push/merge/deploy has happened yet.
+public-launch. release/backend additionally contains unshipped calendar PR140.
+Companion PR144 targets release/security-awareness based on deployed 8970bd4,
+using the same complete backend CI gates and immutable tested-tree requirement.
+The integration history is preserved. Backend rollout must leave the current
+Caddy container, independently deployed logo site and download mounts unchanged.
+Frontend version is 0.2.7 from released 0.2.6. Both releases remain subject to
+CI, reviewed merges and deployed/public artifact acceptance.
