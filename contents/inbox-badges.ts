@@ -74,6 +74,7 @@ function slots(row: Element) {
   const line = row.querySelector(".xT")
   const subject = line?.querySelector(":scope > .y6")
   if (!line || !subject) return null
+  line.classList.add("tl-inbox-line")
   let left = line.querySelector<HTMLElement>(":scope > .tl-left")
   let right = line.querySelector<HTMLElement>(":scope > .tl-right")
   if (!left) {
@@ -327,6 +328,10 @@ let pending = 0
 function scan() {
   pending = 0
   root.setAttribute("data-threadly-mark-words", String(preferences.words))
+  root.setAttribute(
+    "data-threadly-inbox-compact",
+    preferencesReady && preferences.enabled && inInbox() ? "on" : "off"
+  )
   if (!preferencesReady || !preferences.enabled || !inInbox()) {
     show(false)
     hideTooltip()
@@ -465,9 +470,13 @@ const style = document.createElement("style")
 style.textContent = `
 [data-threadly-badges="off"] .tl-slot { display: none; }
 .tl-slot { display: inline-flex; align-items: center; flex: 0 0 auto; height: 20px; color: #5f6368; box-sizing: border-box; }
-.tl-left { width: 118px; gap: 10px; padding: 0 6px 0 4px; }
-.tl-right { width: 92px; gap: 5px; justify-content: center; }
-.tl-slot { cursor: help; font: 400 12px/20px Roboto, Arial, sans-serif; }
+.tl-left { width: 104px; gap: 8px; padding: 0 6px 0 4px; }
+.tl-right { width: 88px; gap: 5px; justify-content: center; }
+.tl-slot { cursor: default; font: 400 12px/20px Roboto, Arial, sans-serif; }
+[data-threadly-inbox-compact="on"] .tl-inbox-line .y2 { display: inline-block; flex: 0 100 auto; min-inline-size: 0; max-inline-size: 24ch; margin-inline-start: .35em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+[data-threadly-inbox-compact="on"] .tl-inbox-line > .tl-right { margin-inline-start: auto; }
+@media (max-width: 1000px) { [data-threadly-inbox-compact="on"] .tl-inbox-line .y2 { max-inline-size: 16ch; } }
+@media (max-width: 700px) { [data-threadly-inbox-compact="on"] .tl-inbox-line .y2 { max-inline-size: 8ch; } }
 .tl-slot:focus-visible { outline: 2px solid #08786f; outline-offset: -1px; border-radius: 4px; }
 .tl-reply-mark { display: inline-flex; align-items: center; gap: 5px; }
 .tl-word { display: inline-block; }

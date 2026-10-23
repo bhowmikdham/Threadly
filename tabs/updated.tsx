@@ -10,19 +10,21 @@ export default function Updated() {
         <Logo height={40} />
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
-        <p className="update-intro">Make your inbox easier to scan.</p>
+        <p className="update-intro">A calmer inbox, with shorter previews.</p>
         <section>
-          <h2>Your inbox, with clearer marks</h2>
+          <h2>Shorter previews, clear subjects</h2>
           <p>
-            Priority chevrons, reply marks and categories help you spot what
-            needs attention. Hover, focus or tap any mark for its meaning.
+            Preview snippets after each subject take up less space. The original
+            subject and message stay intact, with priority, reply and category
+            marks still available.
           </p>
         </section>
         <section>
-          <h2>Prefer words?</h2>
+          <h2>Your display choices stay with you</h2>
           <p>
-            Open Settings to preview words beside the reply and category icons.
-            You can hide inbox marks at any time. Your messages stay in place.
+            Your words/icons preference is unchanged. Hover, focus or tap a mark
+            for its meaning, now with a normal pointer. Hide marks in Settings
+            to return to Gmail’s original preview layout.
           </p>
         </section>
         <a

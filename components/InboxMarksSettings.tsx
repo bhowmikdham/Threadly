@@ -61,7 +61,7 @@ export function InboxMarksSettings() {
       <h3 id="inbox-marks-heading">A more readable inbox</h3>
       <p className="muted">
         Priority, reply and category marks help you scan Gmail. They leave every
-        message in place.
+        message in place, with shorter preview snippets after the subject.
       </p>
       <div
         className="inbox-marks-preview"
