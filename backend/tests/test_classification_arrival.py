@@ -57,3 +57,24 @@ async def test_existing_read_exposes_metadata_without_extra_provider_work(pipeli
     old_client = result.model_dump()
     old_client.pop("latest_incoming")
     assert ClassificationResponse.model_validate(old_client).latest_incoming is None
+
+
+def test_receipt_comes_from_provider_not_untrusted_date_header():
+    from app.mail.live import normalize
+
+    raw = {"id": "abc123", "messages": [{
+        "id": "def456", "threadId": "abc123", "labelIds": ["INBOX"],
+        "internalDate": "1790031600000", "payload": {
+            "mimeType": "text/plain", "headers": [
+                {"name": "From", "value": "sender@example.test"},
+                {"name": "To", "value": "me@example.test"},
+                {"name": "Date", "value": "Fri, 23 Oct 2026 09:00:00 +0000"},
+            ], "body": {"data": ""},
+        },
+    }]}
+    messages = normalize(raw, "abc123", "me@example.test")
+    assert messages[0]["sent_at"] != messages[0]["received_at"]
+    result = service.latest_incoming(messages)
+    assert result.received_at == datetime(2026, 9, 21, 23, tzinfo=UTC)
+    raw["messages"][0].pop("internalDate")
+    assert service.latest_incoming(normalize(raw, "abc123", "me@example.test")) is None
