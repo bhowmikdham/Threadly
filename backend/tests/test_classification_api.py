@@ -52,8 +52,9 @@ def badges(setup, monkeypatch, db_sessionmaker):  # noqa: F811 - shared pytest f
 
 
 async def test_authenticated_badges_store_no_source_or_classification(
-    badges, secure_db_client, db_sessionmaker,
+    badges, secure_db_client, db_sessionmaker, caplog,
 ):
+    caplog.set_level("INFO", logger="uvicorn.error")
     response = secure_db_client.post(URL, json={"time_zone": "Australia/Melbourne"},
                                      headers=headers())
     assert response.status_code == 200, response.text
@@ -64,6 +65,15 @@ async def test_authenticated_badges_store_no_source_or_classification(
     assert body["evidence"]["category"] == ["def456"]
     assert response.headers["cache-control"] == "no-store"
     assert "PRIVATE-SOURCE-MARKER" not in response.text
+    assert body["latest_incoming"] == {
+        "message_id": "def456", "received_at": "2026-09-21T23:00:00Z",
+        "timestamp_source": "gmail.internalDate",
+    }
+    assert len(badges[0].calls) == 2
+    assert "classification_request outcome=classified code=ok" in caplog.text
+    assert not any(value in caplog.text for value in (
+        "PRIVATE-SOURCE-MARKER", "def456", "abc123", "sender@example.test",
+    ))
     async with db_sessionmaker() as session:
         for model in (Thread, Message, ContextSnapshot):
             assert await session.scalar(select(func.count()).select_from(model)) == 0

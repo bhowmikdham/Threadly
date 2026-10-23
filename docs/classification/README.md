@@ -227,3 +227,16 @@ mock/fixture passes establish production accuracy.
 - [TypeScript types and display mappings](types.ts).
 - [Verification record](VERIFICATION.md).
 - [Visual Flow provisioning and candidate evaluation](VISUAL-FLOWS.md).
+
+## Incoming-message metadata for local awareness
+
+`latest_incoming` is an optional nullable object with `message_id`, `received_at`
+and fixed `timestamp_source: "gmail.internalDate"`. It comes from the existing
+authenticated, owner/version-checked source read; no extra Gmail request, scope,
+model input, logging, database record or classification policy is added. Unknown
+receipt/order, a tied latest timestamp, or an outgoing/draft/non-inbox latest
+message yields null. The client must match the exact latest Gmail message ID;
+thread position, unread status and classification time do not establish recency.
+This metadata is not evidence of security relevance or sender authenticity.
+Older clients may ignore the additive field; older responses without it remain
+valid and awareness clients fail closed. No migration/configuration is needed.

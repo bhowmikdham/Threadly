@@ -10,6 +10,15 @@ Merge into `release/backend` and deploy an immutable commit whose complete sourc
 tree passed backend CI. If using a pre-merge CI result, verify exact Git tree
 identity with the merged commit; otherwise wait for the merged commit's CI.
 Record the tested and deployed SHAs and the release-branch CI result.
+
+If the integration branch contains unrelated undeployed features, isolate a
+maintenance branch at the host-recorded current commit, merge the narrowly scoped
+patch through a reviewed PR into that branch, and apply the same complete backend
+CI gates. Pull-request CI supports maintenance bases without workflow changes.
+Verify the merged tree matches the successful tested tree (or dispatch backend CI
+on the merged maintenance ref) before deploying its immutable commit. Preserve
+`release/backend` history; do not reset it or deploy its unrelated changes. Record
+the maintenance base, PR, CI/tree identity and rollback commit in release evidence.
 Backend CI includes classification fixtures, Flow pinning,
 provisioning and the rendered Haiku role template. Follow the existing
 [EC2 deployment runbook](../../infra/deploy/ec2/APP-DEPLOYMENT.md), preserving the

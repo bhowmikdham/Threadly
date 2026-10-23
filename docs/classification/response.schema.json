@@ -57,6 +57,34 @@
       "title": "Evidence",
       "type": "object"
     },
+    "IncomingMessage": {
+      "additionalProperties": false,
+      "description": "Provider metadata only; never a security/authenticity verdict.",
+      "properties": {
+        "message_id": {
+          "pattern": "^[a-f0-9]{1,32}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "received_at": {
+          "format": "date-time",
+          "title": "Received At",
+          "type": "string"
+        },
+        "timestamp_source": {
+          "const": "gmail.internalDate",
+          "default": "gmail.internalDate",
+          "title": "Timestamp Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "received_at"
+      ],
+      "title": "IncomingMessage",
+      "type": "object"
+    },
     "Labels": {
       "additionalProperties": false,
       "properties": {
@@ -204,6 +232,17 @@
       "default": false,
       "title": "Persisted",
       "type": "boolean"
+    },
+    "latest_incoming": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IncomingMessage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
