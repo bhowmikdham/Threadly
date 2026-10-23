@@ -16,9 +16,10 @@ export default function Updated() {
         <section>
           <h2>Notice new security alerts</h2>
           <p>
-            A subtle glow and a question can flag a possible security alert in
-            new mail. This is a subject cue only: Threadly has not verified the
-            sender. No links open and no security actions are taken.
+            A subtle glow fades away before a compact recognition check appears
+            for possible new security alerts. This is a subject cue only:
+            Threadly has not verified the sender. No links open and no security
+            actions are taken.
           </p>
         </section>
         <section>

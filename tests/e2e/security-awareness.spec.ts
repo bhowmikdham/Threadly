@@ -109,25 +109,79 @@ test.afterAll(async () => {
 
 test("only new provider-dated messages prompt; recognition persists and row reuse is safe", async () => {
   await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+  await page.evaluate(() => {
+    const trace = ((window as any).securityMotionTrace = {
+      starts: 0,
+      start: 0,
+      end: 0,
+      prompt: 0,
+      animationAtPrompt: ""
+    })
+    document.addEventListener("animationstart", (event) => {
+      if (event.animationName === "tl-security-glow") {
+        trace.starts++
+        trace.start = performance.now()
+      }
+    })
+    document.addEventListener("animationend", (event) => {
+      if (event.animationName === "tl-security-glow")
+        trace.end = performance.now()
+    })
+    new MutationObserver(() => {
+      if (document.querySelector(".tl-security-cue") && !trace.prompt) {
+        trace.prompt = performance.now()
+        trace.animationAtPrompt = getComputedStyle(
+          document.querySelector("tr")
+        ).animationName
+      }
+    }).observe(document.body, { childList: true, subtree: true })
+  })
+  // A delayed CSS start reproduces the timing risk of a late rendering frame.
+  // Prompt readiness must follow actual completion, rather than a fixed deadline.
+  await page.addStyleTag({
+    content: ".tl-security-row { animation-delay:250ms !important; }"
+  })
   await cache("aaa1")
   await reuse("aaa1")
+  await expect(page.locator(".tl-security-row")).toHaveCount(1)
+  await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+  if (process.env.THREADLY_SECURITY_SCREENSHOT_DIR) {
+    await page.waitForTimeout(400)
+    await page.screenshot({
+      path: path.join(
+        process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
+        "security-glow-first.png"
+      )
+    })
+  }
   const cue = page.getByRole("group", {
-    name: "Possible security alert; sender not verified"
+    name: "Email recognition check"
   })
   await expect(cue).toBeVisible()
-  await expect(cue).toContainText("Do you recognise this security alert?")
+  await expect(cue).toContainText("Do you recognise this email?")
   await expect(cue).toContainText("sender not verified")
-  const animation = await page
-    .locator("tr")
-    .evaluate((el) => getComputedStyle(el).animationIterationCount)
-  expect(animation).toBe("2")
+  const trace = await page.evaluate(() => (window as any).securityMotionTrace)
+  expect(trace.starts).toBe(1)
+  expect(trace.end).toBeGreaterThan(trace.start)
+  expect(trace.prompt).toBeGreaterThan(trace.end)
+  expect(trace.prompt - trace.start).toBeGreaterThan(1400)
+  expect(trace.animationAtPrompt).toBe("none")
+  // Re-rendering an unchanged row must replay neither the glow nor the prompt entrance.
+  await reuse("aaa1")
+  await page.waitForTimeout(200)
+  expect(
+    await page.evaluate(() => (window as any).securityMotionTrace.starts)
+  ).toBe(1)
   for (const width of [1440, 640]) {
     await page.setViewportSize({ width, height: 720 })
     await expect(
-      cue.getByRole("button", { name: "I recognise it" })
+      cue.getByRole("button", { name: "I recognise this email" })
     ).toBeInViewport()
     await expect(
-      cue.getByRole("button", { name: "Dismiss", exact: true })
+      cue.getByRole("button", {
+        name: "Dismiss recognition check",
+        exact: true
+      })
     ).toBeInViewport()
     const box = await cue.boundingBox()
     expect(box.x + box.width).toBeLessThanOrEqual(width)
@@ -139,6 +193,13 @@ test("only new provider-dated messages prompt; recognition persists and row reus
           `security-${width}.png`
         )
       })
+    if (width === 640)
+      await cue.screenshot({
+        path: path.join(
+          process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
+          "security-prompt-closeup-light.png"
+        )
+      })
   }
   await page.emulateMedia({ reducedMotion: "reduce" })
   expect(
@@ -146,7 +207,7 @@ test("only new provider-dated messages prompt; recognition persists and row reus
       .locator("tr")
       .evaluate((el) => getComputedStyle(el).animationName)
   ).toBe("none")
-  await cue.getByRole("button", { name: "I recognise it" }).focus()
+  await cue.getByRole("button", { name: "I recognise this email" }).focus()
   await page.keyboard.press("Enter")
   await expect(cue).toHaveCount(0)
   expect(await page.locator("body").getAttribute("data-opened")).toBeNull()
@@ -156,9 +217,19 @@ test("only new provider-dated messages prompt; recognition persists and row reus
   await expect(page.locator(".tl-right[aria-label]")).toHaveCount(1)
   await expect(cue).toHaveCount(0)
   await cache("aaa2")
+  const reducedStart = Date.now()
   await reuse("aaa2")
   await expect(cue).toBeVisible()
-  await cue.getByRole("button", { name: "Dismiss", exact: true }).click()
+  expect(Date.now() - reducedStart).toBeLessThan(1200)
+  await expect(page.locator(".tl-security-row")).toHaveCount(0)
+  expect(
+    await page
+      .locator(".tl-security-cue")
+      .evaluate((el) => getComputedStyle(el).animationName)
+  ).toBe("none")
+  await cue
+    .getByRole("button", { name: "Dismiss recognition check", exact: true })
+    .click()
   await expect(cue).toHaveCount(0)
   const state = await setup.evaluate(
     async () =>
@@ -236,6 +307,12 @@ test("words/icons, account isolation, disabled marks and unavailable storage fai
           `security-theme-${dark ? "dark" : "light"}.png`
         )
       })
+    await page.locator(".tl-security-cue").screenshot({
+      path: path.join(
+        process.env.THREADLY_SECURITY_SCREENSHOT_DIR,
+        `security-prompt-closeup-${dark ? "dark" : "light"}.png`
+      )
+    })
   }
   await setup.evaluate(() =>
     chrome.storage.local.set({

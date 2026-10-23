@@ -6,9 +6,11 @@ read, based on Gmail internalDate. No new provider/model request or scope.
 
 The content script examines only the displayed subject transiently using explicit
 English security-alert/sign-in/password-change cues with forwarded/marketing
-exclusions. It does not authenticate the alert. A fixed question and unverified
-sender explanation appear with recognise/dismiss controls, a static cue and two
-finite glow cycles (none for reduced motion). No mail/security action is taken.
+exclusions. It does not authenticate the alert. A single refined row glow runs for 1400ms and fades fully, followed by a 160ms
+quiet interval and a 180ms entrance for a compact recognition prompt. The prompt
+reads “Do you recognise this email?” with an unverified-sender note and 36px
+recognise/dismiss controls. Reduced motion skips glow, delay and entrance motion.
+A bounded account/message presentation history prevents replay on row rerenders. No mail/security action is taken.
 Existing subject/snippet content, labels, words/icons, native controls are preserved.
 
 The background binds metadata to the authenticated mailbox, origin/user and exact
@@ -40,7 +42,8 @@ public build passed five focused browser tests including both snippet structures
 security-awareness interactions, missing/invalid reused-row identities, removed
 row structure, explicit light/dark/narrow layouts and the public-origin smoke.
 Backend focused classification/metadata/assets suite: 71 passed; Ruff clean.
-Full PostgreSQL and deployment/Flow checks run in companion PR144's backend CI.
+Companion PR144 passed 2459 PostgreSQL/backend tests, plus deployment/Flow gates
+and 26 classification provisioning tests (8 subtests).
 No real mailbox/provider/model test was run.
 
 Independent source review found one P2: an existing cue survived when Gmail
@@ -57,5 +60,21 @@ Companion PR144 targets release/security-awareness based on deployed 8970bd4,
 using the same complete backend CI gates and immutable tested-tree requirement.
 The integration history is preserved. Backend rollout must leave the current
 Caddy container, independently deployed logo site and download mounts unchanged.
-Frontend version is 0.2.7 from released 0.2.6. Both releases remain subject to
-CI, reviewed merges and deployed/public artifact acceptance.
+Frontend version is 0.2.7 from released 0.2.6. The backend is deployed and publicly verified from maintenance merge
+1cb73283120b753d4ae01359d2a4d696636093c6, preserving schema, configuration, Caddy,
+logo site hashes and downloads. The frontend remains unpublished pending a visual
+checkpoint, exact-head CI and public artifact acceptance; public ZIP remains 0.2.6.
+
+Final sequence validation records browser animation/prompt timestamps: one glow
+starts and ends before prompt insertion; row animation is none when the prompt
+appears; rerendering the same message adds no glow. A new reduced-motion message
+shows the static prompt in under 1200ms (including fixture/bridge scheduling), with
+no animation. Keyboard recognition, dismiss, reload, metadata/account failures,
+narrow/light/dark layouts and original row controls pass. Synthetic full and
+close-up screenshots were inspected before the requested visual checkpoint.
+
+Post-reconnect reconciliation: the old process session could not be recovered;
+a fresh run of the exact built/source revision passed all five focused browser
+tests (17.2s). The completion gate now follows actual animationend and the
+250ms delayed-start regression passes. The independent visual checkpoint and
+synthetic captures are in [security-visuals](security-visuals/README.md).
