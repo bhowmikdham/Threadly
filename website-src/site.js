@@ -135,6 +135,9 @@ const icon = (id, w, cls) =>
   '<svg class="' + (cls || "") + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="'
   + (w || 1.5) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#' + id + '"/></svg>';
 
+const logo = (cls) =>
+  '<svg class="brand-mark ' + cls + '" viewBox="0 0 434 184" aria-hidden="true"><use href="#tl-mark"/></svg>';
+
 /* The hero keeps its own copy of the marks, so re-triaging a row there
    does not silently rewrite the other demos further down the page. */
 const HERO = THREADS.map((t) => Object.assign({}, t));
@@ -269,7 +272,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 ------------------------------------------------------------------- */
 function panelMarkup(name){
   return ''
-  + '<div class="tp-head">' + icon("tl-mark", 1.5, "mark") + "<b>Threadly</b>"
+  + '<div class="tp-head">' + logo("mark") + "<b>Threadly</b>"
   +   '<span class="live-dot" aria-hidden="true"></span>'
   +   '<span class="spacer">'
   +     '<button class="tp-icon" data-p="collapse" type="button" aria-label="Collapse the panel">' + icon("tl-sidebar") + "</button>"
@@ -281,7 +284,7 @@ function panelMarkup(name){
   +     '<span class="subj"></span>'
   +     '<button class="x" data-p="close" type="button" aria-label="Clear the thread">' + icon("tl-x", 1.7) + "</button>"
   +   "</div>"
-  +   '<div class="tp-sumhead">' + icon("tl-mark", 1.5, "tp-modeicon") + '<span class="tp-eyebrow tp-modelabel">Summary</span></div>'
+  +   '<div class="tp-sumhead">' + logo("tp-modeicon") + '<span class="tp-eyebrow tp-modelabel">Summary</span></div>'
   +   '<div class="tp-out" aria-live="polite"></div>'
   +   '<div class="tp-foot"><span class="tp-meta"></span></div>'
   + "</div>"
@@ -335,7 +338,8 @@ class Panel {
     const mine = ++this.tok;
     const out = this.q(".tp-out");
     this.q(".tp-modelabel").textContent = this.mode === "sum" ? "Summary" : "Draft reply";
-    this.q(".tp-modeicon").innerHTML = '<use href="#tl-' + (this.mode === "sum" ? "mark" : "draft") + '"/>';
+    this.q(".tp-modeicon").outerHTML = this.mode === "sum"
+      ? logo("tp-modeicon") : icon("tl-draft", 1.5, "tp-modeicon");
     this.el.querySelectorAll(".tp-act").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.mode === this.mode));
     });

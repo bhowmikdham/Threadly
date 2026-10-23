@@ -9,6 +9,13 @@ aligned with the released extension; automatic marks, Drive, Contacts and Tasks
 are labelled as concepts. All inbox, calendar and voice interactions here use
 fictional fixtures, never real Google data or microphone capture.
 
+Brand artwork reuses the extension's existing `Logo` from `components/Icon.tsx`
+at commit `b574a11f95ac8fe986450fb5ffcb7fd8e8962b61`: two hooked loops, with
+the original paths, 434:184 proportions and stroke retained. The older
+`assets/icons/threadly.svg` and `threadly-mark.svg` are different circular-arc
+glyphs; do not use them as the brand logo. The favicon uses the same loop paths
+on the extension icon's cream background.
+
 `npm ci && npm run build` rebuilds `../website/site.js` from the pinned Motion
 release and lockfile. Serve `website/`; this source directory is outside the
 public document root. Google Fonts are permitted by the static site's CSP.
