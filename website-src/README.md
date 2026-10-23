@@ -37,3 +37,24 @@ bypasses previously cached bare URLs; it does not pin a server-side historical
 artifact. Keep the ZIP's no-store policy and the metadata validation together.
 After deploying these assets and the Caddy configuration, refresh the install
 page before checking the download. Existing unpacked installations are unchanged.
+
+## Inbox marks concept video
+
+The video beside “The marks” is the user-selected `threadly-classifiers.mp4`:
+20 seconds, 1920×1080, 30 fps, H.264 High profile level 4.0, with no audio track.
+It animates the same fictional inbox fixtures used by this page. Its caption
+retains the distinction between the design concept and released functionality.
+The supplied video has not been redrawn or re-encoded. Its original SHA-256 is
+`3558fca54c9ab52aab86ce1251fb8182614e40e5431dea6afa6a31143f4909c4`.
+
+The web copy moves the MP4 movie index before its media data for fast startup;
+the encoded media bytes remain identical. Web copy SHA-256:
+`4af4a20408646bbb016c2ca9899a05cca0006174605d71ae186f66e11a5147af`.
+The poster is the opening frame. Native controls and inline playback work without
+site JavaScript; `preload="none"` avoids fetching the video before interaction.
+The adjacent expandable description supplies the visual information in text.
+
+Playback requires the website CSP to allow same-origin media (`media-src 'self'`).
+The original default-deny policy blocks this player. Keep all other directives,
+the API configuration, logo assets and separately published extension downloads
+unchanged when releasing this scoped addition.

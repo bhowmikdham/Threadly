@@ -743,6 +743,24 @@ button.mk:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
 /* the anatomy opener drops the repeated heading-plus-muted-note scaffold */
 .marks-open{max-width:60ch;margin-bottom:38px}
 .marks-open .h2{margin-bottom:18px}
+.marks-video{margin-bottom:44px;border:1px solid var(--rule);border-radius:18px;background:var(--ground);box-shadow:var(--lift);overflow:hidden}
+.marks-video-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px 28px}
+.marks-video-head h3{font-family:var(--serif);font-weight:500;font-size:clamp(25px,3vw,34px);line-height:1.1;letter-spacing:-.02em}
+.marks-video-head h3 em{font-weight:400}
+.marks-video-meta{flex-shrink:0;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.marks-video-screen{background:#efebe3;border-block:1px solid var(--rule)}
+.marks-video video{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain}
+.marks-video video:focus-visible{outline:3px solid var(--teal);outline-offset:-3px;border-radius:0}
+.marks-video figcaption{padding:20px 28px 14px;font-size:14px;line-height:1.6;color:var(--ink-2);max-width:85ch}
+.marks-video-description{padding:0 28px 22px;font-size:14px;line-height:1.6;color:var(--ink-2)}
+.marks-video-description summary{width:fit-content;cursor:pointer;color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:4px}
+.marks-video-description p{max-width:76ch;margin-top:12px}
+@media (max-width:600px){
+  .marks-video{border-radius:12px;margin-bottom:32px}
+  .marks-video-head{align-items:flex-start;flex-direction:column;gap:10px;padding:20px}
+  .marks-video figcaption{padding:16px 20px 12px}
+  .marks-video-description{padding:0 20px 20px}
+}
 .legend .h2{text-wrap:pretty}
 
 /* =========================================================
