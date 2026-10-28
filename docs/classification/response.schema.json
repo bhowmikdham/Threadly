@@ -136,6 +136,43 @@
       ],
       "title": "Labels",
       "type": "object"
+    },
+    "SecurityPriorityResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "pattern": "^[a-f0-9]{1,32}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "priority_if_recognised": {
+          "enum": [
+            "High",
+            "Low",
+            "Medium"
+          ],
+          "title": "Priority If Recognised",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "message_id",
+        "priority_if_recognised",
+        "evidence"
+      ],
+      "title": "SecurityPriorityResponse",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -237,6 +274,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/IncomingMessage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "security_priority": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecurityPriorityResponse"
         },
         {
           "type": "null"

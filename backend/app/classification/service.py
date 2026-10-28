@@ -9,7 +9,13 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from app.api.errors import ApiError
-from app.classification.contracts import ClassificationResponse, Decision, Evidence, IncomingMessage
+from app.classification.contracts import (
+    ClassificationResponse,
+    Decision,
+    Evidence,
+    IncomingMessage,
+    SecurityPriorityResponse,
+)
 from app.classification.flows import FLOW_RELEASE, ClassificationFlow, configured_flow
 from app.classification.limits import get_limits
 from app.classification.provider import get_provider
@@ -107,6 +113,11 @@ def parse_decision(text, source_ids):
             for refs in value.evidence.model_dump().values():
                 if not set(refs) <= set(source_ids):
                     raise ValueError("Unknown evidence")
+        if value.security_priority:
+            security = value.security_priority
+            if (security.source_id not in source_ids
+                    or not set(security.evidence) <= set(source_ids)):
+                raise ValueError("Unknown recognition evidence")
         return value
     except (ValueError, ValidationError, RecursionError):
         raise ApiError(502, "classification_output_invalid",
@@ -196,5 +207,16 @@ async def _classify(owner, account_version, mailbox_address, thread_id, request,
             for field, refs in decision.evidence.model_dump().items()
         })
     response["labels"] = decision.labels
+    if decision.security_priority:
+        security = decision.security_priority
+        incoming = response["latest_incoming"]
+        # A conversation-level baseline must identify the exact newest incoming event.
+        # Never attach an older/outgoing message's baseline to the current inbox row.
+        if incoming and incoming.message_id == source_ids[security.source_id]:
+            response["security_priority"] = SecurityPriorityResponse(
+                message_id=incoming.message_id,
+                priority_if_recognised=security.priority_if_recognised,
+                evidence=[source_ids[ref] for ref in security.evidence],
+            )
     return ClassificationResponse(**response, status=decision.status,
                                   reason_codes=decision.reason_codes)

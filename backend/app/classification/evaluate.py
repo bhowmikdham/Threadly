@@ -40,6 +40,7 @@ async def run(args):
     scores = {field: {"correct": 0, "total": 0} for field in
               ("needs_reply", "priority", "category", "action")}
     invalid, joint, failures = 0, 0, []
+    recognition = {"correct": 0, "total": 0}
     errors, latency = {}, {}
     for case in cases:
         started = perf_counter()
@@ -67,7 +68,13 @@ async def run(args):
         latency[case["id"]] = round((perf_counter() - started) * 1000)
         expected = Decision.model_validate(case["expected"])
         joint += int(parsed is not None and parsed.status == expected.status
-                     and parsed.labels == expected.labels)
+                     and parsed.labels == expected.labels
+                     and parsed.security_priority == expected.security_priority)
+        if "security_priority" in case["expected"]:
+            recognition["total"] += 1
+            recognition["correct"] += int(parsed is not None
+                                           and parsed.security_priority
+                                           == expected.security_priority)
         if expected.labels:
             for field, score in scores.items():
                 score["total"] += 1
@@ -76,6 +83,7 @@ async def run(args):
                                         == getattr(expected.labels, field))
     report.update(invalid_outputs_or_provider_failures=invalid, failed_cases=failures,
                   joint_correct=joint, field_scores=scores, predictions=predictions,
+                  security_priority_scores=recognition,
                   release_id=pinned.identifier if pinned else None,
                   flow=pinned.flow.model_dump() if pinned and pinned.flow else None,
                   errors=errors, request_latency_ms=latency,

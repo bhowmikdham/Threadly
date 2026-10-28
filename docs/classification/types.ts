@@ -25,6 +25,7 @@ type Metadata = {
   source: "live_gmail";
   coverage: "cleaned_text_only";
   persisted: false;
+  security_priority?: { message_id: string; priority_if_recognised: Priority; evidence: string[] } | null;
   latest_incoming?: { message_id: string; received_at: string; timestamp_source: "gmail.internalDate" } | null;
 };
 export type ClassificationResponse = Metadata & (

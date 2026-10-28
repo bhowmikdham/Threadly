@@ -1,5 +1,8 @@
 # Architecture — what runs where
 
+The security-recognition candidate computes an optional whole-conversation baseline in the same classification inference. Its source ID must bind to the latest incoming provider message before response exposure; local recognition overlays the baseline without a provider write. See [candidate architecture and release gates](classification/SECURITY-RECOGNITION.md).
+
+
 The isolated chat-context prototype and its unresolved architecture gaps are
 documented in [Shared conversation context](chat-context-design-review.md).
 That review distinguishes implemented storage mechanics from unverified semantic

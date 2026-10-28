@@ -1,5 +1,8 @@
 # API contract — v0 DRAFT
 
+The security-recognition candidate adds optional `security_priority` with an exact incoming message ID, evidence IDs and a `priority_if_recognised` enum. It does not accept an acknowledgement or change server labels. See [candidate contract and gates](classification/SECURITY-RECOGNITION.md).
+
+
 ## Email badge classification (deployed; disabled by default in fresh configuration)
 
 `POST /threads/{gmail_thread_id}/classification`, with an access JWT and

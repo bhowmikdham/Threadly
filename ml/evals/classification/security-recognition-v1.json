@@ -1,0 +1,467 @@
+{
+  "policy_version": "1.0.0",
+  "fixture_only": true,
+  "limitation": "Representative synthetic mail, not the actual Hertz message. Expected outputs are authored contracts; model quality is unverified.",
+  "cases": [
+    {
+      "id": "access-code",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Hertz: Your sign-in verification code",
+            "body": "Use this one-time code to sign in to your account: 123456. If this was not you, secure your account."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "Low",
+          "evidence": [
+            "m1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "access-confirmation",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Sign-in confirmation",
+            "body": "You signed in to your account. If this was not you, check your account."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "Low",
+          "evidence": [
+            "m1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "access-blocking",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Confirm your sign-in",
+            "body": "Verify your sign-in to restore access. Your payroll approval is due in one hour; access is blocking that work."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "High",
+          "evidence": [
+            "m1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "access-ordinary-work",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Account access verification",
+            "body": "Confirm access, then review the ordinary weekly project status."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "Medium",
+          "evidence": [
+            "m1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "booking",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Hertz: Confirm your reservation",
+            "body": "Confirm your rental booking for tomorrow."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "Medium",
+          "category": "other",
+          "action": "no_action"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": null
+      }
+    },
+    {
+      "id": "marketing",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Sign-in verification guide",
+            "body": "Our newsletter explains sign-in codes. Read more offers and tips."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "Low",
+          "category": "other",
+          "action": "no_action"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": null
+      }
+    },
+    {
+      "id": "generic-body-access",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Your verification code",
+            "body": "Use this code to log in to your account: 123456. If you did not request this, secure your account."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "Low",
+          "evidence": [
+            "m1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "earlier-independent-urgency",
+      "input": {
+        "messages": [
+          {
+            "source_id": "m2",
+            "from": [
+              "person2"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T11:00:00Z",
+            "sent_at": null,
+            "subject": "Legal filing due",
+            "body": "Your legal filing is due in one hour. Missing it incurs a penalty."
+          },
+          {
+            "source_id": "m1",
+            "from": [
+              "person1"
+            ],
+            "to": [
+              "ME"
+            ],
+            "cc": [],
+            "sent_by_account": false,
+            "received_at": "2026-10-28T12:00:00Z",
+            "sent_at": null,
+            "subject": "Sign-in confirmation",
+            "body": "You signed in to your account. If this was not you, check your account."
+          }
+        ],
+        "time_zone": "UTC",
+        "evaluated_at": "2026-10-28T12:01:00Z"
+      },
+      "expected": {
+        "status": "classified",
+        "labels": {
+          "needs_reply": false,
+          "priority": "High",
+          "category": "it",
+          "action": "review"
+        },
+        "evidence": {
+          "needs_reply": [
+            "m1"
+          ],
+          "priority": [
+            "m1"
+          ],
+          "category": [
+            "m1"
+          ],
+          "action": [
+            "m1"
+          ]
+        },
+        "reason_codes": [
+          "informational"
+        ],
+        "security_priority": {
+          "source_id": "m1",
+          "priority_if_recognised": "High",
+          "evidence": [
+            "m1",
+            "m2"
+          ]
+        }
+      }
+    }
+  ]
+}

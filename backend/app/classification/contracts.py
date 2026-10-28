@@ -59,11 +59,20 @@ class Evidence(StrictModel):
         return values
 
 
+class SecurityPriority(StrictModel):
+    """Counterfactual priority only; never an authenticity or safety verdict."""
+
+    source_id: str = Field(min_length=1, max_length=32)
+    priority_if_recognised: Priority
+    evidence: Sources
+
+
 class Decision(StrictModel):
     status: Literal["classified", "needs_review"]
     labels: Labels | None
     evidence: Evidence | None
     reason_codes: list[Reason] = Field(min_length=1, max_length=7)
+    security_priority: SecurityPriority | None = None
 
     @model_validator(mode="after")
     def consistent(self):
@@ -78,6 +87,14 @@ class Decision(StrictModel):
             raise ValueError("Needs review requires an uncertainty reason")
         if len(set(self.reason_codes)) != len(self.reason_codes):
             raise ValueError("Duplicate reason")
+        if self.security_priority:
+            rank = {"Low": 0, "Medium": 1, "High": 2}
+            if (self.labels is None or self.status != "classified"
+                    or rank[self.security_priority.priority_if_recognised]
+                    > rank[self.labels.priority]):
+                raise ValueError("Invalid recognition baseline")
+            if len(set(self.security_priority.evidence)) != len(self.security_priority.evidence):
+                raise ValueError("Duplicate recognition evidence")
         return self
 
 
@@ -87,6 +104,12 @@ class IncomingMessage(StrictModel):
     message_id: str = Field(pattern=r"^[a-f0-9]{1,32}$")
     received_at: datetime
     timestamp_source: Literal["gmail.internalDate"] = "gmail.internalDate"
+
+
+class SecurityPriorityResponse(StrictModel):
+    message_id: str = Field(pattern=r"^[a-f0-9]{1,32}$")
+    priority_if_recognised: Priority
+    evidence: Sources
 
 
 class ClassificationResponse(StrictModel):
@@ -108,6 +131,7 @@ class ClassificationResponse(StrictModel):
     coverage: Literal["cleaned_text_only"] = "cleaned_text_only"
     persisted: Literal[False] = False
     latest_incoming: IncomingMessage | None = None
+    security_priority: SecurityPriorityResponse | None = None
 
     @model_validator(mode="after")
     def consistent_state(self):
@@ -116,4 +140,14 @@ class ClassificationResponse(StrictModel):
                 raise ValueError("Classified requires labels and evidence")
         elif self.labels is not None or self.evidence is not None:
             raise ValueError("Unclassified states cannot carry badges")
+        if self.security_priority:
+            baseline = self.security_priority
+            rank = {"Low": 0, "Medium": 1, "High": 2}
+            if (self.status != "classified" or self.latest_incoming is None
+                    or baseline.message_id != self.latest_incoming.message_id
+                    or baseline.message_id not in self.source_message_ids
+                    or not set(baseline.evidence) <= set(self.source_message_ids)
+                    or len(set(baseline.evidence)) != len(baseline.evidence)
+                    or rank[baseline.priority_if_recognised] > rank[self.labels.priority]):
+                raise ValueError("Unbound recognition baseline")
         return self

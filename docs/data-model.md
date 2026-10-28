@@ -1,5 +1,8 @@
 # Data model — PostgreSQL
 
+Security recognition adds no backend persistence: the optional counterfactual priority is computed in the existing request and returned transiently. The companion extension retains only its existing protected HMAC acknowledgement state. See [candidate details](classification/SECURITY-RECOGNITION.md).
+
+
 On-demand [badge classification](classification/README.md) adds no tables or migration.
 It reads account/session state, holds mail and model output in request memory, then
 returns validated labels and source provenance. It does not write Message, Thread,
