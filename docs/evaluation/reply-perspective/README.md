@@ -1,5 +1,9 @@
 # Reply authorship and source grounding
 
+The [combined review](../../review/combined-voice-security.md) supersedes this
+initial record's PostgreSQL skip limitation: the full combined suite now passes
+2,482 tests with a disposable PostgreSQL instance and zero skips.
+
 Local candidate based on released maintenance commit `1cb7328`. All mail identities,
 bodies, model decisions and generated replies in the regression tests are synthetic.
 No live inference, Gmail writes, deployment or publication was performed.

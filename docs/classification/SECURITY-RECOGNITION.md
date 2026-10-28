@@ -1,5 +1,9 @@
 # Security recognition candidate — prompt 1.0.2
 
+The [combined review](../review/combined-voice-security.md) supersedes this initial
+record's PostgreSQL skip limitation: all 2,482 combined backend tests pass with an
+isolated PostgreSQL instance and zero skips. Model acceptance remains pending.
+
 This is a local implementation candidate, not a deployed/published release.
 No actual Hertz mail was supplied or available through a connected read route.
 The examples in `ml/evals/classification/security-recognition-v1.json` are
