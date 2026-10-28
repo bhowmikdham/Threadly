@@ -33,7 +33,13 @@ export function knownReplyAnswer(entry: Entry, selection: Selection | null) {
     entry.task?.route?.decision?.intent === "reply"
   const target = selection?.targetId
   const message = selection?.messages.find((m) => m.gmail_msg_id === target)
-  if (!reply || !message || !selection.selectedIds.includes(target)) return null
+  if (
+    !reply ||
+    !message ||
+    message.is_from_user ||
+    !selection.selectedIds.includes(target)
+  )
+    return null
   const recipient = senderAddress(message.from_addr)
   if (fields.includes("recipients") && !recipient) return null
   const answer: Record<string, any> = {}

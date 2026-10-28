@@ -101,6 +101,101 @@ afterEach(() => {
 })
 
 describe("VoiceOrb audio resource lifecycle", () => {
+  it("reveals a draft after barge-in while suppressing the interrupted spoken result", async () => {
+    const answer = deferred<VoiceReply>()
+    const respond = vi
+      .fn()
+      .mockReturnValueOnce(answer.promise)
+      .mockResolvedValue("You're welcome.")
+    const view = render(
+      <div className="threadly">
+        <VoiceOrb respond={respond} onClose={vi.fn()} />
+      </div>
+    )
+    await flush()
+    act(() =>
+      recognizers[0].onresult({ results: [[{ transcript: "Draft a reply" }]] })
+    )
+    await act(() => vi.advanceTimersByTimeAsync(1300))
+    const acknowledgment = speak.mock.calls[0][0]
+    contexts[0].analyser.getByteTimeDomainData.mockImplementation((samples) =>
+      samples.fill(255)
+    )
+    await act(() => vi.advanceTimersByTimeAsync(1200))
+    expect(screen.getByRole("status").textContent).toBe("Listening…")
+    contexts[0].analyser.getByteTimeDomainData.mockImplementation((samples) =>
+      samples.fill(128)
+    )
+    view.rerender(
+      <div className="threadly">
+        <VoiceOrb respond={respond} onClose={vi.fn()} revealChat />
+      </div>
+    )
+    await act(async () => {
+      answer.resolve({ text: "The old turn finished", showChat: true })
+      acknowledgment.onend()
+    })
+    expect(
+      view.container.querySelector(
+        ".threadly.voice-docked .voice-overlay.docked"
+      )
+    ).not.toBeNull()
+    expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("false")
+    expect(
+      speak.mock.calls.some(
+        ([utterance]) => utterance.text === "The old turn finished"
+      )
+    ).toBe(false)
+    act(() =>
+      recognizers[0].onresult({ results: [[{ transcript: "Thanks" }]] })
+    )
+    await act(() => vi.advanceTimersByTimeAsync(1300))
+    expect(respond).toHaveBeenCalledTimes(2)
+    expect(view.container.querySelector(".voice-overlay.docked")).not.toBeNull()
+    closeVoice()
+    view.unmount()
+    const reopened = render(
+      <div className="threadly">
+        <VoiceOrb respond={respond} onClose={vi.fn()} />
+      </div>
+    )
+    expect(reopened.container.querySelector(".voice-docked")).toBeNull()
+    expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true")
+  })
+
+  it("reveals a completed draft before a pending acknowledgment finishes, and cleans up its layout", async () => {
+    const answer = deferred<VoiceReply>()
+    const respond = () => answer.promise
+    const view = render(
+      <div className="threadly">
+        <VoiceOrb respond={respond} onClose={vi.fn()} />
+      </div>
+    )
+    await flush()
+    act(() =>
+      recognizers[0].onresult({ results: [[{ transcript: "Draft a reply" }]] })
+    )
+    await act(() => vi.advanceTimersByTimeAsync(1300))
+    expect(view.container.querySelector(".voice-overlay.docked")).toBeNull()
+    view.rerender(
+      <div className="threadly">
+        <VoiceOrb respond={respond} onClose={vi.fn()} revealChat />
+      </div>
+    )
+    expect(
+      view.container.querySelector(".threadly.voice-docked")
+    ).not.toBeNull()
+    const root = view.container.querySelector(".threadly")!
+    view.rerender(<div className="threadly" />)
+    expect(root.classList.contains("voice-docked")).toBe(false)
+    await act(async () =>
+      answer.resolve({ text: "Late draft", showChat: true })
+    )
+    expect(
+      speak.mock.calls.some(([utterance]) => utterance.text === "Late draft")
+    ).toBe(false)
+  })
+
   it("stops once when Close is repeated and unmount occurs before close settles", async () => {
     const microphone = media()
     getUserMedia.mockResolvedValue(microphone.stream)

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
+import { knownReplyAnswer } from "../components/TaskCard"
 import { activeGmail, capture } from "../lib/context"
 
 const selection: any = {
@@ -77,6 +78,33 @@ describe("reference-only source capture", () => {
 })
 
 describe("reply target when Gmail doesn't mark the open message", () => {
+  it("does not auto-address the owner when an outgoing message is selected", () => {
+    const entry = {
+      id: "reply",
+      instruction: "Draft a reply",
+      task: {
+        route: { decision: { intent: "reply" } },
+        question: { fields: ["recipients"] }
+      }
+    } as any
+    const source = {
+      selectedIds: ["outgoing"],
+      targetId: "outgoing",
+      messages: [
+        {
+          gmail_msg_id: "outgoing",
+          from_addr: "Owner <owner@example.test>",
+          is_from_user: true
+        }
+      ]
+    } as any
+    expect(knownReplyAnswer(entry, source)).toBeNull()
+    source.messages[0].is_from_user = false
+    source.messages[0].from_addr = "Alex <alex@example.test>"
+    expect(knownReplyAnswer(entry, source)).toEqual({
+      recipients: ["alex@example.test"]
+    })
+  })
   const thread: any = {
     thread: { thread_id: "thread1", subject: "Discovery Meeting", version: 1 },
     messages: [
@@ -142,13 +170,23 @@ describe("open-email detection from the Gmail URL", async () => {
   const { gmailUrlShowsEmail } = await import("../lib/gmail-context")
   it("is true only when a single thread is open", () => {
     const base = "https://mail.google.com/mail/u/0/"
-    expect(gmailUrlShowsEmail(base + "#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(true)
-    expect(gmailUrlShowsEmail(base + "#label/Work/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(true)
-    expect(gmailUrlShowsEmail(base + "#search/receipt/18c2f1a9b7d4e6f0")).toBe(true)
+    expect(
+      gmailUrlShowsEmail(base + "#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")
+    ).toBe(true)
+    expect(
+      gmailUrlShowsEmail(base + "#label/Work/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")
+    ).toBe(true)
+    expect(gmailUrlShowsEmail(base + "#search/receipt/18c2f1a9b7d4e6f0")).toBe(
+      true
+    )
     expect(gmailUrlShowsEmail(base + "#inbox")).toBe(false)
     expect(gmailUrlShowsEmail(base + "#label/Work")).toBe(false)
     expect(gmailUrlShowsEmail(base + "#search/receipt")).toBe(false)
-    expect(gmailUrlShowsEmail("https://example.com/#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd")).toBe(false)
+    expect(
+      gmailUrlShowsEmail(
+        "https://example.com/#inbox/FMfcgzQbfLvKxQrWnZtjbVbHkWqmLmZd"
+      )
+    ).toBe(false)
     expect(gmailUrlShowsEmail(undefined)).toBe(false)
   })
 })

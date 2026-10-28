@@ -3,7 +3,7 @@ import React from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { VoiceOrb } from "../components/VoiceOrb"
-import { spokenReply } from "../lib/spoken-reply"
+import { hasChoices, spokenReply } from "../lib/spoken-reply"
 
 // jsdom has no WebGL; the orb simply skips drawing.
 HTMLCanvasElement.prototype.getContext = (() => null) as any
@@ -212,6 +212,23 @@ describe("voice conversation", () => {
 })
 
 describe("spoken replies", () => {
+  it.each([
+    { emailDraft: { draft_id: "text-draft", body: "Hi Alex" } },
+    {
+      artifacts: [
+        {
+          artifact: {
+            kind: "draft",
+            content: { mode: "reply", body: "Hi Alex" }
+          }
+        }
+      ]
+    }
+  ])("reveals a draft card in voice mode: %j", (value) => {
+    const entry = { id: "draft", instruction: "Draft a reply", ...value } as any
+    expect(hasChoices(entry)).toBe(true)
+    expect(spokenReply(entry)).toMatch(/drafted.*chat/)
+  })
   it("waits while the answer is on its way", () => {
     expect(spokenReply({ id: "1", instruction: "x", pending: true })).toBeNull()
     expect(

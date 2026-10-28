@@ -322,10 +322,13 @@ export type VoiceReply = string | { text: string; showChat?: boolean }
 
 export function VoiceOrb({
   respond,
-  onClose
+  onClose,
+  revealChat = false
 }: {
-  // `showChat` lifts the orb to the top so a list of choices (for example the
-  // top five emails) is visible in the chat below it.
+  // Speech can be interrupted or outlive the polling timeout. Chat state can
+  // still reveal a completed draft independently of the spoken turn's result.
+  revealChat?: boolean
+  // `showChat` also reveals cards returned by the current spoken turn.
   respond: (said: string) => Promise<VoiceReply>
   onClose: (error?: string) => void
 }) {
@@ -336,7 +339,7 @@ export function VoiceOrb({
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
-    // The orb stays centred, and only lifts for replies that offer choices.
+    // Completed drafts can also keep the orb above the chat via revealChat.
     [docked, setDocked] = useState(false),
     // Muted: Threadly stops listening (and ignores the mic) until unmuted.
     [muted, setMuted] = useState(false)
@@ -347,6 +350,7 @@ export function VoiceOrb({
   const phaseSince = useRef(performance.now())
   const closed = useRef(false)
   const stop = useRef<() => void>(() => {})
+  const isDocked = docked || revealChat
   const move = (next: Phase) => {
     phaseRef.current = next
     phaseSince.current = performance.now()
@@ -361,10 +365,10 @@ export function VoiceOrb({
   // Leave room for the docked orb above the conversation.
   useEffect(() => {
     const root = overlay.current?.closest(".threadly")
-    if (!docked || !root) return
+    if (!isDocked || !root) return
     root.classList.add("voice-docked")
     return () => root.classList.remove("voice-docked")
-  }, [docked])
+  }, [isDocked])
   useEffect(() => {
     const Recognition =
       (window as any).SpeechRecognition ||
@@ -624,9 +628,9 @@ export function VoiceOrb({
   return (
     <div
       ref={overlay}
-      className={`voice-overlay${docked ? " docked" : ""}`}
+      className={`voice-overlay${isDocked ? " docked" : ""}`}
       role="dialog"
-      aria-modal="true"
+      aria-modal={!isDocked}
       aria-label="Voice conversation">
       <button
         className="icon-button voice-close"

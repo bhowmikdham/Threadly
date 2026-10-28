@@ -32,6 +32,8 @@ export function spokenReply(entry: Entry | undefined): string | null {
       task.workflow?.steps?.some((s: any) => s.artifact_id) ||
       task.compound?.steps?.some((s: any) => s.artifact_id))
   if (expectsArtifacts && !entry.artifacts?.length) return null
+  if (entry.emailDraft)
+    return "I've drafted that email. It's in the chat for you to check before anything is sent."
   const artifact = entry.artifacts?.[entry.artifacts.length - 1]?.artifact
   if (artifact?.kind === "draft")
     return artifact.content?.mode === "reply"
@@ -54,12 +56,17 @@ export function spokenReply(entry: Entry | undefined): string | null {
   return task?.state === "succeeded" ? "Done. It's in the chat." : null
 }
 
-/**
- * True when the reply is a list the user chooses from, such as the top five
- * emails from a search. Voice mode then lifts the orb out of the way so the
- * cards show in the chat, exactly as they would for a typed request.
- */
+/** Draft cards must remain reachable even if their spoken turn is interrupted. */
+export function hasReviewableDraft(entry: Entry | undefined): boolean {
+  return Boolean(
+    entry?.emailDraft ||
+      entry?.artifacts?.some(({ artifact }) => artifact.kind === "draft")
+  )
+}
+
+/** Cards that need room in the chat, including drafts and lists of choices. */
 export function hasChoices(entry: Entry | undefined): boolean {
+  if (hasReviewableDraft(entry)) return true
   if (entry?.calendarActionId && !entry.pending && !entry.error) {
     return true
   }
