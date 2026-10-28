@@ -71,7 +71,7 @@ def test_help_describes_current_workflows_without_promising_write_access():
     assert "not available in this release" not in text
 
 
-def test_live_replay_pins_current_prompt_schemas_and_cases():
+def test_historical_live_replay_keeps_its_evaluated_prompt_schemas_and_cases():
     from pathlib import Path
 
     from app.planner.evaluate_thread_fixes import assets
@@ -79,8 +79,17 @@ def test_live_replay_pins_current_prompt_schemas_and_cases():
     evidence = json.loads(
         (Path(__file__).parents[2] / "docs/evaluation/grounded-thread-live-v1.json").read_text()
     )
-    for key, value in assets().items():
-        assert evidence[key] == value
+    current = assets()
+    for key, value in current.items():
+        if key != "routing_release":
+            assert evidence[key] == value
+    recorded = evidence["routing_release"]
+    assert recorded["draft_release"] == "draft-artifact-1.2.2"
+    assert recorded["draft_release"] != current["routing_release"]["draft_release"]
+    assert recorded["reply_prompt_hash"] != current["routing_release"]["reply_prompt_hash"]
+    for key, value in current["routing_release"].items():
+        if key not in {"draft_release", "reply_prompt_hash"}:
+            assert recorded[key] == value
     assert len(evidence["routes"]) == 6 and all(r["passed"] for r in evidence["routes"])
     assert all(
         evidence[k]

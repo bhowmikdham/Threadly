@@ -111,6 +111,18 @@ def is_compose(instruction):
     return True
 
 
+def is_selected_reply(runtime):
+    from app.conversation.runtime import authorize_workflow
+
+    if "selected" not in runtime.state.get("refs", {}):
+        return False
+    try:
+        authorize_workflow(runtime.request.instruction, "reply", False)
+    except ValueError:
+        return False
+    return True
+
+
 def requires_preparation(runtime):
     # Source-based and compound workflows retain their existing read/binding path.
     # Questions about an existing artifact and social turns are not new requests.
@@ -149,6 +161,12 @@ async def prepare(runtime, args):
     )
 
     latest = runtime.request.instruction.strip()
+    # A request_source validates provenance, not the chosen tool. In particular,
+    # an unread pinned reply must not bypass source grounding through compose.
+    # Check before selecting/mutating an existing compose goal on a mistaken retry.
+    if is_selected_reply(runtime):
+        runtime.source_reply_required = True
+        raise EmailDraftInputError("source_bound_workflow_required")
     cited = await citations.resolve(runtime, args.citations)
     user_context = list((await citations.resolve(runtime, args.context_citations)).values())
     previous = runtime.state.get(KEY)

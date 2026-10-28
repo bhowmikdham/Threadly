@@ -1108,6 +1108,9 @@ class Runtime:
             {
                 "subject": m["subject"],
                 "sender": m["from_addr"],
+                "author_role": "mailbox_owner" if m.get("is_from_user") else "correspondent",
+                "is_from_user": m.get("is_from_user", False),
+                "reply_target": m["gmail_msg_id"] == ref.get("message_id"),
                 "sent_at": m["sent_at"],
                 "received_at": m["received_at"],
                 **received_display(

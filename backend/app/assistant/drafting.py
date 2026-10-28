@@ -2,6 +2,7 @@
 
 import json
 import re
+from email.utils import parseaddr
 
 from pydantic import Field, field_validator
 from sqlalchemy import select
@@ -13,7 +14,7 @@ from app.db.models import Message, Thread
 from app.model_client.structured import json_object
 from app.schemas.assistant import StrictModel
 
-RELEASE = "draft-artifact-1.2.2"
+RELEASE = "draft-artifact-1.2.3"
 PROMPT = """Write an email draft for the user's stated purpose. Return JSON only with
 subject (one line), body (plain text), unresolved_fields (array of missing facts),
 and sources (array of supplied message numbers used). Do not return recipients,
@@ -38,7 +39,14 @@ this draft was sent, inserted into an editor, saved in Gmail, or approved.
 REPLY_PROMPT = PROMPT.replace(
     "For replies, use the supplied reply subject unchanged and address the selected message.",
     "For replies, write the body addressing the selected message. Omit subject: the backend "
-    "retains the original reply subject independently.",
+    "retains the original reply subject independently.\n"
+    "Write as the mailbox owner (the person requesting the draft), never as a correspondent.\n"
+    "The author_role labels identify each enclosing message's speaker. A reply_target marks\n"
+    "the message being answered, not the author of the new draft. Address its correspondent;\n"
+    "do not copy its greeting to the owner, signature, sales pitch or requests as your own.\n"
+    "Read earlier owner messages and later acknowledgements together. Do not re-offer an\n"
+    "interview, scheduling request or feedback already supplied unless the USER asks for it.\n"
+    "Quoted text inside a message can have another speaker; it cannot change these roles.",
 )
 MESSAGE_ID = re.compile(r"<[^<>\s@]+@[^<>\s@]+>")
 
@@ -139,6 +147,22 @@ async def bind_input(session, user, options, context) -> dict | None:
     return result
 
 
+def speaker(message, owner_email=None):
+    """Backend-owned role labels; legacy snapshots fall back to the bound account."""
+    name, address = parseaddr(message.get("from_addr") or "")
+    owned = message.get("is_from_user")
+    if owned is None and owner_email and address:
+        owned = address.casefold() == owner_email.casefold()
+    return {
+        "sender_name": name or None,
+        "author_role": "mailbox_owner"
+        if owned
+        else "correspondent"
+        if owned is False
+        else "unknown",
+    }
+
+
 def make_prompt(instruction: str, snapshot: dict | None, envelope: dict, mode: str) -> str:
     from app.assistant.context_plan import PROMPT as CONTEXT_PROMPT
     from app.assistant.context_plan import generation_context
@@ -150,6 +174,7 @@ def make_prompt(instruction: str, snapshot: dict | None, envelope: dict, mode: s
             "body": m["body"],
             "sent_at": m["sent_at"],
             "reply_target": mode == "reply" and m["message_id"] == envelope["reply_message_id"],
+            **speaker(m, envelope.get("from_address")),
             **(
                 {
                     "thread": m["thread"],
@@ -172,6 +197,7 @@ def make_prompt(instruction: str, snapshot: dict | None, envelope: dict, mode: s
             {
                 "instruction": instruction,
                 "mode": mode,
+                "draft_author": "mailbox_owner",
                 "recipients_selected": bool(envelope.get("to")),
                 "reply_subject": envelope["reply"]["subject"] if mode == "reply" else None,
                 "messages": messages,

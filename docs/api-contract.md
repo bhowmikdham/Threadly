@@ -1675,3 +1675,11 @@ Standalone social closings do not repeat Calendar creation instructions.
 Recognized model-generated Calendar control guidance resolves to the current
 owned action card/state, or a missing-details message. This bounded guidance guard
 does not approve, dispatch or retry the action and is not a universal language check.
+
+Reply preparation preserves backend-owned speaker roles (`author_role`, `is_from_user`)
+and the selected `reply_target` in fresh `read_email` observations. The draft author
+is the authenticated mailbox owner; a selected source is the message to answer, not
+the new draft's speaker. An unread selected-email reply rejected by a standalone
+compose tool must read the source and prepare the reply workflow or ask a genuine
+clarification; a prose-only draft cannot bypass that repair. Existing recipient and
+exact-payload approval controls still apply. See [reply verification](evaluation/reply-perspective/README.md).

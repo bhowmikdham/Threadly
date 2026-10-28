@@ -40,6 +40,7 @@ async def capture_view(
                 total.label("total"),
                 Message.gmail_msg_id,
                 Message.from_addr,
+                Message.is_from_user,
                 Message.sent_at,
                 func.substr(func.coalesce(Message.body_clean, ""), 1, per_message).label("body"),
                 func.length(func.coalesce(Message.body_clean, "")).label("body_length"),
@@ -62,6 +63,7 @@ async def capture_view(
         {
             "message_id": row.gmail_msg_id,
             "from_addr": row.from_addr,
+            "is_from_user": row.is_from_user,
             "sent_at": row.sent_at.isoformat() if row.sent_at else None,
             "body": row.body,
         }
