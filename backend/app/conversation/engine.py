@@ -13,7 +13,7 @@ from app.api.errors import ApiError
 from app.assistant.summary import digest
 from app.calendar import conversation_guard, event_draft
 from app.calendar import intent as calendar_intent
-from app.conversation import budget, email_draft, email_repair, email_review, mail_goal
+from app.conversation import budget, email_draft, email_repair, email_review, mail_goal, social
 from app.conversation.prompt import PROMPT, RELEASE
 from app.model_client.conversation import ConversationModel, ConversationProviderError
 from app.model_client.providers import ProviderError
@@ -92,6 +92,12 @@ class IncorrectCapabilityAdvice(ValueError):
 
 async def run(context, runtime, model=None):
     mail_goal.begin_turn(runtime)
+    if social_response := social.reply(context):
+        return {
+            **social_response,
+            "release": RELEASE,
+            "trace": [{"tool": "respond", "status": "ok"}],
+        }
     if email_review.requested(runtime):
         return {
             **await email_review.review(runtime),

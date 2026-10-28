@@ -533,7 +533,7 @@ def test_committed_release_matches_current_prompt_and_tools():
     root = Path(__file__).parents[2] / "docs/evaluation"
     saved = json.loads(
         (
-            root / "reply-perspective/contextual-conversation-1.8.10+reply-perspective.1.json"
+            root / "natural-voice/contextual-conversation-1.8.11+natural-voice.1.json"
         ).read_text()
     )
     assert saved == {**assets(), "prompt": PROMPT, "tools": tool_config()}

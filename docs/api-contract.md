@@ -1686,3 +1686,11 @@ the new draft's speaker. An unread selected-email reply rejected by a standalone
 compose tool must read the source and prepare the reply workflow or ask a genuine
 clarification; a prose-only draft cannot bypass that repair. Existing recipient and
 exact-payload approval controls still apply. See [reply verification](evaluation/reply-perspective/README.md).
+
+Conversation release `contextual-conversation-1.8.11+natural-voice.1` adds bounded,
+read-only social responses within the existing conversation-turn endpoint and
+versioned history. Complete recognized social turns do not invoke the model or
+tools, restart work, read mail or introduce new action authority. Ambiguous content
+answers, compound work, corrections and cancellation retain normal context handling.
+The client may speak one truthful delayed progress cue for pending work; interruption
+of audio is not a backend cancellation. See [scope and actual verification](evaluation/natural-voice/README.md).
