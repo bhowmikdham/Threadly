@@ -31,6 +31,49 @@ export type Classification = {
   status: "classified" | "needs_review" | "skipped"
   labels: Labels | null
   valid_until: string
+  security_priority?: {
+    message_id: string
+    priority_if_recognised: Priority
+    evidence: string[]
+  } | null
+}
+
+/** Only a source-bound backend baseline can remove security-only importance. */
+export function recognitionLabels(
+  value: Classification,
+  recognised: boolean
+): Labels | null {
+  const baseline = securityBaseline(value)
+  return value.labels && recognised && baseline
+    ? { ...value.labels, priority: baseline.priority_if_recognised }
+    : value.labels
+}
+export function securityBaseline(value: Classification) {
+  const data = value as any,
+    baseline = data?.security_priority
+  const latest = data?.latest_incoming
+  const ranks = { Low: 0, Medium: 1, High: 2 }
+  return data?.status === "classified" &&
+    baseline &&
+    /^[a-f0-9]{1,32}$/.test(baseline.message_id) &&
+    latest?.message_id === baseline.message_id &&
+    latest.timestamp_source === "gmail.internalDate" &&
+    data.source === "live_gmail" &&
+    data.persisted === false &&
+    Array.isArray(data.source_message_ids) &&
+    data.source_message_ids.includes(baseline.message_id) &&
+    Object.hasOwn(ranks, baseline.priority_if_recognised) &&
+    ranks[baseline.priority_if_recognised] <= ranks[data.labels?.priority] &&
+    Array.isArray(baseline.evidence) &&
+    baseline.evidence.length > 0 &&
+    baseline.evidence.length <= 50 &&
+    new Set(baseline.evidence).size === baseline.evidence.length &&
+    baseline.evidence.every(
+      (id: unknown) =>
+        typeof id === "string" && data.source_message_ids.includes(id)
+    )
+    ? (baseline as NonNullable<Classification["security_priority"]>)
+    : null
 }
 
 export const categoryDisplay: Record<Category, string> = {

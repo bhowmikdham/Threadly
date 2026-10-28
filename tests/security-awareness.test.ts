@@ -74,6 +74,59 @@ describe("tentative local subject cues", () => {
   )
 })
 
+describe("synthetic indirect access notices (not the actual Hertz wording)", () => {
+  it.each([
+    "Hertz: Confirm your sign-in",
+    "Your Hertz sign-in verification code",
+    "Your login code",
+    "Account access verification",
+    "Sign in confirmation",
+    "Sign-in successful",
+    "You signed in to Hertz",
+    "You have logged in",
+    "Your one-time sign-in link"
+  ])("recognises account access: %s", (subject) =>
+    expect(possibleSecuritySubject(subject)).toBe(true)
+  )
+  it.each([
+    "Hertz rental reminder",
+    "Confirm your Hertz reservation",
+    "Your booking verification code",
+    "Your verification code",
+    "Confirm your account details",
+    "Login to view your booking confirmation",
+    "Sign-in verification tips",
+    "Your login code sale",
+    "Fwd: Hertz: Confirm your sign-in",
+    "Re: Sign-in confirmation",
+    "Sign-in verification guide",
+    "Hertz offers just for you"
+  ])("leaves ordinary/ambiguous mail alone: %s", (subject) =>
+    expect(possibleSecuritySubject(subject)).toBe(false)
+  )
+})
+
+it("returns the saved first disposition independently of prompt eligibility", async () => {
+  const f = fixture(),
+    s = f.make(),
+    metadata = f.meta()
+  const offered = await s.status("account-a", metadata)
+  expect(offered.state).toBeNull()
+  const saved = await s.status("account-a", metadata, "recognised")
+  expect(saved.state).toBe("recognised")
+  expect((await s.status("account-a", metadata, "dismissed")).state).toBe(
+    "recognised"
+  )
+  expect(await s.check("account-a", metadata)).toBeNull()
+  f.advance(DAY + 1)
+  expect(await f.make().status("account-a", metadata)).toEqual(saved)
+  expect(await f.make().check("account-a", metadata)).toBeNull()
+  expect(await f.make().status("account-b", metadata)).toBeNull()
+  expect(await f.make().status("account-a", f.meta("fff"))).not.toEqual(saved)
+  // Changed receipt metadata must not resurrect an old acknowledgement.
+  expect(await f.make().status("account-a", f.meta())).toBeNull()
+})
+
 it("requires bound provider metadata and rejects missing/forged timestamp sources", () => {
   const data = {
     thread_id: "aaa",

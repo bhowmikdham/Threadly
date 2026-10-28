@@ -77,7 +77,7 @@ test.beforeAll(async () => {
         categories.map((category, i) => {
           const thread = `d${i + 1}`
           return [
-            `classification:1:${thread}:${thread}0:Australia/Melbourne`,
+            `classification:${JSON.stringify([origin, 1, "tester@example.test", thread, `${thread}0`, "Australia/Melbourne"])}`,
             {
               schema_version: "email-classification-with-action.v1",
               thread_id: thread,

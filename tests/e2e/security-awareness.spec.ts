@@ -11,38 +11,53 @@ import {
 
 let context: BrowserContext, page: Page, setup: Page, profile: string
 const fixture = `<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px Arial;margin:0;background:#fff;color:#202124}table{width:100%;table-layout:fixed;border-collapse:collapse}td{padding:6px;overflow:hidden}.xT{display:flex;align-items:center;overflow:hidden;white-space:nowrap}.y6{min-width:0;overflow:hidden}.y2{color:#687078}.sender{width:110px}.when{width:60px}tr{border-bottom:1px solid #ddd}button{font:inherit}</style></head><body><div aria-label="Google Account: Synthetic (tester@example.test)">Synthetic Gmail fixture</div><div role="main"><table><tr class="zA zE" tabindex="0"><td style="width:24px"><input type="checkbox" aria-label="Select synthetic message"></td><td style="width:24px"><button aria-label="Star synthetic message">☆</button></td><td class="sender">Example sender</td><td><div class="xS"><div class="xT"><div class="y6"><span class="bog" data-legacy-thread-id="aaa" data-legacy-last-message-id="aaa0">Security alert</span></div><span class="y2"> — Synthetic preview</span></div></div></td><td class="when">12:00</td></tr></table></div><script>document.querySelector('tr').addEventListener('click',e=>{if(!e.target.closest('button,input'))document.body.dataset.opened='yes'})</script></body></html>`
-async function cache(id: string, age = 0, metadata = true) {
+async function cache(
+  id: string,
+  age = 0,
+  metadata = true,
+  baseline: "Low" | "Medium" | "High" | null = null
+) {
   await setup.evaluate(
-    async ({ id, age, metadata }) => {
+    async ({ id, age, metadata, baseline }) => {
+      const session = (await chrome.storage.local.get("threadlySession"))
+        .threadlySession
       const received = new Date(Date.now() - age).toISOString()
       await chrome.storage.session.set({
-        [`classification:19:aaa:${id}:UTC`]: {
-          schema_version: "email-classification-with-action.v1",
-          thread_id: "aaa",
-          status: "classified",
-          labels: {
-            needs_reply: false,
-            priority: "High",
-            category: "it",
-            action: "review"
-          },
-          source: "live_gmail",
-          persisted: false,
-          source_message_ids: [id],
-          valid_until: new Date(Date.now() + 3600000).toISOString(),
-          ...(metadata
-            ? {
-                latest_incoming: {
+        [`classification:${JSON.stringify([session.origin, 19, "tester@example.test", "aaa", id, "UTC"])}`]:
+          {
+            schema_version: "email-classification-with-action.v1",
+            thread_id: "aaa",
+            status: "classified",
+            labels: {
+              needs_reply: false,
+              priority: "High",
+              category: "it",
+              action: "review"
+            },
+            source: "live_gmail",
+            persisted: false,
+            source_message_ids: [id],
+            valid_until: new Date(Date.now() + 3600000).toISOString(),
+            security_priority: baseline
+              ? {
                   message_id: id,
-                  received_at: received,
-                  timestamp_source: "gmail.internalDate"
+                  priority_if_recognised: baseline,
+                  evidence: [id]
                 }
-              }
-            : {})
-        }
+              : null,
+            ...(metadata
+              ? {
+                  latest_incoming: {
+                    message_id: id,
+                    received_at: received,
+                    timestamp_source: "gmail.internalDate"
+                  }
+                }
+              : {})
+          }
       })
     },
-    { id, age, metadata }
+    { id, age, metadata, baseline }
   )
 }
 async function reuse(id: string, subject = "Security alert") {
@@ -265,6 +280,61 @@ test("recent provider-dated messages before installation prompt; recognition per
   await reuse("aaa5", "<img src=x onerror=alert(1)>")
   await expect(cue).toHaveCount(0)
   await expect(page.locator(".bog img")).toHaveCount(0)
+})
+
+test("synthetic access verification restores its baseline only after recognition", async () => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  for (const [id, baseline] of [
+    ["ccd1", "Low"],
+    ["ccd2", "Medium"],
+    ["ccd3", "High"]
+  ] as const) {
+    await cache(id, 0, true, baseline)
+    await reuse(id, "Hertz: Confirm your sign-in")
+    await expect(page.locator(".tl-security-cue")).toBeVisible()
+    await expect(page.locator(".tl-left")).toHaveAttribute(
+      "aria-label",
+      /High priority/
+    )
+    await page.getByRole("button", { name: "I recognise this email" }).click()
+    await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+    await expect(page.locator(".tl-left")).toHaveAttribute(
+      "aria-label",
+      new RegExp(`${baseline} priority`)
+    )
+    // The raw classifier result deliberately stays High: recognition overlays it.
+    await page.reload()
+    await reuse(id, "Hertz: Confirm your sign-in")
+    await expect(page.locator(".tl-left")).toHaveAttribute(
+      "aria-label",
+      new RegExp(`${baseline} priority`)
+    )
+    await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+  }
+  await cache("ccd4", 0, true, "Low")
+  await reuse("ccd4", "Your verification code") // body context supplied by classifier
+  await expect(page.locator(".tl-security-cue")).toBeVisible()
+  await page
+    .getByRole("button", { name: "Dismiss recognition check", exact: true })
+    .click()
+  await expect(page.locator(".tl-left")).toHaveAttribute(
+    "aria-label",
+    /High priority/
+  )
+  await page.reload()
+  await reuse("ccd4", "Your verification code")
+  await expect(page.locator(".tl-left")).toHaveAttribute(
+    "aria-label",
+    /High priority/
+  )
+  await expect(page.locator(".tl-security-cue")).toHaveCount(0)
+  await cache("ccd5")
+  await reuse("ccd5", "Hertz: Confirm your reservation")
+  await expect(page.locator(".tl-left")).toHaveAttribute(
+    "aria-label",
+    /High priority/
+  )
+  await expect(page.locator(".tl-security-cue")).toHaveCount(0)
 })
 
 test("words/icons, account isolation, disabled marks and unavailable storage fail closed", async () => {

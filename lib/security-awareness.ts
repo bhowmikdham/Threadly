@@ -25,23 +25,44 @@ export type Incoming = {
   timestamp_source: "gmail.internalDate"
 }
 export type Awareness = { key: string; receivedAt: number }
+export type SecurityStatus = Awareness & { state: Recognition | null }
 type Store = { read(): Promise<unknown>; write(value: State): Promise<void> }
 const instant = (n: unknown): n is number =>
   typeof n === "number" && Number.isSafeInteger(n) && n > 0
 
-export function possibleSecuritySubject(subject: string): boolean {
-  // Conservative English cues in the already displayed subject, never stored or sent.
+/** Original exclusions also apply when the classifier supplies a cue. */
+export function securitySubjectAllowed(subject: string): boolean {
   if (subject.length > 500 || /[\u0000-\u001f]/.test(subject)) return false
   const text = subject.trim()
-  if (
+  return !(
     /^(re|fw|fwd)\s*:/i.test(text) ||
     /\b(newsletter|digest|weekly|webinar|sale|offer|tips|training|guide)\b/i.test(
       text
     )
   )
+}
+export function possibleSecuritySubject(subject: string): boolean {
+  // Conservative English cues in the already displayed subject, never stored or sent.
+  if (!securitySubjectAllowed(subject)) return false
+  const text = subject.trim()
+  if (
+    /^(?:(?:critical |important )?security alert(?:\b|:)|(?:new|unrecogni[sz]ed|suspicious|unusual) (?:sign[ -]?in|login|account activity)\b|(?:your )?password (?:was |has been )?(?:changed|reset)\b|(?:new|unrecogni[sz]ed) device (?:sign[ -]?in|login)\b)/i.test(
+      text
+    )
+  )
+    return true
+  // Require access context, not a brand name or a generic booking confirmation.
+  // A semantic cue from the existing classifier can cover body-only context.
+  if (/\b(rental|booking|reservation|pickup|pick-up|itinerary)\b/i.test(text))
     return false
-  return /^(?:(?:critical |important )?security alert(?:\b|:)|(?:new|unrecogni[sz]ed|suspicious|unusual) (?:sign[ -]?in|login|account activity)\b|(?:your )?password (?:was |has been )?(?:changed|reset)\b|(?:new|unrecogni[sz]ed) device (?:sign[ -]?in|login)\b)/i.test(
-    text
+  const access = /\b(sign[ -]?in|log[ -]?in|account access)\b/i.test(text)
+  const verification =
+    /\b(verif(?:y|ication)|confirm(?:ation)?|code|one[ -]time|link|successful|completed|attempt|request)\b/i.test(
+      text
+    )
+  return (
+    (access && verification) ||
+    /\byou (?:have )?(?:signed|logged) in\b/i.test(text)
   )
 }
 
@@ -189,6 +210,20 @@ export class SecurityAwarenessStore {
     metadata: Incoming | null,
     state?: Recognition
   ): Promise<Awareness | null> {
+    return this.status(scope, metadata, state).then((status) =>
+      status &&
+      (!status.state || state) &&
+      status.receivedAt > this.clock() - DAY
+        ? { key: status.key, receivedAt: status.receivedAt }
+        : null
+    )
+  }
+  /** Recognition is separate from prompt eligibility and survives page reloads. */
+  status(
+    scope: string,
+    metadata: Incoming | null,
+    state?: Recognition
+  ): Promise<SecurityStatus | null> {
     return this.serial(async () => {
       const now = this.clock(),
         s = await this.load(now)
@@ -207,11 +242,16 @@ export class SecurityAwarenessStore {
       const key = metadata
         ? await this.key(s, ["message", scope, metadata.message_id])
         : null
-      const acknowledged = key && s.acknowledgements.some((a) => a.key === key)
-      let result: Awareness | null = null
-      if (recent && acknowledged && state) result = { key, receivedAt }
+      const acknowledged = key && s.acknowledgements.find((a) => a.key === key)
+      let result: SecurityStatus | null = null
+      if (
+        acknowledged &&
+        receivedAt <= now &&
+        receivedAt === acknowledged.receivedAt
+      )
+        result = { key, receivedAt, state: acknowledged.state }
       if (recent && !acknowledged && s.acknowledgements.length < ACK_CAP) {
-        result = { key, receivedAt }
+        result = { key, receivedAt, state: state || null }
         if (state)
           s.acknowledgements.push({
             key,
