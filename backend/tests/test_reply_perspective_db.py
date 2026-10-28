@@ -33,6 +33,7 @@ async def test_reply_perspective_survives_source_capture_and_idempotent_worker(
                 instruction="Draft a reply thanking the sender for acknowledging my response.",
                 intent_hint="reply",
                 context_snapshot_id=context.id,
+                continuation=None,
                 draft_options=DraftOptions(to=["sender@example.test"], reply_message_id=MID),
             )
             task = await tasks.submit(session, 1, request)
