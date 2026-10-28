@@ -116,8 +116,8 @@ describe("VoiceOrb audio resource lifecycle", () => {
     act(() =>
       recognizers[0].onresult({ results: [[{ transcript: "Draft a reply" }]] })
     )
-    await act(() => vi.advanceTimersByTimeAsync(1300))
-    const acknowledgment = speak.mock.calls[0][0]
+    await act(() => vi.advanceTimersByTimeAsync(3800))
+    const progressCue = speak.mock.calls[0][0]
     contexts[0].analyser.getByteTimeDomainData.mockImplementation((samples) =>
       samples.fill(255)
     )
@@ -133,7 +133,7 @@ describe("VoiceOrb audio resource lifecycle", () => {
     )
     await act(async () => {
       answer.resolve({ text: "The old turn finished", showChat: true })
-      acknowledgment.onend()
+      progressCue.onend()
     })
     expect(
       view.container.querySelector(
@@ -163,7 +163,7 @@ describe("VoiceOrb audio resource lifecycle", () => {
     expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true")
   })
 
-  it("reveals a completed draft before a pending acknowledgment finishes, and cleans up its layout", async () => {
+  it("reveals a completed draft while its spoken response is pending, and cleans up its layout", async () => {
     const answer = deferred<VoiceReply>()
     const respond = () => answer.promise
     const view = render(
@@ -330,11 +330,11 @@ describe("VoiceOrb audio resource lifecycle", () => {
       const oldError = recognizers[0].onerror
       const oldResult = recognizers[0].onresult
       act(() => oldResult({ results: [[{ transcript: "Summarise this" }]] }))
-      await act(() => vi.advanceTimersByTimeAsync(1300))
+      await act(() => vi.advanceTimersByTimeAsync(3800))
       expect(speak.mock.calls.map(([utterance]) => utterance.text)).toEqual([
-        "Let me check that."
+        "I'm still working on your request."
       ])
-      const acknowledgment = speak.mock.calls[0][0]
+      const progressCue = speak.mock.calls[0][0]
       const cancellations = vi.mocked(window.speechSynthesis.cancel).mock.calls
         .length
       first.unmount()
@@ -353,9 +353,9 @@ describe("VoiceOrb audio resource lifecycle", () => {
         oldResult({ results: [[{ transcript: "Late result" }]] })
       })
       await act(async () => {
-        // A cancelled browser acknowledgment may still emit a late completion.
+        // A cancelled browser progressCue may still emit a late completion.
         // Neither that callback nor the old response may speak in the new session.
-        acknowledgment.onend()
+        progressCue.onend()
         answer.resolve(reply)
       })
       await act(() => vi.advanceTimersByTimeAsync(1300))

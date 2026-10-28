@@ -9,7 +9,7 @@ import { createMockBackend, target, thread, user } from "./mock-backend"
 // Real built extension, synthetic Gmail selection/API and speech only.
 // The test never saves a Gmail draft, sends mail or calls a model/voice provider.
 for (const mode of ["artifact", "text"] as const) {
-  test(`voice reveals a ${mode} draft before acknowledgment ends and keeps it usable on repeated turns`, async () => {
+  test(`voice reveals a ${mode} draft during spoken review and keeps it usable on repeated turns`, async () => {
     const backend = createMockBackend()
     const calls: { path: string; method: string; body?: any }[] = []
     const errors: string[] = []
@@ -210,7 +210,8 @@ for (const mode of ["artifact", "text"] as const) {
                 state.spoken.push(utterance.text)
                 const end = () =>
                   utterance.onend?.(new Event("end") as SpeechSynthesisEvent)
-                if (utterance.text === "Let me check that.") state.release = end
+                if (utterance.text.startsWith("I've drafted"))
+                  state.release = end
                 else setTimeout(end, 10)
               }
             }
