@@ -152,10 +152,35 @@ it("reconciles cached/late classifier results with saved recognition and isolate
   expect(server.security.state).toBeNull()
   expect(server.security.key).not.toBe(other.security.key)
   expect(fetchMock).toHaveBeenCalledTimes(4)
-  const persisted = JSON.stringify(local.threadlySecurityAwarenessV1)
+  // Short raw IDs such as "aaa" can occur by chance inside a valid random HMAC.
+  // Assert the complete persisted shape instead of substring-searching digests.
+  const stored = local.threadlySecurityAwarenessV1
+  expect(Object.keys(stored).sort()).toEqual([
+    "accounts",
+    "acknowledgements",
+    "salt",
+    "version"
+  ])
+  for (const account of stored.accounts) {
+    expect(Object.keys(account).sort()).toEqual([
+      "activatedAt",
+      "key",
+      "lastSeen"
+    ])
+    expect(account.key).toMatch(/^[a-f0-9]{64}$/)
+  }
+  for (const acknowledgement of stored.acknowledgements) {
+    expect(Object.keys(acknowledgement).sort()).toEqual([
+      "acknowledgedAt",
+      "key",
+      "receivedAt",
+      "state"
+    ])
+    expect(acknowledgement.key).toMatch(/^[a-f0-9]{64}$/)
+    expect(acknowledgement.state).toBe("recognised")
+  }
+  const persisted = JSON.stringify(stored)
   for (const forbidden of [
-    "aaa",
-    "bbb",
     "example.test",
     "subject",
     "body",

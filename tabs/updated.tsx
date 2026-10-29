@@ -11,25 +11,25 @@ export default function Updated() {
         <p className="update-eyebrow">WHAT’S NEW · VERSION {version}</p>
         <h1>Threadly was updated</h1>
         <p className="update-intro">
-          A gentle cue for possible recent security alerts.
+          Clearer replies, more natural voice conversations and account-access
+          cues.
         </p>
         <section>
-          <h2>Notice recent security alerts</h2>
+          <h2>Review replies while speaking</h2>
           <p>
-            A subtle glow fades away before a compact recognition check appears
-            for possible recent security alerts. This is a subject cue only:
-            Threadly has not verified the sender. No links open and no security
-            actions are taken.
+            Reply drafts stay visible and editable when Threadly answers aloud.
+            Quick answers speak directly, with a brief progress cue only when
+            work takes longer. Review the draft and recipient before using it.
           </p>
         </section>
         <section>
-          <h2>Recognise or dismiss, once per message</h2>
+          <h2>Recognise account-access mail</h2>
           <p>
-            Unacknowledged mail received within the last 24 hours is eligible,
-            including mail that arrived before this update. Recognised or
-            dismissed messages stay quiet for 30 days. This feature saves only
-            opaque references, timestamps and your response locally; it stores
-            no email text. Hide Inbox marks in Settings to hide the cue.
+            Recent sign-in codes and access confirmations can show a recognition
+            check. Recognising an event removes only its security concern from
+            priority when a supported assessment is available; other important
+            work stays important. This does not verify the sender or mark mail
+            safe. Recognised or dismissed messages stay quiet for 30 days.
           </p>
         </section>
         <a
