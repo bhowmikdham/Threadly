@@ -11,6 +11,7 @@ import {
   trustedSender
 } from "./lib/security"
 import {
+  DAY,
   incomingMetadata,
   SECURITY_STATE_KEY,
   SecurityAwarenessStore
@@ -36,6 +37,13 @@ const awarenessStore = new SecurityAwarenessStore({
 })
 const awarenessScope = (s: Session) =>
   JSON.stringify([s.origin, s.user.id, s.user.email.toLowerCase()])
+const classificationKey = (
+  s: Session,
+  thread: string,
+  last: string,
+  zone: string
+) =>
+  `classification:${JSON.stringify([s.origin, s.user.id, s.user.email.toLowerCase(), thread, last, zone])}`
 async function withAwareness(
   s: Session,
   data: any,
@@ -44,17 +52,21 @@ async function withAwareness(
   run: number
 ) {
   if (run !== sessionGeneration) return { ok: false, code: "account_mismatch" }
-  let awareness = null
+  let security = null
   try {
-    awareness = await awarenessStore.check(
+    security = await awarenessStore.status(
       awarenessScope(s),
       incomingMetadata(data, thread, last)
     )
   } catch {
     /* Unavailable storage hides awareness; existing badges remain usable. */
   }
+  const awareness =
+    security && !security.state && security.receivedAt > Date.now() - DAY
+      ? { key: security.key, receivedAt: security.receivedAt }
+      : null
   return run === sessionGeneration
-    ? { ok: true, data, awareness }
+    ? { ok: true, data, awareness, security }
     : { ok: false, code: "account_mismatch" }
 }
 function mutateSession<T>(operation: () => Promise<T>): Promise<T> {
@@ -432,7 +444,7 @@ async function classifyThread(message: any) {
   }
   // Kept for this browser session until valid_until, so reopening Gmail
   // reuses results. Labels and IDs only; a new message changes the key.
-  const key = `classification:${s.user.id}:${threadId}:${lastMessageId}:${timeZone}`
+  const key = classificationKey(s, threadId, lastMessageId, timeZone)
   const kept = (await chrome.storage.session.get(key))[key]
   if (kept && Date.parse(kept.valid_until) > Date.now())
     return withAwareness(s, kept, threadId, lastMessageId, run)
@@ -527,7 +539,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       )
         return { ok: false }
       // Only metadata already fetched through this authenticated classifier is accepted.
-      const cacheKey = `classification:${s.user.id}:${message.threadId}:${message.lastMessageId}:${message.timeZone}`
+      const cacheKey = classificationKey(
+        s,
+        message.threadId,
+        message.lastMessageId,
+        message.timeZone
+      )
       const data = (await chrome.storage.session.get(cacheKey))[cacheKey]
       if (
         !(Date.parse(data?.valid_until) > Date.now()) ||
@@ -540,12 +557,18 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         message.lastMessageId
       )
       if (!metadata) return { ok: false }
-      const saved = await awarenessStore.check(
+      const saved = await awarenessStore.status(
         awarenessScope(s),
         metadata,
         message.state
       )
-      if (!saved || run !== sessionGeneration) return { ok: false }
+      if (
+        !saved ||
+        !saved.state ||
+        saved.receivedAt <= Date.now() - DAY ||
+        run !== sessionGeneration
+      )
+        return { ok: false }
       const tabs = await chrome.tabs
         .query({ url: "https://mail.google.com/*" })
         .catch(() => [])
@@ -556,12 +579,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             chrome.tabs
               .sendMessage(t.id, {
                 type: "THREADLY_SECURITY_ACKED",
-                key: saved.key
+                key: saved.key,
+                state: saved.state
               })
               .catch(() => {})
           )
       )
-      return { ok: true, key: saved.key }
+      return { ok: true, key: saved.key, state: saved.state }
     })()
       .then(respond)
       .catch(() => respond({ ok: false }))

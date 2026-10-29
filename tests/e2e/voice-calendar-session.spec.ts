@@ -43,6 +43,7 @@ let backend: MockBackend, server: Server, context: BrowserContext, page: Page
 let profile: string, origin: string
 let turns: any[], voiceCalls: string[], failure: number, taskQuestion: boolean
 let holdSpeech: boolean, releaseSpeech: () => void
+let conversationalStyle: boolean, slowWork: boolean, releaseWork: () => void
 const errors: string[] = []
 
 // A short silent WAV exercises real decoding/playback without an external voice.
@@ -69,6 +70,9 @@ test.beforeEach(async () => {
   taskQuestion = false
   holdSpeech = false
   releaseSpeech = () => {}
+  conversationalStyle = false
+  slowWork = false
+  releaseWork = () => {}
   errors.length = 0
   server = createServer(async (req, res) => {
     if (
@@ -108,6 +112,26 @@ test.beforeEach(async () => {
       return
     }
     turns.push(body)
+    if (conversationalStyle) {
+      const work = body.instruction === "Check my latest email"
+      if (work && slowWork)
+        await new Promise<void>((resolve) => (releaseWork = resolve))
+      res.end(
+        JSON.stringify({
+          conversation_id: body.conversation_id,
+          version: body.expected_version + 1,
+          kind: "message",
+          text: work
+            ? "I couldn't read that email. Please select it again."
+            : body.instruction === "I'm good, thanks"
+              ? "Glad to hear it. What would you like to work on?"
+              : body.instruction === "Cancel, cancel"
+                ? "Okay."
+                : "Hey! I'm here and ready to help. How are you?"
+        })
+      )
+      return
+    }
     res.end(
       JSON.stringify({
         conversation_id: body.conversation_id,
@@ -373,4 +397,62 @@ test("Close during pending speech does not reset auth or speak a stale answer af
     await page.evaluate(() => (window as any).voiceTest.spoken)
   ).not.toContain(answer)
   expect((await stored()).user.id).toBe(user.id)
+})
+
+test("greeting, reciprocal follow-up and cancellation speak directly in one continuing chat", async () => {
+  conversationalStyle = true
+  await page.getByRole("button", { name: "Talk to Threadly" }).click()
+  for (const text of [
+    "Hey Threadly, how are you?",
+    "I'm good, thanks",
+    "Cancel, cancel"
+  ]) {
+    await say(text)
+    await expect.poll(() => turns.at(-1)?.instruction).toBe(text)
+    await expect(page.locator(".voice-status")).toHaveText("Listening…")
+  }
+  expect(voiceCalls).toEqual([
+    "Hey! I'm here and ready to help. How are you?",
+    "Glad to hear it. What would you like to work on?",
+    "Okay."
+  ])
+  expect(voiceCalls.join(" ")).not.toMatch(
+    /let me check|I'm Threadly|saved|sent|cancelled/i
+  )
+  expect(new Set(turns.map((t) => t.conversation_id)).size).toBe(1)
+  expect(turns.map((t) => t.expected_version)).toEqual([0, 1, 2])
+})
+
+test("slow work gets one truthful cue and Close suppresses its late spoken answer", async () => {
+  conversationalStyle = true
+  slowWork = true
+  try {
+    await page.getByRole("button", { name: "Talk to Threadly" }).click()
+    await say("Check my latest email")
+    await expect.poll(() => turns.length).toBe(1)
+    await expect
+      .poll(() => voiceCalls)
+      .toEqual(["I'm still working on your request."])
+    await page.getByRole("button", { name: "Close voice conversation" }).click()
+    releaseWork()
+    await expect(
+      page.getByText("I couldn't read that email. Please select it again.")
+    ).toBeVisible()
+    await expect(
+      page.getByRole("button", { name: "Talk to Threadly" })
+    ).toBeEnabled()
+    await page.getByRole("button", { name: "Talk to Threadly" }).click()
+    await say("Hey Threadly, how are you?")
+    await expect(page.locator(".voice-status")).toHaveText("Listening…")
+    await expect.poll(() => turns.length).toBe(2)
+    expect(voiceCalls).toEqual([
+      "I'm still working on your request.",
+      "Hey! I'm here and ready to help. How are you?"
+    ])
+    expect(voiceCalls.join(" ")).not.toMatch(/done|saved|sent|booked/i)
+    expect(turns.map((t) => t.expected_version)).toEqual([0, 1])
+    expect(turns[0].conversation_id).toBe(turns[1].conversation_id)
+  } finally {
+    releaseWork()
+  }
 })

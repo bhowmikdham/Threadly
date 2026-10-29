@@ -94,3 +94,5 @@ production behavior are unchanged. A private synthetic browser recording also
 passed both security cases; its measured glow end was 3761.6ms and prompt
 insertion 3923.4ms (161.8ms gap), with no active animation at insertion. Playback
 frames were inspected across glow, gap, prompt and dark/narrow presentation.
+
+New local candidate: [indirect access recognition and priority restoration](security-recognition.md). It is not a deployed release; see test results and remaining build/model/browser gates there.

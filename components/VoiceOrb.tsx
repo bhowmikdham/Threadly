@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { api } from "../lib/api"
+import { PROGRESS_DELAY_MS, progressCue } from "../lib/voice-progress"
 import { Icon } from "./Icon"
 
 // The glowing purple and white orb, drawn with a single WebGL shader so the
@@ -178,8 +179,6 @@ const labels: Record<Phase, string> = {
 }
 // How long a pause ends what the user is saying.
 const PAUSE_MS = 1200
-// Said as soon as the user finishes speaking, while the answer is worked out.
-const ACKNOWLEDGE = "Let me check that."
 // Talking over Threadly interrupts it. The microphone has to stay above
 // BARGE_LEVEL (0–1) for BARGE_MS, and not within BARGE_GRACE_MS of Threadly
 // starting to speak, so its own voice or a cough doesn't cut it off. If it
@@ -201,7 +200,11 @@ function pickVoice() {
     null
   )
 }
-function speakWithBrowser(text: string, onLevel: (level: number) => void) {
+function speakWithBrowser(
+  text: string,
+  onLevel: (level: number) => void,
+  session: { stop: () => void }
+) {
   return new Promise<void>((resolve) => {
     const synth = window.speechSynthesis
     if (!synth || !text) return resolve()
@@ -211,29 +214,36 @@ function speakWithBrowser(text: string, onLevel: (level: number) => void) {
     const voice = pickVoice()
     if (voice) u.voice = voice
     let timer: ReturnType<typeof setInterval> | undefined
+    let settled = false
     // Browser speech has no volume feed, so the orb follows a speaking rhythm
     // and swells on each word.
     u.onstart = () => {
+      if (settled) return
       let t = 0
       timer = setInterval(() => {
         t += 0.05
         onLevel(0.3 + 0.25 * Math.abs(Math.sin(t * 7)))
       }, 50)
     }
-    u.onboundary = () => onLevel(0.75)
+    u.onboundary = () => {
+      if (!settled) onLevel(0.75)
+    }
     const done = () => {
+      if (settled) return
+      settled = true
       clearInterval(timer)
       onLevel(0)
       resolve()
     }
     u.onend = done
     u.onerror = done
+    session.stop = done
     synth.speak(u)
   })
 }
 
 let active: { cancelled: boolean; stop: () => void } | null = null
-// Short fixed phrases (like the acknowledgement) are fetched once, so repeats
+// Short fixed phrases (like progress cues) are fetched once, so repeats
 // are instant and don't use up more of the voice quota.
 const phraseAudio = new Map<string, string>()
 
@@ -306,11 +316,11 @@ export async function speak(text: string, onLevel: (level: number) => void) {
       code: e?.code,
       message: e?.message
     })
-    if (!session.cancelled) await speakWithBrowser(text, onLevel)
+    if (!session.cancelled) await speakWithBrowser(text, onLevel, session)
   } finally {
     cancelAnimationFrame(frame)
-    onLevel(0)
-    void ctx?.close()
+    if (active === session) onLevel(0)
+    if (ctx && ctx.state !== "closed") void ctx.close().catch(() => {})
     if (active === session) active = null
   }
 }
@@ -322,10 +332,13 @@ export type VoiceReply = string | { text: string; showChat?: boolean }
 
 export function VoiceOrb({
   respond,
-  onClose
+  onClose,
+  revealChat = false
 }: {
-  // `showChat` lifts the orb to the top so a list of choices (for example the
-  // top five emails) is visible in the chat below it.
+  // Speech can be interrupted or outlive the polling timeout. Chat state can
+  // still reveal a completed draft independently of the spoken turn's result.
+  revealChat?: boolean
+  // `showChat` also reveals cards returned by the current spoken turn.
   respond: (said: string) => Promise<VoiceReply>
   onClose: (error?: string) => void
 }) {
@@ -336,7 +349,7 @@ export function VoiceOrb({
   const level = useRef(0)
   const [phase, setPhase] = useState<Phase>("listening"),
     [notice, setNotice] = useState(""),
-    // The orb stays centred, and only lifts for replies that offer choices.
+    // Completed drafts can also keep the orb above the chat via revealChat.
     [docked, setDocked] = useState(false),
     // Muted: Threadly stops listening (and ignores the mic) until unmuted.
     [muted, setMuted] = useState(false)
@@ -347,6 +360,7 @@ export function VoiceOrb({
   const phaseSince = useRef(performance.now())
   const closed = useRef(false)
   const stop = useRef<() => void>(() => {})
+  const isDocked = docked || revealChat
   const move = (next: Phase) => {
     phaseRef.current = next
     phaseSince.current = performance.now()
@@ -361,10 +375,10 @@ export function VoiceOrb({
   // Leave room for the docked orb above the conversation.
   useEffect(() => {
     const root = overlay.current?.closest(".threadly")
-    if (!docked || !root) return
+    if (!isDocked || !root) return
     root.classList.add("voice-docked")
     return () => root.classList.remove("voice-docked")
-  }, [docked])
+  }, [isDocked])
   useEffect(() => {
     const Recognition =
       (window as any).SpeechRecognition ||
@@ -390,6 +404,12 @@ export function VoiceOrb({
     // Each request gets a number, so an interrupted one can tell it was
     // replaced and stop talking.
     let turn = 0
+    let progressCount = 0
+    const progressTimers = new Set<ReturnType<typeof setTimeout>>()
+    const clearProgress = () => {
+      progressTimers.forEach(clearTimeout)
+      progressTimers.clear()
+    }
     const r = new Recognition()
     r.lang = navigator.language
     r.interimResults = true
@@ -411,42 +431,42 @@ export function VoiceOrb({
         r.stop()
       } catch {}
 
-      // Acknowledge straight away, so there is no silence while the answer is
-      // worked out. The request is sent at the same time.
-      move("speaking")
-      let ready = false
-      const work = callbacks.current
-        .respond(said)
-        .then(
-          (result) => result,
+      // Submit immediately. Quick answers speak for themselves; only a still
+      // pending request gets one delayed cue, never a claim that mail was read
+      // or an action completed. A ready answer can interrupt a slow cue.
+      move("thinking")
+      let work: Promise<VoiceReply | null>
+      try {
+        work = Promise.resolve(callbacks.current.respond(said)).catch(
           () => null
         )
-        .finally(() => (ready = true))
-
-      const IGNORE_PHRASES = [
-        "hello",
-        "hi",
-        "how are you",
-        "thank you",
-        "thanks"
-      ]
-      let cleanSaid = said
-        .toLowerCase()
-        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
-        .trim()
-      cleanSaid = cleanSaid
-        .replace(/^(hello|hi|hey|good morning|good afternoon)\s+/, "")
-        .trim()
-
-      const shouldAcknowledge =
-        !IGNORE_PHRASES.includes(cleanSaid) && cleanSaid.length > 0
-
-      if (shouldAcknowledge) {
-        await speak(ACKNOWLEDGE, (value) => (voice.level = value))
-        if (stale()) return
+      } catch {
+        work = Promise.resolve(null)
       }
-
-      if (!ready) move("thinking")
+      const cue = progressCue(said, progressCount)
+      if (cue) {
+        let timer!: ReturnType<typeof setTimeout>
+        const delay = new Promise<false>((resolve) => {
+          timer = setTimeout(() => resolve(false), PROGRESS_DELAY_MS)
+          progressTimers.add(timer)
+        })
+        const ready = await Promise.race([work.then(() => true), delay])
+        clearTimeout(timer)
+        progressTimers.delete(timer)
+        if (stale()) return
+        if (!ready) {
+          progressCount++
+          move("speaking")
+          await Promise.race([
+            speak(cue, (value) => (voice.level = value)),
+            work.then(() => {
+              if (!stale()) stopSpeaking()
+            })
+          ])
+          if (stale()) return
+          move("thinking")
+        }
+      }
       const result = await work
 
       let answer: string,
@@ -468,6 +488,7 @@ export function VoiceOrb({
     // and listen. (The request itself still finishes in the chat.)
     const interrupt = () => {
       turn++
+      clearProgress()
       stopSpeaking()
       listen()
     }
@@ -559,6 +580,7 @@ export function VoiceOrb({
       // Close and React unmount can both reach this while close() is pending.
       if (stopped) return
       stopped = true
+      clearProgress()
       clearTimeout(silence)
       cancelAnimationFrame(frame)
       cancelAnimationFrame(micFrame)
@@ -624,9 +646,9 @@ export function VoiceOrb({
   return (
     <div
       ref={overlay}
-      className={`voice-overlay${docked ? " docked" : ""}`}
+      className={`voice-overlay${isDocked ? " docked" : ""}`}
       role="dialog"
-      aria-modal="true"
+      aria-modal={!isDocked}
       aria-label="Voice conversation">
       <button
         className="icon-button voice-close"

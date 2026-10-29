@@ -4,6 +4,8 @@ import {
   categoryDisplay,
   categoryIcon,
   priorityTip,
+  recognitionLabels,
+  securityBaseline,
   validClassification
 } from "../lib/classification"
 
@@ -74,6 +76,75 @@ describe("classification responses", () => {
         action: "no_action"
       })
     ).toBe("Low priority · no reply needed")
+  })
+})
+
+describe("security-only priority with a source-bound baseline", () => {
+  const access = (priority = "Low"): any => ({
+    ...classified,
+    source: "live_gmail",
+    persisted: false,
+    latest_incoming: {
+      message_id: "def456",
+      timestamp_source: "gmail.internalDate"
+    },
+    labels: { ...classified.labels, priority: "High" },
+    security_priority: {
+      message_id: "def456",
+      priority_if_recognised: priority,
+      evidence: ["def456"]
+    }
+  })
+  it.each(["Low", "Medium", "High"])(
+    "uses %s only after recognition, preserving independent importance",
+    (priority) => {
+      const value = access(priority)
+      expect(recognitionLabels(value, false).priority).toBe("High")
+      expect(recognitionLabels(value, true)).toEqual({
+        ...value.labels,
+        priority
+      })
+      expect(value.labels.priority).toBe("High") // cache/model result stays immutable
+    }
+  )
+  it("does not guess a baseline from a high badge or a subject", () => {
+    expect(recognitionLabels(classified as any, true)).toEqual(
+      classified.labels
+    )
+    expect(
+      recognitionLabels({ ...classified, labels: null } as any, true)
+    ).toBeNull()
+  })
+  it.each([
+    { message_id: "aaa", priority_if_recognised: "Low", evidence: ["def456"] },
+    {
+      message_id: "def456",
+      priority_if_recognised: "Urgent",
+      evidence: ["def456"]
+    },
+    { message_id: "def456", priority_if_recognised: "Low", evidence: [] },
+    { message_id: "def456", priority_if_recognised: "Low", evidence: ["aaa"] },
+    {
+      message_id: "def456",
+      priority_if_recognised: "Low",
+      evidence: ["def456", "def456"]
+    }
+  ])("ignores invalid or another message's baseline", (baseline) => {
+    const value = { ...access(), security_priority: baseline }
+    expect(securityBaseline(value)).toBeNull()
+    expect(recognitionLabels(value, true).priority).toBe("High")
+  })
+  it.each([
+    { source: "cache" },
+    { persisted: true },
+    { latest_incoming: null },
+    { source_message_ids: [] },
+    { status: "needs_review" },
+    {
+      latest_incoming: { message_id: "def456", timestamp_source: "header.Date" }
+    }
+  ])("requires the live source contract", (mutation) => {
+    expect(securityBaseline({ ...access(), ...mutation })).toBeNull()
   })
 })
 

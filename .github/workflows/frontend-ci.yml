@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/frontend' }}
 jobs:
   extension:
-    runs-on: ubuntu-latest
+    # Playwright 1.55.1 supports Noble; ubuntu-latest now resolves to 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

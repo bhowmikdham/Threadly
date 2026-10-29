@@ -6,7 +6,9 @@ import {
   cooldownCodes,
   priorityIcon,
   priorityTip,
+  recognitionLabels,
   replyIcon,
+  securityBaseline,
   validClassification,
   type Classification
 } from "../lib/classification"
@@ -15,8 +17,10 @@ import { inboxMarks } from "../lib/inbox-marks"
 import {
   DAY,
   possibleSecuritySubject,
+  securitySubjectAllowed,
   type Awareness,
-  type Recognition
+  type Recognition,
+  type SecurityStatus
 } from "../lib/security-awareness"
 
 export const config: PlasmoCSConfig = {
@@ -34,6 +38,7 @@ type Result = {
   attempts: number
   code?: string
   awareness?: Awareness | null
+  security?: SecurityStatus | null
 }
 const results = new Map<string, Result>()
 const threads = new Map<string, { thread: string; last: string }>()
@@ -111,7 +116,7 @@ function render(row: Element) {
     r?.state === "done" &&
     r.until > Date.now() &&
     r.value.status === "classified"
-      ? r.value.labels
+      ? recognitionLabels(r.value, r.security?.state === "recognised")
       : null
   const state = labels
     ? `${labels.priority}|${labels.needs_reply}|${labels.action}|${labels.category}|${preferences.words}`
@@ -238,12 +243,21 @@ async function classify(key: string, r: Result) {
   const provider = reply?.code === "classification_provider_unavailable"
   if (reply?.ok && validClassification(reply.data, threadId)) {
     providerTries.delete(key)
+    const security = reply.security
+    if (security && /^[a-f0-9]{64}$/.test(security.key)) {
+      const saved =
+        securityAcknowledgements.get(security.key) ||
+        (results.get(key)?.security?.key === security.key &&
+          results.get(key)?.security?.state)
+      if (saved) security.state = saved
+    }
     results.set(key, {
       state: "done",
       value: reply.data,
       until: Date.parse(reply.data.valid_until),
       attempts: 0,
-      awareness: reply.awareness
+      awareness: reply.awareness,
+      security
     })
     show(true)
   } else if (
@@ -359,6 +373,8 @@ function scan() {
     generation += 1
     results.clear()
     clearAwareness()
+    securityAcknowledgements.clear()
+    suppressedSecurityKeys.clear()
     queue.length = 0
     providerTries.clear()
     // The background still holds any server-side pause for the new account.
@@ -405,6 +421,8 @@ function applyPreferences(value: unknown, reset = false) {
     queue.length = 0
     results.clear()
     clearAwareness()
+    securityAcknowledgements.clear()
+    suppressedSecurityKeys.clear()
   }
   hideTooltip()
   scan()
@@ -415,7 +433,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     message?.type === "THREADLY_SECURITY_ACKED" &&
     /^[a-f0-9]{64}$/.test(message.key)
   ) {
-    suppressSecurityKey(message.key)
+    suppressSecurityKey(message.key, message.state)
+    hideTooltip()
     for (const row of onScreen) if (row.isConnected) render(row)
   }
   if (
@@ -524,13 +543,26 @@ document.head.append(style)
 // Email text remains in Gmail's DOM. Only the exact message reference and a
 // fixed recognition enum go to the protected background bridge.
 const suppressedSecurityKeys = new Set<string>()
-function suppressSecurityKey(key: string) {
+const securityAcknowledgements = new Map<string, Recognition>()
+function suppressSecurityKey(key: string, state?: Recognition) {
   suppressedSecurityKeys.add(key)
+  if (
+    ["recognised", "dismissed"].includes(state) &&
+    !securityAcknowledgements.has(key)
+  )
+    securityAcknowledgements.set(key, state)
+  if (securityAcknowledgements.size > 1000)
+    securityAcknowledgements.delete(
+      securityAcknowledgements.keys().next().value
+    )
   if (suppressedSecurityKeys.size > 1000)
     suppressedSecurityKeys.delete(suppressedSecurityKeys.values().next().value)
   // Forget the offer too: even an eventual bounded-memory eviction cannot re-prompt it.
-  for (const result of results.values())
+  for (const result of results.values()) {
     if (result.awareness?.key === key) result.awareness = null
+    if (result.security?.key === key && securityAcknowledgements.has(key))
+      result.security.state = securityAcknowledgements.get(key)
+  }
 }
 const SECURITY_GLOW_MS = 1400
 const SECURITY_REVEAL_MS = SECURITY_GLOW_MS + 160
@@ -649,7 +681,9 @@ function renderAwareness(row: Element, rowId: string, result?: Result) {
     awareness.receivedAt <= Date.now() &&
     awareness.receivedAt > Date.now() - DAY &&
     !suppressedSecurityKeys.has(awareness.key) &&
-    possibleSecuritySubject(subject)
+    securitySubjectAllowed(subject) &&
+    (possibleSecuritySubject(subject) ||
+      Boolean(securityBaseline(result.value)))
   if (!eligible) {
     existing?.remove()
     row.classList.remove("tl-security-row")
@@ -689,7 +723,9 @@ function renderAwareness(row: Element, rowId: string, result?: Result) {
   text.textContent = "Do you recognise this email?"
   const note = document.createElement("span")
   note.className = "tl-security-note"
-  note.textContent = "Subject cue · sender not verified"
+  note.textContent = possibleSecuritySubject(subject)
+    ? "Subject cue · sender not verified"
+    : "Possible account activity · sender not verified"
   const copy = document.createElement("span")
   copy.append(text, note)
   cue.append(copy)
@@ -740,7 +776,8 @@ function renderAwareness(row: Element, rowId: string, result?: Result) {
         /* No success indication until protected storage confirms. */
       }
       if (saved?.ok && saved.key === awareness.key) {
-        suppressSecurityKey(saved.key)
+        suppressSecurityKey(saved.key, saved.state)
+        hideTooltip()
         render(row)
         if (hadFocus && rowKey(row) === rowId)
           (row as HTMLElement).focus({ preventScroll: true })

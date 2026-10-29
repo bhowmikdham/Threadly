@@ -376,7 +376,11 @@ test("words, preview and reversible visibility work without reclassifying or cha
   await expect(
     settings.locator(".inbox-marks-sample-left .inbox-marks-hidden")
   ).toHaveCount(0)
+  // Settings is a separate foreground tab. Return to Gmail before exercising
+  // real keyboard input; DOM focus alone does not activate the browser tab.
+  await page.bringToFront()
   await left.focus()
+  await expect(left).toBeFocused()
   await expect(page.locator(".tl-tooltip")).toHaveText(
     "High priority · reply needed · Review"
   )

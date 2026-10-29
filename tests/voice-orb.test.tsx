@@ -3,7 +3,7 @@ import React from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { VoiceOrb } from "../components/VoiceOrb"
-import { spokenReply } from "../lib/spoken-reply"
+import { hasChoices, spokenReply } from "../lib/spoken-reply"
 
 // jsdom has no WebGL; the orb simply skips drawing.
 HTMLCanvasElement.prototype.getContext = (() => null) as any
@@ -115,10 +115,7 @@ describe("voice conversation", () => {
       )
       say("Check my inbox")
       await act(() => vi.advanceTimersByTimeAsync(1320))
-      expect(spoken).toEqual([
-        "Let me check that.",
-        "The email is in the chat."
-      ])
+      expect(spoken).toEqual(["The email is in the chat."])
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           path: "/voice/speak",
@@ -145,11 +142,7 @@ describe("voice conversation", () => {
     say("Thanks")
     await act(() => vi.advanceTimersByTimeAsync(1320))
     expect(container.querySelector(".voice-overlay.docked")).toBeNull()
-    expect(spoken).toEqual([
-      "Let me check that.",
-      "Choose an email.",
-      "You're welcome."
-    ])
+    expect(spoken).toEqual(["Choose an email.", "You're welcome."])
   })
   it("sends what was said after a pause, answers aloud, then listens again", async () => {
     const respond = vi.fn().mockResolvedValue("You have two new emails.")
@@ -160,7 +153,7 @@ describe("voice conversation", () => {
     expect(screen.queryByText("What's new in my inbox")).toBeNull()
     await act(() => vi.advanceTimersByTimeAsync(1300))
     expect(respond).toHaveBeenCalledWith("What's new in my inbox")
-    expect(spoken).toEqual(["Let me check that.", "You have two new emails."])
+    expect(spoken).toEqual(["You have two new emails."])
     await act(() => vi.advanceTimersByTimeAsync(20))
     expect(screen.getByRole("status").textContent).toBe("Listening…")
     expect(recognizer.start).toHaveBeenCalledTimes(2)
@@ -191,7 +184,7 @@ describe("voice conversation", () => {
     await act(() => vi.advanceTimersByTimeAsync(1300))
     expect(respond).toHaveBeenCalledTimes(1)
     await act(async () => answer("Here it is."))
-    expect(spoken).toEqual(["Let me check that.", "Here it is."])
+    expect(spoken).toEqual(["Here it is."])
   })
   it("the close button ends the conversation and stops speaking", () => {
     const onClose = vi.fn()
@@ -212,6 +205,23 @@ describe("voice conversation", () => {
 })
 
 describe("spoken replies", () => {
+  it.each([
+    { emailDraft: { draft_id: "text-draft", body: "Hi Alex" } },
+    {
+      artifacts: [
+        {
+          artifact: {
+            kind: "draft",
+            content: { mode: "reply", body: "Hi Alex" }
+          }
+        }
+      ]
+    }
+  ])("reveals a draft card in voice mode: %j", (value) => {
+    const entry = { id: "draft", instruction: "Draft a reply", ...value } as any
+    expect(hasChoices(entry)).toBe(true)
+    expect(spokenReply(entry)).toMatch(/drafted.*chat/)
+  })
   it("waits while the answer is on its way", () => {
     expect(spokenReply({ id: "1", instruction: "x", pending: true })).toBeNull()
     expect(

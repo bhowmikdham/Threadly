@@ -19,7 +19,7 @@ import {
   schedulingReadiness,
   type PreferencesState
 } from "./lib/scheduling-readiness"
-import { hasChoices, spokenReply } from "./lib/spoken-reply"
+import { hasChoices, hasReviewableDraft, spokenReply } from "./lib/spoken-reply"
 import type { Capability, User } from "./lib/types"
 import { useAssistant } from "./lib/use-assistant"
 
@@ -390,7 +390,19 @@ function Assistant({
   }
   // The mic opens voice mode: a spoken back-and-forth. Each thing the user
   // says is sent like a typed request, and Threadly's reply is read aloud.
-  const dictate = () => setRecording(true)
+  const voiceExistingDrafts = useRef(new Set<string>())
+  const dictate = () => {
+    voiceExistingDrafts.current = new Set(
+      c.entries.filter(hasReviewableDraft).map((entry) => entry.id)
+    )
+    setRecording(true)
+  }
+  // A completed draft remains exposed for this voice session, even after
+  // barge-in, a short acknowledgment, or the speech polling deadline.
+  const revealVoiceDraft = c.entries.some(
+    (entry) =>
+      !voiceExistingDrafts.current.has(entry.id) && hasReviewableDraft(entry)
+  )
   const entriesNow = useRef(c.entries)
   entriesNow.current = c.entries
   const busyNow = useRef(inputBusy)
@@ -419,6 +431,7 @@ function Assistant({
   }
   const newChat = async () => {
     if (permissionSaving) return
+    setRecording(false)
     await c.newChat()
     setHistory(null)
     setContextOpen(false)
@@ -1009,7 +1022,13 @@ function Assistant({
           Threadly can make mistakes. Review important details.
         </p>
       </div>
-      {recording && <VoiceOrb respond={voiceRespond} onClose={voiceDone} />}
+      {recording && (
+        <VoiceOrb
+          respond={voiceRespond}
+          onClose={voiceDone}
+          revealChat={revealVoiceDraft}
+        />
+      )}
     </>
   )
 }
