@@ -134,7 +134,7 @@ async def test_transient_provider_failure_retries_with_bounded_delay(monkeypatch
         )
     )
     with caplog.at_level(logging.WARNING, logger="threadly.conversation.provider"):
-        response = await engine.run({"user_turn": "hey"}, Runtime(), model)
+        response = await engine.run({"user_turn": "What can you help me with?"}, Runtime(), model)
     assert response["text"] == "Ready"
     assert model.calls == 2
     assert delays == [2.25]
@@ -155,7 +155,7 @@ async def test_terminal_provider_failure_does_not_retry_or_leak(monkeypatch, cap
     )
     with caplog.at_level(logging.WARNING, logger="threadly.conversation.provider"):
         with pytest.raises(ApiError) as raised:
-            await engine.run({"user_turn": "hey"}, Runtime(), model)
+            await engine.run({"user_turn": "What can you help me with?"}, Runtime(), model)
     assert model.calls == 1
     assert raised.value.code == "conversation_provider_unavailable"
     assert code not in raised.value.message
@@ -174,7 +174,7 @@ async def test_transient_failure_stops_after_three_attempts(monkeypatch):
         *(ConversationProviderError("ServiceUnavailableException") for _ in range(3))
     )
     with pytest.raises(ApiError) as raised:
-        await engine.run({"user_turn": "hey"}, Runtime(), model)
+        await engine.run({"user_turn": "What can you help me with?"}, Runtime(), model)
     assert raised.value.code == "conversation_provider_unavailable"
     assert model.calls == 3
     assert delays == [2, 4]
@@ -191,6 +191,6 @@ async def test_provider_retry_does_not_start_without_time_for_response(monkeypat
     monkeypatch.setattr(engine.random, "uniform", lambda _a, _b: 0)
     model = DecisionModel(ConversationProviderError("ModelNotReadyException"))
     with pytest.raises(ApiError) as raised:
-        await engine.run({"user_turn": "hey"}, Runtime(), model)
+        await engine.run({"user_turn": "What can you help me with?"}, Runtime(), model)
     assert raised.value.code == "conversation_provider_unavailable"
     assert model.calls == 1

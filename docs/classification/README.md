@@ -1,5 +1,8 @@
 # Email classification badge API
 
+Local candidate prompt 1.0.2 adds a source-bound recognition baseline for indirect account-access cues. **Not deployed or model-quality validated.** See [security recognition contract, tests and remaining gates](SECURITY-RECOGNITION.md).
+
+
 **Live backend handoff, 7 October 2026.** Claude Haiku 4.5 classification is deployed
 and enabled at `https://api.threadly.au` from `release/backend` commit `7b2c277`.
 [PR #105](https://github.com/bhowmikdham/Threadly/pull/105) contains the service.

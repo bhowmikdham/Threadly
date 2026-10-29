@@ -425,7 +425,9 @@ def prepare_reply(runtime, args):
 
 
 def require_prepared_reply(runtime, answer):
-    if incomplete(runtime) and answer.kind != "clarification":
+    if (
+        incomplete(runtime) or getattr(runtime, "source_reply_required", False)
+    ) and answer.kind != "clarification":
         raise MailRepair(
             "reply_preparation_incomplete",
             "Repair the pending reply preparation; do not substitute a prose draft or completion "

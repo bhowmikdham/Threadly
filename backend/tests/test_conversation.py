@@ -718,10 +718,11 @@ async def test_persistent_dialogue_encrypted_replay_no_duplicate_model(configure
         second_model = Model(tool("respond", kind="message", text="Ready to help."))
         await service.turn(1, r2, factory=db_sessionmaker, model=second_model)
     assert first["version"] == replay["version"] == 1
-    assert second_model.contexts[0]["recent_dialogue"][0]["assistant"] == "Hey!"
+    assert second_model.contexts[0]["recent_dialogue"][0]["assistant"] == first["text"]
+    assert model.contexts == []  # A plain greeting no longer needs model inference.
     async with db_sessionmaker() as session:
         row = await session.get(Conversation, r.conversation_id)
-        assert b"Hey!" not in row.state_enc
+        assert first["text"].encode() not in row.state_enc
         assert row.version == 2
         assert await session.scalar(select(func.count()).select_from(Message)) == 0
     restored = await service.get(1, r.conversation_id, db_sessionmaker)
@@ -1510,7 +1511,12 @@ async def test_context_clear_does_not_reuse_previous_pin(configured, db_sessionm
         state["refs"]["selected"] = {"thread_id": TID, "context_id": "old"}
         await store.complete(session, 1, r, lease, state, {"kind": "message", "text": "Hey"})
     r2 = r.model_copy(
-        update={"request_id": str(uuid4()), "expected_version": 1, "context_snapshot_id": None}
+        update={
+            "request_id": str(uuid4()),
+            "expected_version": 1,
+            "context_snapshot_id": None,
+            "instruction": "What can you help me with?",
+        }
     )
     model = Model(tool("respond", kind="message", text="Hello"))
     await service.turn(1, r2, factory=db_sessionmaker, model=model)
@@ -1528,6 +1534,7 @@ async def test_active_task_clear_does_not_reuse_previous_work(configured, db_ses
             "request_id": str(uuid4()),
             "expected_version": 1,
             "active_task_id": None,
+            "instruction": "What can you help me with?",
         }
     )
     model = Model(tool("respond", kind="message", text="Hello"))

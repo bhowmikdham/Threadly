@@ -94,6 +94,7 @@ def materialize(ref, source):
             {
                 "message_id": m["gmail_msg_id"],
                 "from_addr": m["from_addr"],
+                "is_from_user": m.get("is_from_user", False),
                 "sent_at": m["sent_at"],
                 "body": body,
             }

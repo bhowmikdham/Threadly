@@ -1,8 +1,8 @@
 {
   "policy_version": "1.0.0",
-  "prompt_sha256": "be4b86d2c66c264b84b7d95224ee82b3146da6bc90d61d0aab7c58c5226d5591",
+  "prompt_sha256": "9e7fd337a14c6c9cbb80b62a0c77fc99bd6279112e6d702f6479ac9705742253",
   "model_id": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
-  "model_evaluation": "synthetic_seed_cases_completed_not_production_acceptance",
+  "model_evaluation": "pending_no_paid_inference_authorized",
   "transport": "bedrock_flow",
   "comparison_transport": "bedrock_converse",
   "flow_release": "classification-flow-1.0.0",
@@ -120,6 +120,45 @@
         ],
         "title": "Labels",
         "type": "object"
+      },
+      "SecurityPriority": {
+        "additionalProperties": false,
+        "description": "Counterfactual priority only; never an authenticity or safety verdict.",
+        "properties": {
+          "source_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Source Id",
+            "type": "string"
+          },
+          "priority_if_recognised": {
+            "enum": [
+              "High",
+              "Low",
+              "Medium"
+            ],
+            "title": "Priority If Recognised",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_id",
+          "priority_if_recognised",
+          "evidence"
+        ],
+        "title": "SecurityPriority",
+        "type": "object"
       }
     },
     "additionalProperties": false,
@@ -169,6 +208,17 @@
         "minItems": 1,
         "title": "Reason Codes",
         "type": "array"
+      },
+      "security_priority": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SecurityPriority"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
       }
     },
     "required": [
@@ -181,5 +231,6 @@
     "type": "object"
   },
   "prompt_version": "1.0.1",
-  "evaluation_results": "results/prompt-1.0.1/"
+  "evaluation_results": "results/prompt-1.0.1/",
+  "prompt_revision": "1.0.2"
 }

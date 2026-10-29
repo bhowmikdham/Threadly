@@ -56,7 +56,11 @@ def observation(runtime, name, values, exc):
             "Continue only its actual goal_id; ask which draft if ambiguous. Do not guess an ID."
         )
     if reason == "source_bound_workflow_required":
-        message = "Use prepare_workflow for the source-based draft; preserve the read source."
+        message = (
+            "Read the selected email with read_email, scope=thread, then use prepare_workflow "
+            "with intent=reply for a reply request. Preserve its selected target and source; "
+            "do not use a standalone compose tool or invent a recipient from words like message."
+        )
     elif reason == "draft_artifact_required":
         message = "Use revise_draft or review_conversation_goal for the existing saved artifact."
     else:

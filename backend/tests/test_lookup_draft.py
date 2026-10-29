@@ -28,7 +28,7 @@ from tests.test_compound_workflows import capture, make_due, saved
 from tests.test_durable_tasks import mailbox
 
 __all__ = ["mailbox"]
-FIXTURE = json.loads((Path(__file__).parent / "fixtures/lookup_draft_v1.json").read_text())
+FIXTURE = json.loads((Path(__file__).parent / "fixtures/lookup_draft_v1.2.3.json").read_text())
 
 
 def test_pinned_lookup_contract_and_historical_summary_contract():
