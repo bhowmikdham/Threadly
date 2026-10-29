@@ -1,5 +1,12 @@
 # Natural voice conversation candidate
 
+Final local PostgreSQL acceptance supersedes the interrupted-run limitation below:
+the exact runtime at `bc81b1d63c166b0488c8ca7fb66d319eb2b19489` passed **2,504 tests,
+zero skips**, in484.78seconds after Docker recovered. Both disposable containers
+are confirmed absent, including the formerly uncertain container. The interrupted
+and offline results below remain historical evidence. Production/model acceptance
+is still required; see [release gates](../../release/voice-security-conversation.md).
+
 Release: `contextual-conversation-1.8.11+natural-voice.1`, based on the locally
 combined reply/security candidate. The JSON alongside this file freezes the prompt,
 tool configuration, social-policy identity and reply hash. Existing historical
